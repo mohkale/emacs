@@ -59,6 +59,8 @@ make emacs less like... emacs. use saner defaults and make emacs look nicer in g
         kill-whole-line              t ; kill-line includes eol
         help-window-select           t ; always
 
+        which-key-enable-extended-define-key t
+
         ; Always Use UTF8, NO CARRIAGE RETURNS
         ; this... might be overkill. see setq-default
         ;; coding-system-for-read  'utf-8-unix
@@ -306,7 +308,9 @@ make emacs less like... emacs. use saner defaults and make emacs look nicer in g
                         (join-path lsp-server-root
                                    "kotlin"
                                    "debugger"
-                                   "bin"))))
+                                   "bin")
+                        (join-path lsp-server-root
+                                   "haskell"))))
         (setq exec-path (append exec-path list)))
 
       ;; ensure some configured paths exist at startup
@@ -387,6 +391,7 @@ initialise installed packages and ensure packages needed to setup configuration 
 | evil-adjust      | 9ffe7fa12b561269aafb92eb86a2021b77ccc8d6620edc6c2fc22fbcc7d92cc2 | https://raw.githubusercontent.com/troyp/evil-adjust/master/evil-adjust.el            |
 | sqlite-dump      | 8277c32f3e9dad7f760b946609c918dd51f32990137f839a000fb6ff5a049939 | https://user42.tuxfamily.org/sqlite-dump/index.html                                  |
 | company-cmake    | 4d682308eb4f6a4be92a4b7dcb2d181b5c26b4337799de0a308969d8babef0a2 | https://raw.githubusercontent.com/purcell/company-cmake/master/company-cmake.el      |
+| transpose-frame  | a40264a07b25d2c1d8d1be341d42952329d1bbfab8c23100904627fef4f4c7b8 | https://www.emacswiki.org/emacs/download/transpose-frame.el                          |
 
 #+begin_src emacs-lisp :var package-list=non-melpa-packages
   (defun external-packages/download-external-package (url dest-path)
@@ -471,7 +476,7 @@ initialise installed packages and ensure packages needed to setup configuration 
     "C-S-<tab>"       'previous-buffer
     "C-<iso-lefttab>" 'previous-buffer
     "RET"             'newline-and-indent
-    "<C-return>"      'comment-indent-new-line)
+    "<C-M-return>"      'comment-indent-new-line)
 
   (setq mohkale-window-map (make-sparse-keymap))
 
@@ -535,7 +540,7 @@ replicate some +basically all+ the built in spacemacs leader features & keys... 
   (defvar mohkale-norm-states (seq-filter (lambda (x) (not (member x mohkale-nnorm-states))) mohkale-evil-states)
     "all the known evil states which do inherit from normal mode")
 
-  (defvar mohkale-major-mode-leader-key-states '(normal visual emacs)
+  (defvar mohkale-major-mode-leader-key-states '(normal visual)
     (format "evil states under which %s can be used to jump to the major modes leader map."
             mohkale-major-mode-leader-key))
 
@@ -765,13 +770,13 @@ replicate some +basically all+ the built in spacemacs leader features & keys... 
     "aC" 'calc-dispatch
     "ac" 'calendar
     "ad" 'ido-dired
-    "ap" 'package-list-packages
+    "ae" 'package-list-packages
     "af" 'list-faces-display
     "am" 'man
-    "aP" 'proced
-    "a:" 'list-processes
+    "a:" 'proced
+    "ap" 'list-processes
     "au" 'undo-tree-visualize
-    "ax" 'customize)
+    "aX" 'customize)
 #+end_src
 
 *** buffers
@@ -1205,6 +1210,13 @@ replicate some +basically all+ the built in spacemacs leader features & keys... 
   (defun mohkale//hide-trailing-whitespace ()
     (when (derived-mode-p 'inf-ruby-mode
                           'messages-buffer-mode
+                          'image-dired-thumbnail-mode
+                          'help-mode
+                          'diff-mode
+                          'dashboard-mode
+                          'sql-interactive-mode
+                          'eshell-mode
+                          'comint-mode
                           'Buffer-menu-mode)
       (setq show-trailing-whitespace nil)))
 
@@ -2081,7 +2093,8 @@ an amazing mode line... needs to be initialised before all others to make sure e
       "gk" 'evil-previous-visual-line)
 
     (general-define-key
-      :states '(normal insert emacs)
+      :keymaps 'global-map
+      :states '(normal insert)
       "C-k"   'evil-join-backwards
       "C-M-k" 'evil-join-backwards)
 
@@ -2125,8 +2138,8 @@ an amazing mode line... needs to be initialised before all others to make sure e
            ("n" . evil-window-next)
            ("p" . evil-window-previous)
 
-           ("1" . evil-window-top-left)
-           ("z" . evil-window-top-right)
+           ("C-1" . evil-window-top-left)
+           ("C-0" . evil-window-bottom-right)
 
            ;; ("u" . evil-window-rotate-upwards)
            ;; ("i" . evil-window-rotate-downwards)
@@ -2283,7 +2296,30 @@ an amazing mode line... needs to be initialised before all others to make sure e
     :commands (buf-move-up
                buf-move-down
                buf-move-left
-               buf-move-right)
+               buf-move-right
+               rotate-windows)
+    :config
+    ;; https://www.emacswiki.org/emacs/TransposeWindows
+    (defun rotate-windows (arg)
+      "Rotate your windows; use the prefix argument to rotate the other direction"
+      (interactive "P")
+      (if (not (> (count-windows) 1))
+          (message "You can't rotate a single window!")
+        (let* ((rotate-times (prefix-numeric-value arg))
+               (direction (if (or (< rotate-times 0) (equal arg '(4)))
+                              'reverse 'identity)))
+          (dotimes (_ (abs rotate-times))
+            (dotimes (i (- (count-windows) 1))
+              (let* ((w1 (elt (funcall direction (window-list)) i))
+                     (w2 (elt (funcall direction (window-list)) (+ i 1)))
+                     (b1 (window-buffer w1))
+                     (b2 (window-buffer w2))
+                     (s1 (window-start w1))
+                     (s2 (window-start w2))
+                     (p1 (window-point w1))
+                     (p2 (window-point w2)))
+                (set-window-buffer-start-and-point w1 b2 s2 p2)
+                (set-window-buffer-start-and-point w2 b1 s1 p1)))))))
     :bind (:map mohkale-window-map
            ("H"   . 'buf-move-left)
            ("M-h" . 'buf-move-left)
@@ -2446,6 +2482,141 @@ an amazing mode line... needs to be initialised before all others to make sure e
       "m"  'diary-mark-entries
       "s"  'diary-show-all-entries))
 #+end_src
+*** comint - command interpreter
+#+begin_src emacs-lisp
+  (use-package comint
+    :defer t
+    :hook ((comint-mode . (lambda () (setq-local evil-emacs-state-cursor 'bar)))
+           ;; (comint-mode . blink-cursor-mode)
+           )
+    :config
+    (evil-set-initial-state 'comint-mode 'emacs)
+
+    (setq comint-mode-map (make-sparse-keymap) ;; reset all
+          comint-prompt-read-only t)
+
+    (defun comint-bol-point (&optional arg)
+      (save-excursion
+        (comint-bol arg)
+        (point)))
+
+    (defmacro comint-clamp-point-to-bol (&rest body)
+      "ensures any operation done by body doesn't move point
+  to before the command interpreter prompt."
+      `(let ((bol (comint-bol-point)))
+         ,@body ;; run body operations
+
+         (when (< (point) bol)
+           (goto-char bol))))
+
+    (defun comint-backward-char (&optional N)
+      (interactive "P")
+      (comint-clamp-point-to-bol (backward-char N)))
+
+    (defun comint-backward-word (&optional N)
+      (interactive "P")
+      (comint-clamp-point-to-bol (backward-word N)))
+
+    (defun comint-on-prompt-line-p ()
+      (interactive)
+      (save-excursion
+        (let ((point (point))
+              (current-line (what-line)))
+          (goto-char (comint-bol-point))
+          (string-equal (what-line) current-line))))
+
+    ;; TODO support prefix arg
+    (defun comint-previous-input-or-previous-line ()
+      (interactive)
+      (if (comint-on-prompt-line-p)
+          (call-interactively 'comint-previous-input)
+        (comint-clamp-point-to-bol
+         (previous-line))))
+
+    (defun comint-next-input-or-next-line ()
+      (interactive)
+      (if (eobp)
+          (call-interactively 'comint-next-input)
+        (next-line)))
+
+    ;; TODO ensure history shifts maintain correct cursor position
+    ;; (advice-add 'comint-previous-input :after 'comint-bol)
+    ;; (advice-add 'comint-next-input     :after 'end-of-buffer)
+
+    (general-define-key
+      :keymaps 'comint-mode-map
+      "RET" 'comint-send-input
+      "<M-return>" 'comint-accumulate
+      "<delete>" 'delete-forward-char
+      "<C-delete>" 'backward-kill-word
+      "<M-delete>" 'comint-delchar-or-maybe-eof ;; forward
+      "<C-M-delete>" 'kill-word                 ;; forward
+      "<mouse-2>" 'comint-insert-input
+
+      "C-w" 'backward-kill-word ;; this kills me :(
+      "M-w" 'kill-word
+      "C-S-w" mohkale-window-map
+      "C-M-w" mohkale-window-map
+      "M-l" 'recenter-top-bottom
+      "C-M-l" 'comint-show-output
+
+      "C-a" 'comint-bol-or-process-mark
+      "C-e" 'end-of-buffer       ;; 'end-of-line
+      "C-M-k" 'comint-kill-input ;; whole line
+      "C-r" 'comint-history-isearch-backward-regexp
+      "M-r" 'comint-dynamic-list-input-ring ;; TODO use ivy
+
+      "C-<left>"  'backward-word
+      "C-<up>"    'comint-previous-input
+      "C-<down>"  'comint-next-input
+      "C-<right>" 'forward-word
+
+      "<left>"    'backward-char
+      "<up>"      'comint-previous-input-or-previous-line
+      "<down>"    'comint-next-input-or-next-line
+      "<right>"   'forward-char
+
+      "C-h"       'backward-char
+      "C-j"       'comint-next-input-or-next-line
+      "C-k"       'comint-previous-input-or-previous-line
+      "C-l"       'forward-char
+
+      "C-S-j"     'comint-next-matching-input-from-input
+      "C-S-k"     'comint-previous-matching-input-from-input
+
+      "C-M-l"     'forward-word
+      "C-M-h"     'backward-word
+
+      "M-j" 'comint-next-prompt
+      "M-k" 'comint-previous-input
+
+      ;; "<remap> <forward-char>"  'comint-forward-char
+      "<remap> <backward-char>" 'comint-backward-char
+      ;; "<remap> <forward-word>"  'comint-forward-word
+      "<remap> <backward-word>" 'comint-backward-word
+
+      "C-c C-c" 'comint-clear-buffer
+      "C-c C-x" 'comint-get-next-from-history)
+
+    (mohkale/declare-prefix-for-major-mode* 'comint-mode
+      "k" "kill"
+      "s" "subjob")
+
+    (mohkale/set-leader-keys-for-major-mode 'comint-mode
+      "kz" 'comint-send-eof
+      "*" 'comint-insert-previous-argument
+      "r" 'comint-dynamic-list-input-ring
+      "m" 'comint-clear-buffer
+      "M" 'comint-show-maximum-output
+      "x" 'comint-get-next-from-history
+      "RET" 'comint-copy-old-input ;; copy text before cursor
+      ">" 'comint-write-output
+      "t" 'comint-show-output
+      "o" 'comint-delete-output
+      "ss" 'comint-stop-subjob
+      "sq" 'comint-quit-subjob
+      "si" 'comint-interrupt-subjob))
+#+end_src
 *** command-log
 #+begin_src emacs-lisp
   (use-package command-log-mode
@@ -2565,14 +2736,12 @@ an amazing mode line... needs to be initialised before all others to make sure e
                                        nil))
                                    bindings)))
       (defun mohkale/unset-company-bindings (&rest args)
-        (message "unbinding company keys")
         (apply 'general-define-key
                :keymaps 'override
                :states  'insert
                unset-bindings))
 
       (defun mohkale/set-company-bindings (&rest args)
-        (message "binding company keys")
         (apply 'general-define-key
                :keymaps 'override
                :states  'insert
@@ -2816,8 +2985,6 @@ a random icon from the following table will be chosen at startup and used for th
 
       (setq dashboard-footer (car (nth (random (1- (1+ (length dashboard-quotes)))) dashboard-quotes))))
 
-    (add-hook 'dashboard-mode-hook (lambda () (setq show-trailing-whitespace nil)))
-
     (add-hook 'emacs-startup-hook (lambda ()
       ;; in hook because theme & powerline get weird
       (let ((loaded-packages (mohkale/get-loaded-packages)))
@@ -3039,7 +3206,6 @@ a random icon from the following table will be chosen at startup and used for th
 
   (use-package image-dired
     :defer t
-    :hook (image-dired-thumbnail-mode . mohkale//hide-trailing-whitespace)
     :config
     ;;; fixed weird moves line, not thumbnail
     (defun image-dired-slideshow-step ()
@@ -3692,7 +3858,7 @@ a random icon from the following table will be chosen at startup and used for th
       "hd" 'counsel-pydoc))
 #+end_src
 **** counsel-ggtags
-#+begin_src emacs-lisp :tangle yes
+#+begin_src emacs-lisp
   (use-package counsel-gtags
     :ensure t
     :defer  t
@@ -3743,11 +3909,6 @@ show recently accessed commands at the top of M-x.
   (use-package smex
     :ensure t
     :defer  t)
-#+end_src
-*** help
-#+begin_src emacs-lisp
-  (use-package help-mode
-    :hook (help-mode . mohkale//hide-trailing-whitespace))
 #+end_src
 *** htmlize
 #+begin_src emacs-lisp
@@ -3878,15 +4039,18 @@ show recently accessed commands at the top of M-x.
 #+end_src
 
 **** server-installation-utils
+:PROPERTIES:
+:header-args+: :tangle no
+:END:
 usefull methods & variables to assist in the installation of scripts.
 
 #+NAME: server-install-path
-#+begin_src emacs-lisp :tangle no
-(message (expand-file-name "~/.emacs.d/var/lsp/servers"))
+#+begin_src emacs-lisp :results value
+  (expand-file-name "~/.emacs.d/var/lsp/servers")
 #+end_src
 
-#+NAME: print_banner
-#+begin_src emacs-lisp :var text="" width=80 char="@" :tangle no
+#+NAME: set_shell_banner
+#+begin_src emacs-lisp :var varname="BANNER" text="" width=80 char="@" :results value
   (let* ((text-width (length text))
          (width (max width
                      (+ 4 text-width)))
@@ -3894,58 +4058,45 @@ usefull methods & variables to assist in the installation of scripts.
                                      (string-to-char char)))
          (pad-width (/ (- width 4 text-width)
                        2))
-         (pad-string (make-string pad-width ? )))
-    (message (concat
-              header-string
+         (pad-string (make-string pad-width ? ))
 
-              "\n"
-              char
-              " "
-              (unless (zerop (% text-width 2))
-                " ")
-              pad-string
-              text
-              pad-string
-              " "
-              char
-              "\n"
-
-              header-string)))
+         (banner (concat "\n"
+                         char
+                         " "
+                         (unless (zerop (% text-width 2))
+                           " ")
+                         pad-string
+                         text
+                         pad-string
+                         " "
+                         char
+                         "\n")))
+    (format "%s='\n%s\n'"
+            varname
+            (concat header-string
+                    banner
+                    header-string)))
 #+end_src
 
 **** server-installation-scripts
 ***** kotlin-language-server
-#+begin_src bash :tangle "~/.emacs.d/bin/install/kotlin-language-server.sh" :shebang #!/usr/bin/bash
-  INSTALLATION_ALREADY_DONE_BANNER='
-  <<print_banner(text="kotlin language server already installed",char="#")>>
-  '
+:PROPERTIES:
+:header-args+: :tangle ~/.emacs.d/bin/install/kotlin-language-server.sh
+:END:
 
-  CLONING_LANGUAGE_SERVER_BANNER='
-  <<print_banner(text="cloning fwcd/kotlin-language-server",char="#")>>
-  '
-
-  CLONING_FAILED_BANNER='
-  <<print_banner(text="failed to clone repository, program terminated",char="*")>>
-  '
-
-  CLONING_ALREADY_DONE_BANNER='
-  <<print_banner(text="fwcd/kotlin-language-server already cloned",char="#")>>
-  '
-
-  RUNNING_GRADLE_BUILD_BANNER='
-  <<print_banner(text="running gradle build process",char="#")>>
-  '
-
-  GRADLE_BUILD_FAILED_BANNER='
-  <<print_banner(text="failed to build kotlin language server",char="*")>>
-  '
-
-  FINISHED_BANNER='
-  <<print_banner(text="finished installing the kotlin language server",char="*")>>
-  '
+#+begin_src bash :shebang #!/usr/bin/bash
+  <<set_shell_banner(varname="INSTALLATION_ALREADY_DONE_BANNER",text="kotlin language server already installed",char="#")>>
+  <<set_shell_banner(varname="CLONING_LANGUAGE_SERVER_BANNER",text="cloning fwcd/kotlin-language-server",char="#")>>
+  <<set_shell_banner(varname="CLONING_FAILED_BANNER",text="failed to clone repository, program terminated",char="*")>>
+  <<set_shell_banner(varname="CLONING_ALREADY_DONE_BANNER",text="fwcd/kotlin-language-server already cloned",char="#")>>
+  <<set_shell_banner(varname="RUNNING_GRADLE_BUILD_BANNER",text="running gradle build process",char="#")>>
+  <<set_shell_banner(varname="GRADLE_BUILD_FAILED_BANNER",text="failed to build kotlin language server",char="*")>>
+  <<set_shell_banner(varname="FINISHED_BANNER",text="finished installing the kotlin language server",char="*")>>
 
   DEST_PATH="<<server-install-path()>>/kotlin"
+#+end_src
 
+#+begin_src bash
   if [ -f "${DEST_PATH}/bin/kotlin-language-server" ]; then
       echo "${INSTALLATION_ALREADY_DONE_BANNER}"
   else
@@ -3979,37 +4130,23 @@ usefull methods & variables to assist in the installation of scripts.
   fi
 #+end_src
 ***** kotlin-debug-adapter
-#+begin_src bash :tangle "~/.emacs.d/bin/install/kotlin-debug-adapter.sh" :shebang #!/usr/bin/bash
-  INSTALLATION_ALREADY_DONE_BANNER='
-  <<print_banner(text="kotlin debug adapter already installed",char="#")>>
-  '
+:PROPERTIES:
+:header-args+: :tangle ~/.emacs.d/bin/install/kotlin-debug-adapter.sh
+:END:
 
-  CLONING_DEBUG_ADAPTER_BANNER='
-  <<print_banner(text="cloning fwcd/kotlin-debug-adapter",char="#")>>
-  '
-
-  CLONING_FAILED_BANNER='
-  <<print_banner(text="failed to clone repository, program terminated",char="*")>>
-  '
-
-  CLONING_ALREADY_DONE_BANNER='
-  <<print_banner(text="fwcd/kotlin-debug-adapter already cloned",char="#")>>
-  '
-
-  RUNNING_GRADLE_BUILD_BANNER='
-  <<print_banner(text="running gradle build process",char="#")>>
-  '
-
-  GRADLE_BUILD_FAILED_BANNER='
-  <<print_banner(text="failed to build kotlin debug adapter",char="*")>>
-  '
-
-  FINISHED_BANNER='
-  <<print_banner(text="finished installing the kotlin debug adapter",char="*")>>
-  '
+#+begin_src bash :shebang #!/usr/bin/bash
+  <<set_shell_banner(varname="INSTALLATION_ALREADY_DONE_BANNER",text="kotlin debug adapter already installed",char="#")>>
+  <<set_shell_banner(varname="CLONING_DEBUG_ADAPTER_BANNER",text="cloning fwcd/kotlin-debug-adapter",char="#")>>
+  <<set_shell_banner(varname="CLONING_FAILED_BANNER",text="failed to clone repository, program terminated",char="*")>>
+  <<set_shell_banner(varname="CLONING_ALREADY_DONE_BANNER",text="fwcd/kotlin-debug-adapter already cloned",char="#")>>
+  <<set_shell_banner(varname="RUNNING_GRADLE_BUILD_BANNER",text="running gradle build process",char="#")>>
+  <<set_shell_banner(varname="GRADLE_BUILD_FAILED_BANNER",text="failed to build kotlin debug adapter",char="*")>>
+  <<set_shell_banner(varname="INISHED_BANNER",text="finished installing the kotlin debug adapter",char="*")>>
 
   DEST_PATH="<<server-install-path()>>/kotlin/debugger"
+#+end_src
 
+#+begin_src bash
   if [ -f "${DEST_PATH}/bin/kotlin-debug-adapter" ]; then
       echo "${INSTALLATION_ALREADY_DONE_BANNER}"
   else
@@ -4042,6 +4179,68 @@ usefull methods & variables to assist in the installation of scripts.
       echo "${FINISHED_BANNER}"
   fi
 #+end_src
+
+***** haskell-ide-engine
+:PROPERTIES:
+:header-args+: :tangle ~/.emacs.d/bin/install/haskell-ide-engine.sh
+:END:
+
+if your install fails with exit code 251, you're computer ran out of memory during the install process. Simply close all running programs and try again. Warning: install can take upto an hour and over 3 GB of RAM.
+
+#+begin_src bash :shebang #!/usr/bin/bash
+  <<set_shell_banner(varname="INSTALLATION_ALREADY_DONE_BANNER",text="haskell IDE engine already installed",char="#")>>
+  <<set_shell_banner(varname="CLONING_LANGUAGE_SERVER_BANNER",text="cloning haskell/haskell-ide-engine",char="#")>>
+  <<set_shell_banner(varname="CLONING_FAILED_BANNER",text="failed to clone repository, program terminated",char="*")>>
+  <<set_shell_banner(varname="CLONING_ALREADY_DONE_BANNER",text="haskell/haskell-ide-engine already cloned",char="#")>>
+  <<set_shell_banner(varname="RUNNING_CABAL_INSTALL_BANNER",text="running cabal installer, you may wish to free some RAM",char="#")>>
+  <<set_shell_banner(varname="CABAL_INSTALL_FAILED_BANNER",text="failed to build haskell IDE engine",char="*")>>
+  <<set_shell_banner(varname="FAILED_TO_MOVE_AFTER_INSTALL_BANNER",text="could not find stack install directory for server move",char="*")>>
+  <<set_shell_banner(varname="FINISHED_BANNER",text="finished installing the haskell IDE engine",char="*")>>
+
+  DEST_PATH="<<server-install-path()>>/haskell"
+#+end_src
+
+#+begin_src bash
+  BUILD_TARGET="stack-hie-8.6.5"
+
+  if [ -f "${DEST_PATH}/hie.exe" -o -f "${DEST_PATH}/hie" ]; then
+      echo "${INSTALLATION_ALREADY_DONE_BANNER}"
+  else
+      mkdir -p "${DEST_PATH}"
+      pushd "${DEST_PATH}"
+
+      CLONE_PATH="./.hie"
+      if [ ! -d "${CLONE_PATH}/.git" ]; then
+          echo "${CLONING_LANGUAGE_SERVER_BANNER}"
+
+          if ! git clone "https://github.com/haskell/haskell-ide-engine" "${CLONE_PATH}" --recurse-submodules; then
+              echo "${CLONING_FAILED_BANNER}"
+              exit 1
+          fi
+      else
+          echo "${CLONING_ALREADY_DONE_BANNER}"
+      fi
+
+      echo "${RUNNING_CABAL_INSTALL_BANNER}"
+
+      pushd "${CLONE_PATH}"
+      if ! cabal v2-run ./install.hs --project-file install/shake.project -j1 --ghc-options="+RTS -M600M" "${BUILD_TARGET}"; then
+          echo "${CABAL_INSTALL_FAILED_BANNER}"
+          exit 2
+      fi
+      popd
+
+      INSTALL_PATH="$(stack path --local-bin)"
+      if [ $? -eq 0 ]; then
+          find "${INSTALL_PATH}/" -maxdepth 1 -iname 'hie*' -print0 | xargs -0 -i% mv % ./
+          rm -rf "${CLONE_PATH}"
+          echo "${FINISHED_BANNER}"
+      else
+          echo "${FAILED_TO_MOVE_AFTER_INSTALL_BANNER}"
+      fi
+  fi
+#+end_src
+
 *** magit
 #+begin_src emacs-lisp
 (use-package magit
@@ -4607,8 +4806,6 @@ needs to be loaded after ivy and projectile, including the init function.
 #+end_src
 *** server
 #+begin_src emacs-lisp
-  ;; For some reason, server-running-p isn't defined
-  ;; until a server is run? WTF!!! :P
   (require 'server)
 
   (unless (server-running-p)
@@ -4728,6 +4925,28 @@ highlights hex color strings in their appropriate color. keep it around... thoug
     :defer t
     :delight " ~")
 #+end_src
+*** transpose-frame
+#+begin_src emacs-lisp
+  (use-package transpose-frame
+    :defer t
+    :commands (transpose-frame
+               flip-frame
+               flop-frame ;; flip horizontally
+               rotate-frame ;; 180 degrees
+               rotate-frame-clockwise ;; 90 degrees
+               rotate-frame-anti-clockwise ;; 90 degrees
+               )
+    :bind (:map mohkale-window-map
+           ("C-t" . transpose-frame)
+           ("t" . transpose-frame)
+           ("(" . rotate-frame-clockwise)
+           (")" . rotate-frame-anti-clockwise)
+           ("*" . rotate-frame)
+           ("C-f" . flip-frame)
+           ("f" . flip-frame)
+           ("C-S-F" . flop-frame)
+           ("F" . flop-frame)))
+#+end_src
 *** undo-tree
 #+begin_src emacs-lisp
   (use-package undo-tree
@@ -4834,6 +5053,42 @@ highlights hex color strings in their appropriate color. keep it around... thoug
     (push '((nil . "winum-select-window-[1-9]") . t) which-key-replacement-alist)
 
     (winum-mode))
+#+end_src
+*** xref
+#+begin_src emacs-lisp
+  (use-package xref
+    :defer t
+    :commands (xref-find-definitions
+               xref-find-apropos
+               xref-find-definitions-other-window
+               xref-find-definitions-other-frame
+               xref-pop-marker-stack
+               xref-find-references
+
+               ;; xref buffer commands
+               xref-next-line
+               xref-prev-line
+               xref-goto-xref
+               xref-show-location-at-point ;; open new window
+               xref-query-replace-in-results ;; substitute
+               xref-quit-and-goto-xref
+               xref-quit)
+    :init
+    (mohkale/declare-prefix "ax" "xref")
+
+    (mohkale/set-leader-keys
+      "axx" 'xref-find-references
+      "axX" 'xref-find-definitions
+      "ax/" 'xref-find-apropos
+      "axw" 'xref-find-definitions-other-window
+      "axf" 'xref-find-definitions-other-frame
+      "ax SPC" 'xref-pop-marker-stack)
+    :bind (;; erase global xref bindings
+           ("M-." . nil)   ; xref-find-definitions
+           ("M-," . nil)   ; xref-pop-marker-stack
+           ("M-?" . nil)   ; xref-find-references
+           ("C-M-." . nil) ; xref-find-apropos
+           ))
 #+end_src
 *** yasnippet
    yet another snippets tool... but amazingly powerful. :-P
@@ -5034,7 +5289,7 @@ highlights hex color strings in their appropriate color. keep it around... thoug
   (use-package paredit
     :ensure t
     :defer  t
-    :hook ((emacs-lisp-mode . paredit-mode))
+    :hook (emacs-lisp-mode . paredit-mode)
     :init
     (add-hook 'emacs-lisp-mode-hook #'electric-pair-mode)
     :config
@@ -5065,8 +5320,6 @@ highlights hex color strings in their appropriate color. keep it around... thoug
       ;; "C-h" 'backward-char
       ;; "C-l" 'forward-char
       "C-j" 'paredit-newline
-      "M-h" 'paredit-backward
-      "M-l" 'paredit-forward
       "C-M-h" 'paredit-backward
       "C-M-l" 'paredit-forward
       "C-<left>" 'paredit-backward
@@ -5074,17 +5327,17 @@ highlights hex color strings in their appropriate color. keep it around... thoug
 
       ;; transformation
       ;;; kill or wrap surrounding parentheses
-      "M-k" 'paredit-splice-sexp
-      "M-j" 'paredit-wrap-round
+      "C-S-K" 'paredit-splice-sexp
+      "C-S-J" 'paredit-wrap-round
       ;;; include previous or next arguments in current sexp
-      "M-h" 'paredit-backward-slurp-sexp
-      "M-l" 'paredit-forward-slurp-sexp
+      "C-S-H" 'paredit-backward-slurp-sexp
+      "C-S-L" 'paredit-forward-slurp-sexp
       ;;; exclude previous or next arguments from current sexp
-      "M-H" 'paredit-backward-barf-sexp
-      "M-L" 'paredit-forward-barf-sexp
+      "C-M-S-H" 'paredit-backward-barf-sexp
+      "C-M-S-L" 'paredit-forward-barf-sexp
 
-      "M-S" 'paredit-split-sexp
-      "M-J" 'paredit-join-sexps
+      "C-S-S" 'paredit-split-sexp
+      "C-S-J" 'paredit-join-sexps
 
       ;; ;; splice next argument after point, deleting
       ;; ;; arguments both before and after it
@@ -5140,35 +5393,37 @@ highlights hex color strings in their appropriate color. keep it around... thoug
        (eval-replace-last-sexp prefix)
        (message nil))
 
-   ;;   (defun elisp-transcript ()
-   ;;     ;; source https://www.emacswiki.org/emacs/LispInteractionMode
-   ;;     "Make an Emacs Lisp interactive transcript.
-   ;; In a new buffer, make a transcript of the Emacs Lisp code by
-   ;; evaluating each line and printing the result under it (/a la/
-   ;;   TODO fix last sexp in the buffer isn't transcripted
-   ;;   `eval-print-last-sexp')."
-   ;;     (interactive)
-   ;;     (let* ((eval-expression-print-length nil)
-   ;;            (eval-expression-print-level nil)
-   ;;            (input-buffer (current-buffer))
-   ;;            (dest-buffer (get-buffer-create (concat "*Transcript for "
-   ;;                                                    (buffer-name input-buffer)
-   ;;                                                    "*"))))
-   ;;       (save-current-buffer
-   ;;         (set-buffer dest-buffer)
-   ;;         (lisp-interaction-mode)
-   ;;         (delete-region (point-min) (point-max))
-   ;;         (insert-buffer-substring input-buffer) ;; `slurp!'
-   ;;         (goto-char (point-min))
-   ;;         (forward-sexp 1)
-   ;;         (while (> (point-max) (point))
-   ;;           (condition-case err
-   ;;               (evil-adjust-eval-print-last-sexp)
-   ;;             (error
-   ;;              (insert (format "%s" err))
-   ;;              (newline)))
-   ;;           (forward-sexp 1)))
-   ;;       (display-buffer dest-buffer)))
+     (evil-set-initial-state 'inferior-emacs-lisp-mode 'emacs)
+
+     ;;   (defun elisp-transcript ()
+     ;;     ;; source https://www.emacswiki.org/emacs/LispInteractionMode
+     ;;     "Make an Emacs Lisp interactive transcript.
+     ;; In a new buffer, make a transcript of the Emacs Lisp code by
+     ;; evaluating each line and printing the result under it (/a la/
+     ;;   TODO fix last sexp in the buffer isn't transcripted
+     ;;   `eval-print-last-sexp')."
+     ;;     (interactive)
+     ;;     (let* ((eval-expression-print-length nil)
+     ;;            (eval-expression-print-level nil)
+     ;;            (input-buffer (current-buffer))
+     ;;            (dest-buffer (get-buffer-create (concat "*Transcript for "
+     ;;                                                    (buffer-name input-buffer)
+     ;;                                                    "*"))))
+     ;;       (save-current-buffer
+     ;;         (set-buffer dest-buffer)
+     ;;         (lisp-interaction-mode)
+     ;;         (delete-region (point-min) (point-max))
+     ;;         (insert-buffer-substring input-buffer) ;; `slurp!'
+     ;;         (goto-char (point-min))
+     ;;         (forward-sexp 1)
+     ;;         (while (> (point-max) (point))
+     ;;           (condition-case err
+     ;;               (evil-adjust-eval-print-last-sexp)
+     ;;             (error
+     ;;              (insert (format "%s" err))
+     ;;              (newline)))
+     ;;           (forward-sexp 1)))
+     ;;       (display-buffer dest-buffer)))
 
      (dolist (mode '(emacs-lisp-mode lisp-interaction-mode))
        (mohkale/declare-prefix-for-major-mode* mode
@@ -5310,6 +5565,11 @@ highlights hex color strings in their appropriate color. keep it around... thoug
   (use-package python
     :defer t
     :hook (python-mode . flycheck-mode)
+    :commands (python-mode
+               run-python)
+    :init
+    (defalias 'python-repl 'run-python)
+    (evil-set-initial-state 'inferior-python-mode 'emacs)
     :config
     (mohkale/declare-prefix-for-major-mode* 'python-mode
       "n" '("navigate" . "move-point")
@@ -5438,6 +5698,7 @@ highlights hex color strings in their appropriate color. keep it around... thoug
                inf-ruby-console-hanami
                inf-ruby-console-default)
     :init
+    (defalias 'ruby-repl 'inf-ruby)
     (mohkale/declare-prefix-for-major-mode 'enh-ruby-mode "r" "REPL")
     (mohkale/set-leader-keys-for-major-mode 'enh-ruby-mode
       "rr" 'inf-ruby
@@ -6189,6 +6450,7 @@ Yes, org mode is it's own language. Even if you don't think it is, it is :P
     :init
     (setq sql-sqlite-options '("-interactive"))
     (push (cons "\\.json$" 'sql-mode) auto-mode-alist)
+    (evil-set-initial-state 'sql-interactive-mode 'emacs)
     :config
     ;; see [here](https://truongtx.me/2014/08/23/setup-emacs-as-an-sql-database-client)
     ;; for a guide on how to make quick database access easier. or if you've already got
@@ -6208,7 +6470,11 @@ Yes, org mode is it's own language. Even if you don't think it is, it is :P
       "er" 'sql-send-region
       "es" 'sql-send-string
       "ll" 'sql-list-all
-      "lt" 'sql-list-table))
+      "lt" 'sql-list-table)
+
+    (mohkale/set-leader-keys-for-major-mode 'sql-interactive-mode
+      "t" 'sql-list-table
+      "a" 'sql-list-all))
 
 #+end_src
 **** sqlup
@@ -6612,6 +6878,31 @@ disabled because it requires helm
       (mohkale/set-leader-keys-for-major-mode mode
         "D" 'disaster)))
 #+end_src
+*** kotlin
+#+begin_src emacs-lisp
+  (use-package kotlin-mode
+    :ensure t
+    :defer  t
+    :hook (kotlin-mode . lsp)
+    :commands (kotlin-mode
+               kotlin-repl)
+    :config
+    (setq kotlin-tab-width 4)
+
+    (mohkale/declare-prefix-for-major-mode 'kotlin-mode
+      "e" "eval")
+
+    (mohkale/set-leader-keys-for-major-mode 'kotlin-mode
+      "r" 'kotlin-repl
+      "e-" 'kotlin-send-line
+      "e|" 'kotlin-send-block
+      "er" 'kotlin-send-region
+      "eb" 'kotlin-send-buffer
+      "e S--" 'kotlin-send-line-and-focus
+      "e S-|" 'kotlin-send-block-and-focus
+      "eR"    'kotlin-send-region-and-focus
+      "eB"    'kotlin-send-buffer-and-focus))
+#+end_src
 ** Unimplemented Languages
 https://github.com/syl20bnr/spacemacs/tree/master/layers/%2Blang
 *** scala
@@ -6708,137 +6999,188 @@ https://github.com/syl20bnr/spacemacs/tree/master/layers/%2Blang
     (mohkale/update-company-backends-for-mode meghanada nil
       '(meghanda-mode)))
 #+end_src
-*** kotlin
-#+begin_src emacs-lisp
-  (use-package kotlin-mode
-    :ensure t
-    :defer  t
-    :hook (kotlin-mode . lsp)
-    :config
-    (setq kotlin-tab-width 4))
-#+end_src
 *** latex
 *** haskell
+#+begin_src emacs-lisp
+  ;; (use-package hindent
+  ;;   :ensure t
+  ;;   :defer  t
+  ;;   :commands (hindent-mode
+  ;;              hindent-reformat-decl
+  ;;              hindent-reformat-buffer
+  ;;              hindent-reformat-decl-or-fill
+  ;;              hindent-reformat-region))
+
+  ;; (use-package company-ghci
+  ;;   :ensure t
+  ;;   :defer  t
+  ;;   :commands company-ghci)
+
+  ;; (use-package flycheck-haskell
+  ;;   :ensure t
+  ;;   :defer  t
+  ;;   :commands (flycheck-haskell-setup))
+
+  ;; (use-package haskell-mode
+  ;;   :ensure t
+  ;;   :defer  t
+  ;;   :commands (haskell-mode)
+  ;;   :config
+  ;;   (mohkale/update-company-backends-for-mode 'haskell-mode t
+  ;;     '(company-ghci))
+  ;;   )
+
+  ;; https://github.com/ndmitchell/hlint
+  ;; https://github.com/mpickering/hlint-refactor-mode
+  ;; http://haskell.github.io/haskell-mode/manual/latest/Introduction.html#Introduction
+  ;; https://gist.github.com/snoyberg/3807bac2cdf276fd0aecd2f26916e025
+  ;; https://github.com/iquiw/company-cabal
+  ;; https://github.com/emacs-lsp/lsp-haskell
+  ;; https://github.com/haskell/haskell-ide-engine ;; THIS SUCKS
+#+end_src
 *** go
 *** C#
 *** assembly
 *** javascript
 #+begin_src emacs-lisp
-  ;; (use-package js2-mode
-  ;;   :ensure t
-  ;;   :defer  t
-  ;;   :init
-  ;;   (push (cons "\\.js$" 'web-mode) auto-mode-alist)
-  ;;   :config
-  ;;   (general-define-key
-  ;;     :keymaps 'js2-mode-map
-  ;;     :states  'insert
-  ;;     ;; properly formets javadocs
-  ;;     "<return>" 'js2-line-break)
+  ;; NOTE no on the fly syntax checking? make sure eslint is installed
+  ;;      no warning or error will be issued if it isn't :(.
 
-  ;;   (mohkale/declare-prefix-for-major-mode* 'js2-mode
-  ;;     "i" "insert"
-  ;;     "h" "help"
-  ;;     "H" "hide/show"
-  ;;     "Hh" "hide"
-  ;;     "Hs" "show")
-  ;;   (mohkale/set-leader-keys-for-major-mode 'js2-mode
-  ;;     "gg" 'js2-jump-to-definition
+  (use-package js2-mode
+    :ensure t
+    :defer  t
+    :hook (js2-mode . flycheck-mode)
+    :init
+    (push (cons "\\.js$" 'js2-mode) auto-mode-alist)
+    :config
+    (mohkale/update-company-backends-for-mode js2-mode t
+      '(company-tern))
 
-  ;;     ;; toggle hide-show
-  ;;     "HH" 'js2-mode-show-all
-  ;;     "Hw" 'js2-mode-toggle-warnings-and-errors
-  ;;     "He" 'js2-mode-toggle-element
-  ;;     "Hc" 'js2-mode-toggle-hide-comments
-  ;;     "Hf" 'js2-mode-toggle-hide-functions
-  ;;     ;; hide
-  ;;     "Hhw" 'js2-mode-hide-warnings-and-errors
-  ;;     "Hhe" 'js2-mode-hide-element
-  ;;     "Hhc" 'js2-mode-show-comments
-  ;;     "Hhf" 'js2-mode-hide-functions
-  ;;     ;; show
-  ;;     "Hsw" 'js2-mode-display-warnings-and-errors
-  ;;     "Hse" 'js2-mode-show-element
-  ;;     "Hsc" 'js2-mode-hide-comments
-  ;;     "Hsf" 'js2-mode-show-functions))
+    (setq js2-mode-show-parse-errors      nil
+          js2-mode-show-strict-warnings   nil
+          js2-strict-missing-semi-warning nil)
 
-  ;; (use-package company-tern
-  ;;   :ensure t
-  ;;   :defer  t
-  ;;   :commands company-tern
-  ;;   :init
-  ;;   (mohkale/update-company-backends-for-mode js2 t
-  ;;     '(company-tern)))
+    (general-define-key
+      :keymaps 'js2-mode-map
+      :states  'insert
+      ;; properly formets javadocs
+      "<return>" 'js2-line-break)
 
-  ;; (use-package tern
-  ;;   :ensure t
-  ;;   :defer  t
-  ;;   :hook (js2-mode . tern-mode)
-  ;;   :commands tern-mode)
+    (mohkale/declare-prefix-for-major-mode* 'js2-mode
+      "i" "insert"
+      "h" "help"
+      "H" "hide/show"
+      "Hh" "hide"
+      "Hs" "show")
 
-  ;; (use-package js-doc
-  ;;   :ensure t
-  ;;   :defer  t
-  ;;   :hook (js2-mode . (lambda ()
-  ;;                       (require 'js-doc)))
-  ;;   :commands (js-doc-insert-function-doc
-  ;;              js-doc-insert-function-doc-snippet
-  ;;              js-doc-insert-tag
-  ;;              js-doc-insert-file-doc
-  ;;              js-doc-describe-tag)
-  ;;   :init
-  ;;   (advice-add 'js-doc-insert-function-doc-snippet :after #'(lambda (&rest r)
-  ;;                                                              (evil-insert nil)))
-  ;;   ;; (general-define-key
-  ;;   ;;   :keymaps 'js2-mode-map
-  ;;   ;;   :states 'insert
-  ;;   ;;   "@" 'js-doc-insert-tag)
-  ;;   (mohkale/set-leader-keys-for-major-mode 'js2-mode
-  ;;     "i@" 'js-doc-insert-tag
-  ;;                                         ; only works from within method
-  ;;     "i)" 'js-doc-insert-function-doc
-  ;;     "i(" 'js-doc-insert-function-doc-snippet
-  ;;     "if" 'js-doc-insert-file-doc
-  ;;     "h@" 'js-doc-describe-tag))
+    (mohkale/set-leader-keys-for-major-mode 'js2-mode
+      "gg" 'js2-jump-to-definition
 
-  ;; ;;; most of this doesn't seem to work very well...
-  ;; ;;; so I'm only using a few functions with simple features.
-  ;; (use-package js2-refactor
-  ;;   :ensure t
-  ;;   :defer  t
-  ;;   :hook (js2-mode . js2-refactor-mode)
-  ;;   :config
-  ;;   (defun js2r-exit-visual-mode-after-func-call (&rest args)
-  ;;     (when (evil-visual-state-p)
-  ;;       (evil-exit-visual-state)))
+      ;; toggle hide-show
+      "HH" 'js2-mode-show-all
+      "Hw" 'js2-mode-toggle-warnings-and-errors
+      "He" 'js2-mode-toggle-element
+      "Hc" 'js2-mode-toggle-hide-comments
+      "Hf" 'js2-mode-toggle-hide-functions
 
-  ;;   (advice-add 'js2r-extract-method   :after #'js2r-exit-visual-mode-after-func-call)
-  ;;   (advice-add 'js2r-extract-function :after #'js2r-exit-visual-mode-after-func-call)
+      ;; hide
+      "Hhw" 'js2-mode-hide-warnings-and-errors
+      "Hhe" 'js2-mode-hide-element
+      "Hhc" 'js2-mode-show-comments
+      "Hhf" 'js2-mode-hide-functions
 
-  ;;   (mohkale/declare-prefix-for-major-mode 'js2-mode
-  ;;     "e" "extract")
+      ;; show
+      "Hsw" 'js2-mode-display-warnings-and-errors
+      "Hse" 'js2-mode-show-element
+      "Hsc" 'js2-mode-hide-comments
+      "Hsf" 'js2-mode-show-functions))
 
-  ;;   (mohkale/set-leader-keys-for-major-mode 'js2-mode
-  ;;     "[" 'js2r-expand-node-at-point
-  ;;     "]" 'js2r-contract-node-at-point
+  (use-package company-tern
+    :ensure t
+    :defer  t
+    :commands company-tern
+    :init
+    (mohkale/update-company-backends-for-mode js2 t
+      '(company-tern)))
 
-  ;;     ; doesn't work unless executed from within a function
-  ;;     "ef" 'js2r-extract-function
-  ;;     "em" 'js2r-extract-method
-  ;;     "ev" 'js2r-extract-var
-  ;;     "el" 'js2r-extract-let
-  ;;     "ec" 'js2r-extract-const
+  (use-package tern
+    :ensure t
+    :defer  t
+    :hook (js2-mode . tern-mode)
+    :commands tern-mode)
 
-  ;;     "l" 'js2r-log-this
-  ;;     "L" 'js2r-debug-this
+  (use-package js-doc
+    :ensure t
+    :defer  t
+    :commands (js-doc-insert-function-doc
+               js-doc-insert-function-doc-snippet
+               js-doc-insert-tag
+               js-doc-insert-file-doc
+               js-doc-describe-tag)
+    :init
+    ;; (general-define-key
+    ;;   :keymaps 'js2-mode-map
+    ;;   :states 'insert
+    ;;   "@" 'js-doc-insert-tag)
 
-  ;;     "v" 'js2r-var-to-this
+    (mohkale/set-leader-keys-for-major-mode 'js2-mode
+      "i@" 'js-doc-insert-tag
+                                          ; only works from within method
+      "i)" 'js-doc-insert-function-doc
+      "i(" 'js-doc-insert-function-doc-snippet
+      "if" 'js-doc-insert-file-doc
+      "h@" 'js-doc-describe-tag)
 
-  ;;     "s" 'js2r-forward-slurp
-  ;;     "b" 'js2r-forward-barf))
+    :config
+    (advice-add 'js-doc-insert-function-doc-snippet :after #'(lambda (&rest r)
+                                                               (evil-insert nil))))
+
+  ;; most of this doesn't seem to work very well...
+  ;; so I'm only using a few functions with simple features.
+  (use-package js2-refactor
+    :ensure t
+    :defer  t
+    :diminish
+    :hook (js2-mode . js2-refactor-mode)
+    :config
+    (defun js2r-exit-visual-mode-after-func-call (&rest args)
+      (when (evil-visual-state-p)
+        (evil-exit-visual-state)))
+
+    (advice-add 'js2r-extract-method   :after #'js2r-exit-visual-mode-after-func-call)
+    (advice-add 'js2r-extract-function :after #'js2r-exit-visual-mode-after-func-call)
+
+    (mohkale/declare-prefix-for-major-mode 'js2-mode
+      "e" "extract")
+
+    (mohkale/set-leader-keys-for-major-mode 'js2-mode
+      "[" 'js2r-expand-node-at-point
+      "]" 'js2r-contract-node-at-point
+
+      ; doesn't work unless executed from within a function
+      "ef" 'js2r-extract-function
+      "em" 'js2r-extract-method
+      "ev" 'js2r-extract-var
+      "el" 'js2r-extract-let
+      "ec" 'js2r-extract-const
+
+      "l" 'js2r-log-this
+      "L" 'js2r-debug-this
+
+      "v" 'js2r-var-to-this
+
+      "s" 'js2r-forward-slurp
+      "b" 'js2r-forward-barf))
+
+  (use-package xref-js2
+    :ensure t
+    :defer  t
+    :commands (xref-js2-xref-backend)
+    :init
+    (with-eval-after-load 'js2-mode
+      (add-hook 'xref-backend-functions #'xref-js2-xref-backend)))
 
   ;; https://github.com/NicolasPetton/Indium
-  ;; https://github.com/nicolaspetton/xref-js2
 #+end_src
 **** skewer-mode
 #+begin_src emacs-lisp
