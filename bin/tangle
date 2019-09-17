@@ -1,0 +1,397 @@
+#!env ruby
+# using env instead of conventional /usr/bin/ruby because of symlink
+# issues with cygwin... only seems to affect ruby and emacs with ruby
+
+require 'rake'
+require 'colorize'
+require 'optparse'
+require 'fileutils'
+require 'shellwords'
+
+# GemFile
+## gem 'pry'
+## gem 'pry-doc', '>=0.6.0'
+## gem 'method_source', '>=0.8.2'
+## gem 'colorize', '0.8.1', git: 'https://github.com/fazibear/colorize'
+
+options = {
+    :"config-file"   => "~/.emacs.d/init.org",
+    # :"tangled-file"  => "~/.emacs.d/init.el",
+    # :"compiled-file" => "~/.emacs.d/init.elc",
+    :"error-file"    => "~/.emacs.d/tangle-error.log",
+    :"no-suppress"   => nil, # suppress output
+    :"force"         => nil, # don't force
+    :"compile"       => false,
+    :"no-tangle"     => false, # do tangle
+    # takes precedence over --force compile
+}
+
+parser = OptionParser.new do |opts|
+    opts.banner = "Usage: tangle.rb [options]"
+
+    opts.on("-c", "--config-file=FILE",   "file to be tangled is FILE")
+    opts.on("-d", "--dest-file=FILE",     "tangling will produce FILE")
+    opts.on("-b", "--compiled-file=FILE", "after compilation you'll recieve FILE")
+    opts.on("-e", "--error-file=FILE",    "on error dump logs and debug info to FILE")
+
+    opts.on("-p", "--print [STAGE]", [:all, :tangle, :compile], "print build output for (all, tangle, compile)") do |v|
+        options[:"no-suppress"] = v || :all
+    end
+
+    opts.on("-f", "--force [STAGE]", [:all, :tangle, :compile], "force stage (all, tangle, compile) to run") do |v|
+        options[:"force"] = v || :all
+    end
+
+    opts.on("-m", "--compile", TrueClass, "compile tangled configuration files")
+
+    opts.on("-T", "--no-tangle", "don't tangle configuration file") do
+        options[:"no-tangle"] = true
+    end
+
+    opts.on("-L", "--no-log", "don't produce an error log on failure") do
+        options[:"error-file"] = nil
+    end
+
+    opts.on("-h", "--help", "print this help message") do
+        puts opts
+        exit 0
+    end
+end.parse!(into: options)
+
+options[:"tangled-file"]  = options[:"tangled-file"]  || options[:"config-file"].pathmap("%X.el")
+options[:"compiled-file"] = options[:"compiled-file"] || options[:"tangled-file"].pathmap("%X.elc")
+
+[:"config-file", :"tangled-file", :"compiled-file", :"error-file"].each do |arg|
+    options[arg] = File.expand_path(options[arg])
+end
+
+NullStream = File.open(File::NULL, "w")
+
+# provides an incremental iterator over chars using counter
+ProgressIterator = Struct.new(:chars, :counter) do
+    def get_char(increment=true)
+        char = chars[counter] # current character in iteration
+        self.counter = (counter + 1) % chars.length if increment
+
+        char
+    end
+end
+
+class ProgressIndicator
+    attr_accessor :prefix, :message, :iterator
+
+    # creates an **pretty** indicator string which morphs
+    # each time this object is converted to a string. the
+    # indicator consists of a non colored prefix, a colored
+    # prefix and a spinning wheel character. You can specify
+    # both prefixes as arguments optionally. By default, only
+    # a spinning wheel will be printed.
+    #
+    def initialize(prefix=nil, message=nil)
+        self.prefix   = prefix
+        self.message  = message
+        @pdelay       = 0.25
+        @lock         = Mutex.new # synchronise acess to output streams
+        self.iterator = ProgressIterator.new(["|", "/", "-", "\\"], 0)
+    end
+
+    def to_s
+        message  = @prefix ? "#{@prefix} " : ""
+        message += @message.green + " " if @message
+        # message += @iterator.get_char(true).green
+        message += @iterator.get_char(true).white
+    end
+
+    def length
+        (self.prefix || "").length + (self.message || "").length + 2
+    end
+
+    ##
+    # execute block while also periodically printing the
+    # progress indicator to STDOUT and synchronising output
+    # between both the indicator and the block
+    #
+    # if +leave_break+ is true, no trailing line break will
+    # be printed after output.
+    #
+    def wrap(puts_stream, leave_break=true, &block)
+        if block
+            @progress_running = true
+            @puts = puts_stream || STDOUT
+
+            progress_thread = Thread.new do
+                while @progress_running
+                    print "#{self.to_s}\r"
+                    sleep(@pdelay)
+                end
+
+                print "#{self.to_s}\r"
+                print "\n" if leave_break
+            end
+
+            self.instance_exec(&block)
+            @progress_running = false
+            progress_thread.join()
+        end
+    end
+
+    ##
+    # pass args to aliased puts method while
+    # also synchronising with indicator output
+    #
+    def puts(*args)
+        @lock.synchronize {
+            # ensure no indicator line remains out
+            @puts.print(indicator_pad_string)
+            @puts.puts(*args)
+        }
+    end
+
+    ##
+    # pass args to STDOUT.print while also
+    # synchronising the indicator output
+    #
+    def print(*args)
+        @lock.synchronize { STDOUT.print(*args)}
+    end
+
+    private
+
+    def indicator_pad_string
+        unless @indicator_pad_string
+            @indicator_pad_string = (" " * length) + "\r"
+        end
+
+        @indicator_pad_string
+    end
+end
+
+def suppress?(options, *association)
+    # suppress if not no-suppress or print associations doesn't include your current association
+    options[:"no-suppress"].nil? || !([:all, *association].include?(options[:"no-suppress"]))
+    # I know, this is nonsensical, don't blame me. ruby's optparse implementation is weird and annoying.
+end
+
+def force?(options, *association)
+    !(options[:"force"].nil?) && [:all, *association].include?(options[:"force"])
+end
+
+# ensures that prior to compilation, the tangled configuration file exists
+# if it doesn't, we can't delegate compilation to the elisp method which
+# actually compiles the source files.
+def _compile__tangle_first(options)
+    if !options[:"no-tangle"] || force?(options, :tangle)
+        # tangling definitely took place or config file isn't out of date
+        # meaning even if we did tangle, we wouldn't recieve the expected tangled file & thus can't compile
+        puts "unable to locate tangled file prior to compilation : %s" % options[:"tangled-file"].red
+        exit 4
+    end
+
+    # prompt to tangle
+    error_message = "cannot compile without a tangled configuration, tangle first: %s " % [
+        "(" + "yes".green + " or " + "no".red + ")"
+    ]
+    print error_message
+
+    while input = gets.chomp.downcase
+        case input
+        when /^y(es)?$/
+            break
+        when /^no?$/
+            puts "unable to compile configuration file... %s.. %s, %s" % [
+                "exiting".yellow, "beep".blue.colorize(:blink) , "boop".blue.colorize(:blink)
+            ]
+            exit 1
+        else
+            print "please answer %s or %s. %s" % [
+                "yes".green, "no".red, error_message
+            ]
+        end
+    end
+
+    TangleCommand.new(options[:"config-file"], suppress?(options, :tangle), options[:"error-file"]).run
+
+    if !File.exists?(options[:"tangled-file"])
+        puts "tangling didn't provide the expected tangled file : %s" % options[:"tangled-file"].red
+        exit 5
+    end
+end
+
+##
+# base class for general emacs command functionality, as defined
+# solely by this tangling script.
+class EmacsCommand
+    @@abstract_error = "unimplemented abstract method: %s"
+
+    ##
+    # ==Parameters
+    # +command_name+
+    #   name of the current command, can either be a string or a tuple,
+    #   if it's a tuple the second value represents the completed command
+    #   name, while the first represents in progress.
+    def initialize(command_name, suppress_output, error_file)
+        @command_name, @command_finished_name =
+                       case command_name
+                       when String
+                           [command_name, command_name]
+                       when Array
+                           raise "not enough values: #{command_name}" if command_name.length < 2
+                           command_name.slice(0, 2) # ensure only the first 2 values of array used
+                       else
+                           ["EmacsCommand"] * 2
+                       end
+        @suppress_output  = suppress_output
+        @error_file       = error_file
+        @failed_exit_code = 1 # ruby exit code
+    end
+
+    def run
+        progress_indicator = ProgressIndicator.new(@command_name, @progress_pretty_prefix)
+        process_output     = StringIO.new() # store complete output from process in memory
+        process_args       = self.process_args() # needed to expose method in block scope
+
+        progress_indicator.wrap(program_output_stream, nil) do
+            IO.popen(process_args, "w+", :external_encoding=>"utf-8") do |io|
+                io.each_line { |line| puts line; process_output.write(line) }
+            end
+        end
+
+        if $?.nil? || !$?.success?
+            puts failed_message
+            error_file.write(process_output.string) if error_file
+            exit @failed_exit_code
+        else
+            progress_indicator.prefix = @command_finished_name
+            progress_indicator.iterator.counter = 2 # prefer -
+            print "#{progress_indicator} \n"
+        end
+    end
+
+    def program_output_stream
+        @suppress_output ? NullStream : STDERR
+    end
+
+    # open error file once, per class, and then leave open
+    # throughout script execution... I would close it, but
+    # I want to truncate the file if it hasn't been opened
+    # at runtime already (by another command) and from then
+    # on each command should append to it... & ruby doesn't
+    # have destructors :P
+    def error_file
+        if @error_file
+            unless @@error_stream
+                @@error_stream = File.open(@error_file, "w:UTF-8")
+            end
+
+            @@error_stream
+        else
+            NullStream
+        end
+    end
+
+    def process_args;   raise @@abstract_error % "process_args";   end
+    def failed_message; raise @@abstract_error % "failed_message"; end
+end
+
+# uses emacs batch mode to tangle a given source file into
+# it's pure source code representation
+class TangleCommand < EmacsCommand
+    def initialize(src_file, suppress_output, error_file)
+        super(["tangling", "tangled"], suppress_output, error_file)
+        @src = @progress_pretty_prefix = src_file
+        @failed_exit_code = 2
+    end
+
+    def failed_message
+        "failed to tangle : %s" % @src.red
+    end
+
+    def process_args
+        [
+            # why not popen emacs directly... turns out emacs doesn't like
+            # cygwin & displays errors due to missing linux character set
+            # files only when not running from bash. DAMN YOU WINDOWS!
+
+            "bash", "-c", [
+                "yes", "yes", "|", "emacs", "--batch",
+                "--eval", "'(require (quote ob-tangle))'",
+                "--eval", "'(org-babel-tangle-file \"%s\")'" % [
+                    Shellwords.escape(@src)
+                ],
+                "2>&1"
+            ].join(" ")
+        ]
+    end
+end
+
+# use mohkale//compile-configuration-files defined in my config
+# file to automate the compilation of my emacs source files.
+class CompileCommand < EmacsCommand
+    def initialize(tangled_file, suppress_output, error_file)
+        super(["compiling", "compiled"], suppress_output, error_file)
+        @src = @progress_pretty_prefix = tangled_file
+        @failed_exit_code = 3
+    end
+
+    def failed_message
+        "failed to compile : %s" % @src.red
+    end
+
+    def process_args
+        [
+            "bash", "-c", [
+                "emacs", "--batch",
+                "--load", Shellwords.escape(@src),
+                "--eval", "'(mohkale//compile-configuration-files)'",
+                "2>&1"
+            ].join(" ")
+        ]
+    end
+end
+
+
+
+#       ___       ___       ___       ___
+#      /\__\     /\  \     /\  \     /\__\
+#     /::L_L_   /::\  \   _\:\  \   /:| _|_
+#    /:/L:\__\ /::\:\__\ /\/::\__\ /::|/\__\
+#    \/_/:/  / \/\::/  / \::/\/__/ \/|::/  /
+#      /:/  /    /:/  /   \:\__\     |:/  /
+#      \/__/     \/__/     \/__/     \/__/
+#
+
+
+
+if !File.exists?(options[:"config-file"])
+    puts "unable to find config file : %s" % options[:"config-file"].red
+    exit 2
+end
+
+
+
+begin
+    uptodate = FileUtils.uptodate?(options[:"tangled-file"], [options[:"config-file"]])
+
+    if options[:"no-tangle"]
+        puts "skipping tangling because of %s flag" % "--no-tangle".magenta
+    elsif uptodate && !force?(options, :tangle)
+        puts "tangled config file is upto date  : %s" % options[:"tangled-file"].green
+    else
+        TangleCommand.new(options[:"config-file"], suppress?(options, :tangle), options[:"error-file"]).run
+    end
+end
+
+
+
+begin
+    if options[:"compile"]
+        uptodate = FileUtils.uptodate?(options[:"compiled-file"], [options[:"tangled-file"]])
+
+        if uptodate && !force?(options, :compile)
+            puts "compiled config file is upto date : %s" % options[:"compiled-file"].green
+        else
+            _compile__tangle_first(options) if !File.exists?(options[:"tangled-file"])
+            CompileCommand.new(options[:"tangled-file"], suppress?(options, :compile), options[:"error-file"]).run
+        end
+    end
+end
