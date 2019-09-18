@@ -1139,7 +1139,7 @@
                                                          ".*\\.el$"))
              (packages-dir (expand-file-name package-user-dir)))
          (dolist (file tangled-files)
-           (unless (string-prefix-p package-dir file)
+           (unless (string-prefix-p packages-dir file)
              (byte-compile-file file)))))
 
      (defun mohkale/build-configuration-file ()
@@ -3697,6 +3697,7 @@
                  ("S-SPC" . nil)
 
                  ("0"     . evil-digit-argument-or-evil-beginning-of-line)
+                 (":"     . evil-ex)
                  ("h"     . backward-char)
                  ("l"     . forward-char)
                  ("gj"    . dashboard-next-section)
