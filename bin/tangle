@@ -1,4 +1,5 @@
 #!env ruby
+# -*- mode: ruby; coding: utf-8-unix -*-
 # using env instead of conventional /usr/bin/ruby because of symlink
 # issues with cygwin... only seems to affect ruby and emacs with ruby
 
@@ -23,6 +24,7 @@ options = {
     :"force"         => nil, # don't force
     :"compile"       => false,
     :"no-tangle"     => false, # do tangle
+    :"keep-log"      => false, # delete log
     # takes precedence over --force compile
 }
 
@@ -51,6 +53,8 @@ parser = OptionParser.new do |opts|
     opts.on("-L", "--no-log", "don't produce an error log on failure") do
         options[:"error-file"] = nil
     end
+
+    opts.on("-k", "--keep-log", TrueClass, "don't remove logs from previous tangles")
 
     opts.on("-h", "--help", "print this help message") do
         puts opts
@@ -222,6 +226,7 @@ end
 # solely by this tangling script.
 class EmacsCommand
     @@abstract_error = "unimplemented abstract method: %s"
+    @@error_stream   = nil
 
     ##
     # ==Parameters
@@ -393,5 +398,12 @@ begin
             _compile__tangle_first(options) if !File.exists?(options[:"tangled-file"])
             CompileCommand.new(options[:"tangled-file"], suppress?(options, :compile), options[:"error-file"]).run
         end
+    end
+end
+
+
+unless options[:"keep-log"]
+    if options[:"error-file"] && File.exists?(options[:"error-file"])
+        File.delete(options[:"error-file"])
     end
 end
