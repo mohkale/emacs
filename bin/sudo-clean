@@ -16,7 +16,11 @@
 #      fire when you get a chance :P
 
 linux_trash_command() { #(filepath)
-    printf "trash not yet implemented for Linux: %s\n" "$*" >&2
+    for file in "$@"; do
+        echo "removing: ${file}"
+    done
+
+    trash -- "$@"
 }
 export -f linux_trash_command
 

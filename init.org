@@ -3,7 +3,7 @@
 #+TITLE: mohkale.org
 #+STARTUP: content
 
-#+PROPERTY: header-args :tangle yes :comments link :mkdirp yes :noweb yes
+#+PROPERTY: header-args :tangle yes :comments link :mkdirp yes :noweb yes :hlines no
 
 # NOTE: <escape> is for gui
 #       ESC      if for cli
@@ -126,11 +126,19 @@
       (defvar mohkale-preferred-indent 4
         "preferred indentation for all modes")
 
+      (setq tab-width mohkale-preferred-indent)
+
+
+      (setq tab-stop-list (number-sequence mohkale-preferred-indent
+                                           120
+                                           mohkale-preferred-indent))
+
+
       (defun mohkale/refresh-config-file-p ()
         "true if config org file needs to be retangled and/or compiled
-      see https://snipplr.com/view/14292/autocompiled-emacs-file/ for example
+       see https://snipplr.com/view/14292/autocompiled-emacs-file/ for example
 
-      NOTE assumes tangled elisp file exists... otherwise what's calling this."
+       NOTE assumes tangled elisp file exists... otherwise what's calling this."
         ;; checks in order:
         ;;     * compiled file doesn't exist when it should
         ;;     * config file is newer than tangled file
@@ -153,7 +161,7 @@
                                         (display-warning 'init
                                                          "your configuration file is out of date... please run <SPC f e b> followed by <SPC f e r>"))))
 
-     (setq mohkale-window-map (make-sparse-keymap))
+      (setq mohkale-window-map (make-sparse-keymap))
     #+END_SRC
 
 *** Paths Setup
@@ -239,6 +247,7 @@
            kkc-init-file-name                                 (var "kkc-init.el")
            message-auto-save-directory                        (var "messages/")
            meghanada-server-install-dir                       (var "meghanada")
+           mohkale-dashboard-banners-directory                (etc "banners/")
            newsticker-cache-filename                          (var "newsticker/cache.el")
            newsticker-dir                                     (var "newsticker/data/")
            nsm-settings-file                                  (var "nsm-settings.el")
@@ -399,7 +408,7 @@
     | hide-comnt          | 0eca097ae073b6536863492eb4d4beeb25b712acd45e21fc0bda9f19d39e963f | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/hide-comnt.el          |
     | imenu-tree          | c4b3ae0d8b5c3e5a50c9c4b3f96fd48e309c2fae9a8902a1d649063c7b3b611c | https://www.emacswiki.org/emacs/download/imenu-tree.el                                    |
     | help-fns+           | c2229229a699d115b91da8692f3b8099c19608728eb402edb6f7cd6e1c81912b | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/help-fns%2B.el         |
-    | vlc-rc              | e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 | https://raw.githubusercontent.com/MoHKale/vlc-rc/master/vlc-rc.el                         |
+    | vlc-rc              | 0064a388ea85f9fefec74401bbdbc74cdd2c6398a6790dee7f15bda13a758be7 | https://raw.githubusercontent.com/MoHKale/vlc-rc/master/vlc-rc.el                         |
     | lorem-ipsum         | 54cb139d6c88632aaef6364a2a6c6cadbb9a5082eb5032e69b5139dcc7074d88 | https://www.emacswiki.org/emacs/download/lorem-ipsum.el                                   |
     | profile-dotemacs    | 1d903fc16d4ab4716cf8097ddb88a5cbb3746c9e49fa3421ae147b0c383c3e7f | http://www.randomsample.de/profile-dotemacs.el                                            |
     | open-junk-file      | c0b835b329758dced4ccae6c2f3fd5af16af929437110ddde00ea55dc7d47be3 | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/open-junk-file.el      |
@@ -780,8 +789,9 @@
         "bt" "buffer-read-only-mode")
 
       (mohkale/set-leader-keys
-        "bB" 'create-new-empty-buffer
+        "b RET" 'create-new-empty-buffer
         "bb" 'switch-to-buffer
+        "bB" 'switch-to-buffer-other-window
         "bd" 'kill-this-buffer
         "be" 'safe-erase-buffer
         "bE" 'erase-buffer
@@ -1159,6 +1169,7 @@
                    delete-buffer-file
                    show-and-copy-buffer-file-name
                    show-and-copy-buffer-file-directory
+                   write-kill-buffer
                    jump-to-directory)
         :init
         (mohkale/set-leader-keys
@@ -1249,6 +1260,20 @@
 
       (defalias 'jump-to-directory 'dired-jump)
       (defalias 'jump-to-directory-other-window 'dired-jump-other-window)
+
+      (defun write-kill-buffer (&optional buffer-or-name confirm)
+        (interactive)
+        (let ((buffer (get-buffer (or buffer-or-name (current-buffer)))))
+          (when (buffer-modified-p)
+            (write-file (or (buffer-file-name) (read-file-name "write file: "))
+                        confirm))
+
+          (when (or (not confirm)
+                    (y-or-no-p (format "are you sure you want to kill this buffer (%s): " buffer)))
+            (let ((window (get-buffer-window buffer)))
+              (kill-buffer buffer)
+              (when (and window (> (length (window-list)) 1))
+                (delete-window window))))))
     #+END_SRC
 
 *** Hooks/Handlers
@@ -1768,47 +1793,19 @@
 
 *** Hydras
     #+BEGIN_SRC emacs-lisp
-      ;; TODO switch to autoloads
-
-      (use-package hydra-text-zoom
-        :defer t
-        :load-path (lambda () (join-path mohkale-package-root "hydras"))
-        :commands hydra-text-zoom/body)
-
-      (use-package hydra-winman
-        :defer t
-        :load-path (lambda () (join-path mohkale-package-root "hydras"))
-        :commands hydra-winman/body)
-
-      (use-package hydra-eyebrowse
-        :defer t
-        :load-path (lambda () (join-path mohkale-package-root "hydras"))
-        :commands hydra-eyebrowse/body)
-
-      (use-package hydra-persp
-        :defer t
-        :load-path (lambda () (join-path mohkale-package-root "hydras"))
-        :commands hydra-persp/body)
-
-      (use-package hydra-vlc-rc
-        :defer t
-        :load-path (lambda () (join-path mohkale-package-root "hydras"))
-        :commands hydra-vlc-rc/body)
-
-      (use-package hydra-ivy-custom
-        :defer t
-        :load-path (lambda () (join-path mohkale-package-root "hydras"))
-        :commands hydra-ivy/body)
-
-      (use-package hydra-flycheck
-        :defer t
-        :load-path (lambda () (join-path mohkale-package-root "hydras"))
-        :commands hydra-flycheck/body)
-
-      (use-package hydra-indent
-        :defer t
-        :load-path (lambda () (join-path mohkale-package-root "hydras"))
-        :commands hydra-indent/body)
+      (dolist (hydra '(hydra-eyebrowse
+                       hydra-flycheck
+                       hydra-ibuffer
+                       hydra-indent
+                       hydra-ivy-custom
+                       hydra-persp
+                       hydra-text-zoom
+                       hydra-vlc-rc
+                       hydra-winman))
+        (let ((hydra-func (intern (concat (symbol-name hydra) "/body")))
+              (hydra-file (join-path mohkale-package-root "hydras"
+                                     (concat (symbol-name hydra) ".el"))))
+          (autoload hydra-func hydra-file nil t)))
 
       (general-define-key
         :keymaps 'mohkale-window-map
@@ -2192,6 +2189,108 @@
          ("q" nil))
      #+END_SRC
 
+**** ibuffer
+     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-ibuffer.el"
+       ;; source: https://github.com/abo-abo/hydra/wiki/Ibuffer
+
+       (defhydra hydra-ibuffer-main (:color pink :hint nil)
+         "
+        ^ ^ ^   ^ ^ ^ | Marks [_*_] | Actions [_a_]     | View       ^^| Select      ^^|
+        _k_ ^ ↑ ^ _h_ +-^-^---------+-^-^---------------+-^-^----------+-^-^-----------+
+        ^ ^ _RET_ ^ ^ | _m_ark      | _D_: delete       | _g_: refresh | _TAB_: toggle |
+        _j_ ^ ↓ ^ _l_ | _u_nmark    | _s_: save marked  | _S_: sort    | _o_: open     |
+        ^ ^ ^   ^ ^ ^ | _t_oggle    | _._: toggle hydra | _/_: filter  | _q_: quit     |
+       "
+         ("m" ibuffer-mark-forward)
+         ("u" ibuffer-unmark-forward)
+         ("*" hydra-ibuffer-mark/body :exit t)
+         ("M" hydra-ibuffer-mark/body :exit t)
+         ("t" ibuffer-toggle-marks)
+
+         ("D" ibuffer-do-delete)
+         ("s" ibuffer-do-save)
+         ("a" hydra-ibuffer-action/body :exit t)
+
+         ("g" ibuffer-update)
+         ("S" hydra-ibuffer-sort/body :exit t)
+         ("/" hydra-ibuffer-filter/body :exit t)
+         ("H" describe-mode :exit t)
+
+         ("h" ibuffer-backward-filter-group)
+         ("k" ibuffer-backward-line)
+         ("l" ibuffer-forward-filter-group)
+         ("j" ibuffer-forward-line)
+         ("RET" ibuffer-visit-buffer :exit t)
+
+         ("TAB" ibuffer-toggle-filter-group)
+
+         ("o" ibuffer-visit-buffer-other-window :exit t)
+         ("Q" quit-window :exit t)
+         ("q" nil :exit t)
+         ("." nil :exit t))
+
+       (defhydra hydra-ibuffer-mark (:color teal :columns 5 :after-exit (hydra-ibuffer-main/body))
+         "Mark"
+         ("*" ibuffer-unmark-all "unmark all")
+         ("M" ibuffer-mark-by-mode "mode")
+         ("m" ibuffer-mark-modified-buffers "modified")
+         ("u" ibuffer-mark-unsaved-buffers "unsaved")
+         ("s" ibuffer-mark-special-buffers "special")
+         ("r" ibuffer-mark-read-only-buffers "read-only")
+         ("/" ibuffer-mark-dired-buffers "dired")
+         ("e" ibuffer-mark-dissociated-buffers "dissociated")
+         ("h" ibuffer-mark-help-buffers "help")
+         ("z" ibuffer-mark-compressed-file-buffers "compressed")
+         ("b" hydra-ibuffer-main/body "back" :exit t))
+
+       (defhydra hydra-ibuffer-action (:color teal :columns 4
+                                       :after-exit
+                                       (if (eq major-mode 'ibuffer-mode)
+                                           (hydra-ibuffer-main/body)))
+         "Action"
+         ("A" ibuffer-do-view "view")
+         ("E" ibuffer-do-eval "eval")
+         ("F" ibuffer-do-shell-command-file "shell-command-file")
+         ("I" ibuffer-do-query-replace-regexp "query-replace-regexp")
+         ("H" ibuffer-do-view-other-frame "view-other-frame")
+         ("N" ibuffer-do-shell-command-pipe-replace "shell-cmd-pipe-replace")
+         ("M" ibuffer-do-toggle-modified "toggle-modified")
+         ("O" ibuffer-do-occur "occur")
+         ("P" ibuffer-do-print "print")
+         ("Q" ibuffer-do-query-replace "query-replace")
+         ("R" ibuffer-do-rename-uniquely "rename-uniquely")
+         ("T" ibuffer-do-toggle-read-only "toggle-read-only")
+         ("U" ibuffer-do-replace-regexp "replace-regexp")
+         ("V" ibuffer-do-revert "revert")
+         ("W" ibuffer-do-view-and-eval "view-and-eval")
+         ("X" ibuffer-do-shell-command-pipe "shell-command-pipe")
+         ("b" nil "back"))
+
+       (defhydra hydra-ibuffer-sort (:color amaranth :columns 3)
+         "Sort"
+         ("i" ibuffer-invert-sorting "invert")
+         ("a" ibuffer-do-sort-by-alphabetic "alphabetic")
+         ("v" ibuffer-do-sort-by-recency "recently used")
+         ("s" ibuffer-do-sort-by-size "size")
+         ("f" ibuffer-do-sort-by-filename/process "filename")
+         ("m" ibuffer-do-sort-by-major-mode "mode")
+         ("b" hydra-ibuffer-main/body "back" :exit t))
+
+       (defhydra hydra-ibuffer-filter (:color amaranth :columns 4)
+         "Filter"
+         ("m" ibuffer-filter-by-used-mode "mode")
+         ("M" ibuffer-filter-by-derived-mode "derived mode")
+         ("n" ibuffer-filter-by-name "name")
+         ("c" ibuffer-filter-by-content "content")
+         ("e" ibuffer-filter-by-predicate "predicate")
+         ("f" ibuffer-filter-by-filename "filename")
+         (">" ibuffer-filter-by-size-gt "size")
+         ("<" ibuffer-filter-by-size-lt "size")
+         ("/" ibuffer-filter-disable "disable")
+         ("b" hydra-ibuffer-main/body "back" :exit t))
+     #+END_SRC
+
 **** ivy
      the actual ivy hydra has trailing whitespace and is inseperably tied to C-o for both entry and exit, despite me not liking the former and changing the latter. This is my variant, much of the same functionality, just different display.
 
@@ -2466,10 +2565,12 @@
         (setq-default spaceline-highlight-face-func       'spaceline-highlight-face-evil-state
                       mode-line-format                    (spaceline-spacemacs-theme)
                       spaceline-buffer-id-max-length      20
-                      spaceline-window-numbers-unicode    t
-                      spaceline-workspace-numbers-unicode t
                       spaceline-org-clock                 t
                       powerline-default-separator         'slant)
+
+        (if (display-graphic-p)
+          (setq-default spaceline-window-numbers-unicode    t
+                        spaceline-workspace-numbers-unicode t))
 
         (defun spaceline--this-macro-to-string ()
           (when defining-kbd-macro
@@ -2578,11 +2679,13 @@
      Partially capitalised variants... for when your fingers are faster than you are.
 
      #+BEGIN_SRC emacs-lisp
-       (with-eval-after-load 'evil
-         (add-hook 'evil-mode-hook (lambda ()
-                                     (evil-ex-define-cmd "W[RITE]" 'evil-write)
-                                     (evil-ex-define-cmd "Wa[LL]"  'evil-write-all)
-                                     (evil-ex-define-cmd "WA[LL]"  'evil-write-all))))
+       (add-hook 'evil-mode-hook (lambda ()
+                                   (evil-ex-define-cmd "W[RITE]" 'evil-write)
+                                   (evil-ex-define-cmd "Wa[LL]"  'evil-write-all)
+                                   (evil-ex-define-cmd "WA[LL]"  'evil-write-all)
+                                   (evil-ex-define-cmd "wk[ill]" 'write-kill-buffer)
+                                   (evil-ex-define-cmd "Wk[ill]" 'write-kill-buffer)
+                                   (evil-ex-define-cmd "WK[ILL]" 'write-kill-buffer)))
      #+END_SRC
 
 **** evil-match-it
@@ -2729,7 +2832,8 @@
 
          (general-define-key
            :states 'insert
-           "<tab>" 'indent-relative
+           "TAB"   'indent-relative
+           "<S-tab>" 'tab-to-tab-stop
            "M-y"   'evil-copy-from-above
            "C-y"   'yank
            "M-y"   'yank-unindented
@@ -2934,6 +3038,54 @@
           (let ((latest (bookmark-get-bookmark bookmark)))
             (setq bookmark-alist (delq latest bookmark-alist))
             (push latest bookmark-alist))))
+    #+END_SRC
+
+*** buffer-menu
+    #+BEGIN_SRC emacs-lisp
+      (use-package buff-menu
+        :defer t
+        :config
+        (evil-set-initial-state 'Buffer-menu-mode 'motion)
+
+        (mohkale/set-leader-keys-for-major-mode 'Buffer-menu-mode
+          "1" 'Buffer-menu-1-window
+          "2" 'Buffer-menu-2-window
+          "f" 'Buffer-menu-toggle-files-only
+          "/" 'Buffer-menu-isearch-buffers-regexp
+          "o" 'Buffer-menu-multi-occur
+          "T" 'Buffer-menu-visit-tags-table)
+        :bind (:map Buffer-menu-mode-map
+               ("0"         . nil)
+               ("1"         . nil)
+               ("2"         . nil)
+               ("<"         . nil)
+               (">"         . nil)
+               ("?"         . nil)
+               ("C-d"       . nil)
+               ("C-k"       . nil)
+               ("S-SPC"     . nil)
+               ("SPC"       . nil)
+               ("<backtab>" . nil)
+               ("TAB"       . nil)
+               ("T"         . nil)
+               ("b"         . nil)
+               ("e"         . nil)
+               ("f"         . nil)
+               ("g"         . nil)
+               ("h"         . nil)
+               ("n"         . nil)
+               ("p"         . nil)
+               ("t"         . nil)
+               ("v"         . nil)
+
+               ("C-SPC" . Buffer-menu-mark)
+               ("S-DEL" . Buffer-menu-bury)
+               ("r"   . Buffer-menu-toggle-read-only)
+               ("C-j" . Buffer-menu-this-window)
+               ("gr"  . revert-buffer)
+               ("gf" . Buffer-menu-toggle-files-only)
+               ("C-l" . tabulated-list-next-column)
+               ("C-M-<return>" . Buffer-menu-select)))
     #+END_SRC
 
 *** buffer-move
@@ -3448,7 +3600,10 @@
                 ;; ("<tab>"     . company-complete-selection)
                 ("C-v"       . company-search-toggle-filtering) ; show filtered/all
                 ("ESC"       . company-search-abort)
-                ("<escape>"  . company-search-abort)))
+                ("<escape>"  . company-search-abort)
+                :map company-active-map
+                ("C-w" . nil) ;; was company-show-location
+                ))
     #+END_SRC
 
 *** company-quickhelp
@@ -3621,13 +3776,19 @@
                (preffered-icon-height 0.75))
            (defun goto-home-buffer ()
              (interactive)
-             (switch-to-buffer (get-buffer-create dashboard-buffer)))
+             (let ((buffer (get-buffer dashboard-buffer-name)))
+               (if buffer
+                   (switch-to-buffer buffer)
+                 ;; (dashboard-refresh-buffer) ;; kills buffer, even if it doesn't exist
+                 (setq dashboard-startup-banner (dashboard--choose-random-startup-banner))
+                 (dashboard-insert-startupify-lists)
+                 (switch-to-buffer dashboard-buffer-name))))
+           ;; (defalias 'goto-home-buffer #'dashboard-refresh-buffer)
 
            (setq inhibit-startup-screen t
-                 initial-buffer-choice (if (< (length command-line-args) 2)
-                                           (lambda () (get-buffer-create dashboard-buffer)))
+                 initial-buffer-choice (when (< (length command-line-args) 2)
+                                         (lambda () (get-buffer-create dashboard-buffer)))
                  dashboard-banner-logo-title "Welcome to Emacs!"
-                 dashboard-startup-banner 'official
                  dashboard-center-content nil
                  dashboard-show-shortcuts t
                  ;; recents, bookmarks, projects, agenda, registers
@@ -3659,6 +3820,26 @@
                                                  #'update-installed-packages)
                                                 ("?" "" "emacs FAQ" #'view-emacs-faq font-lock-builtin-face))))
 
+           (defun dashboard--choose-random-startup-banner ()
+             "toggle another banner to be used on the dashboard"
+             (let ((custom-banners (or (file-expand-wildcards
+                                        (concat mohkale-dashboard-banners-directory "*"))
+                                       '(1 2 3))))
+               (seq-random-elt custom-banners)))
+
+           (setq dashboard-startup-banner (if (display-graphic-p)
+                                              'official ;; emacs logo is epic... always prefer it
+                                            ;; otherwise choose a text banner from my custom banners path or
+                                            ;; choose random text banner from the builtin dashboard banners.
+                                            (progn
+                                              ;; and also ensure a new banner is chosen everytime the buffer
+                                              ;; is refreshed... because why keep the same ascii banner 4ever
+                                              (advice-add 'dashboard-refresh-buffer :before
+                                                          #'(lambda (&rest args)
+                                                              (setq dashboard-startup-banner
+                                                                    (dashboard--choose-random-startup-banner))))
+                                              (dashboard--choose-random-startup-banner))))
+
            (let* ((footer-count (length dashboard-footer-icon-associations))
                   (footer-index (random footer-count))
                   (footer-item (nth footer-index dashboard-footer-icon-associations))
@@ -3684,7 +3865,18 @@
                                          (format "emacs loaded in %s" (emacs-init-time)))))
            (dashboard-setup-startup-hook)))
 
-         (add-hook 'dashboard-mode-hook (lambda () (message nil)))
+         (add-hook 'dashboard-mode-hook (lambda () (message nil))) ;; clear echo area
+
+         (defun dashboard-choose-banner--allow-custom-banners ()
+           "the built in method only supports filepaths to graphical banners
+       so add a case supporting file paths to text based banners as well."
+           (let ((banner dashboard-startup-banner))
+             (when (and banner (stringp banner)
+                        (file-exists-p banner))
+               (let ((banner-ext (intern (file-name-extension banner))))
+                 (when (eq banner-ext 'txt) banner)))))
+
+         (advice-add 'dashboard-choose-banner :before-until #'dashboard-choose-banner--allow-custom-banners)
 
          (general-define-key
            :states 'emacs
@@ -3707,6 +3899,7 @@
                  ("/"     . evil-ex-forward-search)
                  ("n"     . 'evil-ex-search-next)
                  ("N"     . 'evil-ex-search-previous)
+                 ("M-r"   . dashboard-refresh-buffer)
                  ("C-d"   . scroll-down-command)
                  ("C-u"   . scroll-up-command)
                  ("C-e"   . scroll-down-line)
@@ -4534,10 +4727,10 @@
                  ;; complete current selection into minibuffer
                  ;; leave prompt active to build on it.
                  ("C-i" . ivy-insert-current)
-                 ("C-<backspace>" . backward-kill-word)
+                 ("C-DEL" . backward-kill-word)
                  ;; pull word in from point at buffer
                  ("M-w" . ivy-yank-word)
-                 ("C-w" . kill-word)
+                 ("C-w" . backward-kill-word)
                  ;; operate on entire input
                  ("M-k" . ivy-kill-line-backward)
                  ("M-K" . kill-line) ;; kill forward
@@ -4800,6 +4993,265 @@
       (use-package htmlize
         :ensure t
         :defer  t)
+    #+END_SRC
+
+*** ibuffer
+    #+BEGIN_SRC emacs-lisp
+      (use-package ibuffer
+        :defer t
+        :commands (ibuffer)
+        :init
+        (mohkale/set-leader-keys
+          "bm" 'ibuffer)
+        :config
+        (evil-set-initial-state 'ibuffer-mode 'motion)
+
+        (setq mohkale-ibuffer-filter-map (make-sparse-keymap))
+
+        (bind-keys :map mohkale-ibuffer-filter-map
+                   ("TAB"    . ibuffer-exchange-filters)
+                   ("RET"    . ibuffer-filter-by-mode)
+                   ("!"      . ibuffer-negate-filter)
+                   ("&"      . ibuffer-and-filter)
+                   ("*"      . ibuffer-filter-by-starred-name)
+                   ("."      . ibuffer-filter-by-file-extension)
+                   ("/"      . ibuffer-filter-disable)
+                   ("<"      . ibuffer-filter-by-size-lt)
+                   (">"      . ibuffer-filter-by-size-gt)
+                   ("D"      . ibuffer-decompose-filter-group)
+                   ("M"      . ibuffer-filter-by-derived-mode)
+                   ("P"      . ibuffer-pop-filter-group)
+                   ("R"      . ibuffer-switch-to-saved-filter-groups)
+                   ("S"      . ibuffer-save-filter-groups)
+                   ("X"      . ibuffer-delete-saved-filter-groups)
+                   ("\\"     . ibuffer-clear-filter-groups)
+                   ("a"      . ibuffer-add-saved-filters)
+                   ("b"      . ibuffer-filter-by-basename)
+                   ("c"      . ibuffer-filter-by-content)
+                   ("d"      . ibuffer-decompose-filter)
+                   ("e"      . ibuffer-filter-by-predicate)
+                   ("f"      . ibuffer-filter-by-filename)
+                   ("g"      . ibuffer-filters-to-filter-group)
+                   ("i"      . ibuffer-filter-by-modified)
+                   ("m"      . ibuffer-filter-by-used-mode)
+                   ("n"      . ibuffer-filter-by-name)
+                   ("o"      . ibuffer-or-filter)
+                   ("p"      . ibuffer-pop-filter)
+                   ("r"      . ibuffer-switch-to-saved-filters)
+                   ("s"      . ibuffer-save-filters)
+                   ("t"      . ibuffer-exchange-filters)
+                   ("v"      . ibuffer-filter-by-visiting-file)
+                   ("x"      . ibuffer-delete-saved-filters)
+                   ("|"      . ibuffer-or-filter)
+                   ("<S-up>" . ibuffer-pop-filter-group)
+                   ("<up>"   . ibuffer-pop-filter))
+
+        (mohkale/declare-prefix-for-major-mode* 'ibuffer-mode
+          "G" "jump/goto"
+          "m" "mark"
+          "/" "filter")
+
+        (mohkale/set-leader-keys-for-major-mode 'ibuffer-mode
+          ;; unbound:
+          ;;  * ibuffer-do-print
+          "1"   'ibuffer-visit-buffer-1-window
+          "+"   'ibuffer-add-to-tmp-show
+          "-"   'ibuffer-add-to-tmp-hide
+          "."   'hydra-ibuffer-main/body
+          "/"    mohkale-ibuffer-filter-map
+          "RET" 'ibuffer-do-view-horizontally
+          "A"   'ibuffer-auto-mode
+          "E"   'ibuffer-do-view-and-eval
+          "e"   'ibuffer-do-eval
+          "R"   'ibuffer-redisplay
+          "r"   'ibuffer-do-rename-uniquely
+          "S"   'ibuffer-do-query-replace
+          "s"   'ibuffer-do-save
+          ;; "s"   'ibuffer-do-replace-regexp
+          "T"   'ibuffer-visit-tags-table
+          "f"   'ibuffer-find-file
+          "g"   'ibuffer-jump-to-buffer
+          "Gb"  'ibuffer-jump-to-buffer
+          "Gf"  'ibuffer-jump-to-filter-group
+          "|"   'ibuffer-do-shell-command-pipe-replace
+          "~"   'ibuffer-do-toggle-modified
+
+          "mm" 'ibuffer-toggle-marks
+          "m/" 'ibuffer-mark-by-file-name-regexp
+          ;; "m M-/" 'ibuffer-mark-by-name-regexp
+          "mo" 'ibuffer-mark-old-buffers
+          "ml" 'ibuffer-mark-by-locked
+          "mb" 'ibuffer-mark-by-content-regexp
+          "mM" 'ibuffer-mark-by-mode-regexp
+          "md" 'ibuffer-mark-dired-buffers
+          "mh" 'ibuffer-mark-help-buffers
+          "mn" 'ibuffer-mark-dissociated-buffers
+          "mN" 'ibuffer-mark-unsaved-buffers
+          "m*" 'ibuffer-mark-modified-buffers
+          "ms" 'ibuffer-mark-special-buffers
+          "m%" 'ibuffer-mark-read-only-buffers
+          "mz" 'ibuffer-mark-compressed-file-buffers)
+
+        (general-define-key
+          :keymaps 'ibuffer-mode-map
+          "+"                nil
+          "-"                nil
+          "0"                nil
+          "f"                nil
+          "SPC"              nil
+          "S-SPC"            nil
+          ">"                nil
+          "<"                nil
+          "?"                nil
+          "h"                nil
+          "X"                nil
+          "F"                nil
+          "C-d"              nil
+          "C-t"              nil
+          "b"                nil
+          "n"                nil
+          "g"                nil
+          "p"                nil
+          "w"                nil
+          "s"                nil
+          "`"                nil
+          ","                nil
+          "*"                nil
+          "/"                nil
+          "A"                nil
+          "C-c"              nil
+          "C-x"              nil
+          "M-s"              nil
+          "M-g"              nil
+          "M-n"              nil
+          "M-p"              nil
+          "M-{"              nil
+          "M-}"              nil
+          "M-o"              nil
+          "M-DEL"            nil
+          "%"                nil
+
+          ;; "D" 'ibuffer-mark-for-delete-backwards
+          "D"       'ibuffer-do-delete
+          "M"       'ibuffer-do-toggle-modified
+          "="       'ibuffer-diff-with-file
+          "o"       'ibuffer-visit-buffer-other-window
+          "M-o"     'ibuffer-visit-buffer-other-frame
+          "M-RET"   'ibuffer-visit-buffer-other-window-noselect
+          "O"       'ibuffer-do-occur
+          "gr"      'ibuffer-update
+          "gR"      'ibuffer-do-revert
+          "gs"      'ibuffer-do-save
+          ;; "R" 'ibuffer-do-revert
+          "R"       'ibuffer-do-toggle-read-only
+          "r"       'ibuffer-change-marks
+          "S"       'ibuffer-toggle-sorting-mode
+          "sa"      'ibuffer-do-sort-by-alphabetic
+          "sf"      'ibuffer-do-sort-by-filename/process
+          "si"      'ibuffer-invert-sorting
+          "sm"      'ibuffer-do-sort-by-major-mode
+          "ss"      'ibuffer-do-sort-by-size
+          "sr"      'ibuffer-do-sort-by-recency
+          "v"       'ibuffer-do-view
+          "V"       'ibuffer-do-view-other-frame
+          "("       'ibuffer-switch-format
+          "p"       'ibuffer-yank
+          "C-y"     'ibuffer-yank
+          "C-/"      mohkale-ibuffer-filter-map
+          "C-j"     'ibuffer-forward-line
+          "C-k"     'ibuffer-backward-line
+          "M-j"     'ibuffer-forward-filter-group
+          "M-k"     'ibuffer-backward-filter-group
+          "C-S-J"   'ibuffer-forward-next-marked
+          "C-S-K"   'ibuffer-backwards-next-marked
+          "C-M-S-k" 'ibuffer-do-kill-lines
+          "C-M-k"   'ibuffer-kill-line
+          "S-DEL"   'ibuffer-bury-buffer
+          ;; "C-s" 'ibuffer-do-isearch
+          "C-s"     'ibuffer-do-isearch-regexp
+          "yn"      'ibuffer-copy-buffername-as-kill)
+
+        ;;; https://www.emacswiki.org/emacs/IbufferMode
+        ;;  _                                                          _       _     _
+        ;; | |__  _   _ _ __ ___   __ _ _ __        _ __ ___  __ _  __| | __ _| |__ | | ___
+        ;; | '_ \| | | | '_ ` _ \ / _` | '_ \ _____| '__/ _ \/ _` |/ _` |/ _` | '_ \| |/ _ \
+        ;; | | | | |_| | | | | | | (_| | | | |_____| | |  __/ (_| | (_| | (_| | |_) | |  __/
+        ;; |_| |_|\__,_|_| |_| |_|\__,_|_| |_|     |_|  \___|\__,_|\__,_|\__,_|_.__/|_|\___|
+        ;;
+
+        (defun ibuffer--human-readable-file-sizes-to-bytes (string)
+          "Convert a human-readable file size into bytes."
+          ;; (interactive)
+          (let ((decimal (string-to-number string)))
+            (cond
+             ((string-suffix-p "G" string t) (* 1000000000 decimal))
+             ((string-suffix-p "M" string t) (* 1000000    decimal))
+             ((string-suffix-p "K" string t) (* 1000       decimal))
+             (t                                            decimal))))
+
+        (defun ibuffer--bytes-to-human-readable-file-sizes (bytes)
+          "Convert number of bytes to human-readable file size."
+          ;; (interactive)
+          (cond
+           ((> bytes 1000000000) (format "%10.1fG" (/ bytes 1000000000.0)))
+           ((> bytes 100000000)  (format "%10.0fM" (/ bytes 1000000.0)))
+           ((> bytes 1000000)    (format "%10.1fM" (/ bytes 1000000.0)))
+           ((> bytes 100000)     (format "%10.0fk" (/ bytes 1000.0)))
+           ((> bytes 1000)       (format "%10.1fk" (/ bytes 1000.0)))
+           (t                    (format "%10d"       bytes))))
+
+        ;; Use human readable Size column instead of original one
+        (define-ibuffer-column size-human-readable
+          (:name "Size"
+                 :inline t
+                 :summarizer
+                 (lambda (column-strings)
+                   (let ((total 0))
+                     (dolist (string column-strings)
+                       (setq total
+                             ;; like, ewww ...
+                             (+ (float (ibuffer--human-readable-file-sizes-to-bytes
+                                        string))
+                                total)))
+                     (ibuffer--bytes-to-human-readable-file-sizes total))))
+          (ibuffer--bytes-to-human-readable-file-sizes (buffer-size)))
+
+        (setq ibuffer-formats
+              `((mark modified read-only locked
+                      " "
+                      (name 20 20 :left :elide)
+                      " "
+                      (size-human-readable 11 -1 :right)
+                      " "
+                      (mode 16 16 :left :elide)
+                      " " filename-and-process)
+                (mark " "
+                      (name 16 -1)
+                      " "
+                      filename))))
+
+      (use-package ibuffer-vc
+        :ensure t
+        :defer  t
+        :after ibuffer
+        :commands (ibuffer-vc-set-filter-groups-by-vc-root)
+        :init
+        (defalias 'ibuffer-vc #'ibuffer-vc-set-filter-groups-by-vc-root)
+
+        (general-define-key
+          :keymaps 'ibuffer-mode-map
+          "sv" 'ibuffer-vc))
+
+      (use-package ibuffer-tramp
+        :ensure t
+        :defer  t
+        :after ibuffer
+        :commands (ibuffer-tramp-set-filter-groups-by-tramp-connection)
+        :init
+        (defalias 'ibuffer-tramp #'ibuffer-tramp-set-filter-groups-by-tramp-connection)
+        (general-define-key
+          :keymaps 'ibuffer-mode-map
+          "s@" 'ibuffer-tramp))
     #+END_SRC
 
 *** imenu
@@ -5142,8 +5594,9 @@
         "kc" "counter")
 
       (mohkale/set-leader-keys
-        "k(" 'eval-last-sexp
-        "k)" 'eval-replace-last-sexp
+        "kk" 'eval-last-sexp
+        "k(" 'eval-replace-last-sexp
+        "k)" 'eval-print-last-sexp
         "ke" 'kmacro-edit-macro ;; last defined
         "kE" 'edit-kbd-macro ;; any named macro
         "ka" 'apply-macro-to-region-lines
@@ -5926,6 +6379,124 @@
         :defer  t)
     #+END_SRC
 
+*** tabulated-list-mode
+    #+BEGIN_SRC emacs-lisp
+     (use-package tabulated-list
+       :defer t
+       :commands (tabulated-list-mode
+                  tabulated-list-next-column)
+       :config
+       (evil-set-initial-state 'tabulated-list-mode 'motion)
+
+       (defun tabulated-list--get-column-widths ()
+         "return a list of all the "
+         (mapcar (lambda (x) (+ (nth 1 x)
+                                (or (plist-get (cdr x) :pad-right) 1)))
+                 tabulated-list-format))
+
+       (defun tabulated-list--get-column-pivots ()
+         (let (prev values)
+           (setq values (mapcar (lambda (x)
+                                  (let ((new-val (+ x (or prev 0))))
+                                    (setq prev new-val)
+                                    new-val))
+                                (tabulated-list--get-column-widths)))
+           ;; (mapcar (lambda (x) (- x 1)) values)
+           values))
+
+       (defun tabulated-list--properties ()
+         (let* ((current-column-position (- (point)
+                                            (line-beginning-position)))
+                (column-pivots (tabulated-list--get-column-pivots))
+                (column-count (length column-pivots))
+                (preceding-columns (seq-filter
+                                    (lambda (x)
+                                      (<= x current-column-position))
+                                    column-pivots))
+                (following-columns (nthcdr (length preceding-columns)
+                                           column-pivots))
+                (current-column (car following-columns))
+                (following-columns (cdr following-columns)))
+           `(:current-column-position ,current-column-position
+                                      :column-pivots           ,column-pivots
+                                      :column-count            ,column-count
+                                      :preceding-cols          ,preceding-columns
+                                      :current-column          ,current-column
+                                      :following-cols          ,following-columns)))
+
+       ;; doesn't work when row contains truncated entries, such as
+       ;; buffers with a "name..." entry, because those dots aren't
+       ;; included in the width of the column.
+       (defun tabulated-list-next-column (&optional count)
+         "moves to the next column shown by tabulated list mode"
+         (interactive)
+         (or count (setq count 1))
+
+         (when tabulated-list-format
+           (let* ((properties (tabulated-list--properties))
+                  (line-step (floor (/ count
+                                       (plist-get properties :column-count)))))
+             ;; move however many lines it takes to reach row with desired column
+             (unless (zerop line-step)
+               (next-line line-step))
+
+             (unless (eobp)
+               (cond
+                ((eq (point) (line-end-position))
+                 ;; when at the end of the last column, goto next row
+                 (next-line)
+                 (goto-char (line-beginning-position)))
+                ((not (plist-get properties :following-cols))
+                 ;; no next column, goto end of current
+                 (goto-char (line-end-position)))
+                (t
+                 ;; goto next column from the end of the current one
+                 (goto-char (+ (line-beginning-position)
+                               (plist-get properties :current-column)))))))))
+
+       ;; ;; doesn't work for some stupid reason :(
+       ;; (defun tabulated-list-prev-column (&optional count)
+       ;;   (interactive)
+       ;;   (or count (setq count 1))
+
+       ;;   (when tabulated-list-format
+       ;;     (let* ((properties (tabulated-list--properties))
+       ;;            (line-step (floor (/ count
+       ;;                                 (plist-get properties :column-count))))
+       ;;            (line-number (string-to-number (format-mode-line "%l"))))
+       ;;       ;; move however many lines it takes to reach row with desired column
+       ;;       (unless (zerop line-step)
+       ;;         (if (> line-step line-number)
+       ;;             (goto-char (point-min))
+       ;;           (previous-line line-step)))
+
+       ;;       (unless (bobp)
+       ;;         (cond
+       ;;          ((eq (point) (line-beginning-position))
+       ;;           ;; when at first column, goto previous row
+       ;;           (previous-line)
+       ;;           (goto-char (line-end-position)))
+       ;;          ((not (plist-get properties :preceding-cols))
+       ;;           (goto-char (line-beginning-position)))
+       ;;          (t
+       ;;           (goto-char (+ (line-beginning-position)
+       ;;                            (car (last (plist-get properties :preceding-cols)))))))))))
+       :bind (:map tabulated-list-mode-map
+              ("SPC"   . nil)
+              ("ESC"   . nil)
+              ("0"     . nil)
+              ("<"     . nil)
+              (">"     . nil)
+              ("?"     . nil)
+              ("g"     . nil)
+              ("h"     . nil)
+              ("n"     . nil)
+              ("p"     . nil)
+              ("DEL"   . nil)
+              ("S-SPC" . nil)
+              ("gr" . revert-buffer)))
+    #+END_SRC
+
 *** tags
     #+BEGIN_SRC emacs-lisp
       (use-package ggtags
@@ -6576,7 +7147,7 @@
               "C-r" 'log-edit-comment-search-backward
               "M-0" 'evil-beginning-of-line)
 
-            (evil-redirect-digit-argument 'log-edit-mode-map "0" 'log-edit-beginning-of-line)
+            ;; (evil-redirect-digit-argument kmap "0" 'log-edit-beginning-of-line)
 
             (mohkale/declare-prefix-for-mode* mode
               "mi" '("insert" . "insert shortcuts")
@@ -6715,7 +7286,9 @@
                 ("C-<up>"    . nil)
                 ("C-<down>"  . nil)
                 ("C-<left>"  . nil)
-                ("C-<right>" . nil)))
+                ("C-<right>" . nil)
+                ("C-("       . nil)
+                ("C-)"       . nil)))
      #+END_SRC
 
 **** elisp-mode
@@ -6827,10 +7400,12 @@
              "ti" 'ert-run-tests-interactively))
 
          (general-define-key
-           :states '(normal insert)
+           ;; :states '(normal insert motion replace)
            :keymaps 'lisp-interaction-mode-map
-           "C-S-H" 'evil-adjust-eval-print-last-sexp
-           "C-S-L" 'evil-adjust-eval-replace-last-sexp)
+           "C-)" 'evil-adjust-eval-print-last-sexp
+           "C-(" 'evil-adjust-eval-replace-last-sexp
+           "C-S-E" 'evil-adjust-eval-print-last-sexp
+           "C-S-R" 'evil-adjust-eval-replace-last-sexp)
 
          ;; (add-hook 'lisp-interaction-mode-hook #'(lambda () (paredit-mode -1)))
          :bind (:map lisp-interaction-mode-map
@@ -7690,7 +8265,7 @@
          (general-define-key
            :keymaps 'org-mode-map
            :states '(normal visual insert emacs)
-           "<tab>" 'org-cycle)
+           "TAB" 'org-cycle)
 
          ;; predicated on at heading
 
@@ -9514,6 +10089,8 @@
 
       `(org-block ((,cls (:background ,extra-dark-grey))))
       `(org-document-title ((,cls (:foreground "white" :height 1.3 :inherit bold))))
+
+      `(dashboard-text-banner ((,cls (:foreground ,orange-int))))
 
       ;;; ivy
       ;; `(ivy-current-match ((,cls :backgrouns ,blue-dim :foreground ,black))) ;; hl-line
