@@ -96,6 +96,8 @@
                           :width 'normal)
 
       (defalias 'yes-or-no-p 'y-or-n-p)
+      (defalias 'regexp-string-match #'string-match)
+
 
       ;;; disable annoying GUI enhancements
       (menu-bar-mode -1)     ; dropdown menu list below frame title
@@ -105,7 +107,7 @@
 
       ;; frankly, display buffers alist is badly documented.
       ;; there's a quick and simple article exploring how it
-      ;; works [[here][https://www.simplify.ba/articles/2016/01/25/display-buffer-alist/]]
+      ;; works [[https://www.simplify.ba/articles/2016/01/25/display-buffer-alist/][here]]
       ;;
       ;; in the meantime, the following is a breif~er~ summary
       ;;   1. the car of each entry should be a regex matching a buffer
@@ -115,7 +117,21 @@
       ;;      an alist as an argument. Each entry in the list is invoked
       ;;      until one which returns non nil is encountered.
       ;;   3. the remaining list items should be an alists providing options.
-      ;; (push '() display-buffer-alist)
+
+      (defmacro display-buffer--defun-focus-method (func)
+        `(defun ,(intern (concat (symbol-name func) "-and-focus")) (buffer alist)
+           (let ((window (,func buffer alist)))
+             (when window
+               (select-window window)))))
+
+      (display-buffer--defun-focus-method display-buffer-in-side-window)
+
+      (push '("*Async Shell Command*"
+              (display-buffer-reuse-window
+               display-buffer-in-side-window-and-focus)
+              (side          . bottom)
+              (window-height . 0.5))
+            display-buffer-alist)
     #+END_SRC
 
 *** Config Variables
@@ -797,7 +813,7 @@
         "bE" 'erase-buffer
         "bK" 'kill-this-buffer
         "bk" 'kill-this-buffer-and-window-maybe
-        "bM" 'goto-messages-buffer
+        "bM" 'switch-to-messages-buffer
         "bm" 'buffer-menu
         "bn" 'next-buffer
         "bN" 'previous-buffer
@@ -984,6 +1000,7 @@
 
       (mohkale/set-leader-keys
         "tl" 'toggle-truncate-lines
+        "tL" 'toggle-lexical-binding
         "tw" 'toggle-word-wrap
         "t|" 'toggle-scroll-bar
         "t-" 'toggle-horizontal-scroll-bar
@@ -1262,6 +1279,7 @@
       (defalias 'jump-to-directory-other-window 'dired-jump-other-window)
 
       (defun write-kill-buffer (&optional buffer-or-name confirm)
+        "write buffer to file and then kill it"
         (interactive)
         (let ((buffer (get-buffer (or buffer-or-name (current-buffer)))))
           (when (buffer-modified-p)
@@ -1320,35 +1338,9 @@
           (apply func args)))
     #+END_SRC
 
-*** Windows
-    #+BEGIN_SRC emacs-lisp
-      (defun force-set-all-visible-windows-dedication (&optional dedicate)
-        "allows you to set the dedication of all visible windows
-      dedicate if truthy, will result in all windows recieving a dedication.
-      if falsy, all windows will have their dedication removed"
-        (interactive "P")
-        ;; TODO require persp-mode here
-        (and dedicate (setq dedicate t))   ; rationalise value as bool
-        (or  dedicate (setq dedicate nil)) ; rationalise value as nil
+*** Yank Indent Adjust
+    adjust indentation of yanked text in some modes... because doing so manually is a pain :tongue_out:
 
-        (dolist (window (window-list))
-          (if (not (eq dedicate (window-dedicated-p window)))
-              (with-selected-window window
-                (set-window-dedicated-p window dedicate)))))
-
-      (defun window-zen ()
-        "Maximize buffer"
-        ;; from https://gist.github.com/3402786
-        (interactive)
-        (if (and (= 1 (length (window-list)))
-                 (assoc ?_ register-alist))
-            (jump-to-register ?_)
-          (progn
-            (window-configuration-to-register ?_)
-            (delete-other-windows))))
-    #+END_SRC
-
-*** yank-indent-adjust
     #+BEGIN_SRC emacs-lisp
       ;; initially sourced from: https://github.com/magnars/.emacs.d/blob/master/defuns/editing-defuns.el#L99-L124
 
@@ -1401,8 +1393,24 @@
         (yank 1))
     #+END_SRC
 
-*** Text
+*** Misc
+    #+BEGIN_SRC emacs-lisp
+      (defun toggle-lexical-binding (&optional prefix)
+        (interactive "P")
+        (if (not prefix)
+            (setq lexical-binding (not lexical-binding))
+          (cond
+           ((or (listp prefix) (> prefix 0))
+            (setq lexical-binding t))
+           (t
+            (setq lexical-binding nil))))
 
+        (message "lexical binding: %s" (if lexical-binding
+                                           (propertize "enabled" 'face 'compilation-info)
+                                         (propertize "disabled" 'face 'compilation-error))))
+    #+END_SRC
+
+*** Text
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-text-query
         :defer t
@@ -1680,10 +1688,13 @@
                    kill-this-buffer-and-window-maybe
                    switch-to-last-buffer
                    kill-all-windows-and-return-to-home
-                   goto-messages-buffer
+                   switch-to-messages-buffer
+                   force-set-all-visible-windows-dedication
+                   window-zen
                    shell-command-on-buffer
                    async-shell-command-on-buffer
                    safe-erase-buffer
+                   create-new-empty-buffer
                    copy-whole-buffer-to-clipboard
                    split-window-right-and-focus
                    split-window-below-and-focus))
@@ -1691,15 +1702,67 @@
 
     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-bufwin.el"
-      (defun switch-to-scratch-buffer ()
-        (interactive)
-        ;; TODO interactive makes new scratch buffers
-        (switch-to-buffer (get-buffer-create "*scratch*")))
+      (defvar scratch-buffer-name "*scratch*"
+        "name of users scratch buffer")
 
-      (defun goto-messages-buffer ()
+      (defun create-new-empty-buffer (&optional buffer-name)
+        "create and switch to a new empty scratch like buffer
+      with prefix it prompts you for the name of the buffer."
+        (interactive "P")
+        (let* ((def-buf-name scratch-buffer-name)
+               (buffer-name
+                (cond
+                 ((stringp buffer-name) buffer-name)
+                 (buffer-name (read-buffer "buffer name: " def-buf-name))
+                 (t                     def-buf-name)))
+               (buffer-name (generate-new-buffer-name buffer-name)))
+          (switch-to-buffer (get-buffer-create buffer-name))
+          (funcall-interactively initial-major-mode)))
+
+      (defun switch-to-scratch-buffer (&optional prefix)
+        "switch to the scratch buffer
+      with prefix, prompts for which buffer names like the scratch
+      buffer to switch to. If none exists, a new scratch buffer will
+      be made. If only one exists, it will be switched to and if more
+      than one exists then prompts for it."
+        (interactive "P")
+        (if (not prefix)
+            ;; switch to original scratch buffer
+            (let ((buffer (get-buffer scratch-buffer-name)))
+              (unless buffer
+                (setq buffer (get-buffer-create scratch-buffer-name))
+                (funcall-interactively initial-major-mode))
+              (switch-to-buffer buffer))
+          (let* ((buffer-list (seq-filter #'(lambda (x)
+                                              (string-match
+                                               (regexp-quote scratch-buffer-name)
+                                               (buffer-name x) 0))
+                                          (sort (buffer-list) (lambda (x y) (string< (buffer-name x) (buffer-name y))))))
+                 (buffer-names (mapcar #'buffer-name buffer-list)))
+            (cond
+             ((zerop (length buffer-list))
+              (create-new-empty-buffer))
+             ((eq 1 (length buffer-list))
+              (switch-to-buffer (car buffer-list)))
+             (t
+              (let (buffer-choice)
+                (setq buffer-choice (ivy-read "Switch to buffer: " buffer-names
+                                              :require-match t
+                                              :keymap ivy-switch-buffer-map
+                                              :matcher #'ivy--switch-buffer-matcher
+                                              :caller 'switch-to-scratch-buffer
+                                              :unwind #'counsel--switch-buffer-unwind
+                                              :update-fn 'counsel--switch-buffer-update-fn))
+                (switch-to-buffer buffer-choice)))))))
+
+      (defun switch-to-messages-buffer ()
         "switches to messages buffer"
         (interactive)
         (switch-to-buffer (messages-buffer)))
+
+      (defun switch-to-last-buffer ()
+        (interactive)
+        (switch-to-buffer nil))
 
       (defun kill-this-buffer-and-window-maybe ()
         "kills the currently open buffer and the window if another is open"
@@ -1709,10 +1772,6 @@
               (kill-buffer-and-window)
             (kill-this-buffer))))
 
-      (defun switch-to-last-buffer ()
-        (interactive)
-        (switch-to-buffer nil))
-
       (defun kill-all-windows-and-return-to-home ()
         "kills every other window and returns to spacemacs home"
         (interactive)
@@ -1721,10 +1780,34 @@
           (delete-window window))
         (goto-home-buffer))
 
+      (defun force-set-all-visible-windows-dedication (&optional dedicate)
+        "allows you to set the dedication of all visible windows
+      dedicate if truthy, will result in all windows recieving a dedication.
+      if falsy, all windows will have their dedication removed"
+        (interactive "P")
+        ;; TODO require persp-mode here
+        (and dedicate (setq dedicate t))   ; rationalise value as bool
+        (or  dedicate (setq dedicate nil)) ; rationalise value as nil
+
+        (dolist (window (window-list))
+          (if (not (eq dedicate (window-dedicated-p window)))
+              (with-selected-window window
+                (set-window-dedicated-p window dedicate)))))
+
+      (defun window-zen ()
+        "Maximize buffer"
+        ;; from https://gist.github.com/3402786
+        (interactive)
+        (if (and (= 1 (length (window-list)))
+                 (assoc ?_ register-alist))
+            (jump-to-register ?_)
+          (window-configuration-to-register ?_)
+          (delete-other-windows)))
+
       (defun shell-command-on-buffer (&optional prefix)
         "Asks for a command and executes it in inferior shell with current buffer
       as input. if prefix is given, output of command is inserted in current buffer
-      at point."
+      at point. Again... how is this not a built in command :(."
         (interactive "P")
         (let ((command (read-shell-command "Shell command on buffer: "))
               (input-buffer (current-buffer)) output-buffer process-output)
@@ -1741,6 +1824,9 @@
             (message process-output))))
 
       (defun async-shell-command-on-region (&optional start end prefix)
+        "same as `async-shell-command', but also sends the current region
+      as stdin to the asynchronous process... why this isn't a built in
+      command escapes me."
         (interactive "r\nP")
         (require 'subr-x) ;; needed for string-empty-p
 
@@ -1748,7 +1834,6 @@
           (let ((command (read-shell-command "Async shell command on buffer: ")))
             (unless (string-empty-p command)
               (async-shell-command command) ;; XXX WHY??? don't you return the process :P
-
               (let ((program-buffer (get-buffer "*Async Shell Command*")))
 
                 (process-send-region (get-buffer-process program-buffer) start end)
@@ -1763,16 +1848,18 @@
                 (display-buffer program-buffer))))))
 
       (defun async-shell-command-on-buffer (&optional prefix)
+        "same as `async-shell-command-on-region' but sends buffer as region"
         (interactive "P")
         (async-shell-command-on-region (point-min) (point-max) prefix))
 
-      (defun safe-erase-buffer ()
+      (defun safe-erase-buffer (&optional prefix)
         "prompts to really erase and then erases the current buffer"
-        (interactive)
+        (interactive "P")
         (barf-if-buffer-read-only)
-        (if (y-or-n-p (concat "Erase content of buffer "
-                              (buffer-name)
-                              " ?"))
+        (when (or prefix
+                  (y-or-n-p (concat "Erase content of buffer "
+                                    (buffer-name)
+                                    " ?")))
             (erase-buffer)))
 
       (defun split-window-right-and-focus ()
@@ -1786,7 +1873,7 @@
         (other-window 1))
 
       (defun copy-whole-buffer-to-clipboard (buffer)
-        (interactive `(,(current-buffer)))
+        (interactive (list (current-buffer)))
         (with-current-buffer buffer
           (copy-region-as-kill (point-min) (point-max))))
     #+END_SRC
@@ -2358,6 +2445,8 @@
        (setq ivy-dispatching-done-hydra-exit-keys '(("ESC" nil)
                                                     ("C-g" nil)))
 
+       (defalias 'hydra-ivy-custom #'hydra-ivy)
+
        (provide 'hydra-ivy-custom)
      #+END_SRC
 
@@ -2920,7 +3009,9 @@
 
                 :map evil-ex-completion-map
                 ("C-a" . move-beginning-of-line)
-                ("C-e" . move-end-of-line)))
+                ("C-e" . move-end-of-line)
+                ("C-q" . quoted-insert)
+                ("C-M-q" . quit-window)))
      #+END_SRC
 
 **** evil-syntax
@@ -3942,7 +4033,7 @@
          :config
          (evil-set-initial-state 'diff-mode 'motion)
 
-         (mohkale/declare-prefix-for-major-mode* 'diff-mode
+         (mohkale/set-leader-keys-for-major-mode 'diff-mode
            "r" 'diff-refine-hunk
            "c" 'diff-kill-applied-hunks ;; clean displayed hunks only works on hunks below point.
            "k" 'diff-file-kill
@@ -4023,11 +4114,76 @@
           :config
           (setq-default ediff-window-setup-function       'ediff-setup-windows-plain
                         ediff-split-window-function       'split-window-horizontally
-                        ediff-merge-split-window-function 'split-window-horizontally)
+                        ediff-merge-split-window-function 'split-window-horizontally
+                        ;; ediff-keep-variants               nil ;; doesn't do anything :(
+                        )
+
+          (defvar mohkale-ediff-kill-temporary-buffers-on-exit t
+            "whether to keep temporary ediff buffers around")
 
           (require 'outline)
           ;; show org ediffs unfolded
           (add-hook 'ediff-prepare-buffer-hook #'outline-show-all)
+
+          ;; ensure window configuration is restored after diff quit
+          (let* ((ediff-window-register ?w)
+                 (register-active (lambda () (cdr (assoc ediff-window-register register-alist)))))
+            (defun ediff--restore-windows-before (&rest args)
+              ;; (message "setting up")
+              (unless (funcall register-active)
+                ;; (message "assigning to register")
+                (window-configuration-to-register ediff-window-register)))
+            (add-hook 'ediff-before-setup-hook #'ediff--restore-windows-before)
+
+            (defun ediff--restore-windows-after (&rest args)
+              (if (not (funcall register-active))
+                  (message "ediff-restore-windows : no previous window config found to restore")
+                (jump-to-register ediff-window-register)
+                (set-register ediff-window-register nil)))
+            (add-hook 'ediff-quit-hook #'ediff--restore-windows-after))
+
+          (defun ediff--kill-ediff-temp-buffers (&rest args)
+            "kills all the spawned ediff buffers... because
+        there's way too many and their named so similairly that
+        there's no point in them existing... Plus I keep ending
+        up editing the wrong diffed buffer."
+            (when mohkale-ediff-kill-temporary-buffers-on-exit
+              ;; kill diff checking buffers when temporary
+              (dolist (buffer (list ediff-buffer-A
+                                    ediff-buffer-B
+                                    ediff-buffer-C))
+                (when (and buffer
+                           (string-prefix-p "FILE=" (buffer-name buffer)))
+                  (kill-buffer buffer)))
+
+              ;; kill any hardcoded ediff related buffers
+              (dolist (buffer '("*Ediff Registry*"))
+                (let ((buffer (get-buffer buffer)))
+                  (when buffer
+                    (kill-buffer buffer))))
+
+              ;; kill any uniquely named ediff buffers...
+              ;; Ewwww... O(n*m)... how do I live with myself
+              (dolist (buffer-prefix '("*Ediff Control Panel"
+                                       "*ediff-diff"
+                                       "*ediff-errors"
+                                       "*ediff-fine-diff"))
+                (let ((buffer-prefix-regexp (regexp-quote buffer-prefix)))
+                  (dolist (buffer (buffer-list))
+                    (when (string-match buffer-prefix-regexp
+                                        (buffer-name buffer))
+                      (kill-buffer buffer)))))))
+
+          (add-hook 'ediff-quit-hook #'ediff--kill-ediff-temp-buffers)
+
+          (defun ediff--customize-ediff-mode-map (&rest args)
+            "give me back my leader keys damn it :P"
+            (general-define-key
+              :keymaps 'ediff-mode-map
+              :states  'motion
+              "SPC" mohkale-leader-map))
+
+          (add-hook 'ediff-keymap-setup-hook #'ediff--customize-ediff-mode-map)
 
           ;; (evil-set-initial-state 'ediff-meta-mode 'motion)
 
@@ -4872,7 +5028,8 @@
          ;; :after  counsel
          :commands hydra-ivy/body
          :config
-         (require 'hydra-ivy-custom)
+         (when (autoloadp (symbol-function 'hydra-ivy-custom/body))
+           (autoload-do-load (symbol-function 'hydra-ivy-custom/body)))
          :bind* (:map ivy-minibuffer-map
                  ("C-." . hydra-ivy/body)))
      #+END_SRC
@@ -4996,240 +5153,248 @@
     #+END_SRC
 
 *** ibuffer
-    #+BEGIN_SRC emacs-lisp
-      (use-package ibuffer
-        :defer t
-        :commands (ibuffer)
-        :init
-        (mohkale/set-leader-keys
-          "bm" 'ibuffer)
-        :config
-        (evil-set-initial-state 'ibuffer-mode 'motion)
+**** ibuffer
+     #+BEGIN_SRC emacs-lisp
+       (use-package ibuffer
+         :defer t
+         :commands (ibuffer)
+         :init
+         (mohkale/set-leader-keys
+           "bm" 'ibuffer)
+         :config
+         (evil-set-initial-state 'ibuffer-mode 'motion)
 
-        (setq mohkale-ibuffer-filter-map (make-sparse-keymap))
+         (setq mohkale-ibuffer-filter-map (make-sparse-keymap))
 
-        (bind-keys :map mohkale-ibuffer-filter-map
-                   ("TAB"    . ibuffer-exchange-filters)
-                   ("RET"    . ibuffer-filter-by-mode)
-                   ("!"      . ibuffer-negate-filter)
-                   ("&"      . ibuffer-and-filter)
-                   ("*"      . ibuffer-filter-by-starred-name)
-                   ("."      . ibuffer-filter-by-file-extension)
-                   ("/"      . ibuffer-filter-disable)
-                   ("<"      . ibuffer-filter-by-size-lt)
-                   (">"      . ibuffer-filter-by-size-gt)
-                   ("D"      . ibuffer-decompose-filter-group)
-                   ("M"      . ibuffer-filter-by-derived-mode)
-                   ("P"      . ibuffer-pop-filter-group)
-                   ("R"      . ibuffer-switch-to-saved-filter-groups)
-                   ("S"      . ibuffer-save-filter-groups)
-                   ("X"      . ibuffer-delete-saved-filter-groups)
-                   ("\\"     . ibuffer-clear-filter-groups)
-                   ("a"      . ibuffer-add-saved-filters)
-                   ("b"      . ibuffer-filter-by-basename)
-                   ("c"      . ibuffer-filter-by-content)
-                   ("d"      . ibuffer-decompose-filter)
-                   ("e"      . ibuffer-filter-by-predicate)
-                   ("f"      . ibuffer-filter-by-filename)
-                   ("g"      . ibuffer-filters-to-filter-group)
-                   ("i"      . ibuffer-filter-by-modified)
-                   ("m"      . ibuffer-filter-by-used-mode)
-                   ("n"      . ibuffer-filter-by-name)
-                   ("o"      . ibuffer-or-filter)
-                   ("p"      . ibuffer-pop-filter)
-                   ("r"      . ibuffer-switch-to-saved-filters)
-                   ("s"      . ibuffer-save-filters)
-                   ("t"      . ibuffer-exchange-filters)
-                   ("v"      . ibuffer-filter-by-visiting-file)
-                   ("x"      . ibuffer-delete-saved-filters)
-                   ("|"      . ibuffer-or-filter)
-                   ("<S-up>" . ibuffer-pop-filter-group)
-                   ("<up>"   . ibuffer-pop-filter))
+         (bind-keys :map mohkale-ibuffer-filter-map
+                    ("TAB"    . ibuffer-exchange-filters)
+                    ("RET"    . ibuffer-filter-by-mode)
+                    ("!"      . ibuffer-negate-filter)
+                    ("&"      . ibuffer-and-filter)
+                    ("*"      . ibuffer-filter-by-starred-name)
+                    ("."      . ibuffer-filter-by-file-extension)
+                    ("/"      . ibuffer-filter-disable)
+                    ("<"      . ibuffer-filter-by-size-lt)
+                    (">"      . ibuffer-filter-by-size-gt)
+                    ("D"      . ibuffer-decompose-filter-group)
+                    ("M"      . ibuffer-filter-by-derived-mode)
+                    ("P"      . ibuffer-pop-filter-group)
+                    ("R"      . ibuffer-switch-to-saved-filter-groups)
+                    ("S"      . ibuffer-save-filter-groups)
+                    ("X"      . ibuffer-delete-saved-filter-groups)
+                    ("\\"     . ibuffer-clear-filter-groups)
+                    ("a"      . ibuffer-add-saved-filters)
+                    ("b"      . ibuffer-filter-by-basename)
+                    ("c"      . ibuffer-filter-by-content)
+                    ("d"      . ibuffer-decompose-filter)
+                    ("e"      . ibuffer-filter-by-predicate)
+                    ("f"      . ibuffer-filter-by-filename)
+                    ("g"      . ibuffer-filters-to-filter-group)
+                    ("i"      . ibuffer-filter-by-modified)
+                    ("m"      . ibuffer-filter-by-used-mode)
+                    ("n"      . ibuffer-filter-by-name)
+                    ("o"      . ibuffer-or-filter)
+                    ("p"      . ibuffer-pop-filter)
+                    ("r"      . ibuffer-switch-to-saved-filters)
+                    ("s"      . ibuffer-save-filters)
+                    ("t"      . ibuffer-exchange-filters)
+                    ("v"      . ibuffer-filter-by-visiting-file)
+                    ("x"      . ibuffer-delete-saved-filters)
+                    ("|"      . ibuffer-or-filter)
+                    ("<S-up>" . ibuffer-pop-filter-group)
+                    ("<up>"   . ibuffer-pop-filter))
 
-        (mohkale/declare-prefix-for-major-mode* 'ibuffer-mode
-          "G" "jump/goto"
-          "m" "mark"
-          "/" "filter")
+         (mohkale/declare-prefix-for-major-mode* 'ibuffer-mode
+           "G" "jump/goto"
+           "m" "mark"
+           "/" "filter")
 
-        (mohkale/set-leader-keys-for-major-mode 'ibuffer-mode
-          ;; unbound:
-          ;;  * ibuffer-do-print
-          "1"   'ibuffer-visit-buffer-1-window
-          "+"   'ibuffer-add-to-tmp-show
-          "-"   'ibuffer-add-to-tmp-hide
-          "."   'hydra-ibuffer-main/body
-          "/"    mohkale-ibuffer-filter-map
-          "RET" 'ibuffer-do-view-horizontally
-          "A"   'ibuffer-auto-mode
-          "E"   'ibuffer-do-view-and-eval
-          "e"   'ibuffer-do-eval
-          "R"   'ibuffer-redisplay
-          "r"   'ibuffer-do-rename-uniquely
-          "S"   'ibuffer-do-query-replace
-          "s"   'ibuffer-do-save
-          ;; "s"   'ibuffer-do-replace-regexp
-          "T"   'ibuffer-visit-tags-table
-          "f"   'ibuffer-find-file
-          "g"   'ibuffer-jump-to-buffer
-          "Gb"  'ibuffer-jump-to-buffer
-          "Gf"  'ibuffer-jump-to-filter-group
-          "|"   'ibuffer-do-shell-command-pipe-replace
-          "~"   'ibuffer-do-toggle-modified
+         (mohkale/set-leader-keys-for-major-mode 'ibuffer-mode
+           ;; unbound:
+           ;;  * ibuffer-do-print
+           "1"   'ibuffer-visit-buffer-1-window
+           "+"   'ibuffer-add-to-tmp-show
+           "-"   'ibuffer-add-to-tmp-hide
+           "."   'hydra-ibuffer-main/body
+           "/"    mohkale-ibuffer-filter-map
+           "RET" 'ibuffer-do-view-horizontally
+           "A"   'ibuffer-auto-mode
+           "E"   'ibuffer-do-view-and-eval
+           "e"   'ibuffer-do-eval
+           "R"   'ibuffer-redisplay
+           "r"   'ibuffer-do-rename-uniquely
+           "S"   'ibuffer-do-query-replace
+           "s"   'ibuffer-do-save
+           ;; "s"   'ibuffer-do-replace-regexp
+           "T"   'ibuffer-visit-tags-table
+           "f"   'ibuffer-find-file
+           "g"   'ibuffer-jump-to-buffer
+           "Gb"  'ibuffer-jump-to-buffer
+           "Gf"  'ibuffer-jump-to-filter-group
+           "|"   'ibuffer-do-shell-command-pipe-replace
+           "~"   'ibuffer-do-toggle-modified
 
-          "mm" 'ibuffer-toggle-marks
-          "m/" 'ibuffer-mark-by-file-name-regexp
-          ;; "m M-/" 'ibuffer-mark-by-name-regexp
-          "mo" 'ibuffer-mark-old-buffers
-          "ml" 'ibuffer-mark-by-locked
-          "mb" 'ibuffer-mark-by-content-regexp
-          "mM" 'ibuffer-mark-by-mode-regexp
-          "md" 'ibuffer-mark-dired-buffers
-          "mh" 'ibuffer-mark-help-buffers
-          "mn" 'ibuffer-mark-dissociated-buffers
-          "mN" 'ibuffer-mark-unsaved-buffers
-          "m*" 'ibuffer-mark-modified-buffers
-          "ms" 'ibuffer-mark-special-buffers
-          "m%" 'ibuffer-mark-read-only-buffers
-          "mz" 'ibuffer-mark-compressed-file-buffers)
+           "mm" 'ibuffer-toggle-marks
+           "m/" 'ibuffer-mark-by-file-name-regexp
+           ;; "m M-/" 'ibuffer-mark-by-name-regexp
+           "mo" 'ibuffer-mark-old-buffers
+           "ml" 'ibuffer-mark-by-locked
+           "mb" 'ibuffer-mark-by-content-regexp
+           "mM" 'ibuffer-mark-by-mode-regexp
+           "md" 'ibuffer-mark-dired-buffers
+           "mh" 'ibuffer-mark-help-buffers
+           "mn" 'ibuffer-mark-dissociated-buffers
+           "mN" 'ibuffer-mark-unsaved-buffers
+           "m*" 'ibuffer-mark-modified-buffers
+           "ms" 'ibuffer-mark-special-buffers
+           "m%" 'ibuffer-mark-read-only-buffers
+           "mz" 'ibuffer-mark-compressed-file-buffers)
 
-        (general-define-key
-          :keymaps 'ibuffer-mode-map
-          "+"                nil
-          "-"                nil
-          "0"                nil
-          "f"                nil
-          "SPC"              nil
-          "S-SPC"            nil
-          ">"                nil
-          "<"                nil
-          "?"                nil
-          "h"                nil
-          "X"                nil
-          "F"                nil
-          "C-d"              nil
-          "C-t"              nil
-          "b"                nil
-          "n"                nil
-          "g"                nil
-          "p"                nil
-          "w"                nil
-          "s"                nil
-          "`"                nil
-          ","                nil
-          "*"                nil
-          "/"                nil
-          "A"                nil
-          "C-c"              nil
-          "C-x"              nil
-          "M-s"              nil
-          "M-g"              nil
-          "M-n"              nil
-          "M-p"              nil
-          "M-{"              nil
-          "M-}"              nil
-          "M-o"              nil
-          "M-DEL"            nil
-          "%"                nil
+         (general-define-key
+           :keymaps 'ibuffer-mode-map
+           "+"                nil
+           "-"                nil
+           "0"                nil
+           "f"                nil
+           "SPC"              nil
+           "S-SPC"            nil
+           ">"                nil
+           "<"                nil
+           "?"                nil
+           "h"                nil
+           "X"                nil
+           "F"                nil
+           "C-d"              nil
+           "C-t"              nil
+           "b"                nil
+           "n"                nil
+           "g"                nil
+           "p"                nil
+           "w"                nil
+           "s"                nil
+           "`"                nil
+           ","                nil
+           "*"                nil
+           "/"                nil
+           "A"                nil
+           "C-c"              nil
+           "C-x"              nil
+           "M-s"              nil
+           "M-g"              nil
+           "M-n"              nil
+           "M-p"              nil
+           "M-{"              nil
+           "M-}"              nil
+           "M-o"              nil
+           "M-DEL"            nil
+           "%"                nil)
 
-          ;; "D" 'ibuffer-mark-for-delete-backwards
-          "D"       'ibuffer-do-delete
-          "M"       'ibuffer-do-toggle-modified
-          "="       'ibuffer-diff-with-file
-          "o"       'ibuffer-visit-buffer-other-window
-          "M-o"     'ibuffer-visit-buffer-other-frame
-          "M-RET"   'ibuffer-visit-buffer-other-window-noselect
-          "O"       'ibuffer-do-occur
-          "gr"      'ibuffer-update
-          "gR"      'ibuffer-do-revert
-          "gs"      'ibuffer-do-save
-          ;; "R" 'ibuffer-do-revert
-          "R"       'ibuffer-do-toggle-read-only
-          "r"       'ibuffer-change-marks
-          "S"       'ibuffer-toggle-sorting-mode
-          "sa"      'ibuffer-do-sort-by-alphabetic
-          "sf"      'ibuffer-do-sort-by-filename/process
-          "si"      'ibuffer-invert-sorting
-          "sm"      'ibuffer-do-sort-by-major-mode
-          "ss"      'ibuffer-do-sort-by-size
-          "sr"      'ibuffer-do-sort-by-recency
-          "v"       'ibuffer-do-view
-          "V"       'ibuffer-do-view-other-frame
-          "("       'ibuffer-switch-format
-          "p"       'ibuffer-yank
-          "C-y"     'ibuffer-yank
-          "C-/"      mohkale-ibuffer-filter-map
-          "C-j"     'ibuffer-forward-line
-          "C-k"     'ibuffer-backward-line
-          "M-j"     'ibuffer-forward-filter-group
-          "M-k"     'ibuffer-backward-filter-group
-          "C-S-J"   'ibuffer-forward-next-marked
-          "C-S-K"   'ibuffer-backwards-next-marked
-          "C-M-S-k" 'ibuffer-do-kill-lines
-          "C-M-k"   'ibuffer-kill-line
-          "S-DEL"   'ibuffer-bury-buffer
-          ;; "C-s" 'ibuffer-do-isearch
-          "C-s"     'ibuffer-do-isearch-regexp
-          "yn"      'ibuffer-copy-buffername-as-kill)
+         (general-define-key
+           :keymaps 'ibuffer-mode-map
+           :states  'motion
+           ;; "D" 'ibuffer-mark-for-delete-backwards
+           "D"       'ibuffer-do-delete
+           "M"       'ibuffer-do-toggle-modified
+           "="       'ibuffer-diff-with-file
+           "o"       'ibuffer-visit-buffer-other-window
+           "M-o"     'ibuffer-visit-buffer-other-frame
+           "M-RET"   'ibuffer-visit-buffer-other-window-noselect
+           "RET"     'ibuffer-visit-buffer
+           "O"       'ibuffer-do-occur
+           "gr"      'ibuffer-update
+           "gR"      'ibuffer-do-revert
+           "gs"      'ibuffer-do-save
+           ;; "R" 'ibuffer-do-revert
+           "R"       'ibuffer-do-toggle-read-only
+           "r"       'ibuffer-change-marks
+           "S"       'ibuffer-toggle-sorting-mode
+           "sa"      'ibuffer-do-sort-by-alphabetic
+           "sf"      'ibuffer-do-sort-by-filename/process
+           "si"      'ibuffer-invert-sorting
+           "sm"      'ibuffer-do-sort-by-major-mode
+           "ss"      'ibuffer-do-sort-by-size
+           "sr"      'ibuffer-do-sort-by-recency
+           "v"       'ibuffer-do-view
+           "V"       'ibuffer-do-view-other-frame
+           "("       'ibuffer-switch-format
+           "p"       'ibuffer-yank
+           "C-y"     'ibuffer-yank
+           "C-/"      mohkale-ibuffer-filter-map
+           "C-j"     'ibuffer-forward-line
+           "C-k"     'ibuffer-backward-line
+           "M-j"     'ibuffer-forward-filter-group
+           "M-k"     'ibuffer-backward-filter-group
+           "C-S-J"   'ibuffer-forward-next-marked
+           "C-S-K"   'ibuffer-backwards-next-marked
+           "C-M-S-k" 'ibuffer-do-kill-lines
+           "C-M-k"   'ibuffer-kill-line
+           "S-DEL"   'ibuffer-bury-buffer
+           ;; "C-s" 'ibuffer-do-isearch
+           "C-s"     'ibuffer-do-isearch-regexp
+           "yn"      'ibuffer-copy-buffername-as-kill)
 
-        ;;; https://www.emacswiki.org/emacs/IbufferMode
-        ;;  _                                                          _       _     _
-        ;; | |__  _   _ _ __ ___   __ _ _ __        _ __ ___  __ _  __| | __ _| |__ | | ___
-        ;; | '_ \| | | | '_ ` _ \ / _` | '_ \ _____| '__/ _ \/ _` |/ _` |/ _` | '_ \| |/ _ \
-        ;; | | | | |_| | | | | | | (_| | | | |_____| | |  __/ (_| | (_| | (_| | |_) | |  __/
-        ;; |_| |_|\__,_|_| |_| |_|\__,_|_| |_|     |_|  \___|\__,_|\__,_|\__,_|_.__/|_|\___|
-        ;;
+         ;;; https://www.emacswiki.org/emacs/IbufferMode
+         ;;  _                                                          _       _     _
+         ;; | |__  _   _ _ __ ___   __ _ _ __        _ __ ___  __ _  __| | __ _| |__ | | ___
+         ;; | '_ \| | | | '_ ` _ \ / _` | '_ \ _____| '__/ _ \/ _` |/ _` |/ _` | '_ \| |/ _ \
+         ;; | | | | |_| | | | | | | (_| | | | |_____| | |  __/ (_| | (_| | (_| | |_) | |  __/
+         ;; |_| |_|\__,_|_| |_| |_|\__,_|_| |_|     |_|  \___|\__,_|\__,_|\__,_|_.__/|_|\___|
+         ;;
 
-        (defun ibuffer--human-readable-file-sizes-to-bytes (string)
-          "Convert a human-readable file size into bytes."
-          ;; (interactive)
-          (let ((decimal (string-to-number string)))
-            (cond
-             ((string-suffix-p "G" string t) (* 1000000000 decimal))
-             ((string-suffix-p "M" string t) (* 1000000    decimal))
-             ((string-suffix-p "K" string t) (* 1000       decimal))
-             (t                                            decimal))))
+         (defun ibuffer--human-readable-file-sizes-to-bytes (string)
+           "Convert a human-readable file size into bytes."
+           ;; (interactive)
+           (let ((decimal (string-to-number string)))
+             (cond
+              ((string-suffix-p "G" string t) (* 1000000000 decimal))
+              ((string-suffix-p "M" string t) (* 1000000    decimal))
+              ((string-suffix-p "K" string t) (* 1000       decimal))
+              (t                                            decimal))))
 
-        (defun ibuffer--bytes-to-human-readable-file-sizes (bytes)
-          "Convert number of bytes to human-readable file size."
-          ;; (interactive)
-          (cond
-           ((> bytes 1000000000) (format "%10.1fG" (/ bytes 1000000000.0)))
-           ((> bytes 100000000)  (format "%10.0fM" (/ bytes 1000000.0)))
-           ((> bytes 1000000)    (format "%10.1fM" (/ bytes 1000000.0)))
-           ((> bytes 100000)     (format "%10.0fk" (/ bytes 1000.0)))
-           ((> bytes 1000)       (format "%10.1fk" (/ bytes 1000.0)))
-           (t                    (format "%10d"       bytes))))
+         (defun ibuffer--bytes-to-human-readable-file-sizes (bytes)
+           "Convert number of bytes to human-readable file size."
+           ;; (interactive)
+           (cond
+            ((> bytes 1000000000) (format "%10.1fG" (/ bytes 1000000000.0)))
+            ((> bytes 100000000)  (format "%10.0fM" (/ bytes 1000000.0)))
+            ((> bytes 1000000)    (format "%10.1fM" (/ bytes 1000000.0)))
+            ((> bytes 100000)     (format "%10.0fk" (/ bytes 1000.0)))
+            ((> bytes 1000)       (format "%10.1fk" (/ bytes 1000.0)))
+            (t                    (format "%10d"       bytes))))
 
-        ;; Use human readable Size column instead of original one
-        (define-ibuffer-column size-human-readable
-          (:name "Size"
-                 :inline t
-                 :summarizer
-                 (lambda (column-strings)
-                   (let ((total 0))
-                     (dolist (string column-strings)
-                       (setq total
-                             ;; like, ewww ...
-                             (+ (float (ibuffer--human-readable-file-sizes-to-bytes
-                                        string))
-                                total)))
-                     (ibuffer--bytes-to-human-readable-file-sizes total))))
-          (ibuffer--bytes-to-human-readable-file-sizes (buffer-size)))
+         ;; Use human readable Size column instead of original one
+         (define-ibuffer-column size-human-readable
+           (:name "Size"
+                  :inline t
+                  :summarizer
+                  (lambda (column-strings)
+                    (let ((total 0))
+                      (dolist (string column-strings)
+                        (setq total
+                              ;; like, ewww ...
+                              (+ (float (ibuffer--human-readable-file-sizes-to-bytes
+                                         string))
+                                 total)))
+                      (ibuffer--bytes-to-human-readable-file-sizes total))))
+           (ibuffer--bytes-to-human-readable-file-sizes (buffer-size)))
 
-        (setq ibuffer-formats
-              `((mark modified read-only locked
-                      " "
-                      (name 20 20 :left :elide)
-                      " "
-                      (size-human-readable 11 -1 :right)
-                      " "
-                      (mode 16 16 :left :elide)
-                      " " filename-and-process)
-                (mark " "
-                      (name 16 -1)
-                      " "
-                      filename))))
+         (setq ibuffer-formats
+               `((mark modified read-only locked
+                       " "
+                       (name 20 20 :left :elide)
+                       " "
+                       (size-human-readable 11 -1 :right)
+                       " "
+                       (mode 16 16 :left :elide)
+                       " " filename-and-process)
+                 (mark " "
+                       (name 16 -1)
+                       " "
+                       filename))))
+     #+END_SRC
 
+**** ibuffer-vc
+     #+BEGIN_SRC emacs-lisp
       (use-package ibuffer-vc
         :ensure t
         :defer  t
@@ -5241,7 +5406,10 @@
         (general-define-key
           :keymaps 'ibuffer-mode-map
           "sv" 'ibuffer-vc))
+     #+END_SRC
 
+**** ibuffer-tramp
+     #+BEGIN_SRC emacs-lisp
       (use-package ibuffer-tramp
         :ensure t
         :defer  t
@@ -5252,7 +5420,7 @@
         (general-define-key
           :keymaps 'ibuffer-mode-map
           "s@" 'ibuffer-tramp))
-    #+END_SRC
+     #+END_SRC
 
 *** imenu
     #+BEGIN_SRC emacs-lisp
@@ -5631,6 +5799,8 @@
                  ("C-k" . previous-history-element)
                  ("C-h" . previous-matching-history-element)
                  ("C-l" . next-matching-history-element)
+                 ("C-q" . quoted-insert)
+                 ("C-M-q" . quit-window)
 
                  ("C-w" . backward-kill-word)
                  ("C-?" . minibuffer-completion-help)
@@ -6295,6 +6465,17 @@
          ;; (counsel-projectile-mode +1)
          )
      #+END_SRC
+
+*** save-place
+    remembers the cursor position in open files... so when I reopen them I'm taken to that point immeadiately. It's a cool feature, but not really essential. Generally, when I open a file, I'll look around a bit to see where I was and what I was doing. Jumping to where I was immediately only helps with one of those problems & it seems like a bad habit to depend on that to remind me... use org capture for that and mode dependent jump keys to get to where you need to. quick & easy.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package saveplace
+        :commands (save-place-mode)
+        :init
+        (setq save-place-forget-unreadable-files nil)
+        (save-place-mode +1))
+    #+END_SRC
 
 *** server
     #+BEGIN_SRC emacs-lisp
@@ -8308,6 +8489,7 @@
 
          (mohkale/set-leader-keys-for-major-mode 'org-mode
            "RET" 'org-ctrl-c-ret
+           "SPC" 'org-display-outline-path
            "!" 'org-time-stamp-inactive
            "'" 'org-edit-special
            "*" 'org-ctrl-c-star
@@ -10123,8 +10305,6 @@
      (dolist (color colors)
        (makunbound (car color)))
    #+END_SRC
-
-   #+RESULTS:
 
 * Deprecated
   :PROPERTIES:

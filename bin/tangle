@@ -71,6 +71,21 @@ end
 
 NullStream = File.open(File::NULL, "w")
 
+# https://stackoverflow.com/questions/4175733/convert-duration-to-hoursminutesseconds-or-similar-in-rails-3-or-ruby
+module DurationMixin
+    def duration
+        minutes, seconds = self.divmod(60)
+        hours, minutes   = minutes.divmod(60)
+        days, hours      = hours.divmod(24)
+
+        "#{days.to_s.rjust(3)}d #{hours.to_s.rjust(2)}h #{minutes.to_s.rjust(2)}m #{seconds}s"
+        format("%02d:%02d:%02d", hours, minutes, seconds)
+    end
+end
+
+Float.include(DurationMixin)
+Integer.include(DurationMixin)
+
 # provides an incremental iterator over chars using counter
 ProgressIterator = Struct.new(:chars, :counter) do
     def get_char(increment=true)
@@ -97,17 +112,20 @@ class ProgressIndicator
         @pdelay       = 0.25
         @lock         = Mutex.new # synchronise acess to output streams
         self.iterator = ProgressIterator.new(["|", "/", "-", "\\"], 0)
+        @begun        = Time.now()
     end
 
     def to_s
-        message  = @prefix ? "#{@prefix} " : ""
+        message  = ""
+        message += @prefix + " "        if @prefix
+        message += "[#{(Time.now() - @begun).duration}] "
         message += @message.green + " " if @message
         # message += @iterator.get_char(true).green
         message += @iterator.get_char(true).white
     end
 
     def length
-        (self.prefix || "").length + (self.message || "").length + 2
+         to_s.length
     end
 
     ##
