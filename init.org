@@ -150,6 +150,8 @@
         display-buffer-fallback-action
         "the value for fallback actions without my configuration")
 
+      (advice-add 'display-startup-echo-area-message :around #'ignore)
+
       (setq display-buffer-fallback-action
             ;; by default, focus on displayed windows
             '((display-buffer--maybe-same-window-and-focus
@@ -174,6 +176,10 @@
             display-buffer-alist)
 
       (push `("*image-dired-display-image*"
+              ,@display-buffer--default-fallback-action)
+            display-buffer-alist)
+
+      (push `("magit-diff: "
               ,@display-buffer--default-fallback-action)
             display-buffer-alist)
     #+END_SRC
@@ -216,10 +222,11 @@
       ;; (add-hook 'kill-emacs-hook (lambda () (and (mohkale/refresh-config-file-p)
       ;;                                            (mohkale/build-configuration-file))))
 
-      (add-hook 'emacs-startup-hook (lambda ()
-                                      (when (mohkale/refresh-config-file-p)
-                                        (display-warning 'init
-                                                         "your configuration file is out of date... please run <SPC f e b> followed by <SPC f e r>"))))
+      (add-hook 'emacs-startup-hook
+                (lambda ()
+                  (when (mohkale/refresh-config-file-p)
+                    (display-warning 'init
+                                     "your configuration file is out of date... please run <SPC f e b> followed by <SPC f e r>"))))
 
       (setq mohkale-window-map (make-sparse-keymap))
     #+END_SRC
@@ -2391,7 +2398,7 @@
          ("Q" quit-window :exit t)
          ("q" nil :exit t)
          ("." nil :exit t))
-         
+
        (defalias 'hydra-ibuffer/body #'hydra-ibuffer-main/body)
 
        (defhydra hydra-ibuffer-mark (:color teal :columns 5 :after-exit (hydra-ibuffer-main/body))
@@ -6942,8 +6949,21 @@
                                      (project-name (file-name-nondirectory
                                                     (string-remove-suffix "/" project))))
                                  (persp-switch project-name)
-                                 (projectile-switch-project-by-name project)
-                                 )))))
+                                 (projectile-switch-project-by-name project)))))
+
+         (defun projectile-cleanup--shut-up-please (func &rest args)
+           "I don't need to know when you've done nothing... thnx tho :P"
+           (cl-letf* (((symbol-function 'actual-message)
+                       (symbol-function 'message))
+                      ((symbol-function 'message)
+                       (lambda (format &rest args)
+                         (if (string-equal format
+                                           "No projects needed to be removed.")
+                             (apply 'format format args)
+                           (apply 'actual-message format args)))))
+             (apply func args)))
+
+         (advice-add 'projectile-cleanup-known-projects :around #'projectile-cleanup--shut-up-please))
      #+END_SRC
 
 **** org-projectile
@@ -8017,6 +8037,9 @@
      #+BEGIN_SRC emacs-lisp
        (use-package elisp-mode
          :defer t
+         ;; show lambda as an actual lambda symbol
+         :hook ((elisp-mode            . prettify-symbols-mode)
+                (lisp-interaction-mode . prettify-symbols-mode))
          :config
          ;; evil-adjust: https://raw.githubusercontent.com/troyp/evil-adjust/master/evil-adjust.el
          (defmacro defun-evil-adjust-to-eol (function-name arglist &optional interactive &rest body)
@@ -8819,7 +8842,10 @@
        (use-package org
          :ensure t
          :defer  t
-         :hook (org-mode . mohkale//enable-line-numbers-handler)
+         :hook ((org-mode . mohkale//enable-line-numbers-handler)
+                (org-mode . prettify-symbols-mode)
+                (org-mode . (lambda ()
+                              (setq prettify-symbols-alist '(("lambda" . 955))))))
          :commands (org-capture
                     org-agenda
                     org-copy-subtree
@@ -8937,6 +8963,7 @@
                     (funcall insert-line)
                     (org-insert-heading)
                     (evil-append nil))
+
                    ((org-at-item-p)
                     ;; position of cursor dictates where new point goes
                     (if above
@@ -9171,15 +9198,10 @@
                  ;; "C-M-<return>" org-meta-return)
                  ("C-s" . org-sort)
                  ("M-S-<return>" . nil)))
+     #+END_SRC
 
-       (use-package org-src
-         :defer t
-         :config
-         (mohkale/set-leader-keys-for-minor-mode 'org-src-mode
-           (concat mohkale-major-mode-leader-prefix ",") 'org-edit-src-exit
-           (concat mohkale-major-mode-leader-prefix "q") 'org-edit-src-abort
-           (concat mohkale-major-mode-leader-prefix "s") 'org-edit-src-save))
-
+**** org-capture
+     #+BEGIN_SRC emacs-lisp
        (use-package org-capture
          :defer t
          :config
@@ -9187,6 +9209,17 @@
            (concat mohkale-major-mode-leader-prefix ",") 'org-capture-finalize
            (concat mohkale-major-mode-leader-prefix "q") 'org-capture-kill
            (concat mohkale-major-mode-leader-prefix "r") 'org-capture-refile))
+     #+END_SRC
+
+**** org-src
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-src
+         :defer t
+         :config
+         (mohkale/set-leader-keys-for-minor-mode 'org-src-mode
+           (concat mohkale-major-mode-leader-prefix ",") 'org-edit-src-exit
+           (concat mohkale-major-mode-leader-prefix "q") 'org-edit-src-abort
+           (concat mohkale-major-mode-leader-prefix "s") 'org-edit-src-save))
      #+END_SRC
 
 *** JSON
@@ -10269,6 +10302,26 @@
                        magit-diff-mode-map))
           ;; GIVE ME BACK MY LEADER!!!
           (define-key (eval map) (kbd mohkale-leader-key) nil))
+
+        (mohkale/declare-prefix-for-mode* 'git-commit-mode
+          (concat mohkale-major-mode-leader-prefix "i") "insert")
+
+        (mohkale/set-leader-keys-for-minor-mode 'git-commit-mode
+          (concat mohkale-major-mode-leader-prefix ",")  'with-editor-finish
+          (concat mohkale-major-mode-leader-prefix "q")  'with-editor-cancel
+          (concat mohkale-major-mode-leader-prefix "s")  'git-commit-save-message
+          (concat mohkale-major-mode-leader-prefix "d")  'magit-diff-while-committing
+          (concat mohkale-major-mode-leader-prefix "j")  'git-commit-next-message
+          (concat mohkale-major-mode-leader-prefix "k")  'git-commit-prev-message
+          (concat mohkale-major-mode-leader-prefix "ia") 'git-commit-ack ;; knowledgement
+          (concat mohkale-major-mode-leader-prefix "iS") 'git-commit-suggested
+          (concat mohkale-major-mode-leader-prefix "im") 'git-commit-modified
+          (concat mohkale-major-mode-leader-prefix "ic") 'git-commit-cc
+          (concat mohkale-major-mode-leader-prefix "ir") 'git-commit-reported
+          (concat mohkale-major-mode-leader-prefix "iR") 'git-commit-review
+          (concat mohkale-major-mode-leader-prefix "is") 'git-commit-signoff
+          (concat mohkale-major-mode-leader-prefix "it") 'git-commit-test)
+
         :bind* (:map magit-mode-map
                 ("M-j" . magit-section-forward-sibling)
                 ("M-k" . magit-section-backward-sibling)
