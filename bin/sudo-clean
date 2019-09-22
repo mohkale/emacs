@@ -66,6 +66,7 @@ esac
 
 find ./ -depth -type f $(get_tracked_exclusion_filters) \
     -not -wholename './etc/*.org'                       \
+    -not -wholename './etc/private/*'                   \
     "$@"                                                \
     -print0 | xargs --no-run-if-empty -0 -P${MAXPROCS} bash -c ${TRASH_COMMAND}' "$@"' '{}'
 

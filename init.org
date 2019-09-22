@@ -98,12 +98,26 @@
       (defalias 'yes-or-no-p 'y-or-n-p)
       (defalias 'regexp-string-match #'string-match)
 
+      (defalias 'path-basename                   #'file-name-nondirectory)
+      (defalias 'path-dirname                    #'file-name-directory)
+      (defalias 'path-extension                  #'file-name-extension)
+      (defalias 'path-without-extension          #'file-name-sans-extension)
+      (defalias 'path-basename-without-extension #'file-name-base)
+
+      (defalias 'gnu-debugger     #'gdb)
+      (defalias 'gud-gnu-debugger #'gud-gdb)
+      (defalias 'perl-debugger    #'perldb)
+      (defalias 'java-debugger    #'jdb)
 
       ;;; disable annoying GUI enhancements
       (menu-bar-mode -1)     ; dropdown menu list below frame title
       (scroll-bar-mode -1)   ; scrolling bar shown on frames right side
       (tool-bar-mode -1)     ; short mini menu showed below the menu bar
       (blink-cursor-mode -1) ; cursor flashes annoyingly
+
+      ;; to make string based hash tables easier to make
+      (define-hash-table-test 'string-hash-table-test
+        'string-equal 'sxhash-equal)
 
       ;; frankly, display buffers alist is badly documented.
       ;; there's a quick and simple article exploring how it
@@ -124,13 +138,43 @@
              (when window
                (select-window window)))))
 
+      (display-buffer--defun-focus-method display-buffer--maybe-same-window)
+      (display-buffer--defun-focus-method display-buffer-reuse-window)
+      (display-buffer--defun-focus-method display-buffer--maybe-pop-up-frame-or-window)
+      (display-buffer--defun-focus-method display-buffer-in-previous-window)
       (display-buffer--defun-focus-method display-buffer-in-side-window)
+      (display-buffer--defun-focus-method display-buffer-use-some-window)
+      (display-buffer--defun-focus-method display-buffer-pop-up-frame)
+
+      (defvar display-buffer--default-fallback-action
+        display-buffer-fallback-action
+        "the value for fallback actions without my configuration")
+
+      (setq display-buffer-fallback-action
+            ;; by default, focus on displayed windows
+            '((display-buffer--maybe-same-window-and-focus
+               display-buffer-reuse-window-and-focus
+               display-buffer--maybe-pop-up-frame-or-window-and-focus
+               display-buffer-in-previous-window-and-focus
+               display-buffer-use-some-window-and-focus
+               display-buffer-pop-up-frame-and-focus)))
 
       (push '("*Async Shell Command*"
               (display-buffer-reuse-window
                display-buffer-in-side-window-and-focus)
               (side          . bottom)
               (window-height . 0.5))
+            display-buffer-alist)
+
+      (push '("*compilation*"
+              (display-buffer-reuse-window
+               display-buffer-in-side-window-and-focus)
+              (side          . bottom)
+              (window-height . 0.5))
+            display-buffer-alist)
+
+      (push `("*image-dired-display-image*"
+              ,@display-buffer--default-fallback-action)
             display-buffer-alist)
     #+END_SRC
 
@@ -278,7 +322,7 @@
            server-auth-dir                                    (var "server/")
            shared-game-score-directory                        (var "gamescore/")
            tramp-auto-save-directory                          (var "tramp/auto-save/")
-           tramp-persistency-file-name                        (var "tramp/persistency.el")
+           tramp-persistency-file-name                        (etc "private/tramp/history.el")
            url-cache-directory                                (var "url/cache/")
            url-configuration-directory                        (var "url/configuration/")
 
@@ -434,6 +478,9 @@
     | transpose-frame     | a40264a07b25d2c1d8d1be341d42952329d1bbfab8c23100904627fef4f4c7b8 | https://www.emacswiki.org/emacs/download/transpose-frame.el                               |
     | hs-lint             | 61bf6d3cfd43f2729d85ed407a7de5fd6b025540229bc0b57c37785d0b6d7450 | https://raw.githubusercontent.com/ndmitchell/hlint/master/data/hs-lint.el                 |
     | hlint-refactor-mode | 55d5a9e99f0384b15eacfdf2b17ae313c6ddbb0343980ed324707fcaaf2b718a | https://raw.githubusercontent.com/mpickering/hlint-refactor-mode/master/hlint-refactor.el |
+    | miniedit            | c632c33c099362b084d965c51ec4b933be1278c7064096ce3b97cc830436055b | [[https://raw.githubusercontent.com/emacsmirror/miniedit/master/miniedit.el]]                 |
+    | ibuffer-persp       | 6395294e2dd368866d79a81d37c27961e0f871937ccd82cff317e5ad67c52652 | https://raw.githubusercontent.com/rakshasa/ibuffer-persp/master/ibuffer-persp.el          |
+    | org-link-edit       | ac84061d951ef9ef82794ba7f4416afb6da4283a182490a11ae455077321814c | https://raw.githubusercontent.com/kyleam/org-link-edit/master/org-link-edit.el            |
 
     #+BEGIN_SRC emacs-lisp :var package-list=non-melpa-packages
       (defun external-packages/download-external-package (url dest-path)
@@ -835,11 +882,12 @@
         "cd" 'close-compilation-window ;; WARN not yet implemented
         "cs" 'kill-compilation
         "cr" 'recompile
+        "cb" 'display-compilation-buffer
 
         ;; comment
         "cy" 'yank-and-comment
         "ck" 'comment-kill
-        "cb" 'comment-box
+        "c[" 'comment-box
         "ci" 'comment-indent)
     #+END_SRC
 
@@ -911,6 +959,22 @@
         "hds" 'describe-system-info
         "hdt" 'describe-theme
         "hdv" 'describe-variable)
+    #+END_SRC
+
+*** hydras
+    #+BEGIN_SRC emacs-lisp
+      (mohkale/declare-prefix
+        "H" "hydras" "cut off one head, two more shall take it's place")
+
+      (mohkale/set-leader-keys
+        "H TAB" 'hydra-indent/body
+        "He"   'hydra-flycheck/body
+        "Hc"   'hydra-org-clock/body
+        "Hl"   'hydra-persp/body
+        "HL"   'hydra-eyebrowse/body
+        "Hx"   'hydra-text-zoom/body
+        "Hv"   'hydra-vlc-rc/body
+        "Hh"   'hydra-winman/body)
     #+END_SRC
 
 *** insert
@@ -1043,8 +1107,8 @@
      (general-define-key
        ;; ("ESC"   . nil) ;; WARN never do this... it broke everything
 
-       ;; Control for comamnd,
-       ;; Meta for command on region
+       ;; Control     for comamnd,
+       ;; Meta        for command on region
        ;; Control-Alt for command on buffer
        "C-|"             'shell-command
        "M-|"             'shell-command-on-region
@@ -1053,6 +1117,10 @@
        "M-&"             'async-shell-command-on-region
        "C-M-&"           'async-shell-command-on-buffer
 
+       ;; "C-SPC"           'nil ;; emacs like binding
+       "C-@" (general-simulate-key "C-SPC") ;; C-SPC in terminal
+
+       "C-M-a"           'mark-whole-buffer
        "C-/"             'toggle-comment-at-point
        "C-S-/"           'toggle-comment-at-point-alt
        "C-M-\\"          nil ;; was indent-region
@@ -1697,7 +1765,9 @@
                    create-new-empty-buffer
                    copy-whole-buffer-to-clipboard
                    split-window-right-and-focus
-                   split-window-below-and-focus))
+                   split-window-below-and-focus)
+        :bind (:map mohkale-window-map
+               ("T" . force-set-all-visible-windows-dedication)))
     #+END_SRC
 
     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
@@ -1885,6 +1955,10 @@
                        hydra-ibuffer
                        hydra-indent
                        hydra-ivy-custom
+                       hydra-org-navigate
+                       hydra-org-link
+                       hydra-org-agenda
+                       hydra-org-clock
                        hydra-persp
                        hydra-text-zoom
                        hydra-vlc-rc
@@ -2175,8 +2249,8 @@
          ("?" (setq hydra-persp/verbose-p (not hydra-persp/verbose-p)))
          ("t" (setq hydra-persp/show-perspective-names (not hydra-persp/show-perspective-names)))
 
-         ("b" persp-switch-to-buffer) ;; switch to buffer in perspective
-         ("B" persp-temporarily-display-buffer) ;; from outside of perspective
+         ("b" persp-switch-to-buffer :exit t) ;; switch to buffer in perspective
+         ("B" persp-temporarily-display-buffer :exit t) ;; from outside of perspective
 
          ("h" persp-prev)
          ("l" persp-next)
@@ -2199,6 +2273,7 @@
          ("L" persp-move-layout-right)
          (">" persp-move-layout-right)
 
+         ("o" mohkale/switch-to-custom-perspective :exit t)
          ("w" hydra-eyebrowse/body :exit t)
          ("q"   nil :exit t)
          ("RET" nil :exit t))
@@ -2218,7 +2293,7 @@
        [_RET_] quit-to-layout     ^^[_k_]^ kill layout             ^^[_s_/_S_] save state to file/by-name
        [_h_/_l_] layout left/right  [_d_]^ kill current layout     ^^[_f_/_F_] load state from file/by-name
        [_H_/_<_] move layout left   [_r_]^ rename layout
-       [_L_/_>_] move layout right  [_[_/_]_]^ switch window/frame   [_w_]: workgroups [_q_]: quit
+       [_L_/_>_] move layout right  [_[_/_]_]^ switch window/frame   [_o_]: custom [_w_]: workgroups [_q_]: quit
        ")
 
        (defface hydra-persp/active-perspective-face
@@ -2316,6 +2391,8 @@
          ("Q" quit-window :exit t)
          ("q" nil :exit t)
          ("." nil :exit t))
+         
+       (defalias 'hydra-ibuffer/body #'hydra-ibuffer-main/body)
 
        (defhydra hydra-ibuffer-mark (:color teal :columns 5 :after-exit (hydra-ibuffer-main/body))
          "Mark"
@@ -2383,6 +2460,8 @@
 
      #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
      #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-ivy-custom.el"
+       (require 'ivy-hydra)
+
        (defhydra hydra-ivy (:foreign-keys run :hint nil)
          "
         ^ ^   ^ ^   ^ ^ | call        ^^^^| finish         ^^^^| Options | Action _n_/_p_: %s(ivy-action-name)
@@ -2449,6 +2528,258 @@
 
        (provide 'hydra-ivy-custom)
      #+END_SRC
+
+**** org
+***** agenda
+      sourced from [[https://github.com/abo-abo/hydra/wiki/Org-agenda][here]]
+
+     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-org-agenda.el"
+       (defhydra hydra-org-agenda (:pre  (setq which-key-inhibit t)
+                                   :post (setq which-key-inhibit nil)
+                                   :hint none
+                                   :foreign-keys run)
+         "
+       Org agenda (_q_uit)
+
+       ^Clock^      ^Visit entry^              ^Date^             ^Other^
+       ^-----^----  ^-----------^------------  ^----^-----------  ^-----^---------
+       _ci_ in      _SPC_ in other window      _ds_ schedule      _gr_ reload
+       _co_ out     _TAB_ & go to location     _dd_ set deadline  _._  go to today
+       _cq_ cancel  _RET_ & del other windows  _dt_ timestamp     _gd_ go to date
+       _cj_ jump    _o_   link                 _+_  do later
+       ^^           ^^                         _-_  do earlier
+
+       ^View^          ^Filter^                 ^Headline^         ^Toggle mode^
+       ^----^--------  ^------^---------------  ^--------^-------  ^-----------^----
+       _vd_ day        _ft_ by tag              _ht_ set status    _tf_ follow
+       _vw_ week       _fr_ refine by tag       _hk_ kill          _tl_ log
+       _vt_ fortnight  _fc_ by category         _hr_ refile        _ta_ archive trees
+       _vm_ month      _fh_ by top headline     _hA_ archive       _tA_ archive files
+       _vy_ year       _fx_ by regexp           _h:_ set tags      _tr_ clock report
+       _vn_ next span  _fd_ delete all filters  _hp_ set priority  _td_ diaries
+       _vp_ prev span
+       _vr_ reset
+
+       "
+         ;; Entry
+         ("hA" org-agenda-archive-default)
+         ("hk" org-agenda-kill)
+         ("hp" org-agenda-priority)
+         ("hr" org-agenda-refile)
+         ("h:" org-agenda-set-tags)
+         ("ht" org-agenda-todo)
+         ;; Visit entry
+         ("o"   link-hint-open-link :exit t)
+         ("<tab>" org-agenda-goto :exit t)
+         ("TAB" org-agenda-goto :exit t)
+         ("SPC" org-agenda-show-and-scroll-up)
+         ("RET" org-agenda-switch-to :exit t)
+         ;; Date
+         ("dt" org-agenda-date-prompt)
+         ("dd" org-agenda-deadline)
+         ("+" org-agenda-do-date-later)
+         ("-" org-agenda-do-date-earlier)
+         ("ds" org-agenda-schedule)
+         ;; View
+         ("vd" org-agenda-day-view)
+         ("vw" org-agenda-week-view)
+         ("vt" org-agenda-fortnight-view)
+         ("vm" org-agenda-month-view)
+         ("vy" org-agenda-year-view)
+         ("vn" org-agenda-later)
+         ("vp" org-agenda-earlier)
+         ("vr" org-agenda-reset-view)
+         ;; Toggle mode
+         ("ta" org-agenda-archives-mode)
+         ("tA" (org-agenda-archives-mode 'files))
+         ("tr" org-agenda-clockreport-mode)
+         ("tf" org-agenda-follow-mode)
+         ("tl" org-agenda-log-mode)
+         ("td" org-agenda-toggle-diary)
+         ;; Filter
+         ("fc" org-agenda-filter-by-category)
+         ("fx" org-agenda-filter-by-regexp)
+         ("ft" org-agenda-filter-by-tag)
+         ("fr" org-agenda-filter-by-tag-refine)
+         ("fh" org-agenda-filter-by-top-headline)
+         ("fd" org-agenda-filter-remove-all)
+         ;; Clock
+         ("cq" org-agenda-clock-cancel)
+         ("cj" org-agenda-clock-goto :exit t)
+         ("ci" org-agenda-clock-in :exit t)
+         ("co" org-agenda-clock-out)
+         ;; Other
+         ("q" nil :exit t)
+         ("gd" org-agenda-goto-date)
+         ("." org-agenda-goto-today)
+         ("gr" org-agenda-redo))
+      #+END_SRC
+
+***** clock & timers
+      sourced from [[https://github.com/abo-abo/hydra/wiki/Org-clock-and-timers][here]].
+
+     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-org-clock.el"
+       (defhydra hydra-org-clock (:color blue :hint nil)
+         "
+       ^Clock:^ ^In/out^     ^Edit^   ^Summary^    | ^Timers:^ ^Run^           ^Insert
+       -^-^-----^-^----------^-^------^-^----------|--^-^------^-^-------------^------
+       (_?_)    _i_n         _e_dit   _g_oto entry | (_z_)     _r_elative      ti_m_e
+        ^ ^     _c_ontinue   _q_uit   _d_isplay    |  ^ ^      cou_n_tdown     i_t_em
+        ^ ^     _o_ut        ^ ^      _R_eport     |  ^ ^      _p_ause toggle
+        ^ ^     ^ ^          ^ ^      ^ ^          |  ^ ^      _s_top
+       "
+         ("i" org-clock-in)
+         ("c" org-clock-in-last)
+         ("o" org-clock-out)
+
+         ("e" org-clock-modify-effort-estimate)
+         ("q" org-clock-cance)
+
+         ("g" org-clock-goto)
+         ("d" org-clock-display)
+         ("R" org-clock-report)
+         ("?" (org-info "Clocking commands"))
+
+         ("r" org-timer-start)
+         ("n" org-timer-set-timer)
+         ("p" org-timer-pause-or-continue)
+         ("s" org-timer-stop)
+
+         ("m" org-timer)
+         ("t" org-timer-item)
+         ("z" (org-info "Timers")))
+      #+END_SRC
+
+***** links
+      sourced from [[https://github.com/abo-abo/hydra/wiki/Org-mode-links][here]].
+
+     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-org-link.el"
+        (require 'org-link-edit)
+
+        (defun org-link-unlinkify ()
+          "Replace an org-link with the description, or if this is absent, the path."
+          (interactive)
+          (let ((eop (org-element-context)))
+            (when (eq 'link (car eop))
+              (message "%s" eop)
+              (let* ((start (org-element-property :begin eop))
+                     (end (org-element-property :end eop))
+                     (contents-begin (org-element-property :contents-begin eop))
+                     (contents-end (org-element-property :contents-end eop))
+                     (path (org-element-property :path eop))
+                     (desc (and contents-begin
+                                contents-end
+                                (buffer-substring contents-begin contents-end))))
+                (setf (buffer-substring start end)
+                      (concat (or desc path)
+                              (make-string (org-element-property :post-blank eop) ?\s)))))))
+
+        (defhydra hydra-org-link (:color red)
+          "Org Link Edit"
+          ("j" org-link-edit-forward-slurp  "forward slurp")
+          ("k" org-link-edit-forward-barf   "forward barf")
+          ("u" org-link-edit-backward-slurp "backward slurp")
+          ("i" org-link-edit-backward-barf  "backward barf")
+          ("r" org-link-unlinkify "remove link")
+          ("q" nil "cancel" :exit t))
+      #+END_SRC
+
+***** navigation
+     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-org-navigate.el"
+       (defun hydra-org-navigate--end-of-current-branch ()
+         (interactive)
+         (let ((last-point (point))
+               current-point)
+           (while (not (eq last-point
+                           current-point))
+             (setq last-point (point))
+             (org-forward-heading-same-level nil)
+             (setq current-point (point)))))
+
+       (defun hydra-org-navigate--beginning-of-current-branch ()
+         (interactive)
+         (let ((last-point (point))
+               current-point)
+           (while (not (eq last-point
+                           current-point))
+             (setq last-point (point))
+             (org-backward-heading-same-level nil)
+             (setq current-point (point)))))
+
+       (defun hydra-org-navigate--get-pretty-outline-path ()
+         "like `org-display-outline-path' except returns
+       the propertised string instead of displaying it."
+         (interactive)
+         (let ((separator nil)
+               (current nil)
+               (path (org-get-outline-path))
+               (file (buffer-file-name (buffer-base-buffer))))
+           (ignore-errors
+               (setq path
+                     (add-to-list 'path (save-excursion
+                                          (org-back-to-heading t)
+                                          (when (looking-at org-complex-heading-regexp)
+                                            (let ((text (match-string 4)))
+                                              (set-text-properties 0 (length text) nil text)
+                                              text)))
+                                  t)))
+
+           (if path
+               (org-format-outline-path
+                path
+                (1- (frame-width))
+                (and file (concat (file-name-nondirectory file) ": "))
+                separator)
+             (and file (concat (file-name-nondirectory file) ": /")))))
+
+       (defvar hydra-org-navigate/verbose-p nil
+         "display extended help message for hydra-org-navigate/body")
+
+       (defhydra hydra-org-navigate (:hint nil :foreign-keys run)
+         ;; ("h" org-previous-visible-heading)
+         ;; ("p" org-previous-visible-heading)
+         ("h" org-outline-smart-up-level)
+         ("j" org-forward-heading-same-level)
+         ("k" org-backward-heading-same-level)
+         ("l" org-next-visible-heading)
+         ("J" org-next-visible-heading)
+         ("K" org-previous-visible-heading)
+         ("?" (setq hydra-org-navigate/verbose-p (not hydra-org-navigate/verbose-p)))
+         ("g" hydra-org-navigate--beginning-of-current-branch)
+         ("G" hydra-org-navigate--end-of-current-branch)
+         ("f" counsel-org-goto)
+         ("F" counsel-org-goto-all)
+         ("n" org-next-block)
+         ("N" org-previous-block)
+         ("b" org-previous-block)
+         ("q" nil :exit t))
+
+       (defvar hydra-org-navigate/header-hint
+         "
+         %s(hydra-org-navigate--get-pretty-outline-path) (_?_ help)")
+
+       (setq
+        hydra-org-navigate/complete-command-docstring
+        "
+       [_h_]: parent         [_g_]: first child    [_n_]: next block
+       [_j_]: sibling down   [_G_]: last child     [_b_]: prev block
+       [_k_]: sibling up     [_f_]: find node
+       [_l_]: next           [_F_]: find any node
+       ")
+
+       (setq hydra-org-navigate/hint
+             '(eval (hydra--format
+                     nil
+                     '(nil nil :hint nil)
+                     (concat hydra-org-navigate/header-hint
+                             (when hydra-org-navigate/verbose-p
+                               hydra-org-navigate/complete-command-docstring))
+                     hydra-org-navigate/heads)))
+      #+END_SRC
 
 **** vlc-rc
      #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
@@ -2761,6 +3092,57 @@
             (global :when active)
             (buffer-position :priority 99)
             (hud :priority 99))))
+    #+END_SRC
+
+*** persp-mode
+    configure an ease of use macro to programatically define custom macros. the general functionality is sourced from [[https://github.com/syl20bnr/spacemacs/blob/master/layers/%25252Bspacemacs/spacemacs-layouts/funcs.el#L161][spacemacs]].
+
+    #+BEGIN_SRC emacs-lisp
+      (defvar mohkale--custom-perspectives (make-hash-table
+                                       :size 26
+                                       :test 'string-hash-table-test)
+        "all the defined custom perspectives.")
+
+      ;; source: [[https://github.com/syl20bnr/spacemacs/blob/master/layers/%252Bspacemacs/spacemacs-layouts/funcs.el#L161]]
+      (defmacro mohkale//define-custom-perspective (name &rest body)
+        (let* ((name (if (symbolp name)
+                         (symbol-value name)
+                       name))
+               (func (intern (concat "persp-custom-"
+                                     name))))
+          `(prog1
+               (defun ,func ()
+                 ,(format "open custom perspective: %s" name)
+                 (interactive)
+                 (require 'persp-mode) ;; required for init check
+                 (let ((initialize (not (gethash ,name *persp-hash*))))
+                   (persp-switch ,name)
+                   (when initialize
+                     (delete-other-windows)
+                     ,@body)))
+             (puthash ,name (quote ,func) mohkale--custom-perspectives))))
+
+      (put 'mohkale//define-custom-perspective 'lisp-indent-function 'defun)
+
+      (defun mohkale/switch-to-custom-perspective (&optional name)
+        (interactive)
+        (let* ((persps mohkale--custom-perspectives)
+               (pcount (hash-table-count persps))
+               (persp-keys (unless (zerop pcount)
+                             (let (result)
+                               (maphash (lambda (key value)
+                                          (push key result))
+                                        persps)
+                               result))))
+          (if (zerop pcount)
+              (message "no custom perspectives defined")
+            (unless name
+              (setq name (ivy-read "perspective: "
+                              persp-keys
+                              :require-match t)))
+            (funcall (gethash name
+                              persps
+                              (lambda () (message "unable to find perspective: %s" name)))))))
     #+END_SRC
 
 *** evil
@@ -3111,9 +3493,11 @@
                    avy-goto-char-timer
                    avy-goto-line
                    avy-goto-word-1
+                   avy-pop-mark
                    avy-resume)
         :init
         (mohkale/set-leader-keys
+          "jB" 'avy-pop-mark
           "jj" 'avy-goto-char
           "jJ" 'avy-goto-char-2
           "jt" 'avy-goto-char-timer))
@@ -3305,6 +3689,7 @@
       (use-package compile
         :ensure t
         :defer  t
+        :commands (display-compilation-buffer)
         :init
         (setq compilation-read-command nil)
 
@@ -3322,6 +3707,8 @@
         :config
 
         :config
+        (push 'compilation-mode mohkale--whitespace-exempt-modes)
+
         (defun mohkale/compilation-finish-function (buf str)
           "post compilation command hook
         uses the above two variables to determine whether or not (and when)
@@ -3374,6 +3761,15 @@
         ;; (setq compilation-dont-auto-kill-window-when '(warnings))
         (add-hook 'compilation-finish-functions 'mohkale/compilation-finish-function)
 
+        (defun display-compilation-buffer ()
+          (interactive)
+          (let ((buffer-name (if compilation-buffer-name-function
+                                 (funcall compilation-buffer-name-function "compilation")
+                               "*compilation*")))
+            (if (not buffer-name)
+                (message "compilation buffer doesn't exist")
+              (display-buffer buffer-name))))
+
         (mohkale/set-leader-keys-for-major-mode 'compilation-mode
           "r" 'recompile
           "f" 'next-error-follow-minor-mode)
@@ -3407,6 +3803,8 @@
         :hook ((comint-mode . (lambda () (setq-local evil-emacs-state-cursor 'bar)))
                ;; (comint-mode . blink-cursor-mode)
                )
+        :commands (mohkale--comint-set-bindings
+                   mohkale--comint-set-leader-keys)
         :init
         (push 'comint-mode mohkale--whitespace-exempt-modes)
 
@@ -3464,79 +3862,90 @@
         ;; (advice-add 'comint-previous-input :after 'comint-bol)
         ;; (advice-add 'comint-next-input     :after 'end-of-buffer)
 
-        (general-define-key
-          :keymaps 'comint-mode-map
-          "RET" 'comint-send-input
-          "<M-return>" 'comint-accumulate
-          "<delete>" 'delete-forward-char
-          "<C-delete>" 'backward-kill-word
-          "<M-delete>" 'comint-delchar-or-maybe-eof ;; forward
-          "<C-M-delete>" 'kill-word                 ;; forward
-          "<mouse-2>" 'comint-insert-input
+        (defun mohkale--comint-set-bindings (keymap)
+          ;; abstracted into a method because realgud seems
+          ;; to hide all of these bindings.
+          (general-define-key
+            :keymaps keymap
+            "RET" 'comint-send-input
+            "M-RET" 'comint-accumulate
+            "<delete>" 'delete-forward-char
+            "<C-delete>" 'backward-kill-word
+            "<M-delete>" 'comint-delchar-or-maybe-eof ;; forward
+            "<C-M-delete>" 'kill-word                 ;; forward
+            "<mouse-2>" 'comint-insert-input
 
-          "C-w" 'backward-kill-word ;; this kills me :(
-          "M-w" 'kill-word
-          "C-S-w" mohkale-window-map
-          "C-M-w" mohkale-window-map
-          "M-l" 'recenter-top-bottom
-          "C-M-l" 'comint-show-output
+            "C-w" 'backward-kill-word ;; this kills me :(
+            "M-w" 'kill-word
+            "C-S-w" mohkale-window-map
+            "C-M-w" mohkale-window-map
+            "M-l" 'recenter-top-bottom
+            "C-M-l" 'comint-show-output
 
-          "C-a" 'comint-bol-or-process-mark
-          "C-e" 'end-of-buffer       ;; 'end-of-line
-          "C-M-k" 'comint-kill-input ;; whole line
-          "C-r" 'comint-history-isearch-backward-regexp
-          "M-r" 'comint-dynamic-list-input-ring ;; TODO use ivy
+            "C-a" 'comint-bol-or-process-mark
+            "C-e" 'end-of-buffer       ;; 'end-of-line
+            "C-M-k" 'comint-kill-input ;; whole line
+            "C-r" 'comint-history-isearch-backward-regexp
+            "M-r" 'comint-dynamic-list-input-ring ;; TODO use ivy
+            "C-u" 'scroll-down
+            "C-d" 'scroll-up
+            "C-o" 'evil-execute-in-normal-state
 
-          "C-<left>"  'backward-word
-          "C-<up>"    'comint-previous-input
-          "C-<down>"  'comint-next-input
-          "C-<right>" 'forward-word
+            "C-<left>"  'backward-word
+            "C-<up>"    'comint-previous-input
+            "C-<down>"  'comint-next-input
+            "C-<right>" 'forward-word
 
-          "<left>"    'backward-char
-          "<up>"      'comint-previous-input-or-previous-line
-          "<down>"    'comint-next-input-or-next-line
-          "<right>"   'forward-char
+            "<left>"    'backward-char
+            "<up>"      'comint-previous-input-or-previous-line
+            "<down>"    'comint-next-input-or-next-line
+            "<right>"   'forward-char
 
-          "C-h"       'backward-char
-          "C-j"       'comint-next-input-or-next-line
-          "C-k"       'comint-previous-input-or-previous-line
-          "C-l"       'forward-char
+            "C-h"       'backward-char
+            "C-j"       'comint-next-input-or-next-line
+            "C-k"       'comint-previous-input-or-previous-line
+            "C-l"       'forward-char
 
-          "C-S-j"     'comint-next-matching-input-from-input
-          "C-S-k"     'comint-previous-matching-input-from-input
+            "C-S-j"     'comint-next-matching-input-from-input
+            "C-S-k"     'comint-previous-matching-input-from-input
 
-          "C-M-l"     'forward-word
-          "C-M-h"     'backward-word
+            "C-M-l"     'forward-word
+            "C-M-h"     'backward-word
 
-          "M-j" 'comint-next-prompt
-          "M-k" 'comint-previous-input
+            "M-j" 'comint-next-prompt
+            "M-k" 'comint-previous-input
 
-          ;; "<remap> <forward-char>"  'comint-forward-char
-          "<remap> <backward-char>" 'comint-backward-char
-          ;; "<remap> <forward-word>"  'comint-forward-word
-          "<remap> <backward-word>" 'comint-backward-word
+            ;; "<remap> <forward-char>"  'comint-forward-char
+            "<remap> <backward-char>" 'comint-backward-char
+            ;; "<remap> <forward-word>"  'comint-forward-word
+            "<remap> <backward-word>" 'comint-backward-word
 
-          "C-c C-c" 'comint-clear-buffer
-          "C-c C-x" 'comint-get-next-from-history)
+            "C-c C-c" 'comint-clear-buffer
+            "C-c C-x" 'comint-get-next-from-history))
 
-        (mohkale/declare-prefix-for-major-mode* 'comint-mode
-          "k" "kill"
-          "s" "subjob")
+        (mohkale--comint-set-bindings 'comint-mode-map)
 
-        (mohkale/set-leader-keys-for-major-mode 'comint-mode
-          "kz" 'comint-send-eof
-          "*" 'comint-insert-previous-argument
-          "r" 'comint-dynamic-list-input-ring
-          "m" 'comint-clear-buffer
-          "M" 'comint-show-maximum-output
-          "x" 'comint-get-next-from-history
-          "RET" 'comint-copy-old-input ;; copy text before cursor
-          ">" 'comint-write-output
-          "t" 'comint-show-output
-          "o" 'comint-delete-output
-          "ss" 'comint-stop-subjob
-          "sq" 'comint-quit-subjob
-          "si" 'comint-interrupt-subjob))
+        (defun mohkale--comint-set-leader-keys (mode)
+          (mohkale/declare-prefix-for-major-mode* mode
+            "k" "kill"
+            "s" "subjob")
+
+          (mohkale/set-leader-keys-for-major-mode mode
+            "kz" 'comint-send-eof
+            "*" 'comint-insert-previous-argument
+            "r" 'comint-dynamic-list-input-ring
+            "m" 'comint-clear-buffer
+            "M" 'comint-show-maximum-output
+            "x" 'comint-get-next-from-history
+            "RET" 'comint-copy-old-input ;; copy text before cursor
+            ">" 'comint-write-output
+            "t" 'comint-show-output
+            "o" 'comint-delete-output
+            "ss" 'comint-stop-subjob
+            "sq" 'comint-quit-subjob
+            "si" 'comint-interrupt-subjob))
+
+        (mohkale--comint-set-leader-keys 'comint-mode))
     #+END_SRC
 
 *** command-log
@@ -4391,8 +4800,11 @@
      #+BEGIN_SRC emacs-lisp
        (use-package image-dired
          :defer t
+         :commands (persp-custom-@dired-slideshow)
          :init
          (push 'image-dired-thumbnail-mode mohkale--whitespace-exempt-modes)
+         (puthash "@dired-slideshow" 'persp-custom-@dired-slideshow mohkale--custom-perspectives)
+
          :config
          ;;; fixed weird moves line, not thumbnail
          (defun image-dired-slideshow-step ()
@@ -4500,7 +4912,66 @@
            "j" 'image-eob ; far bottom edge
            "k" 'image-bob ; far top    edge
            "l" 'image-eol ; far right  edge
-           "g" 'image-dired-jump-thumbnail-buffer))
+           "g" 'image-dired-jump-thumbnail-buffer)
+         (defvar dired-slideshow--thumbnail-column-count 2
+           "number of columns of thumbnails shown on each row")
+
+         (defvar dired-slideshow--dedicate-image-windows nil
+           "whether to dedicate thumbnail and display windows")
+
+         ;; NOTE keep setq because defvar doesn't work for repeated calls
+         ;; (setq dired-slideshow--thumbnail-column-count 3)
+         ;; (setq dired-slideshow--dedicate-image-windows t)
+
+         (mohkale//define-custom-perspective "@dired-slideshow"
+           (kill-all-windows-and-return-to-home) ; splitting issues with layout
+
+           (let* ((thumbnails-buffer-name "*image-dired*")
+                  (display-buffer-name "*image-dired-display-image*")
+
+                  ;; only load when buffer doesn't exist and user allows it
+                  (load-directory (and (not (get-buffer thumbnails-buffer-name))
+                                       (y-or-n-p "would you like to load an image directory")))
+
+                  (thumbnails-buffer (get-buffer-create thumbnails-buffer-name))
+                  (display-buffer (get-buffer-create display-buffer-name)))
+             (split-window-right) ; left window is for thumbnails, right for display
+
+             (let* ((thumbnails-window (selected-window))
+                    (display-window    (window-right thumbnails-window)))
+               (if load-directory (call-interactively 'image-dired))
+
+               (persp-add-buffer `(,thumbnails-buffer ,display-buffer))
+
+               ;; setup thumbnail window
+               (with-selected-window thumbnails-window
+                 (switch-to-buffer thumbnails-buffer)
+
+                 (unless (eq major-mode 'image-dired-thumbnail-mode)
+                   (image-dired-thumbnail-mode))
+
+                 ;; set number of columns in view
+                 (let ((image-dired-thumbs-per-row dired-slideshow--thumbnail-column-count))
+                   (image-dired-line-up))
+
+                 (let* ((thumbnail-window-width (* image-dired-thumb-width dired-slideshow--thumbnail-column-count))
+                        (delta-width (- thumbnail-window-width (window-pixel-width))))
+                   (unless (> (abs delta-width) (window-pixel-width))
+                     (window-resize thumbnails-window delta-width t nil t)))
+
+                 (window-preserve-size thumbnails-window t))
+
+               ;; setup display window
+               (with-selected-window display-window
+                 (switch-to-buffer display-buffer)
+
+                 (unless (eq major-mode 'image-dired-display-image-mode)
+                   (image-dired-display-image-mode)))
+
+               (and dired-slideshow--dedicate-image-windows (force-set-all-visible-windows-dedication t))
+               (select-window thumbnails-window)
+
+               (message "completed creation of slideshow layout")))))
      #+END_SRC
 
 *** drag-stuff
@@ -4957,7 +5428,9 @@
          :init
          (setq counsel-find-file-occur-use-find t)
 
-         (defalias 'describe-bindings 'counsel-descbinds)
+         (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
+         (fset 'describe-bindings (symbol-function 'counsel-descbinds))
+
          (mohkale/declare-prefix*
            "r" "registers/rings/resume"
            "fs" "recursive-find")
@@ -5422,6 +5895,28 @@
           "s@" 'ibuffer-tramp))
      #+END_SRC
 
+**** ibuffer-persp
+     #+BEGIN_SRC emacs-lisp
+       (use-package ibuffer-persp
+         ;; :ensure t
+         :defer  t
+         :commands (ibuffer-persp ;; only buffers from current perspective
+                    ibuffer-persp-set-filter-groups-by-persp-name-not-nil
+                    ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
+         :init
+         (defalias 'ibuffer-persp-current #'ibuffer-persp-set-filter-groups-by-persp-name-not-nil)
+         (defalias 'ibuffer-persp-other #'ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
+         (general-define-key
+           :keymaps 'ibuffer-mode-map
+           "sp" 'ibuffer-persp-current
+           "sP" 'ibuffer-persp-other)
+
+         ;; (with-eval-after-load 'persp-mode
+         ;;   (mohkale/set-leader-keys "bm" 'ibuffer-persp))
+         )
+     #+END_SRC
+
+
 *** imenu
     #+BEGIN_SRC emacs-lisp
       (use-package imenu
@@ -5827,6 +6322,33 @@
                  ("<escape>" . abort-recursive-edit))
     #+END_SRC
 
+*** miniedit
+    #+BEGIN_SRC emacs-lisp
+      (use-package miniedit
+        :defer t
+        :delight (miniedit-mode "MiniEdit")
+        :commands (miniedit
+                   miniedit-install
+                   miniedit-install-for-xemacs
+                   miniedit-introduction
+                   miniedit-quick-start)
+        :init
+        (general-define-key
+          :keymaps '(minibuffer-local-map
+                     minibuffer-local-ns-map
+                     minibuffer-local-completion-map
+                     minibuffer-local-must-match-map)
+          "C-M-<return>" 'miniedit)
+        ;; ;; can't seem to change major mode without miniedit mode
+        ;; ;; being removed :(
+        ;; (add-hook 'miniedit-mode-hook initial-major-mode)
+        :config
+        (setq miniedit-show-help-p nil) ;; thanks... but no thanks
+
+        (mohkale/set-leader-keys-for-minor-mode 'miniedit-mode
+          (concat mohkale-major-mode-leader-prefix ",") 'exit-recursive-edit))
+    #+END_SRC
+
 *** occur
     #+BEGIN_SRC emacs-lisp
       (use-package occur
@@ -6012,6 +6534,7 @@
                    persp-rename
                    persp-next
                    persp-prev
+                   persp-switch
                    persp-temporarily-display-buffer
                    persp-import-win-conf
                    persp-import-buffers
@@ -6345,6 +6868,7 @@
                     projectile-dired
                     projectile-find-dir
                     projectile-find-file
+                    projectile-ivy-persp-switch-project
                     projectile-regenerate-tags
                     projectile-find-tag
                     projectile-invalidate-cache
@@ -6368,6 +6892,7 @@
            "pg" 'projectile-find-tag
            "pI" 'projectile-invalidate-cache
            "pk" 'projectile-kill-buffers
+           "pl" 'projectile-ivy-persp-switch-project
            "pp" 'projectile-run-project
            "pR" 'projectile-replace
            "pt" 'projectile-test-project)
@@ -6398,11 +6923,27 @@
                                                 "~/programming/repos"
                                                 "~/programming/")
                projectile-tags-backend 'xref ;; opt into gtags
+               projectile-indexing-method 'alien ;; never use native
                projectile-tags-command "ctags -Re -f \"%s\" %s \"%s\"")
 
          (unless (eq system-type 'gnu/linux)
            ;; fixes search glitches on windows when using cygwin
-           (setq projectile-generic-command "find . -type f -print0")))
+           (setq projectile-generic-command "find . -type f -print0"))
+
+         (defun projectile-ivy-persp-switch-project (arg)
+           (interactive "P")
+           (ivy-read "Switch to Project Perspective: "
+                     (if (projectile-project-p)
+                         (cons (abbreviate-file-name (projectile-project-root))
+                               (projectile-relevant-known-projects))
+                       projectile-known-projects)
+                     :action (lambda (project)
+                               (let ((persp-reset-windows-on-nil-window-conf t)
+                                     (project-name (file-name-nondirectory
+                                                    (string-remove-suffix "/" project))))
+                                 (persp-switch project-name)
+                                 (projectile-switch-project-by-name project)
+                                 )))))
      #+END_SRC
 
 **** org-projectile
@@ -8140,12 +8681,13 @@
          (evil-set-initial-state 'org-agenda-mode 'normal)
 
          (mohkale/declare-prefix-for-major-mode* 'org-agenda-mode
-           "mc" '("clock/calendar" . "time management based prefix keys")
-           "mm" '("modes" . "minor modes to support agenda mode")
-           "mp" '("priority" . "alter/view an entries priority")
-           "m/" '("search/filter" . "search / filter org agenda"))
+           "c" '("clock/calendar" . "time management based prefix keys")
+           "m" '("modes" . "minor modes to support agenda mode")
+           "p" '("priority" . "alter/view an entries priority")
+           "/" '("search/filter" . "search / filter org agenda"))
 
          (mohkale/set-leader-keys-for-major-mode 'org-agenda-mode
+           "." 'hydra-org-agenda/body
            "A" 'org-agenda-append-agenda
            "C" 'org-agenda-columns
 
@@ -8252,6 +8794,16 @@
          :hook (org-mode . org-bullets-mode))
      #+END_SRC
 
+**** org-link-edit
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-link-edit
+         :defer  t
+         :commands (org-link-edit-forward-slurp
+                    org-link-edit-forward-barf
+                    org-link-edit-backward-slurp
+                    org-link-edit-backward-barf))
+     #+END_SRC
+
 **** org-toc
      #+BEGIN_SRC emacs-lisp
        (use-package toc-org
@@ -8271,7 +8823,8 @@
          :commands (org-capture
                     org-agenda
                     org-copy-subtree
-                    org-cut-subtree)
+                    org-cut-subtree
+                    org-outline-smart-up-level)
          :init
          ;;; leader keys outside of org mode
          (mohkale/declare-prefix "oo" "org")
@@ -8320,6 +8873,12 @@
          (advice-add 'org-edit-src-code :before #'(lambda (&rest args)
                                                     (unless (eq evil-state 'normal)
                                                       (evil-normal-state))))
+
+         (defun org-outline-smart-up-level ()
+           (interactive)
+           (call-interactively (if (org-at-heading-p)
+                                   'outline-up-heading
+                                 'outline-previous-heading)))
 
          ;;  _
          ;; | | __ _ _ __   __ _ _   _  __ _  __ _  ___  ___
@@ -8429,12 +8988,11 @@
            ;; most bindings stolen from: https://github.com/edwtjo/evil-org-mode
            :keymaps 'org-mode-map
            :states '(normal visual)
-           "gh" '(lambda () (interactive) (call-interactively (if (org-at-heading-p)
-                                                                  'outline-up-heading
-                                                                'outline-previous-heading)))
+           "gh" 'org-outline-smart-up-level
            "gj" 'org-forward-heading-same-level
            "gk" 'org-backward-heading-same-level
            "gl" 'outline-next-visible-heading
+           "g." 'hydra-org-navigate/body
            ;; "t" 'org-todo ; I use this too often
            ;; "T" 'org-insert-todo-heading ; rebound to C-S-<return>
            "$" 'org-end-of-line
@@ -8479,7 +9037,7 @@
            "i" "insert"
            "S" "subtrees"
            "t" "tables"
-           "m" "mark/visual"
+           "m" "mark/move"
            "N" "narrow"
            "x" "text"
 
@@ -8540,6 +9098,7 @@
            "ci" 'org-timer-item
            "cr" 'org-clock-report
            "cs" 'org-clock-display
+           "c." 'hydra-org-clock/body
            "c C-c" 'org-clock-cancel
 
            "ee" 'org-export-dispatch
@@ -8559,6 +9118,7 @@
            "ms" 'org-mark-subtree
            "me" 'org-mark-element
            "mb" 'org-babel-mark-block
+           "mm." 'hydra-org-navigate/body
 
            "Nb" 'org-narrow-to-block
            "Ns" 'org-narrow-to-subtree
@@ -9695,6 +10255,8 @@
           "gf" "file")
 
         (mohkale/set-leader-keys
+          "gm" 'magit-dispatch
+          "g!" 'magit-run
           "gfh" 'magit-log-buffer-file
           "gm"  'magit-dispatch-popup
           "gs"  'magit-status
@@ -9920,6 +10482,43 @@
            '(meghanda-mode)))
      #+END_SRC
 
+*** iallign
+    #+BEGIN_SRC emacs-lisp
+      (use-package ialign
+        :ensure t
+        :defer  t
+        :commands (ialign)
+        )
+    #+END_SRC
+
+*** realgud
+    #+BEGIN_SRC emacs-lisp
+      (use-package realgud
+        :ensure t
+        :defer  t
+        :commands (realgud:gdb
+                   realgud:pdb)
+        :config
+        (mohkale--comint-set-bindings 'realgud:gdb-track-mode-map)
+        (general-define-key
+          :keymaps 'realgud:gdb-track-mode-map
+          "RET" 'realgud:send-input)
+
+        (defun realgud--display-realgud-buffer-instead-of-switch (func &rest args)
+          (let ((current-buffer (current-buffer))
+                debugger-buffer)
+            (apply func args) ;; invoke wrapped function
+
+            (unless (eq current-buffer (current-buffer))
+              (setq debugger-buffer (current-buffer))
+              (switch-to-buffer nil) ;; last buffer
+              (display-buffer debugger-buffer))))
+
+        (advice-add #'realgud:gdb :around #'realgud--display-realgud-buffer-instead-of-switch)
+        :bind (:map realgud-track-mode-map
+               ("<override-state>" . nil)))
+    #+END_SRC
+
 * Themes
 ** an old hope
    #+NAME: an-old-hope-theme-description
@@ -10059,6 +10658,7 @@
       `(shadow ((,cls (:foreground ,light-grey)))) ; shadowed text, undermines actual text
       `(header-line ((,cls (:background ,very-dark-grey :foreground ,blue)))) ; shown at the top of some buffers, including in HEXL mode and helm
       `(match ((,cls (:foreground ,green-dim)))) ; TODO no idea what this is for, document it
+      `(underline ((,cls (:inherit default)))) ;; needs to be set because compile uses it by force :(
 
       ;; line numbers
       `(line-number ((,cls (:background ,black :foreground ,very-light-grey :weight normal :underline nil))))
