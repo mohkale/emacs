@@ -54,7 +54,9 @@
             ring-bell-function 'ignore                                              ; NO ANNOYING RINGS!!!
             sentence-end-double-space nil                                           ; sentence SHOULD end with only a fullstop
             default-fill-column 150                                                 ; toggle wrapping text at given character
-            delete-by-moving-to-trash t
+            delete-by-moving-to-trash t                                             ; don't rm, trash my garbage please :)
+            search-whitespace-regexp nil                                            ; SPC means SPC, not any amount of spaces
+            enable-local-variables t                                                ; allow safe variables, even alongside unsafe ones
 
             display-line-numbers 'relative
 
@@ -226,7 +228,8 @@
                 (lambda ()
                   (when (mohkale/refresh-config-file-p)
                     (display-warning 'init
-                                     "your configuration file is out of date... please run <SPC f e b> followed by <SPC f e r>"))))
+                                     (concat "your configuration file is out of date: "
+                                             mohkale-mohkale-config-file)))))
 
       (setq mohkale-window-map (make-sparse-keymap))
     #+END_SRC
@@ -860,6 +863,7 @@
 
       (mohkale/set-leader-keys
         "b RET" 'create-new-empty-buffer
+        "b DEL" 'bury-buffer
         "bb" 'switch-to-buffer
         "bB" 'switch-to-buffer-other-window
         "bd" 'kill-this-buffer
@@ -911,7 +915,8 @@
       (mohkale/set-leader-keys
         ;; TODO make flycheck aliases
         "en" 'next-error
-        "eN" 'previous-error)
+        "eN" 'previous-error
+        "ep" 'previous-error)
     #+END_SRC
 
 *** files
@@ -1078,7 +1083,7 @@
         "td" 'toggle-debug-on-error
         "tq" 'toggle-debug-on-quit
         "tm" 'toggle-frame-maximized
-        "tn" 'mohkale//enable-line-numbers-handler
+        "tn" 'display-line-numbers-mode
         "tf" 'toggle-frame-fullscreen
         "tg" 'toggle-tool-bar-mode-from-frame
         "tG" 'toggle-menu-bar-mode-from-frame
@@ -1150,6 +1155,10 @@
        :states mohkale-norm-states
        "gr"    'revert-buffer)
 
+     ;; (general-define-key
+     ;;   :states mohkale-nnorm-states
+     ;;   "S-SPC" 'insert-whitespace-after-point)
+
      (general-define-key "C-w" '(:prefix-command mohkale-window-map :which-key "windows"))
 
      (general-define-key
@@ -1193,6 +1202,7 @@
          "fet" 'mohkale/find-tangled-config-file))
    #+END_SRC
 
+*** Mohkale Functions
    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale.el"
      (defmacro mohkale/defun-mohkale-find-package-file (file-type file-path &optional root)
@@ -1251,6 +1261,18 @@
        (when mohkale-should-compile-config
          (mohkale//compile-configuration-files)))
    #+END_SRC
+
+*** Happy Birthday
+    animate-birthday-present on your birthday... yippeee :)
+
+    #+BEGIN_SRC emacs-lisp
+      ;; (time-since '(0 0 0 8 12 1999 3 nil nil))
+
+      (when (string-equal (format-time-string "%d.%m" (current-time))
+                          "08.12")
+        (add-hook 'emacs-startup-hook
+                  'animate-birthday-present))
+    #+END_SRC
 
 ** Methods
 *** File
@@ -1395,6 +1417,7 @@
 
       (defvar mohkale--whitespace-exempt-modes '(help-mode
                                                  Buffer-menu-mode
+                                                 minibuffer-inactive-mode
                                                  eshell-mode)
         "modes under which no trailing whitespace is shown")
 
@@ -1452,7 +1475,8 @@
       (advice-add 'yank     :after #'yank--auto-indent)
       (advice-add 'yank-pop :after #'yank--auto-indent)
 
-      (defun evil-visual-paste--auto-indent (count register)
+      (defun evil-visual-paste--auto-indent (count register &optional yank-handler)
+        ;; not sure what yank handler is for, leave it in, to avoid errors
         "same as `yank--auto-indent', but for evil visual yank replace."
         (with--auto-indent-satisfied register
           (let ((transient-mark-mode nil))
@@ -1500,6 +1524,7 @@
         :commands (dos2unix
                    unix2dos
                    pad-line-with-char-to-length
+                   insert-whitespace-after-point
                    pad-line-with-space-to-length
                    remove-all-trailing-whitespace
                    toggle-comment-at-point
@@ -1620,6 +1645,16 @@
 
           (let ((inhibit-message t))
             (indent-region (line-beginning-position) (1+ (line-end-position)) column)))
+
+        (defun insert-whitespace-after-point (&optional count)
+          "inserts whitespace from point upto COUNT times
+        without moving point."
+          (interactive "P")
+          (or  count         (setq count 1))
+          (and (listp count) (setq count (car count)))
+
+          (save-excursion
+            (insert (make-string count ? ))))
       #+END_SRC
 
 ***** Commenting
@@ -1806,10 +1841,9 @@
         (if (not prefix)
             ;; switch to original scratch buffer
             (let ((buffer (get-buffer scratch-buffer-name)))
-              (unless buffer
-                (setq buffer (get-buffer-create scratch-buffer-name))
-                (funcall-interactively initial-major-mode))
-              (switch-to-buffer buffer))
+              (if buffer
+                  (switch-to-buffer buffer)
+                (create-new-empty-buffer)))
           (let* ((buffer-list (seq-filter #'(lambda (x)
                                               (string-match
                                                (regexp-quote scratch-buffer-name)
@@ -2105,16 +2139,28 @@
        ;;       |___/
 
        (defhydra hydra-eyebrowse (:hint nil)
-         ("0" eyebrowse-switch-to-window-config-0)
-         ("1" eyebrowse-switch-to-window-config-1)
-         ("2" eyebrowse-switch-to-window-config-2)
-         ("3" eyebrowse-switch-to-window-config-3)
-         ("4" eyebrowse-switch-to-window-config-4)
-         ("5" eyebrowse-switch-to-window-config-5)
-         ("6" eyebrowse-switch-to-window-config-6)
-         ("7" eyebrowse-switch-to-window-config-7)
-         ("8" eyebrowse-switch-to-window-config-8)
-         ("9" eyebrowse-switch-to-window-config-9)
+         ("0" eyebrowse-switch-to-window-config-0 :exit t)
+         ("1" eyebrowse-switch-to-window-config-1 :exit t)
+         ("2" eyebrowse-switch-to-window-config-2 :exit t)
+         ("3" eyebrowse-switch-to-window-config-3 :exit t)
+         ("4" eyebrowse-switch-to-window-config-4 :exit t)
+         ("5" eyebrowse-switch-to-window-config-5 :exit t)
+         ("6" eyebrowse-switch-to-window-config-6 :exit t)
+         ("7" eyebrowse-switch-to-window-config-7 :exit t)
+         ("8" eyebrowse-switch-to-window-config-8 :exit t)
+         ("9" eyebrowse-switch-to-window-config-9 :exit t)
+
+         ("M-0" eyebrowse-switch-to-window-config-0)
+         ("M-1" eyebrowse-switch-to-window-config-1)
+         ("M-2" eyebrowse-switch-to-window-config-2)
+         ("M-3" eyebrowse-switch-to-window-config-3)
+         ("M-4" eyebrowse-switch-to-window-config-4)
+         ("M-5" eyebrowse-switch-to-window-config-5)
+         ("M-6" eyebrowse-switch-to-window-config-6)
+         ("M-7" eyebrowse-switch-to-window-config-7)
+         ("M-8" eyebrowse-switch-to-window-config-8)
+         ("M-9" eyebrowse-switch-to-window-config-9)
+
          ("c" eyebrowse-create-window-config)
          ("d" eyebrowse-close-window-config)
          ("r" eyebrowse-rename-window-config)
@@ -2174,16 +2220,17 @@
                 (dolist (wconfig-counter (number-sequence 0 9))
                   (let ((wconfig-item (eyebrowse--window-config-present-p wconfig-counter)))
                     (if (not wconfig-item)
-                        ;; disable binding for non existent wconfig
-                        (hydra-eyebrowse/generate-set-binding
-                          (number-to-string wconfig-counter) nil)
+                        ;; ;; disable binding for non existent wconfig
+                        ;; (hydra-eyebrowse/generate-set-binding
+                        ;;   (number-to-string wconfig-counter) nil)
+                        nil
 
-                      ;; re-enable binding for existent wconfig
-                      (let* ((wconfig-counter-s (number-to-string wconfig-counter))
-                             (invoking-function (intern (concat "hydra-eyebrowse/eyebrowse-switch-to-window-config-"
-                                                                (number-to-string wconfig-counter)))))
-                        ;; re-enable bindings for workgroups which do exist or have been created
-                        (hydra-eyebrowse/generate-set-binding wconfig-counter-s invoking-function))
+                      ;; ;; re-enable binding for existent wconfig
+                      ;; (let* ((wconfig-counter-s (number-to-string wconfig-counter))
+                      ;;        (invoking-function (intern (concat "hydra-eyebrowse/eyebrowse-switch-to-window-config-"
+                      ;;                                           (number-to-string wconfig-counter)))))
+                      ;;   ;; re-enable bindings for workgroups which do exist or have been created
+                      ;;   (hydra-eyebrowse/generate-set-binding wconfig-counter-s invoking-function))
 
                       ;; include wconfig in header string
                       (let ((win-name (eyebrowse-window-list-to-title wconfig-item)))
@@ -2346,16 +2393,18 @@
        ;; source https://github.com/abo-abo/hydra/wiki/Flycheck
 
        (defhydra hydra-flycheck
-         (:pre (flycheck-list-errors)
-               :post (quit-windows-on "*Flycheck errors*")
-               :hint nil)
+         (:pre (let ((buffer-window (selected-window)))
+                 (flycheck-list-errors)
+                 (select-window buffer-window))
+          :post (quit-windows-on "*Flycheck errors*")
+          :hint nil)
          "Errors"
-         ("f" flycheck-error-list-set-filter "Filter")
-         ("j" flycheck-next-error "Next")
-         ("k" flycheck-previous-error "Previous")
+         ("f"  flycheck-error-list-set-filter "Filter")
+         ("j"  flycheck-next-error "Next")
+         ("k"  flycheck-previous-error "Previous")
          ("gg" flycheck-first-error "First")
-         ("G" (progn (goto-char (point-max)) (flycheck-previous-error)) "Last")
-         ("q" nil))
+         ("G"  flycheck-last-error "Last")
+         ("q"  nil :exit t))
      #+END_SRC
 
 **** ibuffer
@@ -3407,16 +3456,19 @@
      #+NAME: underscore-supported-modes
      - c++
      - c
-     - python
      - markdown
      - lisp
      - shell
      - enh-ruby
 
      #+BEGIN_SRC emacs-lisp :var modes=underscore-supported-modes
+       (defun mohkale//adjust-syntax-entry ()
+         "includes underscores in the syntax entry"
+         (modify-syntax-entry ?_ "w"))
+
        (dolist (mode modes)
          (let ((hook-name (concat (car mode) "-mode-hook")))
-           (add-hook (intern hook-name) #'(lambda () (modify-syntax-entry ?_ "w")))))
+           (add-hook (intern hook-name) #'mohkale//adjust-syntax-entry)))
      #+END_SRC
 
 *** hydra
@@ -3427,6 +3479,52 @@
         :commands defhydra
         :config
         (setq lv-use-separator t))
+    #+END_SRC
+
+*** prettify-symbols
+    lets you convert identifiers like lambda into unicode symbols like λ... isn't that epic :).
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package prog-mode
+        :defer t
+        :commands (prettify-symbols-mode)
+        :delight
+        :init
+        (defmacro mohkale//define-pretty-symbols-for-mode (mode &rest symbols)
+          "defines a hook and an alist for MODE which pushes SYMBOLS onto
+      `prettify-symbols-alist' and enables prettify-symbols-mode in that MODE.
+
+      if you want to add more mappings for symbols after this function has been
+      invoked, then push them onto MODE-prettify-symbols-alist."
+          (setq mode (eval mode))
+
+          (let* ((mode-name (symbol-name mode))
+                 (symbols-alist (intern (concat mode-name "-prettify-symbols-alist")))
+                 (mode-hook (intern (concat mode-name "-hook")))
+                 (func-name (intern (concat mode-name "--setup-prettify-symbols"))))
+            `(progn
+               (setq ,symbols-alist (quote ,symbols))
+
+               (defun ,func-name ()
+                 ,(concat "sets up the pretty symbol maps for " mode-name)
+                 (if (not prettify-symbols-alist)
+                     (setq prettify-symbols-alist (copy-sequence ,symbols-alist))
+                   (nconc prettify-symbols-alist ,symbols-alist))
+
+                 ;; invocation must come after symbol list assignment.
+                 ;; or else assigned symbols won't be replaced :(
+                 (prettify-symbols-mode +1))
+
+               (add-hook (quote ,mode-hook) (quote ,func-name)))))
+        (put 'mohkale//define-pretty-symbols-for-mode 'lisp-indent-function 'defun)
+
+        :config
+        ;; I'll bind it myself, thank you.
+        (setq lisp-prettify-symbols-alist nil)
+        ;; no mode line indicator by default... so here's my own
+        (push '(prettify-symbols-mode "λ") minor-mode-alist)
+        ;; don't need to keep symbolifying it whilst I'm on it
+        (setq-default prettify-symbols-unprettify-at-point t))
     #+END_SRC
 
 ** Packages
@@ -3698,7 +3796,8 @@
         :defer  t
         :commands (display-compilation-buffer)
         :init
-        (setq compilation-read-command nil)
+        (setq compilation-read-command nil
+              compilation-scroll-output t)
 
         (defvar compilation-auto-kill-window 2
           "if non-nil, after a successfull compilation the compilation
@@ -5068,6 +5167,9 @@
                    eyebrowse-prev-window-config
                    eyebrowse-next-window-config
                    eyebrowse-create-window-config)
+        :init
+        (mohkale/set-leader-keys
+          "L" 'hydra-eyebrowse/body)
         :config
         (eyebrowse-mode +1))
     #+END_SRC
@@ -5093,6 +5195,8 @@
           "ec" 'flycheck-clear
           "ee" 'flycheck-explain-error-at-point
           "eh" 'flycheck-describe-checker
+          "eg" 'flycheck-first-error
+          "eG" 'flycheck-last-error
           "eL" 'goto-flycheck-error-list
           "el" 'flycheck-list-errors
           "eS" 'flycheck-set-checker-executable
@@ -5139,7 +5243,52 @@
             :severity 0
             :overlay-category 'flycheck-info-overlay
             :fringe-bitmap bitmap
-            :fringe-face 'flycheck-fringe-info)))
+            :fringe-face 'flycheck-fringe-info))
+
+        (defun flycheck-last-error ()
+          (interactive)
+          (goto-char (point-max))
+          (flycheck-previous-error))
+
+        (defun flycheck-error-list-goto-first-error ()
+          (interactive)
+          (goto-char (point-min))
+          (flycheck-error-list-next-error 1)
+          (flycheck-error-list-previous-error 1))
+
+        (defun flycheck-error-list-goto-last-error ()
+          (interactive)
+          (goto-char (point-max))
+          (flycheck-error-list-previous-error 1))
+
+        (defun flycheck-list-errors--goto-first-error (func &rest args)
+          (let ((flycheck-buffer (get-buffer "*Flycheck errors*")))
+            (apply func args) ;; call flycheck-list-errors
+            (unless flycheck-buffer
+              (flycheck-error-list-goto-first-error))))
+
+        (advice-add 'flycheck-list-errors :around #'flycheck-list-errors--goto-first-error)
+
+        (general-define-key
+          :keymaps 'flycheck-error-list-mode-map
+          :states  'motion
+          "RET" 'flycheck-error-list-goto-error
+          "s" 'tabulated-list-sort
+
+          "J"   'flycheck-error-list-next-error
+          "K"   'flycheck-error-list-previous-error
+          "C-j" 'flycheck-error-list-next-error
+          "C-k" 'flycheck-error-list-previous-error
+
+          "gs" 'flycheck-error-list-check-source
+          "gg" 'flycheck-error-list-goto-first-error
+          "G"  'flycheck-error-list-goto-last-error)
+
+        (mohkale/set-leader-keys-for-major-mode 'flycheck-error-list-mode
+          "e" 'flycheck-error-list-explain-error
+          "s" 'flycheck-error-list-check-source ;; syntax check buffer
+          "f" 'flycheck-error-list-set-filter
+          "F" 'flycheck-error-list-reset-filter))
 
       (use-package flycheck-pos-tip
         :ensure t
@@ -5406,8 +5555,9 @@
                     ;; counsel-dired ;; same as find-file
                     counsel-dired-jump
                     counsel-evil-registers
+                    counsel-evil-marks
                     counsel-file-jump
-                    counsel-file-registers
+                    counsel-file-register
                     counsel-fzf
                     ;; counsel-git...
                     counsel-git
@@ -5461,6 +5611,7 @@
            "ooh" 'counsel-org-agenda-headlines
            "ry" 'counsel-yank-pop
            "rm" 'counsel-mark-ring
+           "rn" 'counsel-evil-marks
            "rr" 'counsel-register
            "re" 'counsel-evil-registers
            "rf" 'counsel-file-registers
@@ -5485,13 +5636,15 @@
            ;; "bb" 'counsel-buffer-or-recentf ;; WARN only file buffers
            "bb" 'counsel-switch-buffer
            "hdf" 'counsel-describe-function
-           "hdv" 'counsel-describe-variable)
+           "hdv" 'counsel-describe-variable
+           "hdB" 'describe-bindings-buffer)
 
          (general-define-key
            "C-M-y" 'counsel-yank-pop)
          :config
          (counsel-mode +1)
-         (push (cons 'counsel-evil-registers ivy-height) ivy-height-alist)
+         ;; (push (cons 'counsel-evil-registers ivy-height) ivy-height-alist)
+         (setq counsel-evil-registers-height ivy-height)
 
          :bind* (:map company-mode-map
                  ("C-:" . counsel-company)
@@ -6933,9 +7086,16 @@
                projectile-indexing-method 'alien ;; never use native
                projectile-tags-command "ctags -Re -f \"%s\" %s \"%s\"")
 
+         (dolist (path projectile-project-search-path)
+           ;; ensure project paths exist
+           (unless (file-exists-p path)
+             (mkdir path t)))
+
          (unless (eq system-type 'gnu/linux)
-           ;; fixes search glitches on windows when using cygwin
-           (setq projectile-generic-command "find . -type f -print0"))
+           ;; fixes search glitches on windows when using cygwin... also strips out leading ./ because
+           ;; ivy seems to recognise ./ paths as distinct from their non ./ counterparts... maybe that's
+           ;; projectiles fault... who knows. also exclude special emacs backup files from search results.
+           (setq projectile-generic-command "find . -type f -not -iname '#*#' -print | cut -c3- | tr '\\n' '\\0'"))
 
          (defun projectile-ivy-persp-switch-project (arg)
            (interactive "P")
@@ -7274,6 +7434,28 @@
       (use-package tildify
         :defer t
         :delight " ~")
+    #+END_SRC
+
+*** tramp
+    #+BEGIN_SRC emacs-lisp
+      (use-package tramp
+        :defer t
+        :config
+        ;; google cloud integration... curtesy of:
+        ;;   https://qiita.com/tanatana/items/218b19808f2428b125fe
+        ;; see [[https://cloud.google.com/sdk/docs/quickstart-windows][here]] for how to install gcloud CLI.
+        (push
+         '("gcssh"
+           (tramp-login-program        "gcloud compute ssh")
+           (tramp-login-args           (("%h")))
+           (tramp-async-args           (("-q")))
+           (tramp-remote-shell         "/bin/sh")
+           (tramp-remote-shell-args    ("-c"))
+           (tramp-gw-args              (("-o" "GlobalKnownHostsFile=/dev/null")
+                                        ("-o" "UserKnownHostsFile=/dev/null")
+                                        ("-o" "StrictHostKeyChecking=no")))
+           (tramp-default-port         22))
+         tramp-methods))
     #+END_SRC
 
 *** transpose-frame
@@ -7742,6 +7924,11 @@
                                                 (when (evil-visual-state-p)
                                                   (evil-exit-visual-state))))
 
+        (setq vc-ignore-dir-regexp
+              (format "%s\\|%s"
+                      vc-ignore-dir-regexp
+                      tramp-file-name-regexp))
+
         ;;; annotations
         ;; pops up a buffer showing the most recent changes for every line
         ;; in the current file alongside the commit which made those changes.
@@ -8038,9 +8225,12 @@
        (use-package elisp-mode
          :defer t
          ;; show lambda as an actual lambda symbol
-         :hook ((elisp-mode            . prettify-symbols-mode)
-                (lisp-interaction-mode . prettify-symbols-mode))
          :config
+         (mohkale//define-pretty-symbols-for-mode 'emacs-lisp-mode
+           ("lambda" . ?λ))
+         (mohkale//define-pretty-symbols-for-mode 'lisp-interaction-mode
+           ("lambda" . ?λ))
+
          ;; evil-adjust: https://raw.githubusercontent.com/troyp/evil-adjust/master/evil-adjust.el
          (defmacro defun-evil-adjust-to-eol (function-name arglist &optional interactive &rest body)
            `(defun ,function-name ,arglist
@@ -8264,6 +8454,10 @@
          (defalias 'python-repl 'run-python)
          (evil-set-initial-state 'inferior-python-mode 'emacs)
          :config
+         (setq python--prettify-symbols-alist nil)
+         (mohkale//define-pretty-symbols-for-mode 'python-mode
+           ("lambda" . ?λ))
+
          (mohkale/declare-prefix-for-major-mode* 'python-mode
            "n" '("navigate" . "move-point")
            "e" "eval/exec"
@@ -8842,10 +9036,7 @@
        (use-package org
          :ensure t
          :defer  t
-         :hook ((org-mode . mohkale//enable-line-numbers-handler)
-                (org-mode . prettify-symbols-mode)
-                (org-mode . (lambda ()
-                              (setq prettify-symbols-alist '(("lambda" . 955))))))
+         :hook ((org-mode . mohkale//enable-line-numbers-handler))
          :commands (org-capture
                     org-agenda
                     org-copy-subtree
@@ -8860,7 +9051,10 @@
            "ooy" 'org-copy-subtree
            "ooc" 'org-cut-subtree)
          :config
-          ;; switch to insert state when capturing org templates
+         (mohkale//define-pretty-symbols-for-mode 'org-mode
+           ("lambda" . ?λ))
+
+         ;; switch to insert state when capturing org templates
          (add-hook 'org-capture-mode-hook (lambda () (evil-append nil)) t)
 
          (defun org-src--prevent-window-config-being-saved-wrapper (&rest args)
