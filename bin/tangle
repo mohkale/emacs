@@ -4,7 +4,6 @@
 # issues with cygwin... only seems to affect ruby and emacs with ruby
 
 require 'rake'
-require 'colorize'
 require 'optparse'
 require 'fileutils'
 require 'shellwords'
@@ -14,6 +13,29 @@ require 'shellwords'
 ## gem 'pry-doc', '>=0.6.0'
 ## gem 'method_source', '>=0.8.2'
 ## gem 'colorize', '0.8.1', git: 'https://github.com/fazibear/colorize'
+
+begin
+    require 'colorize' # pretty strings
+rescue LoadError
+    # pretty printing unavailable :(
+    # just define some dummy methods
+    class String
+        ignore = ->(*args) { self } # do nothing
+
+        [
+            :default,
+            :colorize,
+            :black,  :light_black,
+            :red,    :light_red,
+            :green,  :light_green,
+            :yellow, :light_yellow,
+            :blue,   :light_blue,
+            :magenta,:light_magenta,
+            :cyan,   :light_cyan,
+            :white,  :light_white
+        ].each { |name| define_method(name, ignore) }
+    end
+end
 
 options = {
     :"config-file"   => "~/.emacs.d/init.org",
