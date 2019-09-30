@@ -235,7 +235,7 @@
     #+END_SRC
 
 *** Paths Setup
-    #+BEGIN_SRC emacs-lisp :var --mohkale-config-file=(buffer-file-name)
+    #+BEGIN_SRC emacs-lisp :var --mohkale-config-file=(buffer-file-name) :results silent
       (require 'bytecomp)
 
       (defun join-path (root path &rest args)
@@ -370,6 +370,8 @@
            logview-views-file                                 (etc "logview-views")
            lsp-server-root                                    (var "lsp/servers")
            lsp-session-file                                   (var "lsp/session")
+           org-ditaa-jar-path                                 (var "org/bin/ditaa.jar")
+           org-ditaa-eps-jar-path                             (var "org/bin/ditaaEps.jar")
            multi-compile-history-file                         (var "multi-compile-history.el")
            pcache-directory                                   (var "pcache/")
            persp-save-dir                                     (var "perspectives/")
@@ -410,7 +412,7 @@
                                   eww-bookmarks-directory
                                   newsticker-dir
                                   external-packages-directory
-                                  (var "org/")
+                                  (var "org/bin")
                                   (var "bbdb/")
                                   (var "company/")
                                   (var "elfeed/")
@@ -1132,6 +1134,12 @@
        ;; "C-SPC"           'nil ;; emacs like binding
        "C-@" (general-simulate-key "C-SPC") ;; C-SPC in terminal
 
+       "M-l"             nil
+       "M-h"             nil
+       ;; "M-l"             'kill-sentence
+       ;; "M-h"             'backward-kill-sentence
+       "M-L"             'downcase-word
+       "M-H"             'upcase-word
        "C-M-a"           'mark-whole-buffer
        "C-/"             'toggle-comment-at-point
        "C-S-/"           'toggle-comment-at-point-alt
@@ -2526,7 +2534,7 @@
         ^ ^   _j_   ^ ^ | _>_/_-_ shrink  | _C-RET_ dispatch ^^| _c_alling:        %18s(if ivy-calling \"on\" \"off\") ^^^^^|
         _h_   ^+^   _l_ | _t_oggle-mark ^^| _M-RET_ call     ^^| _C_ase-fold:      %18s`ivy-case-fold-search ^^^^^^^^^^^^^^^|
         ^ ^   _k_   ^ ^ | _u_n/_m_ark     | _S-SPC_ restrict ^^| _T_runcate-lines: %18s(if truncate-lines \"on\" \"off\") ^^|
-        ^ ^   _K_   ^ ^ | occ_U_r _q_uit  | ^   ^ ^ ^          | ^ ^                                  ^^^^^^^^^^^^^^^^^^^^^^|
+        ^ ^   _K_   ^ ^ | occ_U_r _q_uit  | ^   ^ ^ ^          | _f_ilter:         %18s(if ivy-use-ignore \"on\" \"off\") ^^|
        "
          ;; movement
          ("h" ivy-beginning-of-buffer)
@@ -2564,7 +2572,24 @@
          ("c" ivy-toggle-calling)
          ("C" ivy-toggle-case-fold)
          ("r" ivy-rotate-preferred-builders) ;; change regex
+         ("f" ivy-toggle-ignore)
          ("T" (setq truncate-lines (not truncate-lines)))
+
+         ;; hidden commands
+         ("1" digit-argument)
+         ("2" digit-argument)
+         ("3" digit-argument)
+         ("4" digit-argument)
+         ("5" digit-argument)
+         ("6" digit-argument)
+         ("7" digit-argument)
+         ("8" digit-argument)
+         ("9" digit-argument)
+         ("0" digit-argument)
+
+         ("g" ivy-beginning-of-buffer)
+         ("G" ivy-end-of-buffer)
+         ("C-u" ivy-scroll-down-command) ;; overriden for uniarg
 
          ;; exit commands
          ;; nil                  means exit the hydra
@@ -2577,8 +2602,7 @@
          ("C-g" keyboard-escape-quit :exit t))
 
        ;; escape keys for ivy-dispatching-done-hydra
-       (setq ivy-dispatching-done-hydra-exit-keys '(("ESC" nil)
-                                                    ("C-g" nil)))
+       (setq ivy-dispatching-done-hydra-exit-keys '(("ESC" nil) ("C-g" nil)))
 
        (defalias 'hydra-ivy-custom #'hydra-ivy)
 
@@ -3329,6 +3353,18 @@
                        evil-want-C-i-jump nil
                        evil-want-visual-char-semi-exclusive t)
 
+         (defun evil-shift-normal-state (&optional arg)
+           "return to normal state while also removing
+       any trailing whitespace from the current line"
+           (interactive "P")
+           (remove-all-trailing-whitespace (line-beginning-position)
+                                           (line-end-position))
+           (evil-normal-state arg))
+
+         (general-define-key
+           :states '(insert replace)
+           "<S-escape>" 'evil-shift-normal-state)
+
          (general-define-key
            ;; "<C-backspace>"   'evil-delete-backward-word
            "C->" 'evil-shift-right-line
@@ -3364,7 +3400,10 @@
            "M-y"   'evil-copy-from-above
            "C-y"   'yank
            "M-y"   'yank-unindented
-           "C-$"   (lambda () (interactive) (evil-end-of-line) (unless (line-empty-p) (forward-char)))
+           "C-$"   (lambda () (interactive)
+                     (evil-end-of-line)
+                     (unless (line-empty-p)
+                       (forward-char)))
            "C-£"   'evil-beginning-of-line
            "C-e"   'evil-copy-from-above
            "M-e"   'evil-copy-from-below
@@ -3444,6 +3483,8 @@
                 :map evil-motion-state-map
                 ("C-w" . nil)
                 ("-"   . negative-argument)
+                ("C-;" . evil-repeat-find-char)
+                ("M-;" . evil-repeat-find-char-reverse)
 
                 :map evil-ex-completion-map
                 ("C-a" . move-beginning-of-line)
@@ -3721,14 +3762,16 @@
         :config
         (evil-set-initial-state 'calendar-mode 'normal)
 
-        (evil-define-key 'normal calendar-mode-map
+        (general-define-key
+          :states  'normal
+          :keymaps 'calendar-mode-map
           ;;; see also https://github.com/emacs-evil/evil-collection/blob/master/evil-collection-calendar.el
           ;; globally useful
           "q"  'calendar-exit
           "p"  'calendar-print-day-of-year
           "c"  'calendar-count-days-region
           "?"  'calendar-goto-info-node
-          (kbd "C-r") 'calendar-redraw
+          "C-r" 'calendar-redraw
 
           ;; jumpt to date
           "."  'calendar-goto-today
@@ -3746,10 +3789,10 @@
           "}"  'calendar-forward-month
           "/"  'calendar-goto-date
 
-          (kbd "C-h") 'calendar-backward-month
-          (kbd "C-l") 'calendar-forward-month
-          (kbd "C-j") 'calendar-scroll-left-three-months
-          (kbd "C-k") 'calendar-scroll-right-three-months
+          "C-h" 'calendar-backward-month
+          "C-l" 'calendar-forward-month
+          "C-j" 'calendar-scroll-left-three-months
+          "C-k" 'calendar-scroll-right-three-months
 
           ;; marking and unmarking
           "X"  'calendar-unmark
@@ -6547,10 +6590,12 @@
                  ("C-q" . quoted-insert)
                  ("C-M-q" . quit-window)
 
-                 ("C-w" . backward-kill-word)
+                 ("C-w" . evil-delete-backward-word)
                  ("C-?" . minibuffer-completion-help)
                  ;; for some reason.. I can't bind Meta keys
-                 ("M-k" . backward-kill-sentence)
+                 ("M-k" . kill-whole-line)
+                 ("M-h" . backward-kill-sentence)
+                 ("M-l" . kill-sentence)
                  ;; ("M-n" . nil)
                  ;; ("M-p" . nil)
                  ;; ("M-r" . nil)
@@ -6789,6 +6834,7 @@
                    persp-import-win-conf
                    persp-import-buffers
                    persp-window-switch
+                   find-file-new-perspective
                    persp-frame-switch
                    persp-save-state-to-file
                    persp-load-state-from-file
@@ -6802,11 +6848,40 @@
           "br" 'persp-remove-buffer
           "bR" 'persp-remove-current-buffer)
 
+        (mohkale/set-leader-keys
+          "fl" 'find-file-new-perspective
+          "fq" 'find-file-literally)
+
         :config
         (require 'eyebrowse)
 
         (persp-mode +1)
         (setq persp-autokill-buffer-on-remove 'kill-weak)
+
+        (defun find-file-new-perspective (&optional prefix file)
+          "open FILE in a new perspective
+      with prefix, prompts for the name of the layout instead of
+      using FILEs name."
+          (interactive "P\nFNew Persp File: ")
+          (let* ((name (if prefix
+                           (let (done value)
+                             (while (not done)
+                               (setq value (read-string "Name for new perspective: "))
+                               (if (not (persp-with-name-exists-p value))
+                                   (setq done t) ;; break loop, valid name encountered
+                                 (unless (y-or-n-p (format "persp with name '%s' already exists. try again: "
+                                                           value))
+                                   (setq done t)) ;; user no longer wishes to create persp
+                                 (setq value nil) ;; unbind in case value being returned
+                                 ))
+                             value)
+                         (file-name-nondirectory (string-trim-right file "/")))))
+            (when name
+              (persp-add-new name)
+              (persp-switch name)
+              (let ((buffer (find-file file)))
+                (switch-to-buffer buffer)
+                (persp-add-buffer buffer)))))
 
         (defun switch-to-persp-by-num (index)
           "switch to a perspective based on it's position in (persp-persps)
@@ -6832,7 +6907,7 @@
         (defun persp-add-new--after (&rest args)
           "hook which is run immeadiately after `persp-add-new'
       this function sets the current persp to the new persp... unless
-      `persp-add-new' wasn't invoked interactively. It also kill all
+      `persp-add-new' wasn't invoked interactively. It also kills all
       displayed windows and returns to the home buffer... unless the
       previous persp is being copied."
           (let ((persp-list (nreverse (persp-persps)))
@@ -9165,6 +9240,11 @@
                                       (org-agenda-files :maxlevel . 9))
                  org-outline-path-complete-in-steps nil ; refile in a single go
                  org-refile-use-outline-path t ; show full paths for refiling
+                 org-cycle-separator-lines 0 ; prevents weird coloring of collapsed trees
+                 ;; org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
+                 ;; break org-cycle-seperator-lines from working automatically
+                 ;; org-src-tab-acts-natively t ;; tab is native to block language
+                 ;; native tabs are slow and unreliable... :sad:
                  org-default-notes-file (concat org-root "notes.org")
                  org-agenda-files (file-expand-wildcards (concat org-root "*.org")))
 
@@ -9185,6 +9265,8 @@
                                                       (evil-normal-state))))
 
          (defun org-outline-smart-up-level ()
+           "when at a heading, move to parent
+       otherwise move to current heading."
            (interactive)
            (call-interactively (if (org-at-heading-p)
                                    'outline-up-heading
@@ -9205,11 +9287,15 @@
             (awk . t)
             (java . t)
             (js . t)
+            (ditaa . t)
             (python . t)
             (ruby . t)
             (sed . t)
             (shell . t)
             (R . t)))
+
+         (push '("ditaa" . fundamental)
+               org-src-lang-modes)
 
          ;;             _ _       _     _           _ _
          ;;   _____   _(_) |     | |__ (_)_ __   __| (_)_ __   __ _ ___
@@ -9222,12 +9308,12 @@
            "define an anonymous function running body at the end of the line"
            `(lambda () (interactive) (end-of-visual-line) ,@body (evil-append nil)))
 
-         (defun org-clever-return (&optional above insert-headings)
-           "depending on the local state, inserts a heading, a table row an item or newline.
-       insert-headings argument is for o & O bindings below. otherwise I don't want to have
-       to insert heading everytime I return from a heading... kind of a hackish fix, maybe
-       come up with a more intuitive way.
+         (defvar org-clever-return--insert-headings nil
+           "when true, returning from the end of a heading
+       inserts a heading.")
 
+         (defun org-clever-return (&optional above)
+           "depending on the local state, inserts a heading, a table row an item or newline.
        TODO fix return broken for words
 
        this function is functionally similair to the result of evil-org-eol-call-anon, but
@@ -9235,18 +9321,19 @@
        folded lines, such as headings), it checks before moving and then inserts the right
        items depending on how things looked where you were."
            (interactive)
-           (let ((insert-line (lambda () (if above
-                                           (evil-insert-newline-above)
-                                         (end-of-visual-line)
-                                         (evil-insert-newline-below)))))
+           (cl-letf (((symbol-function 'evil-open)
+                      (lambda () (call-interactively
+                             (if above
+                                 'evil-open-above
+                               'evil-open-below)))))
              (cond ((org-table-p)
                     (org-table-insert-row (not above))
                     (evil-insert nil))
-                   ((and insert-headings
+
+                   ((and org-clever-return--insert-headings
                          (org-at-heading-p))
-                    (funcall insert-line)
-                    (org-insert-heading)
-                    (evil-append nil))
+                    (evil-open)
+                    (org-insert-heading))
 
                    ((org-at-item-p)
                     ;; position of cursor dictates where new point goes
@@ -9255,9 +9342,18 @@
                       (goto-char (line-end-position)))
                     (org-insert-item)
                     (evil-append nil))
-                   (t (call-interactively (if above 'evil-open-above 'evil-open-below))))))
 
-         (setq org-cycle-separator-lines 0)
+                   (t
+                    (when (and (line-empty-p)
+                               (not (zerop (column-number (point)))))
+                      ;; don't leave a trailing indent unecessarily
+                      (remove-all-trailing-whitespace (line-beginning-position)
+                                                      (line-end-position)))
+                    (if (and (called-interactively-p)
+                             (not above))
+                        (funcall-interactively
+                         'newline-and-indent)
+                      (evil-open))))))
 
          (general-define-key
            :keymaps 'org-mode-map
@@ -9267,9 +9363,12 @@
          (general-define-key
            :keymaps 'org-mode-map
            :states 'normal
-           "o" '(lambda () (interactive) (org-clever-return nil t))
-           "O" '(lambda () (interactive) (org-clever-return t   t))
-
+           "o" '(lambda () (interactive)
+                  (let ((org-clever-return--insert-headings t))
+                    (org-clever-return nil)))
+           "O" '(lambda () (interactive)
+                  (let ((org-clever-return--insert-headings t))
+                    (org-clever-return t)))
            "M-u" 'org-metaleft
            "M-i" 'org-metadown
            "M-o" 'org-metaup
@@ -9286,13 +9385,17 @@
            ;; FIXME prefix arg doesn't work
            ;; FIXME doesn't work when on a heading
            "C-<return>"   (evil-org-eol-call-anon (org-insert-heading nil))
-           "C-M-<return>" (evil-org-eol-call-anon (org-insert-heading nil) (if prefix-arg
-                                                                               (org-metaleft)
-                                                                             (org-metaright)))
+           "C-M-<return>" (evil-org-eol-call-anon
+                           (org-insert-heading nil)
+                           (if current-prefix-arg
+                               (org-metaleft)
+                             (org-metaright)))
            "C-S-<return>"   (evil-org-eol-call-anon (org-insert-todo-heading nil))
-           "C-S-M-<return>" (evil-org-eol-call-anon (org-insert-todo-heading nil) (if prefix-arg
-                                                                                      (org-metaleft)
-                                                                                    (org-metaright)))
+           "C-S-M-<return>" (evil-org-eol-call-anon
+                             (org-insert-todo-heading nil)
+                             (if current-prefix-arg
+                                 (org-metaleft)
+                               (org-metaright)))
            "C-." 'org-toggle-heading)
 
          (general-define-key
@@ -9307,8 +9410,14 @@
            ;; "t" 'org-todo ; I use this too often
            ;; "T" 'org-insert-todo-heading ; rebound to C-S-<return>
            "$" 'org-end-of-line
-           "^" 'org-beginning-of-line
+           "^" 'org-beginning-of-line)
 
+         (general-define-key
+           :keymaps 'org-mode-map
+           :states '(normal visual)
+           :predicate '(or (org-table-p)
+                           (org-at-heading-p)
+                           (org-at-item-p))
            "C-j" 'org-metadown
            "C-k" 'org-metaup)
 
@@ -9317,8 +9426,6 @@
            :states '(normal visual insert emacs)
            "<tab>" 'org-cycle
            "<S-tab>" 'org-shifttab)
-
-         ;; predicated on at heading
 
          (general-define-key
            :keymaps 'org-mode-map
@@ -9482,7 +9589,9 @@
          :bind* (:map org-mode-map
                  ;; "C-M-<return>" org-meta-return)
                  ("C-s" . org-sort)
-                 ("M-S-<return>" . nil)))
+                 ("M-S-<return>" . nil)
+                 ("M-h" . nil)
+                 ("C-j" . nil)))
      #+END_SRC
 
 **** org-capture
