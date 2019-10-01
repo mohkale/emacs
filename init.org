@@ -641,7 +641,7 @@
        ;; create bindings to leader map in every mode
        (general-define-key
          :states states
-         leader '(:keymap mohkale-leader-map :which-key "emacs root")))
+         leader '(:keymap mohkale-leader-map :which-key "emacs-root")))
 
      (let ((major-leader-sequence (concat mohkale-leader-key
                                           " "
@@ -891,7 +891,7 @@
 
       (mohkale/set-leader-keys
         ;; compile
-        "cC" 'compile
+        "c M-SPC" 'compile
         "cd" 'close-compilation-window ;; WARN not yet implemented
         "cs" 'kill-compilation
         "cr" 'recompile
@@ -901,7 +901,10 @@
         "cy" 'yank-and-comment
         "ck" 'comment-kill
         "c[" 'comment-box
-        "ci" 'comment-indent)
+        "ci" 'comment-indent
+
+        "cc" 'toggle-comment-at-point
+        "cC" 'toggle-comment-at-point-alt)
     #+END_SRC
 
 *** diff
@@ -1043,31 +1046,18 @@
         "nw" 'widen)
     #+END_SRC
 
-*** custom
+*** text
     #+BEGIN_SRC emacs-lisp
       (mohkale/declare-prefix*
-        "o"  "custom"
-        "of" "format"
-        "oe" "emacs"
-        "ot" "text"
-
-        "o C-M-k" "hcf")
+        "x" "text")
 
       (mohkale/set-leader-keys
-        "o C-M-k" 'kill-all-windows-and-return-to-home
-
-        "oft" 'remove-all-trailing-whitespace
-        "ofC" 'capitalize-region
-        "ofc" 'toggle-comment-at-point
-        "ofC" 'toggle-comment-at-point-alt
-        "ofp" 'pad-line-with-space-to-length
-        "ofP" 'pad-line-with-char-to-length
-
-        "oef" 'make-frame
-        "oeF" 'delete-frame
-
-        "otp" 'describe-text-properties
-        "otf" 'list-faces)
+        "xa" 'describe-text-properties
+        "xf" 'list-faces
+        "xc" 'capitalize-region
+        "xp" 'pad-line-with-space-to-length
+        "xP" 'pad-line-with-char-to-length
+        "xt" 'remove-all-trailing-whitespace)
     #+END_SRC
 
 *** toggles
@@ -1163,9 +1153,11 @@
        :states mohkale-norm-states
        "gr"    'revert-buffer)
 
-     ;; (general-define-key
-     ;;   :states mohkale-nnorm-states
-     ;;   "S-SPC" 'insert-whitespace-after-point)
+     (general-define-key
+       :states mohkale-nnorm-states
+       ;; "S-SPC" 'insert-whitespace-after-point
+       "<S-backspace>"   'delete-forward-char
+       "<C-S-backspace>" 'kill-word)
 
      (general-define-key "C-w" '(:prefix-command mohkale-window-map :which-key "windows"))
 
@@ -1192,8 +1184,8 @@
                   mohkale/find-org-university-file)
        :init
        (mohkale/declare-prefix*
-         "oon" "find-notes-file"
-         "oou" "find-uni-file"
+         "on" "find-notes-file"
+         "ou" "find-uni-file"
          "feb" "build-config"
          "fec" "find-config"
          "fer" "eval-config"
@@ -1201,8 +1193,8 @@
          "fed" "find-dotfile")
 
        (mohkale/set-leader-keys
-         "oon" 'mohkale/find-capture-notes-file
-         "oou" 'mohkale/find-org-university-file
+         "on" 'mohkale/find-capture-notes-file
+         "ou" 'mohkale/find-org-university-file
          "feb" 'mohkale/build-configuration-file
          "fec" 'mohkale/find-configuration-file
          "fer" 'mohkale/eval-configuration-file
@@ -1806,6 +1798,7 @@
                    kill-this-buffer-and-window-maybe
                    switch-to-last-buffer
                    kill-all-windows-and-return-to-home
+                   halt-and-catch-fire
                    switch-to-messages-buffer
                    force-set-all-visible-windows-dedication
                    window-zen
@@ -1899,14 +1892,16 @@
           (delete-window window))
         (goto-home-buffer))
 
+      (defalias 'halt-and-catch-fire #'kill-all-windows-and-return-to-home)
+
       (defun force-set-all-visible-windows-dedication (&optional dedicate)
         "allows you to set the dedication of all visible windows
       dedicate if truthy, will result in all windows recieving a dedication.
       if falsy, all windows will have their dedication removed"
         (interactive "P")
         ;; TODO require persp-mode here
-        (and dedicate (setq dedicate t))   ; rationalise value as bool
-        (or  dedicate (setq dedicate nil)) ; rationalise value as nil
+        (and dedicate (setq dedicate t))      ; rationalise value as bool
+        (or  dedicate (setq dedicate nil))    ; rationalise value as nil
 
         (dolist (window (window-list))
           (if (not (eq dedicate (window-dedicated-p window)))
@@ -2920,8 +2915,7 @@
          ("os" vlc/set-subtitle-track)
          ("oz" vlc/set-zoom) ;; @
 
-         ("q" nil :exit t)
-         )
+         ("q" nil :exit t))
      #+END_SRC
 
 **** indentation
@@ -3373,8 +3367,7 @@
          (general-define-key
            :states 'normal
            "gj" 'evil-next-visual-line
-           "gk" 'evil-previous-visual-line
-           )
+           "gk" 'evil-previous-visual-line)
 
          ;; because I keep overshadowing the above two
          (general-define-key
@@ -3432,8 +3425,8 @@
          (mohkale/set-leader-keys
            "id" 'evil-insert-digraph
            "sc" 'evil-ex-nohighlight
-           "ofu" 'evil-upcase
-           "ofd" 'evil-downcase)
+           "xu" 'evil-upcase
+           "xd" 'evil-downcase)
          :bind (:map mohkale-window-map
                 ("+" . evil-window-increase-height)
                 ("-" . evil-window-decrease-height)
@@ -5666,7 +5659,7 @@
        (use-package counsel
          :ensure t
          :defer  t
-         :after  ivy
+         :after  (ivy org)
          :diminish
          :commands (counsel-M-x
                     counsel-descbinds
@@ -5733,6 +5726,11 @@
            :keymaps 'mohkale-window-map
            "w" 'counsel-wmctrl)
 
+         (with-eval-after-load 'org
+           (mohkale/set-leader-keys
+             "oc" 'counsel-org-capture
+             "oh" 'counsel-org-agenda-headlines))
+
          (mohkale/set-leader-keys
            "ic" 'counsel-unicode-char
            "ie" 'counsel-org-entity
@@ -5740,8 +5738,6 @@
            "MM" 'counsel-major
 
            "?"  'counsel-appropos
-           "oO" 'counsel-org-capture
-           "ooh" 'counsel-org-agenda-headlines
            "ry" 'counsel-yank-pop
            "rm" 'counsel-mark-ring
            "rn" 'counsel-evil-marks
@@ -5880,6 +5876,8 @@
      #+END_SRC
 
 **** helm-make
+     contrary to what I initially thought, helm-make can also be used with ivy. Maybe should be named something else.
+
      #+BEGIN_SRC emacs-lisp
        (use-package helm-make
          :ensure t
@@ -5889,8 +5887,8 @@
          :init
          (setq helm-make-completion-method 'ivy)
          (mohkale/set-leader-keys
-           "cc" 'helm-make-projectile
-           "cm" 'helm-make))
+           "c SPC" 'helm-make-projectile
+           "cm"    'helm-make))
      #+END_SRC
 
 **** flx
@@ -6783,7 +6781,6 @@
                    rxt-pcre-to-rx)
         :init
         (mohkale/declare-prefix*
-          "x" "text"
           "xr" "regular expressions"
           "xre" "elisp"
           "xrp" "pcre")
@@ -9209,12 +9206,12 @@
                     org-outline-smart-up-level)
          :init
          ;;; leader keys outside of org mode
-         (mohkale/declare-prefix "oo" "org")
+         (mohkale/declare-prefix "o" "org")
          (mohkale/set-leader-keys
-           "oO"  'org-capture
-           "ooa" 'org-agenda
-           "ooy" 'org-copy-subtree
-           "ooc" 'org-cut-subtree)
+           "oc" 'org-capture
+           "oa" 'org-agenda
+           "oy" 'org-copy-subtree
+           "oc" 'org-cut-subtree)
          :config
          (mohkale//define-pretty-symbols-for-mode 'org-mode
            ("lambda" . ?λ))
