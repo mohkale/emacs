@@ -33,11 +33,16 @@
                   (let* ((window-list  (window-list))
                          (window-count (length window-list))
                          (focus-list   '("*Warnings*"
-                                         "*Compile-Log*")))
+                                         "*Compile-Log*"))
+                         (kill-list    '()))
                     (when (> window-count 1)
                       (dolist (window (window-list))
-                        (when (member (buffer-name (window-buffer window)) focus-list)
-                          (select-window window)))))
+                        (let ((buffer-name (buffer-name (window-buffer window))))
+                          (cond
+                           ((member buffer-name focus-list)
+                            (select-window window))
+                           ((member buffer-name kill-list)
+                            (delete-window window)))))))
 
                   ;; load my custom emacs theme
                   (load-theme 'an-old-hope)))
@@ -134,56 +139,61 @@
       ;;      until one which returns non nil is encountered.
       ;;   3. the remaining list items should be an alists providing options.
 
-      (defmacro display-buffer--defun-focus-method (func)
-        `(defun ,(intern (concat (symbol-name func) "-and-focus")) (buffer alist)
-           (let ((window (,func buffer alist)))
-             (when window
-               (select-window window)))))
+      ;; changing at startup messes up the display of the dashboard :(
+      (defun mohkale//update-display-buffer-options-handler ()
+        (defmacro display-buffer--defun-focus-method (func)
+          `(defun ,(intern (concat (symbol-name func) "-and-focus")) (buffer alist)
+             (let ((window (,func buffer alist)))
+               (when window
+                 (select-window window)))))
 
-      (display-buffer--defun-focus-method display-buffer--maybe-same-window)
-      (display-buffer--defun-focus-method display-buffer-reuse-window)
-      (display-buffer--defun-focus-method display-buffer--maybe-pop-up-frame-or-window)
-      (display-buffer--defun-focus-method display-buffer-in-previous-window)
-      (display-buffer--defun-focus-method display-buffer-in-side-window)
-      (display-buffer--defun-focus-method display-buffer-use-some-window)
-      (display-buffer--defun-focus-method display-buffer-pop-up-frame)
+        (display-buffer--defun-focus-method display-buffer--maybe-same-window)
+        (display-buffer--defun-focus-method display-buffer-reuse-window)
+        (display-buffer--defun-focus-method display-buffer--maybe-pop-up-frame-or-window)
+        (display-buffer--defun-focus-method display-buffer-in-previous-window)
+        (display-buffer--defun-focus-method display-buffer-in-side-window)
+        (display-buffer--defun-focus-method display-buffer-use-some-window)
+        (display-buffer--defun-focus-method display-buffer-pop-up-frame)
+        (display-buffer--defun-focus-method display-buffer-below-selected)
 
-      (defvar display-buffer--default-fallback-action
-        display-buffer-fallback-action
-        "the value for fallback actions without my configuration")
+        (defvar display-buffer--default-fallback-action
+          display-buffer-fallback-action
+          "the value for fallback actions without my configuration")
 
-      (advice-add 'display-startup-echo-area-message :around #'ignore)
+        (advice-add 'display-startup-echo-area-message :around #'ignore)
 
-      (setq display-buffer-fallback-action
-            ;; by default, focus on displayed windows
-            '((display-buffer--maybe-same-window-and-focus
-               display-buffer-reuse-window-and-focus
-               display-buffer--maybe-pop-up-frame-or-window-and-focus
-               display-buffer-in-previous-window-and-focus
-               display-buffer-use-some-window-and-focus
-               display-buffer-pop-up-frame-and-focus)))
+        (setq display-buffer-fallback-action
+              ;; by default, focus on displayed windows
+              '((display-buffer--maybe-same-window-and-focus
+                 display-buffer-reuse-window-and-focus
+                 display-buffer--maybe-pop-up-frame-or-window-and-focus
+                 display-buffer-in-previous-window-and-focus
+                 display-buffer-use-some-window-and-focus
+                 display-buffer-pop-up-frame-and-focus)))
 
-      (push '("*Async Shell Command*"
-              (display-buffer-reuse-window
-               display-buffer-in-side-window-and-focus)
-              (side          . bottom)
-              (window-height . 0.5))
-            display-buffer-alist)
+        (push '("*Async Shell Command*"
+                (display-buffer-reuse-window
+                 display-buffer-in-side-window-and-focus)
+                (side          . bottom)
+                (window-height . 0.5))
+              display-buffer-alist)
 
-      (push '("*compilation*"
-              (display-buffer-reuse-window
-               display-buffer-in-side-window-and-focus)
-              (side          . bottom)
-              (window-height . 0.5))
-            display-buffer-alist)
+        (push '("*compilation*"
+                (display-buffer-reuse-window
+                 display-buffer-in-side-window-and-focus)
+                (side          . bottom)
+                (window-height . 0.5))
+              display-buffer-alist)
 
-      (push `("*image-dired-display-image*"
-              ,@display-buffer--default-fallback-action)
-            display-buffer-alist)
+        (push `("*image-dired-display-image*"
+                ,@display-buffer--default-fallback-action)
+              display-buffer-alist)
 
-      (push `("magit-diff: "
-              ,@display-buffer--default-fallback-action)
-            display-buffer-alist)
+        (push `("magit-diff: "
+                ,@display-buffer--default-fallback-action)
+              display-buffer-alist))
+
+      (add-hook #'emacs-startup-hook #'mohkale//update-display-buffer-options-handler)
     #+END_SRC
 
 *** Config Variables
@@ -224,12 +234,13 @@
       ;; (add-hook 'kill-emacs-hook (lambda () (and (mohkale/refresh-config-file-p)
       ;;                                            (mohkale/build-configuration-file))))
 
-      (add-hook 'emacs-startup-hook
-                (lambda ()
-                  (when (mohkale/refresh-config-file-p)
-                    (display-warning 'init
-                                     (concat "your configuration file is out of date: "
-                                             mohkale-mohkale-config-file)))))
+      (defun mohkale//display-out-of-date-configuration-warning ()
+        (when (mohkale/refresh-config-file-p)
+          (display-warning 'init
+                           (concat "your configuration file is out of date: "
+                                   mohkale-mohkale-config-file))))
+
+      (add-hook 'emacs-startup-hook #'mohkale//display-out-of-date-configuration-warning)
 
       (setq mohkale-window-map (make-sparse-keymap))
     #+END_SRC
@@ -300,7 +311,7 @@
            auto-insert-directory                              (etc "auto-insert")
            auto-save-list-file-prefix                         (var "auto-save" "sessions/")
            auto-save-file-name-transforms                     `((".*" ,(var "auto-save" "sessions/") t))
-           backup-directory-alist                             (list (cons ".*" (var "backups/")))
+           backup-directory-alist                             (list (cons "." (var "backups/")))
            bookmark-default-file                              (etc "bookmarks.el")
            desktop-dirname                                    (var "desktop/")
            desktop-path                                       (list desktop-dirname)
@@ -490,7 +501,7 @@
     | transpose-frame     | a40264a07b25d2c1d8d1be341d42952329d1bbfab8c23100904627fef4f4c7b8 | https://www.emacswiki.org/emacs/download/transpose-frame.el                               |
     | hs-lint             | 61bf6d3cfd43f2729d85ed407a7de5fd6b025540229bc0b57c37785d0b6d7450 | https://raw.githubusercontent.com/ndmitchell/hlint/master/data/hs-lint.el                 |
     | hlint-refactor-mode | 55d5a9e99f0384b15eacfdf2b17ae313c6ddbb0343980ed324707fcaaf2b718a | https://raw.githubusercontent.com/mpickering/hlint-refactor-mode/master/hlint-refactor.el |
-    | miniedit            | c632c33c099362b084d965c51ec4b933be1278c7064096ce3b97cc830436055b | [[https://raw.githubusercontent.com/emacsmirror/miniedit/master/miniedit.el]]                 |
+    | miniedit            | c632c33c099362b084d965c51ec4b933be1278c7064096ce3b97cc830436055b | https://raw.githubusercontent.com/emacsmirror/miniedit/master/miniedit.el                 |
     | ibuffer-persp       | 6395294e2dd368866d79a81d37c27961e0f871937ccd82cff317e5ad67c52652 | https://raw.githubusercontent.com/rakshasa/ibuffer-persp/master/ibuffer-persp.el          |
     | org-link-edit       | ac84061d951ef9ef82794ba7f4416afb6da4283a182490a11ae455077321814c | https://raw.githubusercontent.com/kyleam/org-link-edit/master/org-link-edit.el            |
 
@@ -556,7 +567,7 @@
             (let ((buffer (get-buffer "*external-packages*")))
               (and buffer
                    (kill-buffer buffer))) ;; kill process buffer when nothing failed
-          ;; (error "external-package : failed to download packages: %s" failed-installs)
+          (display-warning :warning (format "external-package : failed to download packages: %s" failed-installs))
           ))
     #+END_SRC
 
@@ -1156,7 +1167,7 @@
      (general-define-key
        :states mohkale-nnorm-states
        ;; "S-SPC" 'insert-whitespace-after-point
-       "<S-backspace>"   'delete-forward-char
+       "M-DEL"   'delete-forward-char
        "<C-S-backspace>" 'kill-word)
 
      (general-define-key "C-w" '(:prefix-command mohkale-window-map :which-key "windows"))
@@ -1434,6 +1445,14 @@
       (defun inhibit-messages-wrapper (func &rest args)
         (let ((inhibit-message t))
           (apply func args)))
+
+      (defvar after-load-theme-hook nil
+        "hook which is executed after loading a theme")
+
+      (defun load-theme--execute-hooks (&rest args)
+        (run-hooks 'after-load-theme-hook))
+
+      (advice-add 'load-theme :after #'load-theme--execute-hooks)
     #+END_SRC
 
 *** Yank Indent Adjust
@@ -1528,6 +1547,8 @@
                    pad-line-with-space-to-length
                    remove-all-trailing-whitespace
                    toggle-comment-at-point
+                   tab-to-tab-stop-with-prefix
+                   back-to-tab-stop
                    toggle-comment-at-point-alt
                    custom-insert-line
                    custom-insert-line-below
@@ -1655,6 +1676,19 @@
 
           (save-excursion
             (insert (make-string count ? ))))
+
+        ;; https://emacs.stackexchange.com/questions/32816/backwards-tab-to-tab-stop
+        (defun tab-to-tab-stop-with-prefix (&optional prev)
+          "Like `tab-to-tab-stop', but toggle direction with prefix."
+          (interactive "P")
+          (let ((nexttab (indent-next-tab-stop (current-column) prev)))
+            (delete-horizontal-space t)
+            (indent-to nexttab)))
+
+        (defun back-to-tab-stop ()
+          (interactive)
+          (let ((current-prefix-arg 1))
+            (call-interactively #'tab-to-tab-stop-with-prefix)))
       #+END_SRC
 
 ***** Commenting
@@ -1802,6 +1836,8 @@
                    switch-to-messages-buffer
                    force-set-all-visible-windows-dedication
                    window-zen
+                   display-last-buffer
+                   vertical-display-last-buffer
                    shell-command-on-buffer
                    async-shell-command-on-buffer
                    safe-erase-buffer
@@ -1810,7 +1846,9 @@
                    split-window-right-and-focus
                    split-window-below-and-focus)
         :bind (:map mohkale-window-map
-               ("T" . force-set-all-visible-windows-dedication)))
+               ("T" . force-set-all-visible-windows-dedication)
+               ("C-o" . display-last-buffer)
+               ("M-o" . vertical-display-last-buffer)))
     #+END_SRC
 
     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
@@ -1990,6 +2028,26 @@
         (interactive (list (current-buffer)))
         (with-current-buffer buffer
           (copy-region-as-kill (point-min) (point-max))))
+
+      (defun display-last-buffer ()
+        (interactive)
+        (display-buffer
+         (last-buffer)
+         '((display-buffer-below-selected-and-focus
+            display-buffer-in-previous-window-and-focus
+            display-buffer-use-some-window-and-focus
+            display-buffer-pop-up-frame-and-focus))))
+
+      (defun vertical-display-last-buffer ()
+        (interactive)
+        (display-buffer
+         (last-buffer)
+         (cons '(display-buffer-in-side-window-and-focus
+                 display-buffer-in-previous-window-and-focus
+                 display-buffer-use-some-window-and-focus
+                 display-buffer-pop-up-frame-and-focus)
+               '((side . right)
+                 (window-width . 0.5)))))
     #+END_SRC
 
 *** Hydras
@@ -2014,7 +2072,9 @@
 
       (general-define-key
         :keymaps 'mohkale-window-map
-        "." 'hydra-winman/body)
+        "." 'hydra-winman/body
+        "w" 'hydra-winman/body
+        "C-w" 'hydra-winman/body)
 
       (mohkale/declare-prefix*
         "x." "hydra-text-zoom"
@@ -2023,6 +2083,9 @@
       (mohkale/set-leader-keys
         "x." 'hydra-text-zoom/body
         "l"  'hydra-persp/body)
+
+      (general-define-key
+        "C-x TAB" 'hydra-indent/body)
     #+END_SRC
 
 **** text-zoom
@@ -3044,6 +3107,19 @@
 
 ** Core Packages
    For packages that're need to properly setup other packages. This list won't be in any sort of order, beyond the messy order needed to ensure everything can be built from scratch.
+*** el-get
+    seems promising... but I'm too lazy to get it up and working yet. Here's the [[https://github.com/dimitri/el-get/blob/master/README.md][README]].
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package el-get
+        :ensure t
+        :defer  t)
+
+      (use-package use-package-el-get
+        :demand t
+        :config
+        (use-package-el-get-setup))
+    #+END_SRC
 
 *** spaceline
     an amazing mode line... needs to be initialised before all others to make sure every buffer inherits the same mode line. otherwise, the message buffer will definitely not use spaceline, you'll have to restart it or re evaluate this in it's context.
@@ -3062,7 +3138,10 @@
                       spaceline-org-clock                 t
                       powerline-default-separator         'slant)
 
-        (if (display-graphic-p)
+        ;; by default, colors seem to glitch out on change
+        (add-hook 'after-load-theme-hook #'powerline-reset)
+
+        (when (display-graphic-p)
           (setq-default spaceline-window-numbers-unicode    t
                         spaceline-workspace-numbers-unicode t))
 
@@ -3084,22 +3163,6 @@
                  (concat evil-register--register-prefix
                          (char-to-string ,register-var))
                (make-string 2 evil-register--fallback-char))))
-
-      ;;   (spaceline-define-segment kmacro
-      ;;     "segment showing when a macro is being recorded
-      ;; for evil macros, the assigned register is also shown"
-      ;;     (spaceline--this-macro-to-string)
-      ;;     :enabled t)
-
-      ;;   (spaceline-define-segment evil-register
-      ;;     ;; (concat (evil-register-to-string evil-this-register)
-      ;;     ;;         " / "
-      ;;     ;;         (evil-register-to-string evil-last-register))
-      ;;     (evil-register-to-string evil-this-register)
-      ;;     :enabled t
-      ;;     ;; :when (or evil-this-register
-      ;;     ;;           evil-last-register)
-      ;;     :when evil-this-register)
 
         (spaceline-define-segment evil-macro-and-register
           (let ((macro (spaceline--this-macro-to-string))
@@ -3318,18 +3381,6 @@
            "C-S-x" 'evil-numbers/dec-at-pt))
      #+END_SRC
 
-**** evil-adjust
-     #+BEGIN_SRC emacs-lisp :tangle no
-       (use-package evil-adjust
-         :defer  t
-         :commands evil-adjust
-         :hook (evil-mode . evil-adjust)
-         :config
-         ;; (defalias 'eval-last-sexp 'evil-adjust-eval-last-sexp)
-         ;; (defalias 'eval-print-last-sexp 'evil-adjust-eval-print-last-sexp)
-         )
-     #+END_SRC
-
 **** evil-mode
      come to the dark side, we have cookies... :)
 
@@ -3387,10 +3438,16 @@
            "C-M-k" 'evil-join-backwards)
 
          (general-define-key
+           "C-e" 'evil-copy-from-above
+           "M-e" 'evil-copy-from-below)
+
+         (general-define-key
            :states 'insert
-           "TAB"   'indent-relative
-           "<S-tab>" 'tab-to-tab-stop
-           "M-y"   'evil-copy-from-above
+           "C-e" nil
+           "M-e" nil
+           "<tab>"   'indent-relative
+           "<S-tab>" 'tab-to-tab-stop-with-prefix
+           "<S-backspace>" 'back-to-tab-stop
            "C-y"   'yank
            "M-y"   'yank-unindented
            "C-$"   (lambda () (interactive)
@@ -3398,8 +3455,6 @@
                      (unless (line-empty-p)
                        (forward-char)))
            "C-£"   'evil-beginning-of-line
-           "C-e"   'evil-copy-from-above
-           "M-e"   'evil-copy-from-below
            "M-k"   nil                  ; erase
            ;; (kbd "C-M-k") 'evil-insert-digraph
            "C-l"   'forward-char
@@ -3420,6 +3475,11 @@
            :states '(visual normal motion)
            "C-SPC" nil ;; this is evil, we don't need you :P
            )
+
+         (general-define-key
+           :states mohkale-norm-states
+           ;; keep hitting C-SPC by accident
+           "C-SPC" (general-simulate-key "SPC"))
 
          (mohkale/declare-prefix "sc" "search-noh")
          (mohkale/set-leader-keys
@@ -3503,6 +3563,38 @@
        (dolist (mode modes)
          (let ((hook-name (concat (car mode) "-mode-hook")))
            (add-hook (intern hook-name) #'mohkale//adjust-syntax-entry)))
+     #+END_SRC
+
+**** evil-args
+     see also: [[https://github.com/wcsmith/evil-args][link]].
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package evil-args
+         :ensure t
+         :defer  t
+         :commands (evil-inner-arg
+                    evil-outer-arg
+                    evil-forward-arg
+                    evil-backward-arg
+                    evil-jump-out-args)
+         :init
+         (define-key evil-inner-text-objects-map "a" 'evil-inner-arg)
+         (define-key evil-outer-text-objects-map "a" 'evil-outer-arg)
+         (define-key evil-normal-state-map "K" 'evil-jump-out-args)
+
+         (general-define-key
+           :states '(motion normal)
+           "K" 'evil-jump-out-args)
+
+         (mohkale/set-leader-keys
+           "g(" 'evil-backward-arg
+           "g)" 'evil-forward-arg
+           "gk" 'evil-jump-out-args)
+
+         (defun evil-args--adjust-for-elisp ()
+           (setq evil-args-delimiters '(" ")))
+
+         (add-hook 'emacs-lisp-mode-hook #'evil-args--adjust-for-elisp))
      #+END_SRC
 
 *** hydra
@@ -3830,7 +3922,8 @@
       (use-package compile
         :ensure t
         :defer  t
-        :commands (display-compilation-buffer)
+        :commands (display-compilation-buffer
+                   mohkale/set-compilation-bindings)
         :init
         (setq compilation-read-command nil
               compilation-scroll-output t)
@@ -3846,7 +3939,41 @@
         a list which can take in any symbol from (errors infos warnings). If any
         of the corresponding notifications are encountered during compilation
         the window will not be autokilled.")
-        :config
+
+        (defun mohkale/set-compilation-bindings (mode map)
+          (mohkale/set-leader-keys-for-major-mode mode
+            "r" 'recompile
+            "k" 'kill-compilation
+            "f" 'next-error-follow-minor-mode)
+
+          (general-define-key
+            :keymaps map
+            "S-SPC" nil
+            "SPC" nil
+            "DEL" nil
+            "M-p" nil
+            "M-n" nil
+            "M-{" nil
+            "M-}" nil
+            "0"   nil
+            "h"   nil
+            "g"   nil
+            "?"   nil
+            "n"   nil
+            "p"   nil
+            "o"   'compilation-display-error
+            "j"   'compilation-next-error
+            "k"   'compilation-previous-error
+            "x"   'kill-compilation
+            "C-j" 'compilation-next-file
+            "C-k" 'compilation-previous-file)
+
+          (general-define-key
+            :keyamps map
+            :states 'motion
+            "gr" 'recompile
+            "gj" 'next-error-no-select
+            "gk" 'previous-error-no-select))
 
         :config
         (push 'compilation-mode mohkale--whitespace-exempt-modes)
@@ -3912,30 +4039,7 @@
                 (message "compilation buffer doesn't exist")
               (display-buffer buffer-name))))
 
-        (mohkale/set-leader-keys-for-major-mode 'compilation-mode
-          "r" 'recompile
-          "f" 'next-error-follow-minor-mode)
-
-        :bind (:map compilation-mode-map
-               ("M-n" . compilation-next-error)
-               ("M-N" . compilation-previous-error)
-               ("M-j" . compilation-next-file)
-               ("M-k" . compilation-previous-file)
-               ("o"   . compilation-display-error) ;; open
-               ;; ("q"   . kill-compilation)
-               ;; ("C-q" . kill-compilation)
-               ("M-p" . nil)
-               ("M-{" . nil)
-               ("M-}" . nil)
-               ("DEL" . nil)
-               ("SPC" . nil)
-               ("S-SPC" . nil)
-               ("g"   . nil)
-               ("<"   . nil)
-               (">"   . nil)
-               ("?"   . nil)
-               ("h"   . nil)
-               ("0"   . nil)))
+        (mohkale/set-compilation-bindings 'compilation-mode 'compilation-mode-map))
     #+END_SRC
 
 *** comint - command interpreter
@@ -4029,6 +4133,8 @@
             "C-M-k" 'comint-kill-input ;; whole line
             "C-r" 'comint-history-isearch-backward-regexp
             "M-r" 'comint-dynamic-list-input-ring ;; TODO use ivy
+            "C-M-r" 'evil-paste-from-register
+            "C-v" 'evil-paste-from-register
             "C-u" 'scroll-down
             "C-d" 'scroll-up
             "C-o" 'evil-execute-in-normal-state
@@ -4404,7 +4510,6 @@
          :demand t
          :commands goto-home-buffer
          :init
-         (mohkale/declare-prefix  "bh" "home" "goto-home-buffer")
          (mohkale/set-leader-keys "bh" 'goto-home-buffer)
 
          (push 'dashboard-mode mohkale--whitespace-exempt-modes)
@@ -4418,13 +4523,15 @@
                (preffered-icon-height 0.75))
            (defun goto-home-buffer ()
              (interactive)
-             (let ((buffer (get-buffer dashboard-buffer-name)))
-               (if buffer
-                   (switch-to-buffer buffer)
-                 ;; (dashboard-refresh-buffer) ;; kills buffer, even if it doesn't exist
-                 (setq dashboard-startup-banner (dashboard--choose-random-startup-banner))
-                 (dashboard-insert-startupify-lists)
-                 (switch-to-buffer dashboard-buffer-name))))
+             (let* ((buffer (let ((buffer (get-buffer dashboard-buffer-name)))
+                              (if buffer
+                                  buffer
+                                (setq dashboard-startup-banner
+                                      (dashboard--choose-random-startup-banner))
+                                (dashboard-insert-startupify-lists)
+                                ;; switch to buffer with buffer-name
+                                dashboard-buffer-name))))
+               (switch-to-buffer buffer)))
            ;; (defalias 'goto-home-buffer #'dashboard-refresh-buffer)
 
            (setq inhibit-startup-screen t
@@ -4497,16 +4604,19 @@
 
            (setq dashboard-footer (car (nth (random (1- (1+ (length dashboard-quotes)))) dashboard-quotes))))
 
-         (add-hook 'emacs-startup-hook (lambda ()
-           ;; in hook because theme & powerline get weird
+         (defun dashboard--startup-handler ()
            (let ((loaded-packages (mohkale/get-loaded-packages)))
              (setq dashboard-init-info (if loaded-packages
                                            (format "%d packages loaded in %s"
                                                    (length loaded-packages)
                                                    (emacs-init-time))
-                                         (format "emacs loaded in %s" (emacs-init-time)))))
-           (dashboard-setup-startup-hook)))
+                                         (format "emacs loaded in %s" (emacs-init-time))))
 
+             ;; don't switch to dashboard on error buffer
+             (unless (eq 1 (length (window-list)))
+               (winum-select-window-1))))
+
+         (add-hook 'emacs-startup-hook #'dashboard--startup-handler)
          (add-hook 'dashboard-mode-hook (lambda () (message nil))) ;; clear echo area
 
          (defun dashboard-choose-banner--allow-custom-banners ()
@@ -5352,6 +5462,16 @@
           "jb" 'frog-jump-buffer))
     #+END_SRC
 
+
+*** grep
+    #+BEGIN_SRC emacs-lisp
+      (use-package grep
+        :defer t
+        :config
+        (evil-set-initial-state 'grep-mode 'motion)
+        (mohkale/set-compilation-bindings 'grep-mode 'grep-mode-map))
+    #+END_SRC
+
 *** help
     #+BEGIN_SRC emacs-lisp
       (use-package help
@@ -5687,6 +5807,7 @@
                     counsel-fzf
                     ;; counsel-git...
                     counsel-git
+                    counsel--find-file-1
                     counsel-git-change-work-tree
                     counsel-git-checkout
                     counsel-git-grep
@@ -5760,7 +5881,7 @@
            "sv" 'counsel-git-grep
            "sp" 'counsel-pt
            "sa" 'counsel-ag
-           "sr" 'counsel-ag
+           "sr" 'counsel-rg
 
            ;; "bb" 'counsel-buffer-or-recentf ;; WARN only file buffers
            "bb" 'counsel-switch-buffer
@@ -5773,7 +5894,8 @@
          :config
          (counsel-mode +1)
          ;; (push (cons 'counsel-evil-registers ivy-height) ivy-height-alist)
-         (setq counsel-evil-registers-height ivy-height)
+         (setq counsel-evil-registers-height ivy-height
+               counsel-find-file-ignore-regexp "\\.#.+")
 
          :bind* (:map company-mode-map
                  ("C-:" . counsel-company)
@@ -6267,7 +6389,7 @@
        (use-package lsp-mode
          :ensure t
          :defer  t
-         :commands (lsp lsp-deferred lsp-mode)
+         :commands (lsp lsp-deferred lsp-mode) ;; never use lsp-mode, use lsp.
          :config
          ;; (push 'company-lsp company-backends)
 
@@ -6581,10 +6703,12 @@
 *** minibuffer
     #+BEGIN_SRC emacs-lisp
       (bind-keys :map minibuffer-local-map
+                 ("C-h" . previous-matching-history-element)
                  ("C-j" . next-history-element)
                  ("C-k" . previous-history-element)
-                 ("C-h" . previous-matching-history-element)
                  ("C-l" . next-matching-history-element)
+                 ("C-a" . move-beginning-of-line)
+                 ("C-e" . move-end-of-line)
                  ("C-q" . quoted-insert)
                  ("C-M-q" . quit-window)
 
@@ -6831,7 +6955,8 @@
                    persp-import-win-conf
                    persp-import-buffers
                    persp-window-switch
-                   find-file-new-perspective
+                   ;; find-file-new-perspective
+                   ivy-find-file-new-perspective
                    persp-frame-switch
                    persp-save-state-to-file
                    persp-load-state-from-file
@@ -6846,7 +6971,7 @@
           "bR" 'persp-remove-current-buffer)
 
         (mohkale/set-leader-keys
-          "fl" 'find-file-new-perspective
+          "fl" 'ivy-find-file-new-perspective
           "fq" 'find-file-literally)
 
         :config
@@ -6855,12 +6980,8 @@
         (persp-mode +1)
         (setq persp-autokill-buffer-on-remove 'kill-weak)
 
-        (defun find-file-new-perspective (&optional prefix file)
-          "open FILE in a new perspective
-      with prefix, prompts for the name of the layout instead of
-      using FILEs name."
-          (interactive "P\nFNew Persp File: ")
-          (let* ((name (if prefix
+        (defun ivy-find-file-new-perspective--action (file)
+          (let* ((name (if current-prefix-arg
                            (let (done value)
                              (while (not done)
                                (setq value (read-string "Name for new perspective: "))
@@ -6879,6 +7000,15 @@
               (let ((buffer (find-file file)))
                 (switch-to-buffer buffer)
                 (persp-add-buffer buffer)))))
+
+        (defun ivy-find-file-new-perspective ()
+          (interactive)
+          (counsel--find-file-1
+           "New Persp File: " nil
+           #'ivy-find-file-new-perspective--action
+           ;; 'ivy-find-file-new-perspective
+           ;; with another value, dirs aren't colored
+           'counsel-find-file))
 
         (defun switch-to-persp-by-num (index)
           "switch to a perspective based on it's position in (persp-persps)
@@ -7375,13 +7505,11 @@
         :init
         (push 'messages-buffer-mode mohkale--whitespace-exempt-modes)
         :config
-        (dolist (map `(messages-buffer-mode-map
-                       special-mode-map
-                       message-mode-map))
-          (general-define-key
-            :states 'normal
-            :keymaps map
-            "q" 'quit-window))
+        (dolist (mode `(messages-buffer-mode
+                        special-mode
+                        message-mode))
+          (evil-set-initial-state mode 'motion))
+
         (mohkale/declare-prefix "i TAB" "indent" "indentation")
 
         (mohkale/set-leader-keys
@@ -7394,24 +7522,11 @@
           "i TAB n"     'forward-to-indentation
           "i TAB N"     'back-to-indentation)
 
-        (general-define-key
-          :states '(normal)
-          "M-0" 'back-to-indentation)
-
-        (general-define-key
-          :states 'insert
-          "<tab>" 'indent-relative)
-
-        (evil-set-initial-state 'messages-buffer-mode 'motion)
-
         ;; force state for buffer if it already exists
         (let ((buffer (get-buffer "*Messages*")))
           (when buffer
             (with-current-buffer buffer
-              (evil-motion-state))))
-
-        ;; :bind* (:map indent-rigidly-map)
-        )
+              (evil-motion-state)))))
     #+END_SRC
 
 *** sudo-edit
@@ -8668,6 +8783,8 @@
       also, for some reason, creating a symlink to ruby on cygwin makes the process unrunnable from emacs,
       it just spits out exec error... my loathing towards windows grows :P
       TODO test out performance of enhanced ruby on linux.")
+
+      (mohkale/set-leader-keys "Mr" mohkale-ruby-mode)
     #+END_SRC
 
 **** ruby
@@ -8733,6 +8850,20 @@
          :bind (:map enh-ruby-mode-map
                 ("{" . nil)
                 ("}" . nil)))
+     #+END_SRC
+
+**** solargraph
+     language server implementation for ruby.
+
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (add-hook 'ruby-mode-hook #'lsp)
+
+       (with-eval-after-load 'company
+         (mohkale/update-company-backends-for-mode enh-ruby t
+           '(company-lsp))
+
+         (mohkale/update-company-backends-for-mode ruby t
+           '(company-lsp)))
      #+END_SRC
 
 **** robe
@@ -9648,7 +9779,7 @@
         :commands vimrc-mode
         :delight (vimrc-mode "vim")
         :init
-        (push (cons "\\.rb$" 'vimrc-mode) auto-mode-alist))
+        (push (cons "\\.vim" 'vimrc-mode) auto-mode-alist))
     #+END_SRC
 
 *** sql
@@ -10433,6 +10564,7 @@
        (use-package hindent
          :ensure t
          :defer  t
+         :hook (haskell-mode . hindent-mode)
          :commands (hindent-mode
                     hindent-reformat-decl
                     hindent-reformat-buffer
@@ -10566,12 +10698,15 @@
        (use-package haskell-mode
          :ensure t
          :defer  t
-         :commands (haskell-mode)
-         :hook ((haskell-mode . haskell-indent-mode)
-                ;; disable indentation mode... super ugly
-                (haskell-mode . haskell-indentation-mode))
+         :commands (haskell-mode
+                    run-haskell)
+         ;; :hook (;; disable indentation mode... super ugly
+         ;;        ;; (haskell-mode . haskell-indent-mode)
+         ;;        ;; (haskell-mode . haskell-indentation-mode)
+         ;;        )
          :init
          (push 'haskell-interactive-mode mohkale--whitespace-exempt-modes)
+         (defalias 'haskell-repl #'run-haskell)
 
          :config
          ;; (mohkale/update-company-backends-for-mode haskell t
@@ -10580,6 +10715,11 @@
            '(company-lsp))
          (mohkale/update-company-backends-for-mode haskell-cabal t
            '(company-cabal))
+
+         (general-define-key
+           :states  '(insert replace)
+           :keymaps 'haskell-mode-map
+           "<tab>" 'haskell-indent-cycle)
 
          (mohkale/declare-prefix-for-major-mode* 'haskell-mode
            "r" "refactor"
