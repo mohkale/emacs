@@ -1437,6 +1437,7 @@
 
       (defvar mohkale--whitespace-exempt-modes '(help-mode
                                                  Buffer-menu-mode
+                                                 term-mode
                                                  minibuffer-inactive-mode
                                                  eshell-mode)
         "modes under which no trailing whitespace is shown")
@@ -7866,6 +7867,30 @@
                                         ("-o" "StrictHostKeyChecking=no")))
            (tramp-default-port         22))
          tramp-methods))
+    #+END_SRC
+
+*** tramp-term
+    create remote terminal sessions effortlessly... this should be built into term tbh.
+    #+BEGIN_SRC emacs-lisp
+      (use-package tramp-term
+        :ensure t
+        :defer  t
+        :commands (tramp-term
+                   ;; term--use-tramp-term-when-in-tramp-directory
+                   )
+        :init
+        ;; (add-hook 'term :before-until #'term--use-tramp-term-when-in-tramp-directory)
+        :config
+      ;;   (defun term--use-tramp-term-when-in-tramp-directory (&rest args)
+      ;;     "when current buffers is in a tramp path open a tramp term session
+      ;; if prefix arg specified, disregard this and open a local term sessions"
+      ;;     (when (and (not current-prefix-arg)
+      ;;                default-directory
+      ;;                (tramp-tramp-file-p default-directory))
+      ;;       (tramp-term )
+      ;;         )
+      ;;     )
+        )
     #+END_SRC
 
 *** transpose-frame
