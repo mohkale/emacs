@@ -191,6 +191,10 @@
 
         (push `("magit-diff: "
                 ,@display-buffer--default-fallback-action)
+              display-buffer-alist)
+
+        (push `("*Flycheck error messages*"
+                ,@display-buffer--default-fallback-action)
               display-buffer-alist))
 
       (add-hook #'emacs-startup-hook #'mohkale//update-display-buffer-options-handler)
@@ -383,6 +387,7 @@
            lsp-session-file                                   (var "lsp/session")
            org-ditaa-jar-path                                 (var "org/bin/ditaa.jar")
            org-ditaa-eps-jar-path                             (var "org/bin/ditaaEps.jar")
+           mohkale-library-of-babel-file                      (etc "babel-lib.org")
            multi-compile-history-file                         (var "multi-compile-history.el")
            pcache-directory                                   (var "pcache/")
            persp-save-dir                                     (var "perspectives/")
@@ -391,10 +396,10 @@
            projectile-known-projects-file                     (var "projectile/known-projects.el")
            purpose-default-layout-file                        (etc "window-purpose/default-layout.el")
            purpose-layout-dirs                                (list (etc "window-purpose/layouts/"))
+           rake-cache-file                                    (var "rake.cache")
            request-storage-directory                          (var "requests")
            smex-save-file                                     (var "smex-save.el")
            tldr-directory-path                                (var "tldr/")
-           mohkale-library-of-babel-file                      (etc "babel-lib.org")
            transient-history-file                             (var "transient/history.el")
            transient-levels-file                              (etc "transient/levels.el")
            transient-values-file                              (etc "transient/values.el")
@@ -847,6 +852,16 @@
         "9" 'winum-select-window-9
         "0" 'winum-select-window-by-number
         "u" 'universal-argument)
+
+      ;; (dolist (tuple `(,(cons mohkale-norm-states  mohkale-leader-key)
+      ;;                  ;;,(cons mohkale-nnorm-states mohkale-nnorm-leader-key)
+      ;;                  ))
+      ;;   (let ((states (car tuple))
+      ;;         (leader (cdr tuple)))
+      ;;     (general-define-key
+      ;;       :states  states
+      ;;       :keymaps 'universal-argument-map
+      ;;       (concat leader " u") 'universal-argument-more)))
     #+END_SRC
 
 *** applications
@@ -1526,6 +1541,10 @@
         (message "lexical binding: %s" (if lexical-binding
                                            (propertize "enabled" 'face 'compilation-info)
                                          (propertize "disabled" 'face 'compilation-error))))
+
+      (defun show-prefix (&optional prefix)
+        (interactive "P")
+        (message "prefix is: %s" prefix))
     #+END_SRC
 
 *** Text
@@ -3116,6 +3135,7 @@
         :defer  t)
 
       (use-package use-package-el-get
+        :ensure t
         :demand t
         :config
         (use-package-el-get-setup))
@@ -3942,25 +3962,33 @@
 
         (defun mohkale/set-compilation-bindings (mode map)
           (mohkale/set-leader-keys-for-major-mode mode
-            "r" 'recompile
+            "RET" 'recompile
             "k" 'kill-compilation
             "f" 'next-error-follow-minor-mode)
 
           (general-define-key
             :keymaps map
             "S-SPC" nil
-            "SPC" nil
-            "DEL" nil
-            "M-p" nil
-            "M-n" nil
-            "M-{" nil
-            "M-}" nil
-            "0"   nil
-            "h"   nil
-            "g"   nil
-            "?"   nil
-            "n"   nil
-            "p"   nil
+            "SPC"   nil
+            "DEL"   nil
+            "M-p"   nil
+            "M-n"   nil
+            "M-{"   nil
+            "M-}"   nil
+            "0"     nil
+            "h"     nil
+            "g"     nil
+            "?"     nil
+            "n"     nil
+            "p"     nil
+            "<override-state>" nil)
+
+          (general-define-key
+            :keymaps map
+            :states  'motion
+            "gr"  'recompile
+            "gj"  'next-error-no-select
+            "gk"  'previous-error-no-select
             "o"   'compilation-display-error
             "j"   'compilation-next-error
             "k"   'compilation-previous-error
@@ -3969,11 +3997,9 @@
             "C-k" 'compilation-previous-file)
 
           (general-define-key
-            :keyamps map
-            :states 'motion
-            "gr" 'recompile
-            "gj" 'next-error-no-select
-            "gk" 'previous-error-no-select))
+            :keymaps map
+            :states  '(replace insert)
+            "ESC" 'evil-motion-state))
 
         :config
         (push 'compilation-mode mohkale--whitespace-exempt-modes)
@@ -4023,12 +4049,27 @@
                         (run-at-time (concat (number-to-string compilation-auto-kill-window)
                                             " sec")
                                       nil 'delete-windows-on compilation-buffer)
-                      (delete-windows-on compilation-buffer)))))))
+                      (quit-windows-on compilation-buffer)))))))
 
         ;; NOTE setq kept for debug purposes, defvar only works on first call
         ;; (setq compilation-auto-kill-window 2)
         ;; (setq compilation-dont-auto-kill-window-when '(warnings))
         (add-hook 'compilation-finish-functions 'mohkale/compilation-finish-function)
+
+        (add-hook 'compilation-start-hook
+                  (defun compilation--set-initial-evil-state (&rest args)
+                    "use insert state when running an interactive compilation"
+                    (when (eq major-mode 'comint-mode)
+                      (evil-insert-state +1))))
+
+        (add-hook 'compilation-finish-functions
+                  (defun compilation--restore-initial-evil-state (&rest args)
+                    "revert to initial state unless already in initial state"
+                    (let ((desired-state (evil-initial-state 'compilation-mode)))
+                      (unless (eq evil-state desired-state)
+                        (funcall-interactively (intern (concat "evil-"
+                                                               (symbol-name desired-state)
+                                                               "-state")))))))
 
         (defun display-compilation-buffer ()
           (interactive)
@@ -4039,7 +4080,13 @@
                 (message "compilation buffer doesn't exist")
               (display-buffer buffer-name))))
 
-        (mohkale/set-compilation-bindings 'compilation-mode 'compilation-mode-map))
+        (mohkale/set-compilation-bindings 'compilation-mode 'compilation-mode-map)
+
+        (general-define-key
+          :states  'motion
+          :keymaps 'compilation-mode-map
+          "j" nil
+          "k" nil))
     #+END_SRC
 
 *** comint - command interpreter
@@ -7415,7 +7462,28 @@
                            (apply 'actual-message format args)))))
              (apply func args)))
 
-         (advice-add 'projectile-cleanup-known-projects :around #'projectile-cleanup--shut-up-please))
+         (advice-add 'projectile-cleanup-known-projects :around #'projectile-cleanup--shut-up-please)
+
+         (defun projectile-compile--double-prefix-means-run-comint (func &optional args)
+           "allow running compilation interactively when multiple prefixes are given.
+       with two prefixes (C-u C-u) runs default compilation command in interactive
+       compilation buffer. with three prompts for command and then runs it in an
+       interactive compilation buffer."
+           (let ((prefix current-prefix-arg))
+             (if (and (consp prefix)
+                      (setq prefix (car prefix))
+                      (>= prefix 16))
+                 (cl-letf* (((symbol-function 'actual-compile)
+                             (symbol-function 'compile))
+                            ((symbol-function 'compile)
+                             (lambda (command &optional comint)
+                               (actual-compile command t))))
+                   (funcall func (if (eq prefix 16) nil '(4))))
+               (funcall func prefix))))
+
+         (advice-add 'projectile-run-project     :around #'projectile-compile--double-prefix-means-run-comint)
+         (advice-add 'projectile-compile-project :around #'projectile-compile--double-prefix-means-run-comint)
+         (advice-add 'projectile-test-project    :around #'projectile-compile--double-prefix-means-run-comint))
      #+END_SRC
 
 **** org-projectile
@@ -7442,6 +7510,7 @@
 
 **** ivy-projectile
      needs to be loaded after ivy and projectile, including the init function.
+
      #+BEGIN_SRC emacs-lisp
        (use-package counsel-projectile
          :ensure t
@@ -7465,6 +7534,7 @@
          (mohkale/declare-prefix "ps" "search")
 
          (mohkale/set-leader-keys
+           "fp"    'counsel-projectile-switch-project
            "pP"    'counsel-projectile-switch-project
            "pf"    'counsel-projectile-find-file
            "pd"    'counsel-projectile-find-dir
@@ -7478,6 +7548,25 @@
          ;; (counsel-projectile-mode +1)
          )
      #+END_SRC
+
+*** rake
+    #+BEGIN_SRC emacs-lisp
+      (use-package rake
+        :ensure t
+        :defer  t
+        :commands (rake
+                   rake-rerun
+                   rake-find-task ;; jump to task in rakefile
+                   rake-compilation-mode
+                   rake-regenerate-cache)
+        :init
+        (mohkale/set-leader-keys
+          "cr" 'rake
+          "cR" 'rake-rerun)
+        (defalias 'rake-refresh #'rake-regenerate-cache)
+        :config
+        (setq rake-completion-system 'ivy-read))
+    #+END_SRC
 
 *** save-place
     remembers the cursor position in open files... so when I reopen them I'm taken to that point immeadiately. It's a cool feature, but not really essential. Generally, when I open a file, I'll look around a bit to see where I was and what I was doing. Jumping to where I was immediately only helps with one of those problems & it seems like a bad habit to depend on that to remind me... use org capture for that and mode dependent jump keys to get to where you need to. quick & easy.
@@ -10701,7 +10790,7 @@
          :commands (haskell-mode
                     run-haskell)
          ;; :hook (;; disable indentation mode... super ugly
-         ;;        ;; (haskell-mode . haskell-indent-mode)
+         ;;        (haskell-mode . haskell-indent-mode)
          ;;        ;; (haskell-mode . haskell-indentation-mode)
          ;;        )
          :init
@@ -10716,10 +10805,10 @@
          (mohkale/update-company-backends-for-mode haskell-cabal t
            '(company-cabal))
 
-         (general-define-key
-           :states  '(insert replace)
-           :keymaps 'haskell-mode-map
-           "<tab>" 'haskell-indent-cycle)
+         ;; (general-define-key
+         ;;   :states  '(insert replace)
+         ;;   :keymaps 'haskell-mode-map
+         ;;   "<tab>" 'haskell-indent-cycle)
 
          (mohkale/declare-prefix-for-major-mode* 'haskell-mode
            "r" "refactor"
@@ -10747,6 +10836,9 @@
          (evil-set-initial-state 'haskell-interactive-mode 'emacs)
          :bind (:map haskell-mode-map
                 ("C-M-i" . nil)))
+
+       (use-package haskell-indent
+         :commands (haskell-indent-cycle))
      #+END_SRC
 
 **** company-ghci
@@ -11467,6 +11559,7 @@
      (custom-theme-set-variables 'an-old-hope
        `(hl-todo-keyword-faces '(("TODO"        . ,red)
                                  ("NEXT"        . ,red)
+                                 ("RANT"        . ,red)
                                  ("THEM"        . ,purple)
                                  ("PROG"        . ,blue-int)
                                  ("OKAY"        . ,blue-int)
