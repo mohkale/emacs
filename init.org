@@ -45,7 +45,7 @@
                             (delete-window window)))))))
 
                   ;; load my custom emacs theme
-                  (load-theme 'an-old-hope)))
+                  (load-theme 'an-old-hope t)))
     #+END_SRC
 
 *** Emacs Sanitize
@@ -8824,6 +8824,9 @@
          (mohkale//define-pretty-symbols-for-mode 'python-mode
            ("lambda" . ?λ))
 
+         (defun python-shell-calculate-command ()
+           "python3 -i")
+
          (mohkale/declare-prefix-for-major-mode* 'python-mode
            "n" '("navigate" . "move-point")
            "e" "eval/exec"
@@ -9450,7 +9453,8 @@
            (org-babel-lob-ingest mohkale-library-of-babel-file))
 
          (let ((org-root (concat mohkale-config-root "/org/")))
-           (setq-default org-src-window-setup 'current-window)
+           (setq-default org-src-window-setup 'current-window
+                         org-babel-python-command "python3")
 
            (setq org-todo-keywords '((sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED"))
                  org-refile-targets '((nil :maxlevel . 9)
@@ -9885,7 +9889,7 @@
          :hook (sql-mode . flycheck-mode)
          :init
          (setq sql-sqlite-options '("-interactive"))
-         (push (cons "\\.json$" 'sql-mode) auto-mode-alist)
+         (push (cons "\\.sql" 'sql-mode) auto-mode-alist)
          (push 'sql-interactive-mode mohkale--whitespace-exempt-modes)
 
          (evil-set-initial-state 'sql-interactive-mode 'emacs)
@@ -11197,6 +11201,7 @@
 
 * Themes
 ** an old hope
+*** Description
    #+NAME: an-old-hope-theme-description
    #+BEGIN_EXAMPLE
       emacs theme inspired by a galaxy far far away...
@@ -11207,6 +11212,7 @@
       it.
    #+END_EXAMPLE
 
+*** Colors
    #+NAME: an-old-hope-theme-color-associations
    | color-name        | new-name   | hue | sat | light | description                       |
    |-------------------+------------+-----+-----+-------+-----------------------------------|
@@ -11294,7 +11300,35 @@
        (reverse result))
    #+END_SRC
 
-   #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+*** Header
+   #+HEADER: :shebang ";; an-old-hope-theme.el -- a syntax theme from a galaxy far away... -*- lexical-binding: t -*-"
+   #+BEGIN_SRC emacs-lisp :comments no :tangle "~/.emacs.d/etc/themes/an-old-hope-theme.el"
+     ;; Author: MoHKale
+     ;; URL: https://github.com/MoHKale/an-old-hope-theme
+     ;; Version: 0.1.0
+     ;; Keywords: color, theme
+     ;; Package-Requires: ((emacs "24"))
+
+     ;; This file is not part of GNU Emacs
+
+     ;; This file is free software; you can redistribute it and/or modify
+     ;; it under the terms of the GNU General Public License as published by
+     ;; the Free Software Foundation; either version 3, or (at your option)
+     ;; any later version.
+
+     ;; This program is distributed in the hope that it will be useful,
+     ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+     ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+     ;; GNU General Public License for more details.
+
+     ;; For a full copy of the GNU General Public License
+     ;; see <http://www.gnu.org/licenses/>.
+
+     ;; Commentary:
+     ;; see https://github.com/MoHKale/an-old-hope-theme/tree/master/emacs
+   #+END_SRC
+
+*** Faces
    #+HEADER: :var desc=an-old-hope-theme-description colors=color-assoc-to-rgb-strings() cls=(eval t) rainbow-delims=rainbow-delimeter-shades
    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/etc/themes/an-old-hope-theme.el"
      (require 'dash)
