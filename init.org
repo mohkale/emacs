@@ -970,9 +970,9 @@
         ;; "fo" 'open-file-or-directory-in-external-app ;; TODO implement
         "fR" 'rename-buffer-file
         "fy" 'show-and-copy-buffer-file-name
-        "fY" 'show-and-copy-buffer-file-directory
         "f M-r" 'revert-buffer
         "f M-f" 'find-dired
+        "fq" 'find-file-literally
 
         "fCd" 'unix2dos
         "fCu" 'dos2unix
@@ -1017,6 +1017,7 @@
         "HL"   'hydra-eyebrowse/body
         "Hx"   'hydra-text-zoom/body
         "Hv"   'hydra-vlc-rc/body
+        "Hm"   'hydra-visual-move/body
         "Hh"   'hydra-winman/body)
     #+END_SRC
 
@@ -1308,7 +1309,6 @@
         :commands (rename-buffer-file
                    delete-buffer-file
                    show-and-copy-buffer-file-name
-                   show-and-copy-buffer-file-directory
                    write-kill-buffer
                    jump-to-directory)
         :init
@@ -1359,44 +1359,33 @@
               (kill-buffer buffer)))))
 
       (defun show-and-copy-buffer-file-name (&optional prefix)
-        "displays the current buffers name in the echo area & yank it
+        "Displays the current buffers name in the echo area & yanks it
       when a prefix arg is given, the buffer name is also inserted into
-      the buffer."
+      the buffer. When a double prefix arg is given, the filename is
+      inserted but the point is not moved. With a positive numerical
+      prefix greater than 0, that many parent directories will be
+      navigated to before yanking."
         (interactive "P")
-        (let ((bufname (or (buffer-file-name) "")))
+        (let ((bufname (or (buffer-file-name)
+                           (and (derived-mode-p 'dired-mode)
+                                (string-trim-right (dired-current-directory) "/"))
+                           "")))
+          (cond
+           ((consp prefix)
+            (if (eq (car prefix) 4)
+                (insert bufname)
+              (save-excursion
+                (insert bufname))))
+           (prefix
+            (while (and (> prefix 0)
+                        bufname)
+              (setq bufname (string-trim-right (file-name-directory bufname) "/")
+                    prefix  (- prefix 1)))
+
+            (or bufname (setq bufname ""))))
+
           (message bufname)
-          (kill-new bufname)
-
-          (when prefix
-            (insert bufname))))
-
-      (defun show-and-copy-buffer-file-directory (&optional prefix)
-        "display the containing directory of the the current buffers file and yanks it
-      when a prefix arg is given, the buffer name is also inserted into the buffer."
-        (interactive "P")
-        (let* ((bufname (or buffer-file-name ""))
-               (dirname (or (file-name-directory bufname) "")))
-          (message dirname)
-          (kill-new dirname)
-
-          (when prefix
-            (insert dirname))))
-
-      ;; (defun jump-to-directory (&optional buffer other-window-p)
-      ;;   (interactive `(,(current-buffer)))
-      ;;   (let ((filename (buffer-file-name buffer)))
-      ;;     (if (not filename)
-      ;;         (message "no filename is associated with the buffer: %s" buffer)
-      ;;       (message "%s" (f-dirname filename))
-
-      ;;       (funcall (if other-window-p
-      ;;                    'find-file-other-window
-      ;;                  'find-file)
-      ;;                (f-dirname filename)))))
-
-      ;; (defun jump-to-directory-other-window (&optional buffer)
-      ;;   (interactive `(,(current-buffer)))
-      ;;   (jump-to-directory buffer t))
+          (kill-new bufname)))
 
       (defalias 'jump-to-directory 'dired-jump)
       (defalias 'jump-to-directory-other-window 'dired-jump-other-window)
@@ -2079,6 +2068,7 @@
                        hydra-org-navigate
                        hydra-org-link
                        hydra-org-agenda
+                       hydra-visual-move
                        hydra-org-clock
                        hydra-persp
                        hydra-text-zoom
@@ -2998,6 +2988,18 @@
          ("oz" vlc/set-zoom) ;; @
 
          ("q" nil :exit t))
+     #+END_SRC
+
+
+**** visual-move
+     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-visual-move.el"
+       (defhydra hydra-visual-move (:foreign-keys run)
+         ("gj" evil-next-line "next-line")
+         ("gk" evil-previous-line "prev-line")
+         ("j"  evil-next-visual-line "next-visual-line")
+         ("k"  evil-previous-visual-line "prev-visual-line")
+         ("q"  nil "quit" :exit t))
      #+END_SRC
 
 **** indentation
@@ -5027,6 +5029,7 @@
            "?" 'dired-summary ;; like transient state
            "#" 'dired-clean-directory
            "o" 'browse-url-of-dired-file ;; open in external app
+           "O" 'dired-omit-mode
            "v" 'dired-view-file          ;; TODO customize view mode
            ":" 'dired-goto-file ;; prompt for file to visit in current buffer
            "s" 'dired-sort-toggle-or-edit
@@ -5600,20 +5603,21 @@
                counsel-evil-registers-height 15
                ivy-use-virtual-buffers t
                projectile-completion-system 'ivy
-               ivy-initial-inputs-alist '((counsel-minor . "^+")
-                                          (counsel-package . "^+")
-                                          ;; (org-refile . "^")
-                                          (org-agenda-refile . "^")
-                                          (org-capture-refile . "^")
-                                          ;; (counsel-M-x . "^")
-                                          ;; (counsel-describe-function . "^")
-                                          ;; (counsel-describe-variable . "^")
-                                          ;; (counsel-org-capture . "^")
-                                          ;; (org-refile . "^")
-                                          ;; (org-agenda-refile . "^")
-                                          ;; (org-capture-refile . "^")
-                                          (Man-completion-table . "^")
-                                          (woman . "^")))
+               mohkale--ivy-initial-inputs-alist '((counsel-minor . "^+")
+                                                   (counsel-package . "^+")
+                                                   ;; (org-refile . "^")
+                                                   (org-agenda-refile . "^")
+                                                   (org-capture-refile . "^")
+                                                   ;; (counsel-M-x . "^")
+                                                   ;; (counsel-describe-function . "^")
+                                                   ;; (counsel-describe-variable . "^")
+                                                   ;; (counsel-org-capture . "^")
+                                                   ;; (org-refile . "^")
+                                                   ;; (org-agenda-refile . "^")
+                                                   ;; (org-capture-refile . "^")
+                                                   (Man-completion-table . "^")
+                                                   (woman . "^"))
+               ivy-initial-inputs-alist mohkale--ivy-initial-inputs-alist)
 
          (defun ivy-kill-line-backward ()
            (interactive)
@@ -5659,7 +5663,7 @@
          (mohkale/set-leader-keys
            "bb" 'ivy-switch-buffer
            "SPC" 'counsel-M-x
-           "M-SPC" 'ivy-resume)
+           "`" 'ivy-resume)
          :bind* (:map ivy-minibuffer-map
                  ("C-j" . nil) ;; was ivy-alt-done
                  ("C-." . nil) ;; was hydra-ivy/body
@@ -5678,7 +5682,8 @@
 
                  ;;; selection execution
                  ;; exit with current input, not selection
-                 ("C-c <return>" . ivy-immeadiate-done)
+                 ("<S-return>"   . ivy-immediate-done)
+                 ("C-c <return>" . ivy-immediate-done)
                  ;; prompt for action, then done
                  ("C-<return>" . ivy-dispatching-done)
                  ;; invoke default action. but exit the minibuffer
@@ -5942,7 +5947,8 @@
          (counsel-mode +1)
          ;; (push (cons 'counsel-evil-registers ivy-height) ivy-height-alist)
          (setq counsel-evil-registers-height ivy-height
-               counsel-find-file-ignore-regexp "\\.#.+")
+               counsel-find-file-ignore-regexp "\\.#.+"
+               ivy-initial-inputs-alist mohkale--ivy-initial-inputs-alist)
 
          :bind* (:map company-mode-map
                  ("C-:" . counsel-company)
@@ -7011,15 +7017,14 @@
                    persp-load-from-file-by-names
                    persp-save-and-kill)
         :init
-        (mohkale/set-leader-keys-for-minor-mode 'persp-mode
+        (mohkale/set-leader-keys-mode
           "ba" 'persp-add-current-buffer
           "bA" 'persp-add-buffer
           "br" 'persp-remove-buffer
           "bR" 'persp-remove-current-buffer)
 
         (mohkale/set-leader-keys
-          "fl" 'ivy-find-file-new-perspective
-          "fq" 'find-file-literally)
+          "fl" 'ivy-find-file-new-perspective)
 
         :config
         (require 'eyebrowse)
@@ -9811,6 +9816,8 @@
                  ;; "C-M-<return>" org-meta-return)
                  ("C-s" . org-sort)
                  ("M-S-<return>" . nil)
+                 ("C-e" . nil)
+                 ("M-e" . nil)
                  ("M-h" . nil)
                  ("C-j" . nil)))
      #+END_SRC
@@ -10911,6 +10918,7 @@
           (setenv "GIT_ASKPASS" "git-gui--askpass"))
 
         (mohkale/declare-prefix*
+          "g" "magit"
           "gd" "diff"
           "gf" "file")
 
