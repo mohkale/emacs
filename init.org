@@ -1121,7 +1121,9 @@
         "s" "search/symbol")
 
       (mohkale/set-leader-keys
-        "sg" 'rgrep)
+        "sg" 'rgrep
+        "sf" 'find-dired
+        "sF" 'find-grep-dired)
     #+END_SRC
 
 *** window
@@ -1174,7 +1176,8 @@
        "C-S-<tab>"       'previous-buffer
        "C-<iso-lefttab>" 'previous-buffer
        "RET"             'newline-and-indent
-       "<C-M-return>"    'comment-indent-new-line)
+       "<C-M-return>"    'comment-indent-new-line
+       "<C-backspace>"   'evil-delete-backward-word)
 
      (general-define-key
        :states mohkale-norm-states
@@ -1192,6 +1195,7 @@
        :keymaps 'mohkale-window-map
        "m"   'window-zen
        "C-m" 'window-zen)
+
    #+END_SRC
 
 ** Mohkale
@@ -1310,7 +1314,8 @@
                    delete-buffer-file
                    show-and-copy-buffer-file-name
                    write-kill-buffer
-                   jump-to-directory)
+                   jump-to-directory
+                   jump-to-directory-other-window)
         :init
         (mohkale/set-leader-keys
           "fj" 'jump-to-directory
@@ -1855,7 +1860,9 @@
                    split-window-below-and-focus)
         :bind (:map mohkale-window-map
                ("T" . force-set-all-visible-windows-dedication)
+               ("o"   . display-last-buffer)
                ("C-o" . display-last-buffer)
+               ("O"   . vertical-display-last-buffer)
                ("M-o" . vertical-display-last-buffer)))
     #+END_SRC
 
@@ -3325,6 +3332,11 @@
          :defer  t
          :hook (evil-mode . global-evil-matchit-mode)
          :commands evilmi-jump-items
+         :init
+         (general-define-key
+           :states mohkale-norm-states
+           ;; "g%" 'evilmi-select-items
+           "g%" 'evilmi--simple-jump)
          :config
          (defalias 'evil-jump-item 'evilmi-jump-items))
      #+END_SRC
@@ -3433,7 +3445,6 @@
            "<S-escape>" 'evil-shift-normal-state)
 
          (general-define-key
-           ;; "<C-backspace>"   'evil-delete-backward-word
            "C->" 'evil-shift-right-line
            "C-<" 'evil-shift-left-line)
 
@@ -3483,6 +3494,7 @@
            "C-h"   'backward-char
            "C-n"   'evil-next-line
            "C-p"   'evil-previous-line
+           "C-w"   'backward-kill-word
 
            "TAB" nil ;; ANNOYING
            "C-d" nil ; erase
@@ -4165,7 +4177,7 @@
             "RET" 'comint-send-input
             "M-RET" 'comint-accumulate
             "<delete>" 'delete-forward-char
-            "<C-delete>" 'backward-kill-word
+            "<C-delete>" 'evil-backward-delete-word
             "<M-delete>" 'comint-delchar-or-maybe-eof ;; forward
             "<C-M-delete>" 'kill-word                 ;; forward
             "<mouse-2>" 'comint-insert-input
@@ -4963,6 +4975,8 @@
                ls-lisp-use-insert-directory-program t
                dired-listing-switches "-laXhv --group-directories-first")
 
+         (push 'dired-mode mohkale--whitespace-exempt-modes)
+
          (defun dired-goto-home-dir (&optional other-window)
            "goto users home directory
        with prefix, visits in another window"
@@ -4971,6 +4985,16 @@
                         'find-file-other-window
                       'find-file)
                     (expand-file-name "~")))
+
+         (defun dired-evil-scroll-down ()
+           (interactive)
+           (call-interactively 'evil-scroll-down)
+           (dired-move-to-filename))
+
+         (defun dired-evil-scroll-up ()
+           (interactive)
+           (call-interactively 'evil-scroll-up)
+           (dired-move-to-filename))
 
          (evil-set-initial-state 'dired-mode 'motion)
 
@@ -5010,6 +5034,8 @@
            "C-S-K" 'dired-prev-marked-file
            "M-j" 'dired-next-dirline           ; unbound, dired-tree-down
            "M-k" 'dired-prev-dirline           ; unbound, dired-tree-up
+           "C-d" 'dired-evil-scroll-down
+           "C-u" 'dired-evil-scroll-up
            "C-h" 'dired-goto-min-subdir
            "C-j" 'dired-next-subdir
            "C-k" 'dired-prev-subdir
@@ -5275,6 +5301,7 @@
 
                (message "completed creation of slideshow layout")))))
      #+END_SRC
+
 
 *** drag-stuff
     #+BEGIN_SRC emacs-lisp
@@ -5651,6 +5678,12 @@
                            (persp-window-switch . nil)
                            (persp-frame-switch  . nil)))))
 
+         (setq ivy-preferred-re-builders
+               '((ivy--regex-plus         . "ivy")
+                 (ivy--regex-ignore-order . "order")
+                 (ivy--regex-fuzzy        . "fuzzy")
+                 (regexp-quote            . "literal")))
+
          (general-define-key
            "M-x" 'counsel-M-x)
 
@@ -5666,7 +5699,6 @@
            "`" 'ivy-resume)
          :bind* (:map ivy-minibuffer-map
                  ("C-j" . nil) ;; was ivy-alt-done
-                 ("C-." . nil) ;; was hydra-ivy/body
                  ("M-j" . nil) ;; was ivy-yank-word
                  ("M-v" . nil) ;; was ivy-scroll-down-command
                  ("C-v" . nil) ;; was ivy-scroll-up-command
@@ -5697,6 +5729,8 @@
                  ("<escape>" . minibuffer-keyboard-quit)
 
                  ;;; movement commands
+                 ("C-a" . move-beginning-of-line)
+                 ("C-e" . move-end-of-line)
                  ("C-h" . backward-char)
                  ("C-l" . ivy-forward-char-or-partial-or-done)
                  ("C-j" . next-line)
@@ -5718,7 +5752,7 @@
                  ;; complete current selection into minibuffer
                  ;; leave prompt active to build on it.
                  ("C-i" . ivy-insert-current)
-                 ("C-DEL" . backward-kill-word)
+                 ("C-DEL" . evil-delete-backward-word)
                  ;; pull word in from point at buffer
                  ("M-w" . ivy-yank-word)
                  ("C-w" . backward-kill-word)
@@ -5995,7 +6029,12 @@
                     swiper-isearch-toggle)
          :init
          (mohkale/set-leader-keys
-           "ss" 'swiper))
+           "ss" 'swiper)
+         :bind (:map swiper-map
+                ("C-q" . nil)
+                ("C-l" . ivy-forward-char-or-partial-or-done)
+                ("C-q" . swiper-avy)
+                ("C-s" . swiper-query-replace)))
      #+END_SRC
 
 **** ivy-yasnippet
@@ -6765,7 +6804,7 @@
                  ("C-q" . quoted-insert)
                  ("C-M-q" . quit-window)
 
-                 ("C-w" . evil-delete-backward-word)
+                 ("C-w" . backward-kill-word)
                  ("C-?" . minibuffer-completion-help)
                  ;; for some reason.. I can't bind Meta keys
                  ("M-k" . kill-whole-line)
@@ -7017,7 +7056,7 @@
                    persp-load-from-file-by-names
                    persp-save-and-kill)
         :init
-        (mohkale/set-leader-keys-mode
+        (mohkale/set-leader-keys
           "ba" 'persp-add-current-buffer
           "bA" 'persp-add-buffer
           "br" 'persp-remove-buffer
@@ -7891,6 +7930,27 @@
         :commands (vi-tilde-fringe-mode global-vi-tilde-fringe-mode)
         :config
         (global-vi-tilde-fringe-mode))
+    #+END_SRC
+
+*** view-mode
+    #+BEGIN_SRC emacs-lisp
+      (use-package view
+        :defer t
+        :config
+        (general-define-key
+          :keymaps 'view-mode-map
+          :states  'normal
+          "q" 'View-quit
+          "Q" 'View-quit-all
+          "G" 'View-scroll-to-buffer-end
+          "zq" 'View-exit
+          "zk" 'View-kill-and-leave
+          "C-j" 'View-scroll-line-forward
+          "C-k" 'View-scroll-line-backward
+          ;; "C-d" 'View-scroll-half-page-forward
+          ;; "C-u" 'View-scroll-half-page-backward
+          "M-d" 'View-scroll-page-forward
+          "M-u" 'View-scroll-page-backward))
     #+END_SRC
 
 *** visible-mark
@@ -11776,7 +11836,7 @@
                 ("M-)"   . helm-next-visible-mark)
 
                 :map helm--minor-mode-map
-                ("<C-backspace>" . backward-kill-word)))
+                ("<C-backspace>" . evil-delete-backward-word)))
 
       (use-package helm-files
         ;; :ensure t
