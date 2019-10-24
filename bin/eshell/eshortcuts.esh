@@ -1,0 +1,46 @@
+# -*- mode: lisp-interaction; coding: utf-8-unix -*-
+#            _          _ _           _                _             _
+#   ___  ___| |__   ___| | |      ___| |__   ___  _ __| |_ ___ _   _| |_ ___
+#  / _ \/ __| '_ \ / _ \ | |_____/ __| '_ \ / _ \| '__| __/ __| | | | __/ __|
+# |  __/\__ \ | | |  __/ | |_____\__ \ | | | (_) | |  | || (__| |_| | |_\__ \
+#  \___||___/_| |_|\___|_|_|     |___/_| |_|\___/|_|   \__\___|\__,_|\__|___/
+
+# remove all defined aliases, so you can refresh them all
+for alias in ${alias | cut -d ' ' -f 2} { alias $alias }
+
+setq eshell--shortcuts-script "~/programming/scripts/build_shortcuts.sh" >/dev/null
+
+setq eshell--program-shortcuts {
+    # source aliases from global shortcuts, os shortcuts and finally eshell shortcuts
+    bash $eshell--shortcuts-script                                              \
+        ~/.shortcuts/shortcuts                                                  \
+        (cond
+         ((or (eq system-type 'windows-nt)
+              (eq system-type 'ms-dos)
+              (eq system-type 'cygwin))
+          (expand-file-name "~/.shortcuts/shortcuts.windows"))
+         ((eq system-type 'darwin)
+          (expand-file-name "~/.shortcuts/shortcuts.macos"))
+         ((or (eq system-type 'gnu)
+              (eq system-type 'gnu/linux)
+              (eq system-type 'gnu/kfreebsd))
+          (expand-file-name "~/.shortcuts/shortcuts.linux")))                   \
+        ~/.shortcuts/shortcuts.eshell | sed -r -e 's/alias ([^=]+)=(.+)/\1 \2/'
+}
+
+setq eshell--filesystem-shortcuts {
+    bash -c 'FS=1 '$eshell--shortcuts-script' "$1"' bash ~/.shortcuts/fsmaps | sed -r -e 's/alias ([^=]+)=(.+)/\1 \2/'
+}
+
+(dolist (alias eshell--program-shortcuts)
+  (let* ((index (string-match " " alias))
+         (key   (substring alias 0 index))
+         (value (concat (substring alias (+ 2 index) -1)
+                        " $*")))
+    (eshell/alias key value)))
+
+(dolist (alias eshell--filesystem-shortcuts)
+  (let* ((index (string-match " " alias))
+         (key   (substring alias 0 index))
+         (value (substring alias (+ 2 index) -1)))
+    (eshell/alias key value)))

@@ -62,6 +62,7 @@
             delete-by-moving-to-trash t                                             ; don't rm, trash my garbage please :)
             search-whitespace-regexp nil                                            ; SPC means SPC, not any amount of spaces
             enable-local-variables t                                                ; allow safe variables, even alongside unsafe ones
+            recenter-positions '(top middle bottom)
 
             display-line-numbers 'relative
 
@@ -91,6 +92,7 @@
                     show-trailing-whitespace t
                     scroll-conservatively 101 ; smooth... enough scrolling going line by line
                     scroll-preserve-screen-position t
+                    cursor-in-non-selected-windows nil ;; hide cursor
                     default-buffer-file-coding-system 'utf-8-unix
                     buffer-file-coding-system 'utf-8-unix
                     echo-keystrokes 0.02)
@@ -186,6 +188,10 @@
               display-buffer-alist)
 
         (push `("*image-dired-display-image*"
+                ,@display-buffer--default-fallback-action)
+              display-buffer-alist)
+
+        (push `("*Anaconda*"
                 ,@display-buffer--default-fallback-action)
               display-buffer-alist)
 
@@ -321,6 +327,9 @@
            desktop-path                                       (list desktop-dirname)
            diary-file                                         (var "diary")
            eshell-directory-name                              (var "eshell")
+           eshell-aliases-file                                (var "eshell" "aliases")
+           eshell-login-script                                (etc "eshell" "loginrc")
+           eshell-rc-script                                   (etc "eshell" "eshrc")
            eww-bookmarks-directory                            (var "eww/")
            gamegrid-user-score-file-directory                 (var "gamegrid/")
            ido-save-directory-list-file                       (var "ido-save-directory-list.el")
@@ -442,6 +451,10 @@
                        ensured-path
                      (eval ensured-path))
                    t))))
+
+
+      (setenv "EDITOR"
+              (concat "emacsclient --no-wait --suppress-output --server-file '" server-auth-dir "server'"))
 
       (push mohkale-package-root load-path)
       (push (mohkale/join-dotemacs-etc-path "themes") custom-theme-load-path)
@@ -871,6 +884,7 @@
         "au" "undo tree")
 
       (mohkale/set-leader-keys
+        "a:" 'eshell
         "aC" 'calc-dispatch
         "ac" 'calendar
         "ad" 'ido-dired
@@ -1153,7 +1167,7 @@
        ;; "C-SPC"           'nil ;; emacs like binding
        "C-@" (general-simulate-key "C-SPC") ;; C-SPC in terminal
 
-       "M-l"             nil
+       "M-l"             'recenter-top-bottom
        "M-h"             nil
        ;; "M-l"             'kill-sentence
        ;; "M-h"             'backward-kill-sentence
@@ -1181,7 +1195,8 @@
 
      (general-define-key
        :states mohkale-norm-states
-       "gr"    'revert-buffer)
+       "gr"    'revert-buffer
+       "gz"    'recenter-top-bottom)
 
      (general-define-key
        :states mohkale-nnorm-states
@@ -1427,6 +1442,9 @@
         (display-line-numbers-mode 1)
         (setq display-line-numbers 'relative))
 
+      (add-hook 'prog-mode-hook        #'mohkale//enable-line-numbers-handler)
+      (add-hook 'fundamental-mode-hook #'mohkale//enable-line-numbers-handler)
+
       (setq command-error-function
             (defun mohkale/command-error-function (data context caller)
               "hide some error message"
@@ -1435,34 +1453,73 @@
                                             end-of-buffer)))
                 (command-error-default-function data context caller))))
 
+      (defun inhibit-messages-wrapper (func &rest args)
+        (let ((inhibit-message t))
+          (apply func args)))
+
+      ;;; switch to buffer hook
+      (defvar switch-to-buffer-hook nil
+        "hook run when you switch to a buffer.")
+
+      (advice-add 'switch-to-buffer
+                  :after (defun switch-to-buffer--execute-hook (&rest args)
+                           (apply 'run-hook-with-args 'switch-to-buffer-hook args)))
+
+      ;;; theme loading hook
+      (defvar after-load-theme-hook nil
+        "hook which is executed after loading a theme")
+
+      (advice-add 'load-theme
+                  :after (defun load-theme--execute-hooks (&rest args)
+                           (run-hooks 'after-load-theme-hook)))
+
+      ;;; whitespace exemption
       (defvar mohkale--whitespace-exempt-modes '(help-mode
                                                  Buffer-menu-mode
+                                                 eshell-mode
                                                  term-mode
                                                  minibuffer-inactive-mode
                                                  eshell-mode)
         "modes under which no trailing whitespace is shown")
 
-      (defun mohkale//hide-trailing-whitespace ()
+      (defvar mohkale--whitespace-exempt-buffers '("\\*Ibuffer confirmation\\*")
+        "regular expressions matching buffer names under which no trailing
+      whitespace is shown.")
+
+      (defun chain-match-regexp (string &rest regexps)
+        "checks for string-match against STRING using regexps
+      returns true if any of the regexps match the string."
+        (let (match-found regexp)
+          (while (and (not match-found)
+                      (setq regexp (car regexps)))
+            (setq match-found (string-match-p regexp string)
+                  regexps (cdr regexps)))
+          (not (not match-found))))
+
+      (defun mohkale//hide-trailing-whitespace--mode-based (&rest args)
         (when (and mohkale--whitespace-exempt-modes
                    (apply 'derived-mode-p
                           mohkale--whitespace-exempt-modes))
-          (setq show-trailing-whitespace nil)))
+          (setq show-trailing-whitespace nil)
+          t))
 
-      (add-hook 'after-change-major-mode-hook 'mohkale//hide-trailing-whitespace)
-      (add-hook 'prog-mode-hook #'mohkale//enable-line-numbers-handler)
-      (add-hook 'fundamental-mode-hook #'mohkale//enable-line-numbers-handler)
+      (defun mohkale//hide-trailing-whitespace--name-based (&rest args)
+        (when (and mohkale--whitespace-exempt-buffers
+                   (apply 'chain-match-regexp
+                          (buffer-name)
+                          mohkale--whitespace-exempt-buffers))
+          (setq show-trailing-whitespace nil)
+          t))
 
-      (defun inhibit-messages-wrapper (func &rest args)
-        (let ((inhibit-message t))
-          (apply func args)))
+      (defun mohkale//hide-trailing-whitespace (&rest args)
+        (or (mohkale//hide-trailing-whitespace--mode-based)
+            (mohkale//hide-trailing-whitespace--name-based)))
 
-      (defvar after-load-theme-hook nil
-        "hook which is executed after loading a theme")
-
-      (defun load-theme--execute-hooks (&rest args)
-        (run-hooks 'after-load-theme-hook))
-
-      (advice-add 'load-theme :after #'load-theme--execute-hooks)
+      ;; add switch-to-buffer hook because some functions, such as ibuffers confirmation
+      ;; popup use switch-to-buffer instead of display buffer and there's no easy way
+      ;; to modify it.
+      (add-hook 'switch-to-buffer-hook        #'mohkale//hide-trailing-whitespace--name-based)
+      (add-hook 'after-change-major-mode-hook #'mohkale//hide-trailing-whitespace--mode-based)
     #+END_SRC
 
 *** Yank Indent Adjust
@@ -2072,6 +2129,7 @@
                        hydra-flycheck
                        hydra-ibuffer
                        hydra-indent
+                       hydra-eim
                        hydra-ivy-custom
                        hydra-org-navigate
                        hydra-org-link
@@ -2340,6 +2398,66 @@
                                        (concat header-s
                                                hydra-eyebrowse/complete-command-docstring))
                                      hydra-eyebrowse/heads))))
+     #+END_SRC
+
+**** emacs-ipython-notebook
+     sourced from [[https://github.com/syl20bnr/spacemacs/blob/master/layers/%252Blang/ipython-notebook/packages.el][here]].
+
+     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/eim.el"
+       (defhydra hydra-ein (:hint nil)
+               "
+        Operations on Cells^^^^^^            On Worksheets^^^^              Other
+        ----------------------------^^^^^^   ------------------------^^^^   ----------------------------------^^^^
+        [_k_/_j_]^^     select prev/next     [_h_/_l_]   select prev/next   [_t_]^^         toggle output
+        [_K_/_J_]^^     move up/down         [_H_/_L_]   move left/right    [_C-l_/_C-S-l_] clear/clear all output
+        [_C-k_/_C-j_]^^ merge above/below    [_1_.._9_]  open [1st..last]   [_C-o_]^^       open console
+        [_O_/_o_]^^     insert above/below   [_+_/_-_]   create/delete      [_C-s_/_C-r_]   save/rename notebook
+        [_y_/_p_/_d_]   copy/paste           ^^^^                           [_x_]^^         close notebook
+        [_u_]^^^^       change type          ^^^^                           [_q_]^^         quit transient-state
+        [_RET_]^^^^     execute"
+               ("q" nil :exit t)
+               ("?" spacemacs//ipython-notebook-ms-toggle-doc)
+               ("h" ein:notebook-worksheet-open-prev-or-last)
+               ("j" ein:worksheet-goto-next-input)
+               ("k" ein:worksheet-goto-prev-input)
+               ("l" ein:notebook-worksheet-open-next-or-first)
+               ("H" ein:notebook-worksheet-move-prev)
+               ("J" ein:worksheet-move-cell-down)
+               ("K" ein:worksheet-move-cell-up)
+               ("L" ein:notebook-worksheet-move-next)
+               ("t" ein:worksheet-toggle-output)
+               ("d" ein:worksheet-kill-cell)
+               ("R" ein:worksheet-rename-sheet)
+               ("y" ein:worksheet-copy-cell)
+               ("p" ein:worksheet-yank-cell)
+               ("o" ein:worksheet-insert-cell-below)
+               ("O" ein:worksheet-insert-cell-above)
+               ("u" ein:worksheet-change-cell-type)
+               ("RET" ein:worksheet-execute-cell-and-goto-next)
+               ;; Output
+               ("C-l" ein:worksheet-clear-output)
+               ("C-S-l" ein:worksheet-clear-all-output)
+               ;;Console
+               ("C-o" ein:console-open)
+               ;; Merge cells
+               ("C-k" ein:worksheet-merge-cell)
+               ("C-j" spacemacs/ein:worksheet-merge-cell-next)
+               ;; Notebook
+               ("C-s" ein:notebook-save-notebook-command)
+               ("C-r" ein:notebook-rename-command)
+               ("1" ein:notebook-worksheet-open-1th)
+               ("2" ein:notebook-worksheet-open-2th)
+               ("3" ein:notebook-worksheet-open-3th)
+               ("4" ein:notebook-worksheet-open-4th)
+               ("5" ein:notebook-worksheet-open-5th)
+               ("6" ein:notebook-worksheet-open-6th)
+               ("7" ein:notebook-worksheet-open-7th)
+               ("8" ein:notebook-worksheet-open-8th)
+               ("9" ein:notebook-worksheet-open-last)
+               ("+" ein:notebook-worksheet-insert-next)
+               ("-" ein:notebook-worksheet-delete)
+               ("x" ein:notebook-close))
      #+END_SRC
 
 **** persp-mode
@@ -3450,6 +3568,10 @@
            "C-<" 'evil-shift-left-line)
 
          (general-define-key
+           :states 'emacs
+           "C-o" 'evil-execute-in-normal-state)
+
+         (general-define-key
            :states 'normal
            "gj" 'evil-next-visual-line
            "gk" 'evil-previous-visual-line)
@@ -3873,6 +3995,28 @@
 
                ("L"   . 'buf-move-right)
                ("M-l" . 'buf-move-right)))
+    #+END_SRC
+
+
+*** calc
+    #+BEGIN_SRC emacs-lisp
+      (use-package calc
+        :defer t
+        :init
+        (mohkale/declare-prefix
+          "*" "calculator")
+
+        (mohkale/set-leader-keys
+          "*." 'calc-dispatch
+          "**" 'calc
+          "*y" 'calc-copy-to-buffer)
+
+        :config
+        (general-define-key
+          :keymaps 'calc-mode-map
+          "C-w" mohkale-window-map
+          ;; WARN hard coded leader key
+          mohkale-leader-key (general-simulate-key "C-SPC")))
     #+END_SRC
 
 *** calendar
@@ -4966,6 +5110,28 @@
                     epa-dired-do-verify))
      #+END_SRC
 
+**** diredfl
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (use-package diredfl
+         :ensure t
+         :defer  t
+         :commands (diredfl-mode)
+         :hook (dired-mode . diredfl-mode))
+     #+END_SRC
+
+**** dired-git-info
+     #+BEGIN_SRC emacs-lisp
+       (use-package dired-git-info
+         :ensure t
+         :defer  t
+         :commands (dired-git-info-mode)
+         :init
+         (general-define-key
+           :keymaps 'dired-mode-map
+           :states  'motion
+           ")" 'dired-git-info-mode))
+     #+END_SRC
+
 **** dired
      #+BEGIN_SRC emacs-lisp
        (use-package dired
@@ -5368,6 +5534,194 @@
          :hook ((text-mode prog-mode) . electric-indent-mode))
      #+END_SRC
 
+*** eshell
+**** eshell-mode
+     #+BEGIN_SRC emacs-lisp
+       (use-package esh-mode
+         :defer t
+         :hook (
+                ;;; cursor-type is block... changing to bar
+                ;;; doesn't persist on window change... boo!!!
+                ;; (eshell-mode . (setq-local cursor-type 'bar))
+                ;;; disable company-mode in eshell-mode
+                (eshell-mode . (lambda () (company-mode -1))))
+         :init
+         (mohkale/set-leader-keys ":" 'eshell-command)
+
+         :config
+         (evil-set-initial-state 'eshell-mode 'emacs)
+
+         ;; don't auto scroll to bottom after execution
+         (remove-hook 'eshell-output-filter-functions
+                      'eshell-postoutput-scroll-to-bottom)
+
+         ;; clear shouldn't scroll back to bottom of the screen
+         (advice-add 'eshell/clear :after #'recenter-top-bottom)
+
+         (setq eshell-banner-message "") ;; no banner
+
+         (defun eshell-backward-kill-word ()
+           (interactive)
+           (let ((bol
+                  (save-excursion
+                    (eshell-bol)))
+                 (beginning-word-point
+                  (save-excursion
+                    (backward-word)
+                    (point))))
+             (when (>= beginning-word-point bol)
+               (call-interactively 'backward-kill-word))))
+
+         (mohkale/declare-prefix-for-major-mode* 'eshell-mode
+           "i" "insert"
+           "k" "kill/signal")
+
+         (mohkale/set-leader-keys-for-major-mode 'eshell-mode
+           "o"   'eshell-show-output
+           "O"   'eshell-mark-output
+           "TAB" 'counsel-esh-history
+           "RET" 'eshell-queue-input
+
+           "ib" 'eshell-insert-buffer-name
+           "ip" 'eshell-insert-process
+           "ie" 'eshell-insert-envvar
+
+           "kz" 'eshell-send-eof-to-process
+           "kc" 'eshell-interrupt-process
+           "kq" 'eshell-quit-process)
+
+         (defun eshell-mode--setup-bindings ()
+           (general-define-key
+             :keymaps 'eshell-mode-map
+             ;;; movement commands
+             "C-e"   'end-of-line
+             "M-l"   'recenter-top-bottom
+             "C-h"   'backward-char
+             "C-l"   'forward-char
+             "C-M-h" 'backward-word
+             "C-M-l" 'forward-word
+             ;;; scroll commands
+             "<S-down>" 'evil-scroll-down
+             "<S-up>"   'evil-scroll-up
+             ;; move to beginning of output
+             ;; or return to end of cursor
+             "M-a" 'eshell-show-output
+             "M-e" 'eshell-show-maximum-output
+
+             ;;; signals
+             "C-c C-z" 'eshell-send-eof-to-process
+             "C-c C-q" 'eshell-quit-process
+             "M-c"     'eshell-interrupt-process
+             "M-z"     'eshell-send-eof-to-process
+             "M-q"     'eshell-quit-process
+
+             "C-s"   'counsel-esh-history
+             "M-SPC" 'counsel-esh-history
+
+             "M-y"           'eshell-repeat-argument
+             "C-d"           'eshell-kill-input
+             "C-M-k"         'eshell-kill-input
+             "M-d"           'eshell-kill-output
+             "C-w"           'eshell-backward-kill-word
+             "<C-backspace>" 'evil-delete-backward-word
+             ;; copy entered input back into current line
+             "<C-return>"    'eshell-copy-old-input
+
+             "C-j"       'eshell-next-input
+             "C-k"       'eshell-previous-input
+             "M-j"       'eshell-next-prompt
+             "M-k"       'eshell-previous-prompt
+             ;; reverse the default affect of up and down
+             "<up>"      'eshell-previous-input
+             "<down>"    'eshell-next-input
+             "<C-up>"    'eshell-previous-matching-input-from-input
+             "<C-down>"  'eshell-next-matching-input-from-input
+             "<S-left>"  'eshell-backward-argument
+             "<S-right>" 'eshell-forward-argument
+             "<M-left>"  'eshell-backward-argument
+             "<M-right>" 'eshell-forward-argument))
+
+         ;; needs to be in a hook because eshell-mode-map isn't
+         ;; defined until the mode is activated, and even then
+         ;; it's only buffer-local :(.
+         (add-hook 'eshell-mode-hook #'eshell-mode--setup-bindings)
+
+       ;;   ;; source: https://emacs.stackexchange.com/questions/48205/how-to-execute-external-commands-from-an-eshell-script/48215
+       ;;   (require 'cl-lib)  ;; for macro `cl-pushnew' (not autoloaded ?!)
+       ;;   (require 'esh-cmd) ;; for variable `eshell-complex-commands'
+
+       ;;   (defun eshell-source-string (string &optional args subcommand-p)
+       ;;     "Execute a series of Eshell commands in STRING, passing ARGS.
+       ;; Comments begin with `#'."
+       ;;     (interactive "sString to be evaluated as eshell script: ")
+       ;;     (let ((orig (point))
+       ;;           (here (point-max))
+       ;;           (inhibit-point-motion-hooks t))
+       ;;       (goto-char (point-max))
+       ;;       (with-silent-modifications
+       ;;         ;; FIXME: Why not use a temporary buffer and avoid this
+       ;;         ;; "insert&delete" business?  --Stef
+       ;;         (insert string)
+       ;;         (goto-char (point-max))
+       ;;         (throw 'eshell-replace-command
+       ;;                (prog1
+       ;;                    (list 'let
+       ;;                          (list (list 'eshell-command-name (list 'quote "source-string"))
+       ;;                                (list 'eshell-command-arguments
+       ;;                                      (list 'quote args)))
+       ;;                          (let ((cmd (eshell-parse-command (cons here (point)))))
+       ;;                            (if subcommand-p
+       ;;                                (setq cmd (list 'eshell-as-subcommand cmd)))
+       ;;                            cmd))
+       ;;                  (delete-region here (point))
+       ;;                  (goto-char orig))))))
+
+       ;;   (defun define-eshell-script (cmd doc string)
+       ;;     "Define CMD as eshell script STRING with documentation DOC.
+       ;; CMD can be a string or a symbol."
+       ;;     (let ((fun (intern (concat "eshell/" cmd))))
+       ;;       (fset fun
+       ;;             `(lambda (&rest args)
+       ;;                ,doc
+       ;;                (eshell-source-string ,string args)))
+       ;;       (cl-pushnew cmd (default-value 'eshell-complex-commands) :test #'equal)
+       ;;       (dolist (buffer (buffer-list))
+       ;;         (with-current-buffer buffer
+       ;;           (when (derived-mode-p 'eshell-mode)
+       ;;             (cl-pushnew cmd eshell-complex-commands :test #'equal))))
+       ;;       (put fun 'eshell-no-numeric-conversions t)))
+         )
+     #+END_SRC
+
+**** eshell-prompt-extras
+     #+BEGIN_SRC emacs-lisp
+       (use-package eshell-prompt-extras
+         :ensure t
+         :defer  t
+         :commands (epe-theme-mohkale)
+         :init
+         (with-eval-after-load 'esh-mode
+           (require 'eshell-prompt-extras))
+         :config
+
+         (setq epe-show-python-info t
+               epe-path-style 'full)
+
+         (defvar eshell-prompt--enable-git-on-remote-files t
+           "when true, show branch info even on remote files")
+
+         (defun epe-git-p ()
+           "If you installed git and in a git project."
+           (when (or eshell-prompt--enable-git-on-remote-files
+                     ;; either enable everywhere, including remote
+                     ;; or enable when not remote
+                     (not (epe-remote-p)))
+             (and (eshell-search-path "git")
+                  (vc-find-root (eshell/pwd) ".git"))))
+
+         (setq eshell-prompt-function #'epe-theme-lambda))
+     #+END_SRC
+
 *** eyebrowse
     #+BEGIN_SRC emacs-lisp
       (use-package eyebrowse
@@ -5619,6 +5973,13 @@
           "it" 'hl-todo-insert-keyword))
     #+END_SRC
 
+*** htmlize
+    #+BEGIN_SRC emacs-lisp
+      (use-package htmlize
+        :ensure t
+        :defer  t)
+    #+END_SRC
+
 *** ivy
 **** ivy
      #+BEGIN_SRC emacs-lisp
@@ -5768,7 +6129,11 @@
 
                  :map ivy-switch-buffer-map
                  ("C-k" . previous-line)
-                 ("M-d" . ivy-switch-buffer-kill)))
+                 ("M-d" . ivy-switch-buffer-kill)
+
+                 :map ivy-reverse-i-search-map
+                 ("C-k" . previous-line)
+                 ("C-d" . ivy-reverse-i-search-kill)))
      #+END_SRC
 
 **** collapse directories
@@ -5881,6 +6246,7 @@
                     counsel-load-library
                     counsel-load-theme
                     counsel-yank-pop
+                    counsel-esh-history
                     counsel-mark-ring
                     counsel-bookmark
                     counsel-company
@@ -6123,13 +6489,6 @@
          :ensure t
          :defer  t)
      #+END_SRC
-
-*** htmlize
-    #+BEGIN_SRC emacs-lisp
-      (use-package htmlize
-        :ensure t
-        :defer  t)
-    #+END_SRC
 
 *** ibuffer
 **** ibuffer
@@ -6422,7 +6781,6 @@
          )
      #+END_SRC
 
-
 *** imenu
     #+BEGIN_SRC emacs-lisp
       (use-package imenu
@@ -6457,6 +6815,97 @@
       ;;   ;; TODO look into more bindings
       ;;   :bind (:map isearch-mode-map
       ;;          ("DEL" . isearch-delete-char)))
+    #+END_SRC
+
+*** ein - emacs-ipython-notebook
+    #+BEGIN_SRC emacs-lisp
+      (use-package ein
+        :ensure t
+        :defer  t
+        :init
+        (with-eval-after-load 'org
+          (push '(ein . t) org-babel-load-languages))
+        :config
+        (defun evil-write--ein-save-buffer (&rest args)
+          (when (derived-mode-p 'ein:notebook-mode 'ein:notebook-multilang-mode)
+            (call-interactively 'ein:notebook-save-notebook-command)
+            t))
+
+        (advice-add 'evil-write :before-until #'evil-write--ein-save-buffer)
+
+        (mohkale/set-leader-keys-for-major-mode 'ein:notebooklist-mode
+          "f" 'ein:file-open
+          "n" 'ein:notebook-open
+          "r" 'ein:notebooklist-reload)
+
+        (general-define-key
+          :keymaps 'ein:notebooklist-mode-map
+          "gr" 'ein:notebooklist-reload
+          "<S-tab>"   'widget-backward
+          "<backtab>" 'widget-backward
+          "TAB"       'widget-forward
+          "<tab>"     'widget-forward
+
+          "gn" 'ein:notebooklist-next-item
+          "gN" 'ein:notebooklist-prev-item
+          "gp" 'ein:notebooklist-prev-item)
+
+        (dolist (mode '(ein:notebook-mode ein:notebook-multilang-mode))
+          (mohkale/set-leader-keys-for-major-mode mode
+            "." 'hydra-ein/body
+            "'" 'ein:edit-cell-contents
+            mohkale-major-mode-leader-key 'ein:worksheet-execute-cell
+
+            "c" 'ein:notebook-close
+            "f" 'ein:file-open
+            "F" 'ein:notebook-open
+            "i" 'ein:inspect-object
+            "m" 'ein:pytools-request-tooltip-or-help
+            "o" 'ein:worksheet-toggle-output
+            "p" 'ein:worksheet-yank-cell
+            "r" 'ein:notebook-rename-command
+            "R" 'ein:notebook-restart-session-command
+            ;; "R" 'ein:notebook-reconnect-session-command
+            "s" 'ein:notebook-scratchsheet-open
+            "w" 'ein:notebook-save-notebook-command
+            "y" 'ein:worksheet-copy-cell
+
+            "ts" 'ein:worksheet-toggle-slide-type
+            "tc" 'ein:worksheet-toggle-cell-type
+            "tC" 'ein:worksheet-change-cell-type
+            "gg" 'ein:pytools-jump-to-source-command
+            "gb" 'ein:pytools-jump-back-command
+            "dc" 'ein:worksheet-kill-cell
+            "do" 'ein:worksheet-clear-output
+            "dO" 'ein:worksheet-clear-all-output
+            "dk" 'ein:notebook-kill-kernel-then-close-command
+            "dz" 'ein:notebook-kernel-interrupt-command
+
+            "TAB" 'ein:completer-complete))
+
+        (general-define-key
+          :keymaps 'ein:notebook-mode-map
+          "<C-down>" nil
+          "<C-up>"   nil
+
+          "<C-return>" 'ein:worksheet-execute-cell
+          "<S-return>" 'ein:worksheet-execute-cell-and-goto-next)
+
+        (general-define-key
+          :keymaps 'ein:notebook-mode-map
+          :states  mohkale-norm-states
+          "go" 'ein:worksheet-insert-cell-above
+          "gO" 'ein:worksheet-insert-cell-below
+          "gJ" 'ein:worksheet-merge-cell
+          "gs" 'ein:worksheet-split-cell-at-point
+          "gj" 'ein:worksheet-goto-next-input
+          "gk" 'ein:worksheet-goto-prev-input
+          "gc" 'ein:worksheet-kill-cell)
+
+        (general-define-key
+          :keymaps 'ein:notebook-multilang-mode-map
+          "<M-down>" 'ein:worksheet-move-cell-down
+          "<M-up>"   'ein:worksheet-move-cell-up))
     #+END_SRC
 
 *** lorem-ipsum
@@ -11676,6 +12125,10 @@
       `(org-document-title ((,cls (:foreground "white" :height 1.3 :inherit bold))))
 
       `(dashboard-text-banner ((,cls (:foreground ,orange-int))))
+
+      ;; eshell-prompt-extras
+      `(epe-remote-face ((,cls (:foreground ,turquoise))))
+      `(epe-venv-face ((,cls (:foreground ,purple))))
 
       ;;; ivy
       ;; `(ivy-current-match ((,cls :backgrouns ,blue-dim :foreground ,black))) ;; hl-line
