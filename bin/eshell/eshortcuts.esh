@@ -5,8 +5,8 @@
 # |  __/\__ \ | | |  __/ | |_____\__ \ | | | (_) | |  | || (__| |_| | |_\__ \
 #  \___||___/_| |_|\___|_|_|     |___/_| |_|\___/|_|   \__\___|\__,_|\__|___/
 
-# remove all defined aliases, so you can refresh them all
-for alias in ${alias | cut -d ' ' -f 2} { alias $alias }
+# remove all defined aliases, so you can refresh them
+(setq eshell-command-aliases-list nil)
 
 setq eshell--shortcuts-script "~/programming/scripts/build_shortcuts.sh" >/dev/null
 
@@ -24,23 +24,35 @@ setq eshell--program-shortcuts {
          ((or (eq system-type 'gnu)
               (eq system-type 'gnu/linux)
               (eq system-type 'gnu/kfreebsd))
-          (expand-file-name "~/.shortcuts/shortcuts.linux")))                   \
-        ~/.shortcuts/shortcuts.eshell | sed -r -e 's/alias ([^=]+)=(.+)/\1 \2/'
-}
+          (expand-file-name "~/.shortcuts/shortcuts.linux"))) | sed -r -e 's/alias ([^=]+)=(.+)/\1 \2/'
+} >/dev/null
+
+setq eshell--eshell-shortcuts {
+    bash $eshell--shortcuts-script ~/.shortcuts/shortcuts.eshell | sed -r -e 's/alias ([^=]+)=(.+)/\1 \2/'
+} >/dev/null
+
 
 setq eshell--filesystem-shortcuts {
     bash -c 'FS=1 '$eshell--shortcuts-script' "$1"' bash ~/.shortcuts/fsmaps | sed -r -e 's/alias ([^=]+)=(.+)/\1 \2/'
-}
+} >/dev/null
 
-(dolist (alias eshell--program-shortcuts)
-  (let* ((index (string-match " " alias))
-         (key   (substring alias 0 index))
-         (value (concat (substring alias (+ 2 index) -1)
-                        " $*")))
-    (eshell/alias key value)))
+(cl-letf (((symbol-function #'eshell-write-aliases-list)
+           (symbol-function #'ignore)))
+  ;; set aliases from shortcuts file, avoiding writing them all
+  ;; until every alias has been defined.
+  (dolist (alias-list (list (cons eshell--program-shortcuts    " $*")
+                            (cons eshell--eshell-shortcuts     nil)
+                            (cons eshell--filesystem-shortcuts nil)))
+    (let ((append-args (cdr alias-list))
+          (alias-list  (car alias-list)))
+      (dolist (alias alias-list)
+        (let* ((index (string-match " " alias))
+               (key   (substring alias 0 index))
+               (value (concat (substring alias (+ 2 index) -1)
+                              (when append-args append-args))))
+          (unless (bound-and-true-p eshell--shortcuts-silence-output)
+            (eshell-print (concat key " ")))
 
-(dolist (alias eshell--filesystem-shortcuts)
-  (let* ((index (string-match " " alias))
-         (key   (substring alias 0 index))
-         (value (substring alias (+ 2 index) -1)))
-    (eshell/alias key value)))
+          (eshell/alias key value))))))
+
+eshell-write-aliases-list # finally write all the defined aliases back

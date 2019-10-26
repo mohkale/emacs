@@ -6,3 +6,26 @@
 #  \___||___/_| |_|\___|_|_|_|  \___|
 
 addpath ~/.emacs.d/bin/eshell/ >/dev/null
+
+(defvar eshell--shortcuts-silence-output nil
+  "when true, the eshell build script won't produce any output") >/dev/null
+
+(let* ((aliases-file   eshell-aliases-file)
+       (build-script   "~/.emacs.d/bin/eshell/eshortcuts.esh")
+       (shortcut-files (mapcar (lambda (x) (concat "~/.shortcuts/" x))
+                               '("shortcuts" "shortcuts.eshell" "fsmaps")))
+       ;; if aliases doesn't exist, auto rebuild aliases
+       (rebuild-aliases (not (file-exists-p aliases-file)))
+       shortcut-file)
+  ;; check wether any shortcut file has been modified, and if so
+  ;; resource all shortcut files using the aliases build script.
+  (while (and (not rebuild-aliases)
+              (setq shortcut-file  (pop shortcut-files)))
+    (when (file-exists-p shortcut-file)
+      (setq rebuild-aliases (file-newer-than-file-p shortcut-file aliases-file))))
+
+  (when rebuild-aliases
+    ;; for some reason, the let clause doesn't work
+    (setq eshell--shortcuts-silence-output t)
+    (eshell/. build-script)
+    (setq eshell--shortcuts-silence-output nil)))

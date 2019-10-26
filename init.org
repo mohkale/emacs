@@ -1930,8 +1930,9 @@
         "name of users scratch buffer")
 
       (defun create-new-empty-buffer (&optional buffer-name)
-        "create and switch to a new empty scratch like buffer
-      with prefix it prompts you for the name of the buffer."
+        "creates and returns a new empty scratch like buffer
+      with prefix it prompts you for the name of the buffer.
+      if called interactively, the new buffer is switched to."
         (interactive "P")
         (let* ((def-buf-name scratch-buffer-name)
                (buffer-name
@@ -1939,9 +1940,13 @@
                  ((stringp buffer-name) buffer-name)
                  (buffer-name (read-buffer "buffer name: " def-buf-name))
                  (t                     def-buf-name)))
-               (buffer-name (generate-new-buffer-name buffer-name)))
-          (switch-to-buffer (get-buffer-create buffer-name))
-          (funcall-interactively initial-major-mode)))
+               (buffer-name (generate-new-buffer-name buffer-name))
+               (buffer (get-buffer-create buffer-name)))
+          (with-current-buffer buffer
+            (funcall-interactively initial-major-mode))
+          (when (called-interactively-p)
+            (switch-to-buffer buffer))
+          buffer))
 
       (defun switch-to-scratch-buffer (&optional prefix)
         "switch to the scratch buffer
@@ -1960,23 +1965,28 @@
                                               (string-match
                                                (regexp-quote scratch-buffer-name)
                                                (buffer-name x) 0))
-                                          (sort (buffer-list) (lambda (x y) (string< (buffer-name x) (buffer-name y))))))
-                 (buffer-names (mapcar #'buffer-name buffer-list)))
+                                          (sort (buffer-list) (lambda (x y) (string<
+                                                                        (buffer-name x)
+                                                                        (buffer-name y))))))
+                 (buffer-names (mapcar #'buffer-name buffer-list))
+                 buffer)
             (cond
              ((zerop (length buffer-list))
-              (create-new-empty-buffer))
+              (setq buffer (create-new-empty-buffer)))
              ((eq 1 (length buffer-list))
-              (switch-to-buffer (car buffer-list)))
+              (setq buffer (car buffer-list)))
              (t
-              (let (buffer-choice)
-                (setq buffer-choice (ivy-read "Switch to buffer: " buffer-names
-                                              :require-match t
-                                              :keymap ivy-switch-buffer-map
-                                              :matcher #'ivy--switch-buffer-matcher
-                                              :caller 'switch-to-scratch-buffer
-                                              :unwind #'counsel--switch-buffer-unwind
-                                              :update-fn 'counsel--switch-buffer-update-fn))
-                (switch-to-buffer buffer-choice)))))))
+              (require 'counsel)
+              (setq buffer (ivy-read "Switch to buffer: " buffer-names
+                                     :require-match t
+                                     :keymap ivy-switch-buffer-map
+                                     :matcher #'ivy--switch-buffer-matcher
+                                     :caller 'switch-to-scratch-buffer
+                                     :unwind #'counsel--switch-buffer-unwind
+                                     :update-fn 'counsel--switch-buffer-update-fn))))
+            (when (called-interactively-p)
+              (switch-to-buffer buffer))
+            buffer)))
 
       (defun switch-to-messages-buffer ()
         "switches to messages buffer"
@@ -8085,6 +8095,8 @@
     GET ME OUT OF HERE!!!
     #+BEGIN_SRC emacs-lisp
       (use-package simple
+        :defer t
+        :commands (completion-list-mode)
         :init
         (push 'messages-buffer-mode mohkale--whitespace-exempt-modes)
         :config
@@ -8109,7 +8121,24 @@
         (let ((buffer (get-buffer "*Messages*")))
           (when buffer
             (with-current-buffer buffer
-              (evil-motion-state)))))
+              (evil-motion-state))))
+
+        (evil-set-initial-state 'completion-list-mode 'motion)
+
+        (general-define-key
+          :keymaps 'completion-list-mode-map
+          :states  'motion
+          "RET" 'choose-completion
+          "C-j" 'choose-completion
+
+          "q" 'quit-window
+          "Q" 'delete-completion-window
+
+          "j" 'next-completion
+          "k" 'previous-completion
+          "n" 'next-completion
+          "p" 'previous-completion
+          "N" 'previous-completion))
     #+END_SRC
 
 *** sudo-edit
@@ -10185,6 +10214,7 @@
            :keymaps 'org-mode-map
            :states '(normal visual insert emacs)
            "<tab>" 'org-cycle
+           "TAB" 'org-cycle
            "<S-tab>" 'org-shifttab)
 
          (general-define-key
