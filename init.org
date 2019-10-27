@@ -164,6 +164,11 @@
 
         (advice-add 'display-startup-echo-area-message :around #'ignore)
 
+        (defun display-buffer--restore-default-actions (func &rest args)
+          (let ((display-buffer-fallback-action
+                 display-buffer--default-fallback-action))
+            (apply func args)))
+
         (setq display-buffer-fallback-action
               ;; by default, focus on displayed windows
               '((display-buffer--maybe-same-window-and-focus
@@ -454,7 +459,7 @@
 
 
       (setenv "EDITOR"
-              (concat "emacsclient --no-wait --suppress-output --server-file '" server-auth-dir "server'"))
+              (concat "emacsclient --no-wait --suppress-output --server-file '" (expand-file-name server-auth-dir) "server'"))
 
       (push mohkale-package-root load-path)
       (push (mohkale/join-dotemacs-etc-path "themes") custom-theme-load-path)
@@ -513,7 +518,6 @@
     | lorem-ipsum         | 54cb139d6c88632aaef6364a2a6c6cadbb9a5082eb5032e69b5139dcc7074d88 | https://www.emacswiki.org/emacs/download/lorem-ipsum.el                                   |
     | profile-dotemacs    | 1d903fc16d4ab4716cf8097ddb88a5cbb3746c9e49fa3421ae147b0c383c3e7f | http://www.randomsample.de/profile-dotemacs.el                                            |
     | open-junk-file      | c0b835b329758dced4ccae6c2f3fd5af16af929437110ddde00ea55dc7d47be3 | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/open-junk-file.el      |
-    | evil-adjust         | 9ffe7fa12b561269aafb92eb86a2021b77ccc8d6620edc6c2fc22fbcc7d92cc2 | https://raw.githubusercontent.com/troyp/evil-adjust/master/evil-adjust.el                 |
     | sqlite-dump         | 8277c32f3e9dad7f760b946609c918dd51f32990137f839a000fb6ff5a049939 | https://user42.tuxfamily.org/sqlite-dump/index.html                                       |
     | company-cmake       | 4d682308eb4f6a4be92a4b7dcb2d181b5c26b4337799de0a308969d8babef0a2 | https://raw.githubusercontent.com/purcell/company-cmake/master/company-cmake.el           |
     | transpose-frame     | a40264a07b25d2c1d8d1be341d42952329d1bbfab8c23100904627fef4f4c7b8 | https://www.emacswiki.org/emacs/download/transpose-frame.el                               |
@@ -3554,12 +3558,29 @@
          :ensure t
          :demand t
          :commands (evil-define-key
+                    defun-evil-adjust-to-eol
                     evil-mode)
          :config
          (evil-mode 1)
          (setq-default evil-cross-lines t
                        evil-want-C-i-jump nil
                        evil-want-visual-char-semi-exclusive t)
+
+         ;; evil-adjust: https://raw.githubusercontent.com/troyp/evil-adjust/master/evil-adjust.el
+         (defmacro defun-evil-adjust-to-eol (function-name arglist &optional interactive &rest body)
+           `(defun ,function-name ,arglist
+              ,interactive
+              (cl-case evil-state
+                ('normal (progn
+                           (evil-append 1)
+                           ,@body
+                           (evil-normal-state)))
+                ('visual (progn
+                           (evil-append 1)
+                           ,@body
+                           (evil-visual-restore)))
+                (otherwise ,@body))))
+
 
          (defun evil-shift-normal-state (&optional arg)
            "return to normal state while also removing
@@ -6512,45 +6533,45 @@
          :config
          (evil-set-initial-state 'ibuffer-mode 'motion)
 
-         (setq mohkale-ibuffer-filter-map (make-sparse-keymap))
-
-         (bind-keys :map mohkale-ibuffer-filter-map
-                    ("TAB"    . ibuffer-exchange-filters)
-                    ("RET"    . ibuffer-filter-by-mode)
-                    ("!"      . ibuffer-negate-filter)
-                    ("&"      . ibuffer-and-filter)
-                    ("*"      . ibuffer-filter-by-starred-name)
-                    ("."      . ibuffer-filter-by-file-extension)
-                    ("/"      . ibuffer-filter-disable)
-                    ("<"      . ibuffer-filter-by-size-lt)
-                    (">"      . ibuffer-filter-by-size-gt)
-                    ("D"      . ibuffer-decompose-filter-group)
-                    ("M"      . ibuffer-filter-by-derived-mode)
-                    ("P"      . ibuffer-pop-filter-group)
-                    ("R"      . ibuffer-switch-to-saved-filter-groups)
-                    ("S"      . ibuffer-save-filter-groups)
-                    ("X"      . ibuffer-delete-saved-filter-groups)
-                    ("\\"     . ibuffer-clear-filter-groups)
-                    ("a"      . ibuffer-add-saved-filters)
-                    ("b"      . ibuffer-filter-by-basename)
-                    ("c"      . ibuffer-filter-by-content)
-                    ("d"      . ibuffer-decompose-filter)
-                    ("e"      . ibuffer-filter-by-predicate)
-                    ("f"      . ibuffer-filter-by-filename)
-                    ("g"      . ibuffer-filters-to-filter-group)
-                    ("i"      . ibuffer-filter-by-modified)
-                    ("m"      . ibuffer-filter-by-used-mode)
-                    ("n"      . ibuffer-filter-by-name)
-                    ("o"      . ibuffer-or-filter)
-                    ("p"      . ibuffer-pop-filter)
-                    ("r"      . ibuffer-switch-to-saved-filters)
-                    ("s"      . ibuffer-save-filters)
-                    ("t"      . ibuffer-exchange-filters)
-                    ("v"      . ibuffer-filter-by-visiting-file)
-                    ("x"      . ibuffer-delete-saved-filters)
-                    ("|"      . ibuffer-or-filter)
-                    ("<S-up>" . ibuffer-pop-filter-group)
-                    ("<up>"   . ibuffer-pop-filter))
+         (general-define-key
+           :keymaps 'mohkale-ibuffer-filter-map
+           "TAB"    'ibuffer-exchange-filters
+           "RET"    'ibuffer-filter-by-mode
+           "!"      'ibuffer-negate-filter
+           "&"      'ibuffer-and-filter
+           "*"      'ibuffer-filter-by-starred-name
+           "."      'ibuffer-filter-by-file-extension
+           "/"      'ibuffer-filter-disable
+           "<"      'ibuffer-filter-by-size-lt
+           ">"      'ibuffer-filter-by-size-gt
+           "D"      'ibuffer-decompose-filter-group
+           "M"      'ibuffer-filter-by-derived-mode
+           "P"      'ibuffer-pop-filter-group
+           "R"      'ibuffer-switch-to-saved-filter-groups
+           "S"      'ibuffer-save-filter-groups
+           "X"      'ibuffer-delete-saved-filter-groups
+           "\\"     'ibuffer-clear-filter-groups
+           "a"      'ibuffer-add-saved-filters
+           "b"      'ibuffer-filter-by-basename
+           "c"      'ibuffer-filter-by-content
+           "d"      'ibuffer-decompose-filter
+           "e"      'ibuffer-filter-by-predicate
+           "f"      'ibuffer-filter-by-filename
+           "g"      'ibuffer-filters-to-filter-group
+           "("      'ibuffer-filters-to-filter-group
+           "i"      'ibuffer-filter-by-modified
+           "m"      'ibuffer-filter-by-used-mode
+           "n"      'ibuffer-filter-by-name
+           "o"      'ibuffer-or-filter
+           "p"      'ibuffer-pop-filter
+           "r"      'ibuffer-switch-to-saved-filters
+           "s"      'ibuffer-save-filters
+           "t"      'ibuffer-exchange-filters
+           "v"      'ibuffer-filter-by-visiting-file
+           "x"      'ibuffer-delete-saved-filters
+           "|"      'ibuffer-or-filter
+           "<S-up>" 'ibuffer-pop-filter-group
+           "<up>"   'ibuffer-pop-filter)
 
          (mohkale/declare-prefix-for-major-mode* 'ibuffer-mode
            "G" "jump/goto"
@@ -6563,7 +6584,7 @@
            "1"   'ibuffer-visit-buffer-1-window
            "+"   'ibuffer-add-to-tmp-show
            "-"   'ibuffer-add-to-tmp-hide
-           "."   'hydra-ibuffer-main/body
+           "."   'hydra-ibuffer/body
            "/"    mohkale-ibuffer-filter-map
            "RET" 'ibuffer-do-view-horizontally
            "A"   'ibuffer-auto-mode
@@ -6640,6 +6661,9 @@
          (general-define-key
            :keymaps 'ibuffer-mode-map
            :states  'motion
+           "TAB"       'ibuffer-forward-filter-group
+           "<S-tab>"   'ibuffer-backward-filter-group
+           "<backtab>" 'ibuffer-backward-filter-group
            ;; "D" 'ibuffer-mark-for-delete-backwards
            "D"       'ibuffer-do-delete
            "M"       'ibuffer-do-toggle-modified
@@ -6675,7 +6699,9 @@
            "C-S-J"   'ibuffer-forward-next-marked
            "C-S-K"   'ibuffer-backwards-next-marked
            "C-M-S-k" 'ibuffer-do-kill-lines
+           "C-M-d"   'ibuffer-do-kill-lines
            "C-M-k"   'ibuffer-kill-line
+           "M-d"     'ibuffer-kill-line
            "S-DEL"   'ibuffer-bury-buffer
            ;; "C-s" 'ibuffer-do-isearch
            "C-s"     'ibuffer-do-isearch-regexp
@@ -6713,17 +6739,17 @@
          ;; Use human readable Size column instead of original one
          (define-ibuffer-column size-human-readable
            (:name "Size"
-                  :inline t
-                  :summarizer
-                  (lambda (column-strings)
-                    (let ((total 0))
-                      (dolist (string column-strings)
-                        (setq total
-                              ;; like, ewww ...
-                              (+ (float (ibuffer--human-readable-file-sizes-to-bytes
-                                         string))
-                                 total)))
-                      (ibuffer--bytes-to-human-readable-file-sizes total))))
+            :inline t
+            :summarizer
+            (lambda (column-strings)
+              (let ((total 0))
+                (dolist (string column-strings)
+                  (setq total
+                        ;; like, ewww ...
+                        (+ (float (ibuffer--human-readable-file-sizes-to-bytes
+                                   string))
+                           total)))
+                (ibuffer--bytes-to-human-readable-file-sizes total))))
            (ibuffer--bytes-to-human-readable-file-sizes (buffer-size)))
 
          (setq ibuffer-formats
@@ -6736,7 +6762,7 @@
                        (mode 16 16 :left :elide)
                        " " filename-and-process)
                  (mark " "
-                       (name 16 -1)
+                       (name 20 20)
                        " "
                        filename))))
      #+END_SRC
@@ -7239,6 +7265,7 @@
         "kcs" 'kmacro-set-counter
         "kc=" 'kmacro-set-counter
         "kcc" 'kmacro-insert-counter
+        "kci" 'kmacro-insert-counter
         "kca" 'kmacro-add-counter
         "kc+" 'kmacro-add-counter
         "kcf" 'kmacro-set-format)
@@ -7320,44 +7347,56 @@
 
 *** occur
     #+BEGIN_SRC emacs-lisp
-      (use-package occur
+      (use-package replace
         :defer t
         :config
-        (evil-set-initial-state 'occur-mode 'normal)
+        ;; occur-mode-display-occurrence
+        (advice-add 'occur-mode-display-occurrence :around
+                    #'display-buffer--restore-default-actions)
+
+        (dolist (mode '(occur-mode occur-edit-mode))
+          (mohkale/set-leader-keys-for-major-mode mode
+            "e" 'occur-edit-mode
+            "R" 'occur-rename-buffer
+            "g" 'occur-mode-goto-occurrence
+            "G" 'occur-mode-goto-occurrence-other-window))
+
+        (defun-evil-adjust-to-eol evil-adjust-occur-next (&optional prefix)
+          (interactive "P")
+          (occur-next prefix))
+
+        (defun-evil-adjust-to-eol evil-adjust-occur-prev (&optional prefix)
+          (interactive "P")
+          (occur-prev prefix))
+
+        (evil-set-initial-state 'occur-mode 'motion)
         (general-define-key
-          :states 'normal
           :keymaps 'occur-mode-map
+          :states  'motion
           ;; occur-mode-mouse-goto
-          "<return>" 'occur-mode-goto-occurrence
-          "o" 'occur-mode-goto-occurrence
-          "O" 'occur-mode-goto-occurrence-other-window
-          "s" 'occur-mode-display-occurrence ;; jump in other buffer
+          "RET" 'occur-mode-goto-occurrence
+          "o" 'occur-mode-goto-occurrence-other-window
+          "s" 'occur-mode-display-occurrence
 
-          "C-j" 'occur-next
-          "C-k" 'occur-prev
-          "n" 'occur-next
-          "N" 'occur-prev
-          "e" 'occur-edit-mode
-
-          "i" 'ignore
-          "a" 'ignore
-          "A" 'ignore
-          "s" 'ignore
+          "j"  'evil-adjust-occur-next
+          "k"  'evil-adjust-occur-prev
+          "gj" 'evil-next-line
+          "gk" 'evil-previous-line
 
           "R" 'occur-rename-buffer
           "q" 'quit-window)
 
         (evil-set-initial-state 'occur-edit-mode 'normal)
         (general-define-key
-          :states 'normal
+          :states  'normal
           :keymaps 'occur-edit-mode-map
           ;; occur-mode-mouse-goto
-          "C-o" 'occur-mode-goto-occurrence
-          "M-o" 'occur-mode-goto-occurrence-other-window
-          "n" 'occur-next
-          "N" 'occur-prev
-
-          "q" 'occur-cease-edit))
+          "RET" 'occur-mode-goto-occurrence
+          "go"  'occur-mode-goto-occurrence-other-window
+          "gs"  'occur-mode-display-occurrence
+          "j"   'evil-adjust-occur-next
+          "k"   'evil-adjust-occur-prev
+          "q"   'occur-cease-edit))
     #+END_SRC
 
 *** open-junk-file
@@ -9164,21 +9203,6 @@
            ("lambda" . ?λ))
          (mohkale//define-pretty-symbols-for-mode 'lisp-interaction-mode
            ("lambda" . ?λ))
-
-         ;; evil-adjust: https://raw.githubusercontent.com/troyp/evil-adjust/master/evil-adjust.el
-         (defmacro defun-evil-adjust-to-eol (function-name arglist &optional interactive &rest body)
-           `(defun ,function-name ,arglist
-              ,interactive
-              (cl-case evil-state
-                ('normal (progn
-                           (evil-append 1)
-                           ,@body
-                           (evil-normal-state)))
-                ('visual (progn
-                           (evil-append 1)
-                           ,@body
-                           (evil-visual-restore)))
-                (otherwise ,@body))))
 
          (defun-evil-adjust-to-eol evil-adjust-eval-print-last-sexp (&optional arg)
            (interactive "P")
