@@ -2143,7 +2143,7 @@
                        hydra-flycheck
                        hydra-ibuffer
                        hydra-indent
-                       hydra-eim
+                       hydra-ein
                        hydra-ivy-custom
                        hydra-org-navigate
                        hydra-org-link
@@ -2418,7 +2418,7 @@
      sourced from [[https://github.com/syl20bnr/spacemacs/blob/master/layers/%252Blang/ipython-notebook/packages.el][here]].
 
      #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/eim.el"
+     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-ein.el"
        (defhydra hydra-ein (:hint nil)
                "
         Operations on Cells^^^^^^            On Worksheets^^^^              Other
@@ -3344,53 +3344,53 @@
           ;; |_|\___|_|  \__|
           ;;
 
-          '(((persp-name
-              workspace-number
-              window-number)
-             :fallback evil-state
-             :face highlight-face
-             :priority 100)
-            (anzu :priority 95)
-            auto-compile
-            ((buffer-modified buffer-size buffer-id remote-host)
-             :priority 98)
-            (major-mode :priority 79)
-            (process :when active)
-            ((flycheck-error flycheck-warning flycheck-info)
-             :when active
-             :priority 89)
-            (minor-modes :when active
-                         :priority 9)
-            (mu4e-alert-segment :when active)
-            (erc-track :when active)
-            (version-control :when active
-                             :priority 78)
-            (org-pomodoro :when active)
-            (org-clock :when active)
-            nyan-cat)
+         '(((persp-name
+             workspace-number
+             window-number)
+            :fallback evil-state
+            :face highlight-face
+            :priority 100)
+           (anzu :priority 95)
+           auto-compile
+           ((buffer-modified buffer-size buffer-id remote-host)
+            :priority 98)
+           (major-mode :priority 79)
+           (process :when active)
+           ((flycheck-error flycheck-warning flycheck-info)
+            :when active
+            :priority 89)
+           (minor-modes :when active
+                        :priority 9)
+           (mu4e-alert-segment :when active)
+           (erc-track :when active)
+           (version-control :when active
+                            :priority 78)
+           (org-pomodoro :when active)
+           (org-clock :when active)
+           nyan-cat)
 
-          ;;       _       _     _
-          ;;  _ __(_) __ _| |__ | |_
-          ;; | '__| |/ _` | '_ \| __|
-          ;; | |  | | (_| | | | | |_
-          ;; |_|  |_|\__, |_| |_|\__|
-          ;;         |___/
+         ;;       _       _     _
+         ;;  _ __(_) __ _| |__ | |_
+         ;; | '__| |/ _` | '_ \| __|
+         ;; | |  | | (_| | | | | |_
+         ;; |_|  |_|\__, |_| |_|\__|
+         ;;         |___/
 
-          '(which-function
-            (python-pyvenv :fallback python-pyenv)
-            (purpose :priority 94)
-            (battery :when active)
-            (selection-info :priority 95)
-            input-method
-            ((evil-macro-and-register
-              buffer-encoding-abbrev
-              point-position
-              line-column)
-             :separator " | "
-             :priority 96)
-            (global :when active)
-            (buffer-position :priority 99)
-            (hud :priority 99))))
+         '(which-function
+           (python-pyvenv :fallback python-pyenv)
+           (purpose :priority 94)
+           (battery :when active)
+           (selection-info :priority 95)
+           input-method
+           ((evil-macro-and-register
+             buffer-encoding-abbrev
+             point-position
+             line-column)
+            :separator " | "
+            :priority 96)
+           (global :when active)
+           (buffer-position :priority 99)
+           (hud :priority 99))))
     #+END_SRC
 
 *** persp-mode
@@ -6533,6 +6533,8 @@
          :config
          (evil-set-initial-state 'ibuffer-mode 'motion)
 
+         (setq mohkale-ibuffer-filter-map (make-sparse-keymap))
+
          (general-define-key
            :keymaps 'mohkale-ibuffer-filter-map
            "TAB"    'ibuffer-exchange-filters
@@ -7005,51 +7007,229 @@
            "ygf" 'lsp-find-type-definition))
      #+END_SRC
 
-**** lsp-ui
-     #+BEGIN_SRC emacs-lisp
-       (use-package lsp-ui
+***** lsp-ui
+      #+BEGIN_SRC emacs-lisp
+        (use-package lsp-ui
+          :ensure t
+          :defer  t
+          ;; :hook (lsp-mode-hook . lsp-ui-mode)
+          :commands (lsp-ui-mode)
+          :init
+          ;; only really installed for flycheck support
+          (setq lsp-prefer-flymake nil
+                lsp-ui-sideline-enable nil
+                lsp-ui-doc-enable nil)
+          :config
+          (mohkale/declare-prefix-for-mode 'lsp-mode
+            "yp" "peek")
+          (mohkale/set-leader-keys-for-minor-mode 'lsp-mode
+            "pg" 'lsp-ui-peek-find-definitions
+            "pG" 'lsp-ui-peek-find-definitions))
+      #+END_SRC
+
+***** company-lsp
+      #+BEGIN_SRC emacs-lisp
+        (use-package company-lsp
+          :ensure t
+          :defer  t
+          :commands company-lsp
+          :config
+          ;; reduces write lag
+          (setq company-lsp-cache-candidates t))
+      #+END_SRC
+
+***** lsp-haskell
+      #+BEGIN_SRC emacs-lisp
+        (use-package lsp-haskell
+          :ensure t
+          :defer  t
+          :hook ((haskell-mode . lsp) ;; order of evaluation matters
+                 (haskell-mode . (lambda ()
+                                   (require 'lsp-haskell)
+                                   ;; until there's actually any useful info
+                                   (setq-local lsp-eldoc-enable-hover nil))))
+          :config
+          (setq lsp-haskell-process-args-hie (list "-d" "-l" (make-temp-file "hie." nil ".log")))
+
+          ;;  _   _    _    ____ _  __       _     _            _ _ _
+          ;; | | | |  / \  / ___| |/ /   ___| | __| | ___   ___| | | |
+          ;; | |_| | / _ \| |   | ' /   / _ \ |/ _` |/ _ \ / __| | | |
+          ;; |  _  |/ ___ \ |___| . \  |  __/ | (_| | (_) | (__|_|_|_|
+          ;; |_| |_/_/   \_\____|_|\_\  \___|_|\__,_|\___/ \___(_|_|_)
+          ;;
+
+          ;; thank you @ walseb: https://github.com/walseb/QualityEmacsConfig#hack-in-eldoc-support
+          ;; (setq my/haskell-lsp-eldoc-entries '())
+
+          ;; ;; This function modifies what's displayed in lsp-ui-sideline.
+          ;; ;; Here it is redefined so that it takes what's supposed to be displayed in the sideline,
+          ;; ;; and instead sends it to an eldoc cache.
+          ;; (defun lsp-ui-sideline--push-info (symbol tag bounds info bol eol)
+          ;;   (when (and (= tag (lsp-ui-sideline--calculate-tag))
+          ;;              (not (lsp-ui-sideline--stop-p)))
+          ;;     (let* ((info (concat (thread-first (gethash "contents" info)
+          ;;                            lsp-ui-sideline--extract-info
+          ;;                            lsp-ui-sideline--format-info)))
+          ;;            (current (and (>= (point) (car bounds)) (<= (point) (cdr bounds)))))
+          ;;       (when (and (> (length info) 0)
+          ;;                  (lsp-ui-sideline--check-duplicate symbol info))
+          ;;         (let* ((final-string (lsp-ui-sideline--make-display-string info symbol current))
+          ;;                (pos-ov (lsp-ui-sideline--find-line (length final-string) bol eol))
+          ;;                (ov (when pos-ov (make-overlay (car pos-ov) (car pos-ov)))))
+
+          ;;           ;; My changes:
+          ;;           (let ((final-string-formatted (substring-no-properties final-string)))
+          ;;             (add-to-list 'my/haskell-lsp-eldoc-entries final-string-formatted))
+
+          ;;           (when pos-ov
+          ;;             ;; (overlay-put ov 'info info)
+          ;;             ;; (overlay-put ov 'symbol symbol)
+          ;;             (overlay-put ov 'bounds bounds)
+          ;;             (overlay-put ov 'current current)
+          ;;             ;;(overlay-put ov 'after-string final-string)
+          ;;             (overlay-put ov 'window (get-buffer-window))
+          ;;             (overlay-put ov 'kind 'info)
+          ;;             (push ov lsp-ui-sideline--ovs)))))))
+
+          ;; (defun lsp-ui-sideline--push-info (symbol tag bounds info bol eol)
+          ;;   (when (and (= tag (lsp-ui-sideline--calculate-tag))
+          ;;              (not (lsp-ui-sideline--stop-p)))
+          ;;     (let* ((info (concat (thread-first (gethash "contents" info)
+          ;;                            lsp-ui-sideline--extract-info
+          ;;                            lsp-ui-sideline--format-info)))
+          ;;            (current (and (>= (point) (car bounds)) (<= (point) (cdr bounds)))))
+          ;;       (when (and (> (length info) 0)
+          ;;                  (lsp-ui-sideline--check-duplicate symbol info))
+          ;;         (let* ((final-string (lsp-ui-sideline--make-display-string info symbol current))
+          ;;                (pos-ov (lsp-ui-sideline--find-line (length final-string) bol eol))
+          ;;                (ov (when pos-ov (make-overlay (car pos-ov) (car pos-ov)))))
+          ;;           (when pos-ov
+          ;;             (overlay-put ov 'info info)
+          ;;             (overlay-put ov 'symbol symbol)
+          ;;             (overlay-put ov 'bounds bounds)
+          ;;             (overlay-put ov 'current current)
+          ;;             (overlay-put ov 'after-string final-string)
+          ;;             (overlay-put ov 'window (get-buffer-window))
+          ;;             (overlay-put ov 'kind 'info)
+          ;;             (push ov lsp-ui-sideline--ovs)))))))
+
+          ;; (defun my/haskell-lsp-eldoc-print ()
+          ;;   (interactive)
+          ;;   (when my/haskell-lsp-eldoc-entries
+          ;;     (let ((at-point (thing-at-point 'symbol t)))
+          ;;       (when at-point
+          ;;         (let ((str (seq-find
+          ;;                     (lambda (candidate)
+          ;;                       (let ((candidate-last-word (string-match (rx (not whitespace) (regexp "*") space eol) candidate)))
+          ;;                         (if candidate-last-word
+          ;;                             (progn
+          ;;                               (string=
+          ;;                                (substring candidate candidate-last-word (- (length candidate) 1))
+          ;;                                at-point))
+          ;;                           nil)))
+          ;;                     my/haskell-lsp-eldoc-entries)))
+
+          ;;           (if str
+          ;;               (s-trim str)
+          ;;             nil))))))
+
+          ;; ;; No idea why but eldoc doesn't run the documentation function unless I press escape, this fixes that
+          ;; (add-hook 'haskell-mode-hook '(lambda ()
+          ;;                                 (eldoc-mode -1)
+          ;;                                 (setq-local eldoc-documentation-function 'my/haskell-lsp-eldoc-print)
+
+          ;;                                 (add-hook 'post-command-hook
+          ;;                                           'eldoc-print-current-symbol-info nil t)))
+          )
+      #+END_SRC
+
+***** lsp-kotlin
+      #+BEGIN_SRC emacs-lisp
+        (add-hook 'kotlin-mode-hook 'lsp-mode)
+      #+END_SRC
+
+**** eglot
+     seems cool, but the lack of good documentation and support for flycheck is off putting. Also doesn't seem to highlight errors using eldoc when possible, which is a feature I quite like from lsp-mode. Give it some time, check back again.
+
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (use-package eglot
          :ensure t
          :defer  t
-         ;; :hook (lsp-mode-hook . lsp-ui-mode)
-         :commands (lsp-ui-mode)
+         :commands (eglot
+                    eglot-format
+                    eglot-format-buffer
+                    eglot-rename
+                    eglot-shutdown
+                    eglot-reconnect
+                    eglot-clear-status
+                    eglot-code-actions
+                    eglot-events-buffer
+                    eglot-stderr-buffer
+                    eglot-help-at-point
+                    eglot-find-declaration
+                    eglot-find-implementation
+                    eglot-find-typeDefinition
+                    eglot-forget-pending-continuations
+                    eglot-signal-didChangeConfiguration)
          :init
-         ;; only really installed for flycheck support
-         (setq lsp-prefer-flymake nil
-               lsp-ui-sideline-enable nil
-               lsp-ui-doc-enable nil)
+         (defalias 'eglot-rename-symbol 'eglot-rename)
          :config
-         (mohkale/declare-prefix-for-mode 'lsp-mode
-           "yp" "peek")
-         (mohkale/set-leader-keys-for-minor-mode 'lsp-mode
-           "pg" 'lsp-ui-peek-find-definitions
-           "pG" 'lsp-ui-peek-find-definitions))
+         (setq eglot-ignored-server-capabilites
+               '(:documentHighlightProvider))
+
+         ;; ;; add flycheck support: https://github.com/joaotavora/eglot/issues/195
+         ;; (defvar-local eglot-flycheck--fc-callback nil)
+
+         ;; (defun eglot-flycheck--point->line-col (buffer beg)
+         ;;   (with-current-buffer buffer
+         ;;     (save-excursion
+         ;;       (goto-char beg)
+         ;;       (cons (line-number-at-pos)
+         ;;             (- (point)
+         ;;                (line-beginning-position))))))
+
+         ;; (defun eglot-flycheck--fm-error->fc-error (err)
+         ;;   (pcase-let* ((msg (flymake--diag-text err))
+         ;;                (beg (flymake--diag-beg err))
+         ;;                (buffer (flymake--diag-buffer err))
+         ;;                (`(,line . ,col) (eglot-flycheck--point->line-col buffer beg)))
+         ;;     (flycheck-error-new-at
+         ;;      line nil ;; TODO: use column and region
+         ;;      (pcase (flymake--diag-type err)
+         ;;        (':error 'error)
+         ;;        (':warning 'warning)
+         ;;        (':note 'info))
+         ;;      msg
+         ;;      :id "eglot-flycheck"
+         ;;      ;; :checker
+         ;;      :buffer buffer
+         ;;      :filename (buffer-file-name buffer))))
+
+         ;; (cl-defun eglot-flycheck--flymake-handle-result (flymake-errors &key region)
+         ;;   (funcall eglot-flycheck--fc-callback
+         ;;            'finished
+         ;;            (mapcar #'eglot-flycheck--fm-error->fc-error flymake-errors)))
+
+         ;; (cl-defun eglot-flycheck-checker (checker callback)
+         ;;   (setq eglot-flycheck--fc-callback callback)
+         ;;   (eglot-flymake-backend #'eglot-flycheck--flymake-handle-result))
+
+         ;; (flycheck-define-generic-checker
+         ;;  'eglot-checker
+         ;;  "eglot flycheck checker"
+         ;;  :start #'eglot-flycheck-checker
+         ;;  :modes (eglot--all-major-modes))
+         )
      #+END_SRC
 
-**** company-lsp
-     #+BEGIN_SRC emacs-lisp
-       (use-package company-lsp
-         :ensure t
-         :defer  t
-         :commands company-lsp
-         :config
-         ;; reduces write lag
-         (setq company-lsp-cache-candidates t))
-     #+END_SRC
-
-**** server-installation-utils
-     :PROPERTIES:
-     :header-args+: :tangle no
-     :END:
-
-     usefull methods & variables to assist in the installation of scripts.
-
+**** server-installation-scripts
      #+NAME: server-install-path
-     #+BEGIN_SRC emacs-lisp :results value
+     #+BEGIN_SRC emacs-lisp :results value :tangle no
        (expand-file-name "~/.emacs.d/var/lsp/servers")
      #+END_SRC
 
      #+NAME: set_shell_banner
-     #+BEGIN_SRC emacs-lisp :var varname="BANNER" text="" width=80 char="@" :results value
+     #+BEGIN_SRC emacs-lisp :var varname="BANNER" text="" width=80 char="@" :results value :tangle no
        (let* ((text-width (length text))
               (width (max width
                           (+ 4 text-width)))
@@ -7077,7 +7257,6 @@
                          header-string)))
      #+END_SRC
 
-**** server-installation-scripts
 ***** kotlin-language-server
       :PROPERTIES:
       :header-args+: :tangle ~/.emacs.d/bin/install/kotlin-language-server.sh
@@ -7240,7 +7419,6 @@
             fi
         fi
       #+END_SRC
-
 *** macro/kmacro/edmacro
     #+BEGIN_SRC emacs-lisp
       (mohkale/declare-prefix*
@@ -7949,6 +8127,9 @@
                                            :run     "rake run"
                                            :test-suffix ".spec")
 
+         (projectile-register-project-type 'pipenv '("Pipfile")
+                                           :test "pipenv py -m pytest")
+
          (defun projectile-ensure-no-trailing-slash-in-root (func &rest args)
            (cl-letf* (((symbol-function 'true-projectile-project-root)
                        (symbol-function 'projectile-project-root))
@@ -7962,7 +8143,8 @@
          (advice-add 'projectile-regenerate-tags :around #'projectile-ensure-no-trailing-slash-in-root)
 
          (setq projectile-project-search-path '("~/programming/projects/"
-                                                "~/programming/repos"
+                                                "~/programming/repos/"
+                                                "~/programming/.modules/python/"
                                                 "~/programming/")
                projectile-tags-backend 'xref ;; opt into gtags
                projectile-indexing-method 'alien ;; never use native
@@ -10127,8 +10309,6 @@
 
          (defun org-clever-return (&optional above)
            "depending on the local state, inserts a heading, a table row an item or newline.
-       TODO fix return broken for words
-
        this function is functionally similair to the result of evil-org-eol-call-anon, but
        instead of checking the line after moving to the end of it (which doesn't work for
        folded lines, such as headings), it checks before moving and then inserts the right
@@ -10138,35 +10318,42 @@
                       (lambda () (call-interactively
                              (if above
                                  'evil-open-above
-                               'evil-open-below)))))
-             (cond ((org-table-p)
-                    (org-table-insert-row (not above))
-                    (evil-insert nil))
+                               'evil-open-below))))
+                     ((symbol-function 'fallback-action)
+                      (lambda ()
+                        (when (and (line-empty-p)
+                                   (not (zerop (column-number (point)))))
+                          ;; don't leave a trailing indent on current line unecessarily
+                          (remove-all-trailing-whitespace (line-beginning-position)
+                                                          (line-end-position)))
+                        (if (and (called-interactively-p)
+                                 (not above))
+                            (funcall-interactively
+                             'newline-and-indent)
+                          (evil-open)))))
+             (if (and current-prefix-arg (listp current-prefix-arg))
+                 ;; when called with simple prefix, goto
+                 ;; fallaback action.
+                 (let ((current-prefix-arg nil))
+                   (fallback-action))
+               (cond ((org-table-p)
+                      (org-table-insert-row (not above))
+                      (evil-insert nil))
 
-                   ((and org-clever-return--insert-headings
-                         (org-at-heading-p))
-                    (evil-open)
-                    (org-insert-heading))
+                     ((and org-clever-return--insert-headings
+                           (org-at-heading-p))
+                      (evil-open)
+                      (org-insert-heading))
 
-                   ((org-at-item-p)
-                    ;; position of cursor dictates where new point goes
-                    (if above
-                        (goto-char (line-beginning-position))
-                      (goto-char (line-end-position)))
-                    (org-insert-item)
-                    (evil-append nil))
+                     ((org-at-item-p)
+                      ;; position of cursor dictates where new point goes
+                      (if above
+                          (goto-char (line-beginning-position))
+                        (goto-char (line-end-position)))
+                      (org-insert-item)
+                      (evil-append nil))
 
-                   (t
-                    (when (and (line-empty-p)
-                               (not (zerop (column-number (point)))))
-                      ;; don't leave a trailing indent unecessarily
-                      (remove-all-trailing-whitespace (line-beginning-position)
-                                                      (line-end-position)))
-                    (if (and (called-interactively-p)
-                             (not above))
-                        (funcall-interactively
-                         'newline-and-indent)
-                      (evil-open))))))
+                     (t (fallback-action))))))
 
          (general-define-key
            :keymaps 'org-mode-map
@@ -10715,9 +10902,9 @@
            "<S-iso-lefttab>" 'markdown-shifttab
            "<S-tab>"         'markdown-shifttab
            "<backtab>"       'markdown-shifttab
-           ;; "gh" 'markdown-outline-up
-           "gj" 'markdown-next
-           "gk" 'markdown-previous
+           "gh" 'markdown-up-heading
+           "gj" 'markdown-outline-next
+           "gk" 'markdown-outline-previous
            "gl" 'markdown-outline-next-same-level)
          (general-define-key
            :keymaps 'markdown-mode-map
@@ -10961,7 +11148,6 @@
        (use-package kotlin-mode
          :ensure t
          :defer  t
-         :hook (kotlin-mode . lsp)
          :commands (kotlin-mode
                     kotlin-repl)
          :config
@@ -11168,7 +11354,7 @@
          (add-hook 'css-mode-hook 'skewer-css-mode)
          (add-hook 'html-mode-hook 'skewer-html-mode)
 
-         (run-skewer) ;; and begin server
+         ;; (run-skewer) ;; and begin server
 
          (let ((_ (concat mohkale-major-mode-leader-prefix
                           "S")))
@@ -11266,111 +11452,6 @@
          :ensure t
          :defer  t
          :commands company-cabal)
-     #+END_SRC
-
-**** lsp-haskell
-     #+BEGIN_SRC emacs-lisp
-       (use-package lsp-haskell
-         :ensure t
-         :defer  t
-         :hook ((haskell-mode . lsp) ;; order of evaluation matters
-                (haskell-mode . (lambda ()
-                                  (require 'lsp-haskell)
-                                  ;; until there's actually any useful info
-                                  (setq-local lsp-eldoc-enable-hover nil))))
-         :config
-         (setq lsp-haskell-process-args-hie (list "-d" "-l" (make-temp-file "hie." nil ".log")))
-
-         ;;  _   _    _    ____ _  __       _     _            _ _ _
-         ;; | | | |  / \  / ___| |/ /   ___| | __| | ___   ___| | | |
-         ;; | |_| | / _ \| |   | ' /   / _ \ |/ _` |/ _ \ / __| | | |
-         ;; |  _  |/ ___ \ |___| . \  |  __/ | (_| | (_) | (__|_|_|_|
-         ;; |_| |_/_/   \_\____|_|\_\  \___|_|\__,_|\___/ \___(_|_|_)
-         ;;
-
-         ;; thank you @ walseb: https://github.com/walseb/QualityEmacsConfig#hack-in-eldoc-support
-         ;; (setq my/haskell-lsp-eldoc-entries '())
-
-         ;; ;; This function modifies what's displayed in lsp-ui-sideline.
-         ;; ;; Here it is redefined so that it takes what's supposed to be displayed in the sideline,
-         ;; ;; and instead sends it to an eldoc cache.
-         ;; (defun lsp-ui-sideline--push-info (symbol tag bounds info bol eol)
-         ;;   (when (and (= tag (lsp-ui-sideline--calculate-tag))
-         ;;              (not (lsp-ui-sideline--stop-p)))
-         ;;     (let* ((info (concat (thread-first (gethash "contents" info)
-         ;;                            lsp-ui-sideline--extract-info
-         ;;                            lsp-ui-sideline--format-info)))
-         ;;            (current (and (>= (point) (car bounds)) (<= (point) (cdr bounds)))))
-         ;;       (when (and (> (length info) 0)
-         ;;                  (lsp-ui-sideline--check-duplicate symbol info))
-         ;;         (let* ((final-string (lsp-ui-sideline--make-display-string info symbol current))
-         ;;                (pos-ov (lsp-ui-sideline--find-line (length final-string) bol eol))
-         ;;                (ov (when pos-ov (make-overlay (car pos-ov) (car pos-ov)))))
-
-         ;;           ;; My changes:
-         ;;           (let ((final-string-formatted (substring-no-properties final-string)))
-         ;;             (add-to-list 'my/haskell-lsp-eldoc-entries final-string-formatted))
-
-         ;;           (when pos-ov
-         ;;             ;; (overlay-put ov 'info info)
-         ;;             ;; (overlay-put ov 'symbol symbol)
-         ;;             (overlay-put ov 'bounds bounds)
-         ;;             (overlay-put ov 'current current)
-         ;;             ;;(overlay-put ov 'after-string final-string)
-         ;;             (overlay-put ov 'window (get-buffer-window))
-         ;;             (overlay-put ov 'kind 'info)
-         ;;             (push ov lsp-ui-sideline--ovs)))))))
-
-         ;; (defun lsp-ui-sideline--push-info (symbol tag bounds info bol eol)
-         ;;   (when (and (= tag (lsp-ui-sideline--calculate-tag))
-         ;;              (not (lsp-ui-sideline--stop-p)))
-         ;;     (let* ((info (concat (thread-first (gethash "contents" info)
-         ;;                            lsp-ui-sideline--extract-info
-         ;;                            lsp-ui-sideline--format-info)))
-         ;;            (current (and (>= (point) (car bounds)) (<= (point) (cdr bounds)))))
-         ;;       (when (and (> (length info) 0)
-         ;;                  (lsp-ui-sideline--check-duplicate symbol info))
-         ;;         (let* ((final-string (lsp-ui-sideline--make-display-string info symbol current))
-         ;;                (pos-ov (lsp-ui-sideline--find-line (length final-string) bol eol))
-         ;;                (ov (when pos-ov (make-overlay (car pos-ov) (car pos-ov)))))
-         ;;           (when pos-ov
-         ;;             (overlay-put ov 'info info)
-         ;;             (overlay-put ov 'symbol symbol)
-         ;;             (overlay-put ov 'bounds bounds)
-         ;;             (overlay-put ov 'current current)
-         ;;             (overlay-put ov 'after-string final-string)
-         ;;             (overlay-put ov 'window (get-buffer-window))
-         ;;             (overlay-put ov 'kind 'info)
-         ;;             (push ov lsp-ui-sideline--ovs)))))))
-
-         ;; (defun my/haskell-lsp-eldoc-print ()
-         ;;   (interactive)
-         ;;   (when my/haskell-lsp-eldoc-entries
-         ;;     (let ((at-point (thing-at-point 'symbol t)))
-         ;;       (when at-point
-         ;;         (let ((str (seq-find
-         ;;                     (lambda (candidate)
-         ;;                       (let ((candidate-last-word (string-match (rx (not whitespace) (regexp "*") space eol) candidate)))
-         ;;                         (if candidate-last-word
-         ;;                             (progn
-         ;;                               (string=
-         ;;                                (substring candidate candidate-last-word (- (length candidate) 1))
-         ;;                                at-point))
-         ;;                           nil)))
-         ;;                     my/haskell-lsp-eldoc-entries)))
-
-         ;;           (if str
-         ;;               (s-trim str)
-         ;;             nil))))))
-
-         ;; ;; No idea why but eldoc doesn't run the documentation function unless i press escape, this fixes that
-         ;; (add-hook 'haskell-mode-hook '(lambda ()
-         ;;                                 (eldoc-mode -1)
-         ;;                                 (setq-local eldoc-documentation-function 'my/haskell-lsp-eldoc-print)
-
-         ;;                                 (add-hook 'post-command-hook
-         ;;                                           'eldoc-print-current-symbol-info nil t)))
-         )
      #+END_SRC
 
 **** flycheck-haskell
@@ -11708,11 +11789,6 @@
        ;; M-a             c-beginning-of-statement
        ;; M-e             c-end-of-statement
        ;; M-q             c-fill-paragraph
-
-       ;; (use-package company-meghanada
-       ;;   :ensure t
-       ;;   :defer  t
-       ;;   :commands company-meghanada)
 
        (use-package meghanada
          :ensure t
