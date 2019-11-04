@@ -97,6 +97,8 @@
                     buffer-file-coding-system 'utf-8-unix
                     echo-keystrokes 0.02)
 
+      (put 'narrow-to-region 'disabled nil)
+
       (set-face-attribute 'default nil
                           :family "Source Code Pro"
                           ;; height value is 1/10pt. so 100 = 10pt
@@ -1964,7 +1966,7 @@
             (let ((buffer (get-buffer scratch-buffer-name)))
               (if buffer
                   (switch-to-buffer buffer)
-                (create-new-empty-buffer)))
+                (call-interactively 'create-new-empty-buffer)))
           (let* ((buffer-list (seq-filter #'(lambda (x)
                                               (string-match
                                                (regexp-quote scratch-buffer-name)
@@ -5212,6 +5214,7 @@
            "K" 'dired-do-kill-lines
            "'" 'dired-show-file-type ;; like file command
            "M" 'dired-unmark
+           "u" 'dired-unmark
            "r" 'dired-change-marks
            "y" 'dired-copy-filename-as-kill
 
@@ -6428,6 +6431,8 @@
          :init
          (mohkale/set-leader-keys
            "ss" 'swiper)
+         :config
+         (setq swiper-min-highlight 50000000) ;; never highlight
          :bind (:map swiper-map
                 ("C-q" . nil)
                 ("C-l" . ivy-forward-char-or-partial-or-done)
@@ -7630,6 +7635,44 @@
             (apply func args)))
 
         (advice-add 'open-junk-file :around #'open-junk-file--fix-read-file-name-with-directory-wrapper))
+    #+END_SRC
+
+*** package
+    #+BEGIN_SRC emacs-lisp
+      (use-package package
+        :defer t
+        :config
+        (evil-set-initial-state 'package-menu-mode 'motion)
+        (general-define-key
+          :keymaps 'package-menu-mode-map
+          :states  'motion
+          "TAB" 'forward-button
+          "<backtab>" 'backward-button
+          "RET" 'package-menu-describe-package
+          "DEL" 'package-menu-backup-unmark
+          "("   'package-menu-toggle-hiding
+          "S"   'tabulated-list-sort
+          "U"   'package-menu-mark-upgrades
+          "d"   'package-menu-mark-delete
+          "i"   'package-menu-mark-install
+          "u"   'package-menu-mark-unmark
+          "x"   'package-menu-execute
+          "q"   'quit-window
+          "~"   'package-menu-mark-obsolete-for-deletion
+          "gr"  'package-menu-refresh)
+
+        (mohkale/declare-prefix-for-major-mode* 'package-menu-mode
+          "m" "mark")
+
+        (mohkale/set-leader-keys-for-major-mode 'package-menu-mode
+          "h" 'package-menu-hide-package
+          "?" 'package-menu-quick-help
+          "/" 'package-menu-filter
+          "m~" 'package-menu-mark-obsolete-for-deletion
+          "mu" 'package-menu-mark-unmark
+          "mi" 'package-menu-mark-install
+          "mu" 'package-menu-mark-upgrades
+          "md" 'package-menu-mark-delete))
     #+END_SRC
 
 *** page-break-lines
@@ -10752,7 +10795,7 @@
           "f" 'yaml-fill-paragraph
           "v" 'yaml-mode-version)
 
-        (setq yaml-indent-offset mohkale-preferred-indent))
+        (setq yaml-indent-offset 2))
     #+END_SRC
 
 *** csv
@@ -10892,29 +10935,27 @@
          :ensure t
          :defer  t
          :hook ((markdown-mode . mohkale//enable-line-numbers-handler)
-                (markdown-mode . emojify-mode)
+                ;; (markdown-mode . emojify-mode)
                 (markdown-mode . flycheck-mode))
          :config
          (general-define-key
            :keymaps 'markdown-mode-map
            :states 'normal
-           "<tab>" 'markdown-cycle
-           "<S-iso-lefttab>" 'markdown-shifttab
-           "<S-tab>"         'markdown-shifttab
-           "<backtab>"       'markdown-shifttab
            "gh" 'markdown-up-heading
            "gj" 'markdown-outline-next
            "gk" 'markdown-outline-previous
            "gl" 'markdown-outline-next-same-level)
+
          (general-define-key
            :keymaps 'markdown-mode-map
            :states 'insert
            "<return>" 'markdown-enter-key
-           "<backspace>" 'markdown-outdent-or-delete
-           "<S-iso-lefttab>" 'markdown-outdent-or-delete
-           "<S-tab>"         'markdown-outdent-or-delete
-           "<backtab>"       'markdown-outdent-or-delete
+           ;; "<backspace>" 'markdown-outdent-or-delete
+           ;; "<S-iso-lefttab>" 'markdown-outdent-or-delete
+           ;; "<S-tab>"         'markdown-outdent-or-delete
+           ;; "<backtab>"       'markdown-outdent-or-delete
            )
+
          (general-define-key
            :keymaps 'markdown-mode-map
            :states '(insert normal)
@@ -10923,6 +10964,16 @@
            "C-S-K" 'markdown-move-up
            "C-S-H" 'markdown-promote
            "C-S-L" 'markdown-demote)
+
+         (general-define-key
+           :keymaps 'markdown-mode-map
+           :states '(insert normal)
+           :predicate '(or (markdown--table-at-point-p)
+                           (markdown-on-heading-p))
+           "<tab>"           'markdown-cycle
+           "<S-iso-lefttab>" 'markdown-shifttab
+           "<S-tab>"         'markdown-shifttab
+           "<backtab>"       'markdown-shifttab)
 
          (mohkale/update-company-backends-for-mode markdown t
            '(company-emoji))
@@ -11873,7 +11924,6 @@
 
 * Themes
 ** an old hope
-*** Description
    #+NAME: an-old-hope-theme-description
    #+BEGIN_EXAMPLE
       emacs theme inspired by a galaxy far far away...
