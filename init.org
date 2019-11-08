@@ -461,7 +461,8 @@
 
 
       (setenv "EDITOR"
-              (concat "emacsclient --no-wait --suppress-output --server-file '" (expand-file-name server-auth-dir) "server'"))
+              (concat "emacsclient --no-wait --suppress-output --server-file '"
+                      (expand-file-name server-auth-dir) "server'"))
 
       (push mohkale-package-root load-path)
       (push (mohkale/join-dotemacs-etc-path "themes") custom-theme-load-path)
@@ -870,17 +871,8 @@
         "8" 'winum-select-window-8
         "9" 'winum-select-window-9
         "0" 'winum-select-window-by-number
-        "u" 'universal-argument)
-
-      ;; (dolist (tuple `(,(cons mohkale-norm-states  mohkale-leader-key)
-      ;;                  ;;,(cons mohkale-nnorm-states mohkale-nnorm-leader-key)
-      ;;                  ))
-      ;;   (let ((states (car tuple))
-      ;;         (leader (cdr tuple)))
-      ;;     (general-define-key
-      ;;       :states  states
-      ;;       :keymaps 'universal-argument-map
-      ;;       (concat leader " u") 'universal-argument-more)))
+        "U" 'universal-argument
+        "u" 'smart-universal-argument)
     #+END_SRC
 
 *** applications
@@ -1235,6 +1227,8 @@
                   mohkale/find-capture-notes-file
                   mohkale/find-org-university-file)
        :init
+       (setq mohkale--server-leader-key "y")
+
        (mohkale/declare-prefix*
          "on" "find-notes-file"
          "ou" "find-uni-file"
@@ -5128,6 +5122,7 @@
          (setq dired-omit-files (concat dired-omit-files
                                         "\\|^__pycache__$"
                                         "\\|^\\.pytest_cache$"
+                                        "\\|^\\.gradle$"
                                         "\\|^\\.sass-cache$"
                                         "\\|^\\.git$"
                                         "\\|^Pipfile")))
@@ -6979,37 +6974,45 @@
          ;; (push 'company-lsp company-backends)
 
          (setq lsp-enable-snippet             nil
-               lsp-enable-symbol-highlighting nil)
+               lsp-enable-symbol-highlighting nil
+               mohkale-lsp-map (make-sparse-keymap))
 
          (mohkale/declare-prefix-for-mode* 'lsp-mode
-           "yw" "workspaces"
-           "yl" "lens"
-           "yr" "refactor"
-           "yg" "goto")
+           (concat mohkale--server-leader-key "w") "workspaces"
+           (concat mohkale--server-leader-key "l") "lens"
+           (concat mohkale--server-leader-key "r") "refactor"
+           (concat mohkale--server-leader-key "g") "goto")
+
+         (general-define-key
+           :keymaps 'mohkale-lsp-map
+           "?"   'lsp-describe-session
+           "|"   'lsp-describe-thing-at-point
+           "e"   'lsp-execute-code-action
+           "h"   'lsp-document-highlight
+           "wR"  'lsp-restart-workspace
+           "wa"  'lsp-workspace-folders-add
+           "wr"  'lsp-workspace-folders-remove
+           "ws"  'lsp-workspace-folders-switch
+           "DEL" 'lsp-disconnect
+
+           "ll" 'lsp-lens-mode
+           "ls" 'lsp-lens-show
+           "lh" 'lsp-lens-hide
+
+           "rr" 'lsp-format-buffer
+           "ri" 'lsp-organize-imports
+           "rc" 'lsp-rename
+
+           "gg" 'lsp-goto-type-definition
+           "gG" 'lsp-goto-implementation
+           "gF" 'lsp-find-implementation
+           "gf" 'lsp-find-type-definition)
+
+         (mohkale/declare-prefix-for-mode* 'lsp-mode
+           mohkale--server-leader-key "server")
 
          (mohkale/set-leader-keys-for-minor-mode 'lsp-mode
-           "y?" 'lsp-describe-session
-           "y|" 'lsp-describe-thing-at-point
-           "ye" 'lsp-execute-code-action
-           "yh" 'lsp-document-highlight
-           "ywR" 'lsp-restart-workspace
-           "ywa" 'lsp-workspace-folders-add
-           "ywr" 'lsp-workspace-folders-remove
-           "yws" 'lsp-workspace-folders-switch
-           "y <backspace>" 'lsp-disconnect
-
-           "yll" 'lsp-lens-mode
-           "yls" 'lsp-lens-show
-           "ylh" 'lsp-lens-hide
-
-           "yrr" 'lsp-format-buffer
-           "yri" 'lsp-organize-imports
-           "yrc" 'lsp-rename
-
-           "ygg" 'lsp-goto-type-definition
-           "ygG" 'lsp-goto-implementation
-           "ygF" 'lsp-find-implementation
-           "ygf" 'lsp-find-type-definition))
+           mohkale--server-leader-key mohkale-lsp-map))
      #+END_SRC
 
 ***** lsp-ui
@@ -8356,14 +8359,25 @@
     #+END_SRC
 
 *** simple
-    GET ME OUT OF HERE!!!
     #+BEGIN_SRC emacs-lisp
       (use-package simple
         :defer t
-        :commands (completion-list-mode)
+        :commands (completion-list-mode
+                   smart-universal-argument)
         :init
         (push 'messages-buffer-mode mohkale--whitespace-exempt-modes)
         :config
+        (defun smart-universal-argument ()
+          "combine both universal-argument and universal-argument-more
+      into a single invokeable command. for some reason, calling simply
+      more before a regular prefix has been specified, will result in no
+      overall prefix being set :("
+          (interactive)
+          (prefix-command-preserve-state)
+          (if prefix-arg
+              (universal-argument-more prefix-arg)
+            (universal-argument)))
+
         (dolist (mode `(messages-buffer-mode
                         special-mode
                         message-mode))
@@ -9032,41 +9046,45 @@
 
          (setq ycmd-global-config (expand-file-name "~/.ycmd-config")
                ycmd-startup-timeout 10
-               ycmd-server-command `("python3" "-u" ,(expand-file-name "~/.vim/plugged/YouCompleteMe/third_party/ycmd/ycmd")))
+               ycmd-server-command `("python3" "-u" ,(expand-file-name "~/.vim/plugged/YouCompleteMe/third_party/ycmd/ycmd"))
+               mohkale-ycmd-map (make-sparse-keymap))
 
          ;; (ycmd-toggle-force-semantic-completion)
 
+         (general-define-key
+           :keymaps 'mohkale-ycmd-map
+           "y" 'ycmd-mode
+           "Y" 'global-ycmd-mode
+           "n" 'ycmd-open
+           "k" 'ycmd-close
+           "v" 'ycmd-version
+           "b" 'ycmd-parse-buffer
+           "c" 'ycmd-load-conf-file
+           "C" 'ycmd-clear-compilation-flag-cache
+           "s" 'ycmd-show-debug-info
+           "d" 'ycmd-show-documentation
+           "l" 'ycmd-toggle-log-enabled
+           "r" 'ycmd-restart-semantic-server
+           "t" 'ycmd-get-type
+           "." 'ycmd-completer ;; completing-read all ycmd requests
+           "SPC" 'ycmd-toggle-force-semantic-completion
+           "C-r" 'ycmd-refactor-rename
+           "C-c" 'ycmd-display-completions
+           "gg" 'ycmd-goto
+           "gG" 'ycmd-goto-imprecise
+           "gt" 'ycmd-goto-type
+           "gd" 'ycmd-goto-definition
+           "gD" 'ycmd-goto-declaration
+           "gr" 'ycmd-goto-references
+           "gi" 'ycmd-goto-include
+           "gI" 'ycmd-goto-implementation)
+
          (mohkale/declare-prefix-for-mode* 'ycmd-mode
-           "y" "ycmd"
-           "yg" "jump")
+           mohkale--server-leader-key              "ycmd"
+           (concat mohkale--server-leader-key "g") "jump")
 
          (mohkale/set-leader-keys-for-minor-mode 'ycmd-mode
-           "yy" 'ycmd-mode
-           "yY" 'global-ycmd-mode
-           "yn" 'ycmd-open
-           "yk" 'ycmd-close
-           "yv" 'ycmd-version
-           "yb" 'ycmd-parse-buffer
-           "yc" 'ycmd-load-conf-file
-           "yC" 'ycmd-clear-compilation-flag-cache
-           "ys" 'ycmd-show-debug-info
-           "yd" 'ycmd-show-documentation
-           "yl" 'ycmd-toggle-log-enabled
-           "yr" 'ycmd-restart-semantic-server
-           "yt" 'ycmd-get-type
-           "y." 'ycmd-completer           ; completing-read all ycmd requests
-           "y SPC" 'ycmd-toggle-force-semantic-completion
-           "y C-r" 'ycmd-refactor-rename
-           "y C-c" 'ycmd-display-completions
-           "ygg" 'ycmd-goto
-           "ygG" 'ycmd-goto-imprecise
-           "ygt" 'ycmd-goto-type
-           "ygd" 'ycmd-goto-definition
-           "ygD" 'ycmd-goto-declaration
-           "ygr" 'ycmd-goto-references
-           "ygi" 'ycmd-goto-include
-           "ygI" 'ycmd-goto-implementation)
-         )
+           mohkale--server-leader-key mohkale-ycmd-map))
      #+END_SRC
 
 *** vc
@@ -10363,14 +10381,13 @@
                                  'evil-open-above
                                'evil-open-below))))
                      ((symbol-function 'fallback-action)
-                      (lambda ()
+                      (lambda (&optional interactive)
                         (when (and (line-empty-p)
                                    (not (zerop (column-number (point)))))
                           ;; don't leave a trailing indent on current line unecessarily
                           (remove-all-trailing-whitespace (line-beginning-position)
                                                           (line-end-position)))
-                        (if (and (called-interactively-p)
-                                 (not above))
+                        (if (and interactive (not above))
                             (funcall-interactively
                              'newline-and-indent)
                           (evil-open)))))
@@ -10396,7 +10413,7 @@
                       (org-insert-item)
                       (evil-append nil))
 
-                     (t (fallback-action))))))
+                     (t (fallback-action (called-interactively-p)))))))
 
          (general-define-key
            :keymaps 'org-mode-map
@@ -11101,9 +11118,11 @@
            "ts" 'markdown-table-sort-lines
            "tT" 'markdown-table-transpose
            "tt" 'markdown-insert-table
+           "tn" 'markdown-insert-table
            "tc" 'markdown-table-convert-region
            "tir" 'markdown-table-insert-row
            "tic" 'markdown-table-insert-column
+           "tit" 'markdown-insert-table
            "tdr" 'markdown-table-delete-row
            "tdc" 'markdown-table-delete-column))
      #+END_SRC
@@ -11147,7 +11166,7 @@
        (use-package cc-mode
          :ensure t
          :defer  t
-         :commands (c-mode c++-mode)
+         :commands (c-mode c++-mode mohkale//set-c-mode-bindings)
          :hook (
                 ;; use global-ycmd-mode manually
                 ;; (c-mode   . ycmd-mode)
@@ -11157,15 +11176,42 @@
          :init
          (push (cons ".*\\.h$" 'c-mode) auto-mode-alist)
          :config
-         (c-toggle-auto-newline +1)
+         (c-toggle-auto-newline  +1)
+         ;; WARN never do this, it breaks commenting in
+         ;;      weird places.
+         ;; (c-toggle-comment-style +1)
+
          (setq c-default-style "stroustrup"
-               c-basic-offset mohkale-preferred-indent)
+               c-basic-offset  mohkale-preferred-indent)
 
-         (mohkale/update-company-backends-for-mode c t
-           '(company-ycmd company-c-headers))
+         ;; (mohkale/update-company-backends-for-mode c t
+         ;;   '(company-ycmd company-c-headers))
 
-         (mohkale/update-company-backends-for-mode c++ t
-           '(company-ycmd company-c-headers)))
+         ;; (mohkale/update-company-backends-for-mode c++ t
+         ;;   '(company-ycmd company-c-headers))
+
+         (defun mohkale//set-c-mode-bindings (mode)
+           (mohkale/set-leader-keys-for-major-mode mode
+             "S" 'c-set-style
+             "D" 'c-display-defun-name
+             "m" 'c-mark-function
+             "r" 'c-indent-defun
+             "/" 'c-backslash-region
+             "\\" 'c-toggle-comment-style
+             "DEL" 'c-hungry-delete-forward
+             "M-DEL" 'c-hungry-delete-backwards)
+
+           (let ((mode-map (intern (concat (symbol-name mode)
+                                           "mode"))))
+             (general-define-key
+               :map mode-map
+               "C-M-a" 'c-beginning-of-defun
+               "C-M-e" 'c-end-of-defun
+               "M-a"   'c-beginning-of-statement
+               "M-e"   'c-end-of-statement)))
+
+         (mohkale//set-c-mode-bindings 'c-mode)
+         (mohkale//set-c-mode-bindings 'cc-mode))
      #+END_SRC
 
 **** disaster
@@ -11221,6 +11267,139 @@
          (mohkale/update-company-backends-for-mode kotlin t
            '(company-lsp)))
      #+END_SRC
+
+*** java
+    java, the language *everyone* tolerates.
+
+**** java mode
+    #+BEGIN_SRC emacs-lisp
+      (use-package cc-mode
+        :defer t
+        :init
+        (with-eval-after-load 'projectile
+          ;; see: https://github.com/bbatsov/projectile/blob/master/projectile.el#L2636
+          (projectile-register-project-type 'gradle '("build.gradle.kts")
+                                            :run     "gradle run"
+                                            :compile "gradle build"
+                                            :test    "gradle test"
+                                            :test-suffix "Spec")
+
+          (projectile-register-project-type 'gradlew '("gradlew")
+                                            :run     "./gradlew run"
+                                            :compile "./gradlew build"
+                                            :test    "./gradlew test"
+                                            :test-suffix "Spec"))
+        :config
+        (mohkale//set-c-mode-bindings 'java-mode))
+    #+END_SRC
+
+**** meghanada
+    #+BEGIN_SRC emacs-lisp
+      (defun mohkale/load-meghanada ()
+        "load and enable the meghanada java language server package"
+        (interactive)
+
+        (use-package meghanada
+          :ensure t
+          :defer  t
+          :delight (meghanada "MEG")
+          :hook ((java-mode . meghanada-mode))
+          :commands (meghanada-mode
+                     meghanada-install-server
+                     meghanada-update-server
+                     meghanada-server-start
+                     meghanada-restart
+                     meghanada-server-kill
+                     meghanada-client-direct-connect
+                     meghanada-client-connect
+                     meghanada-client-disconnect
+                     meghanada-client-ping
+                     meghanada-clear-cache
+
+                     meghanada-import-all
+                     meghanada-optimize-import
+                     meghanada-import-at-point
+                     meghanada-local-variable
+                     meghanada-compile-file
+                     meghanada-show-project
+                     meghanada-compile-project
+                     meghanada-switch-testcase
+                     meghanada-exec-main
+                     meghanada-debug-main
+                     meghanada-reference
+                     meghanada-search-everywhere
+                     meghanada-search-everywhere-ex
+                     meghanada-typeinfo
+                     meghanada-run-junit-class
+                     meghanada-run-junit-test-case
+                     meghanada-debug-junit-class
+                     meghanada-debug-junit-test-case
+                     meghanada-run-task
+                     meghanada-jump-declaration
+                     meghanada-back-jump
+                     meghanada-code-beautify)
+          :config
+          (mohkale/update-company-backends-for-mode meghanada nil
+            '(company-meghanada))
+
+          (setq mohkale-meghanada-map (make-sparse-keymap))
+
+          (general-define-key
+            :keymaps 'mohkale-meghanada-map
+            "SPC" 'meghanada-run-task
+            "D"   'meghanada-typeinfo
+            "G"   'meghanada-back-jump
+            "F"   'meghanada-search-everywhere-ex
+            "d"   'meghanada-reference ;; documentation
+            "g"   'meghanada-jump-declaration
+            "k"   'meghanada-server-kill
+            "n"   'meghanada-server-start
+            "p"   'meghanada-code-beautify
+            "r"   'meghanada-restart
+            "s"   'meghanada-show-project
+            "f"   'meghanada-search-everywhere
+            "y"   'meghanada-mode
+
+            "cc" 'meghanada-compile-project
+            "cd" 'meghanada-debug-main
+            "cf" 'meghanada-compile-file
+            "cr" 'meghanada-exec-main
+
+            "Si" 'meghanada-install-server
+            "Su" 'meghanada-update-server
+
+            "ia" 'meghanada-import-all
+            "il" 'meghanada-local-variable
+            "io" 'meghanada-optimize-import
+            "ip" 'meghanada-import-at-point
+
+            "td"      'meghanada-debug-junit-class
+            "tt"      'meghanada-switch-testcase ;; test -> file -> test
+            "tf"      'meghanada-run-junit-class
+            "t SPC"   'meghanada-run-junit-test-case
+            "t C-SPC" 'meghanada-debug-junit-test-case)
+
+          (let ((prefixes (list (concat mohkale--server-leader-key "c") "compile/run"
+                                (concat mohkale--server-leader-key "t") "test"
+                                (concat mohkale--server-leader-key "S") "server"
+                                (concat mohkale--server-leader-key "i") "insert/refactor")))
+            (apply 'mohkale/declare-prefix-for-mode* 'meghanada-mode prefixes)
+            (apply 'mohkale/declare-prefix-for-major-mode* 'java-mode prefixes))
+
+          (mohkale/declare-prefix-for-major-mode* 'java-mode
+            mohkale--server-leader-key "meghanada")
+
+          (mohkale/set-leader-keys-for-major-mode 'java-mode
+            mohkale--server-leader-key mohkale-meghanada-map)
+
+          (mohkale/declare-prefix-for-mode* 'meghanada-mode
+            mohkale--server-leader-key "meghanada")
+
+          (mohkale/set-leader-keys-for-minor-mode 'meghanada-mode
+            mohkale--server-leader-key mohkale-meghanada-map)))
+
+      (mohkale/load-meghanada)
+    #+END_SRC
 
 *** javascript
     # NOTE no on the fly syntax checking? make sure eslint is installed no warning or error will be issued if it isn't :(
@@ -11792,99 +11971,6 @@
      #+END_SRC
 
 ** Unimplemented
-*** Languages
-    https://github.com/syl20bnr/spacemacs/tree/master/layers/%2Blang
-**** java
-     java, the language *everyone* tolerates.
-
-     #+BEGIN_SRC emacs-lisp :tangle no
-       ;; (use-package cc-mode
-       ;;   :defer t
-       ;;   :commands (java-mode . ycmd-mode)
-       ;;   :config
-       ;;   (mohkale/update-company-backends-for-mode java t
-       ;;     '(ycmd-mode))
-       ;;   )
-
-       ;; key             binding
-       ;; ---             -------
-
-       ;; C-c C-a         c-toggle-auto-newline
-       ;; C-c C-b         c-submit-bug-report
-       ;; C-c C-c         comment-region
-       ;; C-c C-d         c-hungry-delete-forward
-       ;; C-c C-k         c-toggle-comment-style
-       ;; C-c C-l         c-toggle-electric-state
-       ;; C-c C-n         c-forward-conditional
-       ;; C-c C-o         c-set-offset
-       ;; C-c C-p         c-backward-conditional
-       ;; C-c C-q         c-indent-defun
-       ;; C-c C-s         c-show-syntactic-information
-       ;; C-c C-u         c-up-conditional
-       ;; C-c C-w         c-subword-mode
-       ;; C-c C-z         c-display-defun-name
-       ;; C-c C-\         c-backslash-region
-       ;; C-c .           c-set-style
-       ;; C-c DEL         c-hungry-delete-backwards
-       ;; C-c C-DEL       c-hungry-delete-backwards
-       ;; C-c <C-backspace>               c-hungry-delete-backwards
-       ;; C-c <C-delete>                  c-hungry-delete-forward
-       ;; C-c <C-deletechar>              c-hungry-delete-forward
-       ;; C-c <deletechar>                c-hungry-delete-forward
-
-       ;; C-M-a           c-beginning-of-defun
-       ;; C-M-e           c-end-of-defun
-       ;; C-M-h           c-mark-function
-       ;; C-M-j           c-indent-new-comment-line
-       ;; C-M-q           c-indent-exp
-       ;; M-a             c-beginning-of-statement
-       ;; M-e             c-end-of-statement
-       ;; M-q             c-fill-paragraph
-
-       (use-package meghanada
-         :ensure t
-         :defer  t
-         :delight (meghanada "MEG")
-         :hook (meghanda-mode . meghanada-telemetry-enable)
-         :commands (meghanda-mode
-                    meghanada-install-server
-                    meghanada-update-server
-                    meghanada-server-start
-                    meghanada-restart
-                    meghanada-server-kill
-                    meghanada-client-direct-connect
-                    meghanada-client-connect
-                    meghanada-client-disconnect
-                    meghanada-client-ping
-                    meghanada-clear-cache
-
-                    meghanada-import-all
-                    meghanada-optimize-import
-                    meghanada-import-at-point
-                    meghanada-local-variable
-                    meghanada-compile-file
-                    meghanada-project-show
-                    meghanada-project-compile
-                    meghanada-switch-testcase
-                    meghanada-exec-main
-                    meghanada-debug-main
-                    meghanada-reference
-                    meghanada-search-everywhere
-                    meghanada-search-everywhere-ex
-                    meghanada-typeinfo
-                    meghanada-run-junit-class
-                    meghanada-run-junit-test-case
-                    meghanada-debug-junit-class
-                    meghanada-debug-junit-test-case
-                    meghanada-run-task
-                    meghanada-jump-declaration
-                    meghanada-back-jump
-                    meghanada-code-beautify)
-         :config
-         (mohkale/update-company-backends-for-mode meghanada nil
-           '(meghanda-mode)))
-     #+END_SRC
-
 *** iallign
     #+BEGIN_SRC emacs-lisp
       (use-package ialign
