@@ -194,21 +194,13 @@
                 (window-height . 0.5))
               display-buffer-alist)
 
-        (push `("*image-dired-display-image*"
-                ,@display-buffer--default-fallback-action)
-              display-buffer-alist)
-
-        (push `("*Anaconda*"
-                ,@display-buffer--default-fallback-action)
-              display-buffer-alist)
-
-        (push `("magit-diff: "
-                ,@display-buffer--default-fallback-action)
-              display-buffer-alist)
-
-        (push `("*Flycheck error messages*"
-                ,@display-buffer--default-fallback-action)
-              display-buffer-alist))
+        (dolist (buffer-name '("*image-dired-display-image*"
+                               "*Anaconda*"
+                               "magit-diff: "
+                               "*Flycheck error messages*"
+                               "*HTTP Response*"))
+          (push `(,buffer-name ,@display-buffer--default-fallback-action)
+                display-buffer-alist)))
 
       (add-hook #'emacs-startup-hook #'mohkale//update-display-buffer-options-handler)
     #+END_SRC
@@ -886,7 +878,7 @@
         "aC" 'calc-dispatch
         "ac" 'calendar
         "ad" 'ido-dired
-        "ae" 'package-list-packages
+        "aE" 'package-list-packages
         "af" 'list-faces-display
         "am" 'man
         "aP" 'proced
@@ -3441,19 +3433,6 @@
     #+END_SRC
 
 *** evil
-**** ex commands
-     Partially capitalised variants... for when your fingers are faster than you are.
-
-     #+BEGIN_SRC emacs-lisp
-       (add-hook 'evil-mode-hook (lambda ()
-                                   (evil-ex-define-cmd "W[RITE]" 'evil-write)
-                                   (evil-ex-define-cmd "Wa[LL]"  'evil-write-all)
-                                   (evil-ex-define-cmd "WA[LL]"  'evil-write-all)
-                                   (evil-ex-define-cmd "wk[ill]" 'write-kill-buffer)
-                                   (evil-ex-define-cmd "Wk[ill]" 'write-kill-buffer)
-                                   (evil-ex-define-cmd "WK[ILL]" 'write-kill-buffer)))
-     #+END_SRC
-
 **** evil-match-it
      #+BEGIN_SRC emacs-lisp
        (use-package evil-matchit
@@ -3547,8 +3526,6 @@
 **** evil-mode
      come to the dark side, we have cookies... :)
 
-     # WARN keep this at the bottom of this branch. None of the mode hooks will be evaluated otherwise.
-
      #+BEGIN_SRC emacs-lisp
        (use-package evil
          :ensure t
@@ -3576,7 +3553,6 @@
                            ,@body
                            (evil-visual-restore)))
                 (otherwise ,@body))))
-
 
          (defun evil-shift-normal-state (&optional arg)
            "return to normal state while also removing
@@ -3730,25 +3706,6 @@
                 ("C-M-q" . quit-window)))
      #+END_SRC
 
-**** evil-syntax
-     #+NAME: underscore-supported-modes
-     - c++
-     - c
-     - markdown
-     - lisp
-     - shell
-     - enh-ruby
-
-     #+BEGIN_SRC emacs-lisp :var modes=underscore-supported-modes
-       (defun mohkale//adjust-syntax-entry ()
-         "includes underscores in the syntax entry"
-         (modify-syntax-entry ?_ "w"))
-
-       (dolist (mode modes)
-         (let ((hook-name (concat (car mode) "-mode-hook")))
-           (add-hook (intern hook-name) #'mohkale//adjust-syntax-entry)))
-     #+END_SRC
-
 **** evil-args
      see also: [[https://github.com/wcsmith/evil-args][link]].
 
@@ -3780,6 +3737,56 @@
 
          (add-hook 'emacs-lisp-mode-hook #'evil-args--adjust-for-elisp))
      #+END_SRC
+
+**** evil-syntax
+     #+NAME: underscore-supported-modes
+     - c++
+     - c
+     - markdown
+     - lisp
+     - shell
+     - enh-ruby
+
+     #+BEGIN_SRC emacs-lisp :var modes=underscore-supported-modes
+       (defun mohkale//adjust-syntax-entry ()
+         "includes underscores in the syntax entry"
+         (modify-syntax-entry ?_ "w"))
+
+       (dolist (mode modes)
+         (let ((hook-name (concat (car mode) "-mode-hook")))
+           (add-hook (intern hook-name) #'mohkale//adjust-syntax-entry)))
+     #+END_SRC
+
+**** commands
+     see [[https://bytebucket.org/lyro/evil/raw/default/doc/evil.pdf][here]] for a list of the different evil commands and how they work.
+
+***** ex
+      Partially capitalised variants... for when your fingers are faster than you are.
+
+      #+BEGIN_SRC emacs-lisp
+        (evil-ex-define-cmd "W[RITE]" 'evil-write)
+        (evil-ex-define-cmd "Wa[LL]"  'evil-write-all)
+        (evil-ex-define-cmd "WA[LL]"  'evil-write-all)
+        (evil-ex-define-cmd "wk[ill]" 'write-kill-buffer)
+        (evil-ex-define-cmd "Wk[ill]" 'write-kill-buffer)
+        (evil-ex-define-cmd "WK[ILL]" 'write-kill-buffer)
+      #+END_SRC
+
+***** operators
+      #+BEGIN_SRC emacs-lisp
+        (evil-define-operator evil-toggle-comment (beg end)
+          :type        line
+          :repeat      t
+          :move-point  nil
+          :keep-visual nil
+          "run `toggle-comment-at-point' using evil motion."
+          (toggle-comment-at-point beg end))
+
+        (general-define-key
+          :states mohkale-norm-states
+          "gc" 'evil-toggle-comment)
+      #+END_SRC
+
 
 *** hydra
     #+BEGIN_SRC emacs-lisp
@@ -5563,6 +5570,55 @@
          :hook ((text-mode prog-mode) . electric-indent-mode))
      #+END_SRC
 
+*** engine-mode
+    #+NAME: engine-mode-search-engines
+    | Search Engine | Key | Identifier     | URL                                                                      |
+    |---------------+-----+----------------+--------------------------------------------------------------------------|
+    | DuckDuckGo    | d   | duckduckgo     | https://duckduckgo.com/?q=%s                                             |
+    | Github        | G   | github         | https://github.com/search?ref=simplesearch&q=%s                          |
+    | Google        | g   | google         | http://www.google.com/search?ie=utf-8&oe=utf-8&q=%s                      |
+    | GoogleImages  | i   | google-images  | http://www.google.com/images?hl=en&source=hp&q=%s                        |
+    | GoogleMaps    | m   | google-maps    | http://maps.google.com/maps?q=%s                                         |
+    | StackOverflow | s   | stack-overflow | https://stackoverflow.com/search?q=%s                                    |
+    | Wikipedia     | w   | wikipedia      | http://www.wikipedia.org/search-redirect.php?language=en&go=Go&search=%s |
+    | Youtube       | y   | youtube        | http://www.youtube.com/results?aq=f&oq=&search_query=%s                  |
+
+
+    #+BEGIN_SRC emacs-lisp :var engines=engine-mode-search-engines :results output
+      (use-package engine-mode
+        :ensure t
+        :defer  t
+        :init
+        (let ((engine-prefix "se"))
+          (mohkale/declare-prefix engine-prefix "engines")
+
+          (dolist (engine engines)
+            (let* ((key               (nth 1 engine))
+                   (identifier-string (nth 2 engine))
+                   (engine            (nth 0 engine))
+
+                   (function-identifier (intern
+                                         (concat "engine/search-"
+                                                 identifier-string)))
+                   (key (unless (string-empty-p key)
+                          (concat engine-prefix key))))
+              (when key
+                (mohkale/declare-prefix  key engine)
+                (mohkale/set-leader-keys key function-identifier))
+              (autoload function-identifier "engine-mode.el" nil t))))
+        :config
+        (dolist (engine engines)
+          (let* ((identifier-string (nth 2 engine))
+                 (query-link        (nth 3 engine))
+                 (identifier (when identifier-string
+                               (intern identifier-string))))
+            (when (and identifier
+                       (not (string-empty-p query-link)))
+              (eval
+               `(defengine ,identifier
+                  ,query-link))))))
+    #+END_SRC
+
 *** eshell
 **** eshell-mode
      #+BEGIN_SRC emacs-lisp
@@ -6335,6 +6391,7 @@
              "oh" 'counsel-org-agenda-headlines))
 
          (mohkale/set-leader-keys
+           "ae" 'counsel-package
            "ic" 'counsel-unicode-char
            "ie" 'counsel-org-entity
            "Mm" 'counsel-major
@@ -8339,6 +8396,88 @@
         (setq rake-completion-system 'ivy-read))
     #+END_SRC
 
+*** restclient
+**** restclient-mode
+     #+BEGIN_SRC emacs-lisp
+       (use-package restclient
+         :ensure t
+         :defer  t
+         :commands (restclient)
+         :init
+         (mohkale/set-leader-keys
+           "ar" 'restclient)
+         :config
+         (let ((leader mohkale-major-mode-leader-key))
+           (mohkale/set-leader-keys-for-major-mode 'restclient-mode
+             "RET"   'restclient-http-send-current
+             "M-RET" 'restclient-http-send-current-raw
+             leader  'restclient-http-send-current-stay-in-window
+             "y"     'restclient-copy-curl-command
+             "m"     'restclient-mark-current
+             "n"     'restclient-narrow-to-current
+             "w"     'widen)
+
+           (mohkale/declare-prefix-for-major-mode* 'restclient-mode
+             "RET"   "execute-current"
+             "M-RET" "execute-current-raw"
+             leader  "execute-current-same-window"
+             "y"     "yank-curl-command"
+             "m"     "mark-current"
+             "n"     "narrow-to-current"))
+
+         (general-define-key
+           :states 'normal
+           :keymaps 'restclient-mode-map
+           "gj" 'restclient-jump-next
+           "gk" 'restclient-jump-prev)
+
+         (general-define-key
+           :states  'normal
+           :keymaps 'restclient-outline-mode-map
+           "TAB"   'restclient-toggle-body-visibility-or-indent
+           "g TAB" 'restclient-toggle-body-visibility-or-indent)
+
+         (add-hook 'restclient-response-mode-hook
+                   'evil-motion-state)
+
+         (push "*HTTP Response*" mohkale--whitespace-exempt-buffers)
+
+         (defun restclient ()
+           "create a new buffer in restclient mode"
+           (interactive)
+           (let ((buffer (create-new-empty-buffer "restclient")))
+             (with-current-buffer buffer
+               (restclient-mode))
+             (display-buffer buffer))))
+
+     #+END_SRC
+
+**** company-restclient
+     #+BEGIN_SRC emacs-lisp
+       (use-package company-restclient
+         :ensure t
+         :defer  t
+         :commands (company-restclient)
+         :init
+         (with-eval-after-load 'restclient
+           (mohkale/update-company-backends-for-mode restclient t
+             '(company-restclient))))
+
+     #+END_SRC
+
+**** org-babel-restclient
+     #+BEGIN_SRC emacs-lisp
+       (use-package ob-restclient
+         :ensure t
+         :defer  t
+         :init
+         (with-eval-after-load 'org
+           (org-babel-do-load-languages
+            'org-babel-load-languages
+            '((restclient . t)))))
+
+     #+END_SRC
+
 *** save-place
     remembers the cursor position in open files... so when I reopen them I'm taken to that point immeadiately. It's a cool feature, but not really essential. Generally, when I open a file, I'll look around a bit to see where I was and what I was doing. Jumping to where I was immediately only helps with one of those problems & it seems like a bad habit to depend on that to remind me... use org capture for that and mode dependent jump keys to get to where you need to. quick & easy.
 
@@ -9315,6 +9454,33 @@
 
               "ta" 'vc-git-log-edit-toggle-amend
               "ts" 'vc-git-log-edit-toggle-signoff))))
+    #+END_SRC
+
+*** ztree
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package ztree
+        :ensure t
+        :defer  t
+        :config
+        (evil-set-initial-state 'ztree-mode 'motion)
+        (general-define-key
+          :states  'motion
+          :keymaps 'ztree-mode-map
+          "gr"    'ztree-refresh-buffer
+          "j"     'ztree-next-line
+          "k"     'ztree-previous-line
+          "gh"    'ztree-move-up-in-tree
+          "gl"    'ztree-next-line
+          "RET"   'ztree-dir-open-dired-at-point
+          "TAB"   'ztree-perform-action
+          "M-TAB" 'ztree-perform-soft-action
+          "DEL"   'ztree-move-up-in-tree)
+
+        (mohkale/set-leader-keys-for-major-mode 'ztree-mode
+          "TAB" 'ztree-jump-side
+          "n"   'ztree-dir-widen-to-parent
+          "w"   'ztree-dir-narrow-to-dir
+          "h"   'ztree-dir-toggle-show-filtered-files))
     #+END_SRC
 
 ** languages
@@ -10592,6 +10758,7 @@
            "if" 'org-footnote-new
            ;; "ik" 'insert-keybinding-org
            "il" 'org-insert-link
+           "it" 'org-table-create
            ;; "is" 'org-download-screenshot
            ;; "iy" 'org-download-yank
 
