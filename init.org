@@ -395,6 +395,8 @@
            lsp-session-file                                   (var "lsp/session")
            org-ditaa-jar-path                                 (var "org/bin/ditaa.jar")
            org-ditaa-eps-jar-path                             (var "org/bin/ditaaEps.jar")
+           plantuml-jar-path                                  (var "org/bin/plantuml.jar")
+           org-plantuml-jar-path                              plantuml-jar-path
            mohkale-library-of-babel-file                      (etc "babel-lib.org")
            multi-compile-history-file                         (var "multi-compile-history.el")
            pcache-directory                                   (var "pcache/")
@@ -865,6 +867,11 @@
         "0" 'winum-select-window-by-number
         "U" 'universal-argument
         "u" 'smart-universal-argument)
+
+      (general-define-key
+        :keymap universal-argument-map
+        "M-u" 'universal-argument-batch-increment
+        "M-U" 'universal-argument-batch-decrement)
     #+END_SRC
 
 *** applications
@@ -2150,7 +2157,7 @@
       (general-define-key
         :keymaps 'mohkale-window-map
         "." 'hydra-winman/body
-        "w" 'hydra-winman/body
+        "w" 'hydra-eyebrowse/body
         "C-w" 'hydra-winman/body)
 
       (mohkale/declare-prefix*
@@ -3606,7 +3613,8 @@
            "M-e" nil
            "<tab>"   'indent-relative
            "<S-tab>" 'tab-to-tab-stop-with-prefix
-           "<S-backspace>" 'back-to-tab-stop
+           ;; "<S-backspace>" 'back-to-tab-stop
+           "<S-backspace>" 'evil-delete-char
            "C-y"   'yank
            "M-y"   'yank-unindented
            "C-$"   (lambda () (interactive)
@@ -3866,6 +3874,13 @@
       ;;   :ensure t
       ;;   :defer  t
       ;;   :commands adaptive-wrap-prefix-mode)
+    #+END_SRC
+
+*** asciidoc-mode
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package adoc-mode
+        :ensure t
+        :defer  t)
     #+END_SRC
 
 *** all-the-icons
@@ -4673,7 +4688,7 @@
      - Writing code has a place in the human hierarchy worth somewhere above grave robbing & beneath managing
      - Copy and paste is a design error
      - bleeep blooop... am I sentient yet!
-     - Software undergoes beta testing shortly before it’s released. Beta is Latin for “still doesn’t work"
+     - Beta is Latin for “still doesn’t work".
      - First learn computer science and all the theory. Next develop a style. Then forget all that & just hack
      - Good design adds value faster than it adds cost
      - Python’s a drop-in replacement for BASIC in the same sense that Optimus Prime is for a truck
@@ -5572,19 +5587,49 @@
 
 *** engine-mode
     #+NAME: engine-mode-search-engines
-    | Search Engine | Key | Identifier     | URL                                                                      |
-    |---------------+-----+----------------+--------------------------------------------------------------------------|
-    | DuckDuckGo    | d   | duckduckgo     | https://duckduckgo.com/?q=%s                                             |
-    | Github        | G   | github         | https://github.com/search?ref=simplesearch&q=%s                          |
-    | Google        | g   | google         | http://www.google.com/search?ie=utf-8&oe=utf-8&q=%s                      |
-    | GoogleImages  | i   | google-images  | http://www.google.com/images?hl=en&source=hp&q=%s                        |
-    | GoogleMaps    | m   | google-maps    | http://maps.google.com/maps?q=%s                                         |
-    | StackOverflow | s   | stack-overflow | https://stackoverflow.com/search?q=%s                                    |
-    | Wikipedia     | w   | wikipedia      | http://www.wikipedia.org/search-redirect.php?language=en&go=Go&search=%s |
-    | Youtube       | y   | youtube        | http://www.youtube.com/results?aq=f&oq=&search_query=%s                  |
+    | Search Engine | Key | Identifier               | URL                                                                      |
+    |---------------+-----+--------------------------+--------------------------------------------------------------------------|
+    | DuckDuckGo    | d   | duckduckgo               | https://duckduckgo.com/?q=%s                                             |
+    | Github        | G   | github                   | https://github.com/search?ref=simplesearch&q=%s                          |
+    | Google        | g   | google                   | http://www.google.com/search?ie=utf-8&oe=utf-8&q=%s                      |
+    | GoogleImages  | i   | google-images            | http://www.google.com/images?hl=en&source=hp&q=%s                        |
+    | GoogleMaps    | m   | google-maps              | http://maps.google.com/maps?q=%s                                         |
+    | StackOverflow | s   | stack-overflow           | https://stackoverflow.com/search?q=%s                                    |
+    | Wikipedia     | w   | wikipedia                | http://www.wikipedia.org/search-redirect.php?language=en&go=Go&search=%s |
+    | Youtube       | y   | youtube                  | http://www.youtube.com/results?aq=f&oq=&search_query=%s                  |
+    |---------------+-----+--------------------------+--------------------------------------------------------------------------|
+    | MyAnimeList   | aa  | myanimelist              | https://myanimelist.net/search/all?q=%s                                  |
+    | Anime         | aA  | myanimelist/anime        | https://myanimelist.net/anime.php?q=%s                                   |
+    | Manga         | am  | myanimelist/manga        | https://myanimelist.net/manga.php?q=%s                                   |
+    | Characters    | ac  | myanimelist/chars        | https://myanimelist.net/character.php?q=%s                               |
+    | People        | ap  | myanimelist/people       | https://myanimelist.net/people.php?q=%s                                  |
+    | News          | an  | myanimelist/news         | https://myanimelist.net/news/search?q=%s                                 |
+    | Articles      | aF  | myanimelist/articles     | https://myanimelist.net/featured/search?q=%s                             |
+    | Forums        | af  | myanimelist/forums       | https://myanimelist.net/forum/search?u=&uloc=1&loc=-1&q=%s               |
+    | Clubs         | aC  | myanimelist/clubs        | https://myanimelist.net/clubs.php?action=find&cn=%s                      |
+    | Users         | au  | myanimelist/users        | https://myanimelist.net/users.php?q=%s                                   |
+    |---------------+-----+--------------------------+--------------------------------------------------------------------------|
+    | Nyaa          | nn  | nyaa                     | https://nyaa.si/?f=0&c=0_0&q=%s                                          |
+    | Anime         | na  | nyaa/anime-english       | https://nyaa.si/?f=0&c=1_2&q=%s                                          |
+    | AnimeAll      | nA  | nyaa/anime               | https://nyaa.si/?f=0&c=1_0&q=%s                                          |
+    | Music         | nm  | nyaa/music               | https://nyaa.si/?f=0&c=2_0&q=%s                                          |
+    | Literature    | nl  | nyaa/literature-english  | https://nyaa.si/?f=0&c=3_1&q=%s                                          |
+    | LiteratureAll | nL  | nyaa/literature          | https://nyaa.si/?f=0&c=3_0&q=%s                                          |
+    | LiveAction    | nv  | nyaa/live-action-english | https://nyaa.si/?f=0&c=4_1&q=%s                                          |
+    | LiveActionAll | nV  | nyaa/live-action         | https://nyaa.si/?f=0&c=4_0&q=%s                                          |
+    | Images        | ni  | nyaa/images              | https://nyaa.si/?f=0&c=5_0&q=%s                                          |
+    | Software      | ns  | nyaa/software            | https://nyaa.si/?f=0&c=6_0&q=%s                                          |
+    | Games         | ng  | nyaa/games               | https://nyaa.si/?f=0&c=6_2&q=%s                                          |
 
+    #+NAME: engine-mode-prefix-names
+    | prefix | name        |
+    |--------+-------------|
+    | n      | Nyaa        |
+    | a      | MyAnimeList |
 
-    #+BEGIN_SRC emacs-lisp :var engines=engine-mode-search-engines :results output
+    #+BEGIN_SRC emacs-lisp :var engines=engine-mode-search-engines prefix-aliases=engine-mode-prefix-names :results output
+      (setq engines (cdr engines)) ;; strip header row
+
       (use-package engine-mode
         :ensure t
         :defer  t
@@ -5605,7 +5650,12 @@
               (when key
                 (mohkale/declare-prefix  key engine)
                 (mohkale/set-leader-keys key function-identifier))
-              (autoload function-identifier "engine-mode.el" nil t))))
+              (autoload function-identifier "engine-mode.el" nil t)))
+
+          (dolist (alias prefix-aliases)
+            (let* ((prefix (concat engine-prefix (car alias)))
+                   (name   (nth 1 alias)))
+              (mohkale/declare-prefix prefix name))))
         :config
         (dolist (engine engines)
           (let* ((identifier-string (nth 2 engine))
@@ -5834,7 +5884,23 @@
         (mohkale/set-leader-keys
           "L" 'hydra-eyebrowse/body)
         :config
-        (eyebrowse-mode +1))
+        (eyebrowse-mode +1)
+
+        (defun eyebrowse-switch-window-config--when-new-zen-current-window (func slot &rest args)
+          "by default, when you create a new window config it's a complete copy
+      of your current config. More often then not when you make a new config you
+      want to change the layout of the windows (and buffers) within it. Creating
+      a new config and then manuall deleting every other window is a pain, this
+      makes it so when you make a new config, you're current window is maximised
+      automatically."
+          (let ((slot-new-p (not (eyebrowse--window-config-present-p slot))))
+            (apply func slot args)
+            (when (and slot-new-p
+                       (> (length (window-list)) 1))
+              (window-zen))))
+
+        (advice-add 'eyebrowse-switch-to-window-config
+                    :around #'eyebrowse-switch-window-config--when-new-zen-current-window))
     #+END_SRC
 
 *** flycheck
@@ -6383,7 +6449,7 @@
 
          (general-define-key
            :keymaps 'mohkale-window-map
-           "w" 'counsel-wmctrl)
+           "^" 'counsel-wmctrl)
 
          (with-eval-after-load 'org
            (mohkale/set-leader-keys
@@ -8096,6 +8162,7 @@
         (add-hook 'persp-after-load-state-functions #'layouts//load-eyebrowse-after-perspective-load))
     #+END_SRC
 
+
 *** proced
     #+BEGIN_SRC emacs-lisp
       (use-package proced
@@ -8502,20 +8569,48 @@
       (use-package simple
         :defer t
         :commands (completion-list-mode
-                   smart-universal-argument)
+                   smart-universal-argument
+                   universal-argument-batch-increment
+                   universal-argument-batch-decrement)
         :init
         (push 'messages-buffer-mode mohkale--whitespace-exempt-modes)
         :config
-        (defun smart-universal-argument ()
+        (defmacro defun-universal-argument-operation (name docstring &rest body)
+          `(defun ,name ()
+             ,docstring
+             (interactive)
+             (prefix-command-preserve-state)
+             (if (not prefix-arg)
+                 (universal-argument)
+               ,@body)))
+
+        (put 'defun-universal-argument-operation 'lisp-indent-function 'defun)
+
+        (defun-universal-argument-operation smart-universal-argument
           "combine both universal-argument and universal-argument-more
       into a single invokeable command. for some reason, calling simply
       more before a regular prefix has been specified, will result in no
       overall prefix being set :("
-          (interactive)
-          (prefix-command-preserve-state)
-          (if prefix-arg
-              (universal-argument-more prefix-arg)
-            (universal-argument)))
+          (universal-argument-more prefix-arg))
+
+        (let ((universal-argument-increment-by 4))
+          ;; I'm not sure why universal-argument-more multiplies
+          ;; the prefix arg by a factor of 4. I mean, 4 to 16 is
+          ;; fine, but 16 to 64 is pretty unlikely to be what you
+          ;; wanted. Adding by 4 would be more useful, especially
+          ;; if you're using it to gauge indents.
+          (defun-universal-argument-operation universal-argument-batch-increment
+            (format "increment the current prefix-arg by %d."
+                    universal-argument-increment-by)
+            (let* ((prefix-value (prefix-numeric-value prefix-arg)))
+              (setq prefix-arg
+                    (+ prefix-value universal-argument-increment-by))))
+
+          (defun-universal-argument-operation universal-argument-batch-decrement
+            (format "decrement the current prefix-arg by %d."
+                    universal-argument-increment-by)
+            (let* ((prefix-value (prefix-numeric-value prefix-arg)))
+              (setq prefix-arg (- prefix-value universal-argument-increment-by)))))
 
         (dolist (mode `(messages-buffer-mode
                         special-mode
@@ -10510,6 +10605,7 @@
             (java . t)
             (js . t)
             (ditaa . t)
+            (plantuml . t)
             (python . t)
             (ruby . t)
             (sed . t)
@@ -10584,7 +10680,9 @@
          (general-define-key
            :keymaps 'org-mode-map
            :states 'insert
-           "<return>" 'org-clever-return)
+           "<return>" 'org-clever-return
+           "DEL" 'org-delete-backward-char
+           "<S-backspace>" 'org-delete-char)
 
          (general-define-key
            :keymaps 'org-mode-map
@@ -10800,7 +10898,7 @@
            "tdc" 'org-table-delete-column
            "tdr" 'org-table-delete-row
            "tic" 'org-table-insert-column
-           "tiH" 'org-table-hline-and-move
+           "ti-" 'org-table-hline-and-move
            "tih" 'org-table-insert-hline
            "tir" 'org-table-insert-row
            "ttf" 'org-table-toggle-formula-debugger
@@ -12136,6 +12234,15 @@
           (bind-keys :map magit-mode-map
                      ("%" . magit-gitflow-popup))))
      #+END_SRC
+
+*** plantuml
+    #+BEGIN_SRC emacs-lisp
+      (use-package plantuml-mode
+        :ensure t
+        :defer  t
+        :config
+        (setq plantuml-indent-level mohkale-preferred-indent))
+    #+END_SRC
 
 ** Unimplemented
 *** iallign
