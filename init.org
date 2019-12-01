@@ -188,7 +188,7 @@
               display-buffer-alist)
 
         (push '("*compilation*"
-                (display-buffer-reuse-window
+                (display-buffer-reuse-window-and-focus
                  display-buffer-in-side-window-and-focus)
                 (side          . bottom)
                 (window-height . 0.5))
@@ -1481,7 +1481,8 @@
                                                  eshell-mode)
         "modes under which no trailing whitespace is shown")
 
-      (defvar mohkale--whitespace-exempt-buffers '("\\*Ibuffer confirmation\\*")
+      (defvar mohkale--whitespace-exempt-buffers '("\\*Ibuffer confirmation\\*"
+                                                   "\\*Org Export Dispatcher\\*")
         "regular expressions matching buffer names under which no trailing
       whitespace is shown.")
 
@@ -3612,7 +3613,8 @@
            "C-e" nil
            "M-e" nil
            "<tab>"   'indent-relative
-           "<S-tab>" 'tab-to-tab-stop-with-prefix
+           "<S-tab>"         'tab-to-tab-stop-with-prefix
+           "<S-iso-lefttab>" 'tab-to-tab-stop-with-prefix
            ;; "<S-backspace>" 'back-to-tab-stop
            "<S-backspace>" 'evil-delete-char
            "C-y"   'yank
@@ -4212,52 +4214,58 @@
         :config
         (push 'compilation-mode mohkale--whitespace-exempt-modes)
 
-        (defun mohkale/compilation-finish-function (buf str)
-          "post compilation command hook
-        uses the above two variables to determine whether or not (and when)
-        to kill the compilation window. By default, no attempt to kill will
-        take place when compilation-auto-kill-window is nil. Otherwise the
-        window will be killed unless the compilation processes exit code is
-        non 0.
+        (let* ((compilation-buffer-name "*compilation*"))
+          (defun compilation-safely-close-window ()
+            (let* ((compilation-buffer (get-buffer compilation-buffer-name))
+                   (compilation-process (get-buffer-process compilation-buffer)))
+              (unless (or (not compilation-buffer) compilation-process)
+                ;; don't skip if new compilation began before window
+                ;; from previous compilation has been killed.
+                (quit-windows-on compilation-buffer))))
 
-        UPDATE added compilation-dont-auto-kill-window-when option so window
-        kill can be aborted should any important information be given during
-        the compilation process."
-          (if (and compilation-auto-kill-window
-                  (null (string-match ".*exited abnormally.*" str)))
+          (defun mohkale/compilation-finish-function (buf str)
+            "post compilation command hook
+      uses the above two variables to determine whether or not (and when)
+      to kill the compilation window. By default, no attempt to kill will
+      take place when compilation-auto-kill-window is nil. Otherwise the
+      window will be killed unless the compilation processes exit code is
+      non 0.
+
+      UPDATE added compilation-dont-auto-kill-window-when option so window
+      kill can be aborted should any important information be given during
+      the compilation process."
+            (when (and compilation-auto-kill-window
+                       ;; an abnormal exit automatically cancels window kill
+                       (not (string-match-p ".*exited abnormally.*" str)))
               ;; no abnormalities prepare to exit compilation window
-              (progn
-                (let ((compilation-buffer (get-buffer-create "*compilation*"))
-                      (terminate-window t)) ; terminate it unless you find you shouldn't
+              (let* ((terminate-window t)) ; set to nil to terminate window kill
 
-                  ;; check if config variable determines window should be kept open
-                  (if compilation-dont-auto-kill-window-when ; non nil
-                      (progn
-                        (unless (listp compilation-dont-auto-kill-window-when)
-                          (error (format "compilation-dont-auto-kill-window-when failed listp")))
+                ;; check if config variable determines window should be kept open
+                (when compilation-dont-auto-kill-window-when ; non nil
+                  (unless (listp compilation-dont-auto-kill-window-when)
+                    (error "compilation-dont-auto-kill-window-when failed listp"))
 
-                        (let ((encountered-errors '()))
-                          (and (member 'errors compilation-dont-auto-kill-window-when)
-                              (> compilation-num-errors-found 0)
-                              (push "errors" encountered-errors))
-                          (and (member 'warnings compilation-dont-auto-kill-window-when)
-                              (> compilation-num-warnings-found 0)
-                              (push "warnings" encountered-errors))
-                          (and (member 'infos compilation-dont-auto-kill-window-when)
-                              (> compilation-num-infos-found 0)
-                              (push "information" encountered-errors))
-                          (if (> (length encountered-errors) 0)
-                              (progn
-                                (message "window kill suspended due to encountering: %s"
-                                          (combine-and-quote-strings encountered-errors))
-                                (setq terminate-window nil))))))
+                  (let ((encountered-errors '()))
+                    (and (member 'errors compilation-dont-auto-kill-window-when)
+                         (> compilation-num-errors-found 0)
+                         (push "errors" encountered-errors))
+                    (and (member 'warnings compilation-dont-auto-kill-window-when)
+                         (> compilation-num-warnings-found 0)
+                         (push "warnings" encountered-errors))
+                    (and (member 'infos compilation-dont-auto-kill-window-when)
+                         (> compilation-num-infos-found 0)
+                         (push "information" encountered-errors))
+                    (when (> (length encountered-errors) 0)
+                      (message "window kill suspended due to encountering: %s"
+                               (combine-and-quote-strings encountered-errors))
+                      (setq terminate-window nil))))
 
-                  (if terminate-window
-                    (if (numberp compilation-auto-kill-window)
-                        (run-at-time (concat (number-to-string compilation-auto-kill-window)
-                                            " sec")
-                                      nil 'delete-windows-on compilation-buffer)
-                      (quit-windows-on compilation-buffer)))))))
+                (when terminate-window
+                  (if (numberp compilation-auto-kill-window) ;; kill after delay
+                      (run-at-time (concat (number-to-string compilation-auto-kill-window)
+                                           " sec")
+                                   nil 'compilation-safely-close-window)
+                    (compilation-safely-close-window)))))))
 
         ;; NOTE setq kept for debug purposes, defvar only works on first call
         ;; (setq compilation-auto-kill-window 2)
@@ -7881,7 +7889,9 @@
                    persp-add-new
                    persp-kill
                    persp-add-buffer
+                   persp-add-current-buffer
                    persp-remove-buffer
+                   persp-remove-current-buffer
                    persp-kill-buffer
                    persp-switch-to-buffer
                    persp-copy
@@ -11568,7 +11578,10 @@
           :ensure t
           :defer  t
           :delight (meghanada "MEG")
-          :hook ((java-mode . meghanada-mode))
+          :hook ((java-mode . meghanada-mode)
+                  ;; yasnippet offers progressive completion
+                  ;; of function arguments like snippets.
+                  )
           :commands (meghanada-mode
                      meghanada-install-server
                      meghanada-update-server
@@ -11604,6 +11617,8 @@
                      meghanada-back-jump
                      meghanada-code-beautify)
           :config
+          (require 'yasnippet)
+
           (mohkale/update-company-backends-for-mode meghanada nil
             '(company-meghanada))
 
@@ -11665,6 +11680,9 @@
 
       (mohkale/load-meghanada)
     #+END_SRC
+
+    #+RESULTS:
+    | meghanada |
 
 *** javascript
     # NOTE no on the fly syntax checking? make sure eslint is installed no warning or error will be issued if it isn't :(
@@ -11979,6 +11997,8 @@
            '(company-lsp))
          (mohkale/update-company-backends-for-mode haskell-cabal t
            '(company-cabal))
+
+         ;; (setq haskell-process-type 'ghci)
 
          ;; (general-define-key
          ;;   :states  '(insert replace)
