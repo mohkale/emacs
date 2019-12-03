@@ -6,9 +6,12 @@
 #  \___||___/_| |_|\___|_|_|     |___/_| |_|\___/|_|   \__\___|\__,_|\__|___/
 
 # remove all defined aliases, so you can refresh them
+# TODO add platform dependent fsmaps bindings
 (setq eshell-command-aliases-list nil)
 
-setq eshell--shortcuts-script "~/programming/scripts/build_shortcuts.sh" >/dev/null
+setq eshell--shortcuts-script      "~/programming/scripts/build_shortcuts.sh" >/dev/null
+setq eshell--list-shortcuts-script "~/programming/scripts/list_shortcuts.sh"  >/dev/null
+setq eshell--shortcuts-root        "~/.shortcuts"
 
 setq eshell--program-shortcuts {
     # source aliases from global shortcuts, os shortcuts and finally eshell shortcuts
@@ -18,17 +21,17 @@ setq eshell--program-shortcuts {
          ((or (eq system-type 'windows-nt)
               (eq system-type 'ms-dos)
               (eq system-type 'cygwin))
-          (expand-file-name "~/.shortcuts/shortcuts.windows"))
+          (expand-file-name "~/.shortcuts/windows/shortcuts"))
          ((eq system-type 'darwin)
-          (expand-file-name "~/.shortcuts/shortcuts.macos"))
+          (expand-file-name "~/.shortcuts/macos/shortcuts"))
          ((or (eq system-type 'gnu)
               (eq system-type 'gnu/linux)
               (eq system-type 'gnu/kfreebsd))
-          (expand-file-name "~/.shortcuts/shortcuts.linux"))) | sed -r -e 's/alias ([^=]+)=(.+)/\1 \2/'
+          (expand-file-name "~/.shortcuts/linux/shortcuts"))) | sed -r -e 's/alias ([^=]+)=(.+)/\1 \2/'
 } >/dev/null
 
 setq eshell--eshell-shortcuts {
-    bash $eshell--shortcuts-script ~/.shortcuts/shortcuts.eshell | sed -r -e 's/alias ([^=]+)=(.+)/\1 \2/'
+    bash $eshell--shortcuts-script ~/.shortcuts/eshell/shortcuts | sed -r -e 's/alias ([^=]+)=(.+)/\1 \2/'
 } >/dev/null
 
 
