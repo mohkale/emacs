@@ -397,6 +397,8 @@
            org-ditaa-eps-jar-path                             (var "org/bin/ditaaEps.jar")
            plantuml-jar-path                                  (var "org/bin/plantuml.jar")
            org-plantuml-jar-path                              plantuml-jar-path
+           org-projectile-projects-directory                  (etc "projects/org/")
+           org-projectile-projects-file                       (etc "projects/org/global.org")
            mohkale-library-of-babel-file                      (etc "babel-lib.org")
            multi-compile-history-file                         (var "multi-compile-history.el")
            pcache-directory                                   (var "pcache/")
@@ -6442,7 +6444,8 @@
                     counsel-recentf
                     counsel-mode)
          :init
-         (setq counsel-find-file-occur-use-find t)
+         (setq counsel-find-file-occur-use-find t
+               counsel-rg-base-command "rg --with-filename --no-heading --line-number --path-separator // --color never %s .")
 
          (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
          (fset 'describe-bindings (symbol-function 'counsel-descbinds))
@@ -6503,6 +6506,10 @@
            "hdB" 'describe-bindings-buffer)
 
          (general-define-key
+           :keymaps 'counsel-find-file-map
+           "C-b" 'counsel-find-file--jump-to-bookmark)
+
+         (general-define-key
            "C-M-y" 'counsel-yank-pop)
          :config
          (counsel-mode +1)
@@ -6511,6 +6518,19 @@
                counsel-find-file-ignore-regexp "\\.#.+"
                ivy-initial-inputs-alist mohkale--ivy-initial-inputs-alist)
 
+         (defun counsel-find-file--jump-to-bookmark ()
+           "jumpt to a bookmark directory from a `counsel-find-file' session"
+           (interactive)
+           (require 'bookmark)
+           (let ((last-directory ivy--directory))
+             (ivy-quit-and-run
+               (ivy-read "Jump to bookmark: "
+                         (counsel-bookmarked-directory--candidates)
+                         :caller 'counsel-find-file--jump-to-bookmark
+                         :action (lambda (dir)
+                                   (counsel-find-file (if (string-empty-p dir)
+                                                          last-directory
+                                                        dir)))))))
          :bind* (:map company-mode-map
                  ("C-:" . counsel-company)
                  :map counsel-describe-map
@@ -6616,6 +6636,25 @@
            "Tc" 'counsel-gtags-create-tags
            "Tu" 'counsel-gtags-update-tags
            "TT" 'counsel-gtags-dwim))
+     #+END_SRC
+
+**** counsel-tramp
+     #+BEGIN_SRC emacs-lisp
+       (use-package counsel-tramp
+         :ensure t
+         :defer  t
+         :commands (counsel-tramp)
+         :init
+         (mohkale/set-leader-keys
+           "f@" 'counsel-tramp))
+     #+END_SRC
+
+**** counsel-css
+     #+BEGIN_SRC emacs-lisp
+       (use-package counsel-css
+         :ensure t
+         :defer  t
+         :commands (counsel-css))
      #+END_SRC
 
 **** helm-make
@@ -8389,28 +8428,6 @@
          (advice-add 'projectile-run-project     :around #'projectile-compile--double-prefix-means-run-comint)
          (advice-add 'projectile-compile-project :around #'projectile-compile--double-prefix-means-run-comint)
          (advice-add 'projectile-test-project    :around #'projectile-compile--double-prefix-means-run-comint))
-     #+END_SRC
-
-**** org-projectile
-     #+BEGIN_SRC emacs-lisp
-       (use-package org-projectile
-         :ensure t
-         :defer  t
-         :commands (org-projectile-capture-for-current-project
-                    ;; org-projectile-helm-template-or-project
-                    org-projectile-project-todo-completing-read
-                    org-projectile-goto-location-for-project)
-         :init
-         (mohkale/declare-prefix*
-           "po" "org-projectile-goto-todos"
-           "pO" "org-projectile-capture")
-
-         (mohkale/set-leader-keys
-           "po" 'org-projectile-goto-location-for-project
-           ;; "pO" 'org-projectile-helm-template-or-project
-           )
-         :config
-         (org-projectile-per-project))
      #+END_SRC
 
 **** ivy-projectile
@@ -10540,7 +10557,7 @@
            "oc" 'org-capture
            "oa" 'org-agenda
            "oy" 'org-copy-subtree
-           "oc" 'org-cut-subtree)
+           "oY" 'org-cut-subtree)
          :config
          (mohkale//define-pretty-symbols-for-mode 'org-mode
            ("lambda" . ?λ))
@@ -10952,6 +10969,58 @@
            (concat mohkale-major-mode-leader-prefix ",") 'org-edit-src-exit
            (concat mohkale-major-mode-leader-prefix "q") 'org-edit-src-abort
            (concat mohkale-major-mode-leader-prefix "s") 'org-edit-src-save))
+     #+END_SRC
+
+**** org-projectile
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-projectile
+         :ensure t
+         :defer  t
+         :commands (org-projectile-project-todo-completing-read
+                    org-projectile-project-todo-entry
+                    org-projectile-goto-location-for-project
+                    org-projectile-find-todo-file)
+         :init
+         (push (org-projectile-project-todo-entry) org-capture-templates)
+         (setq org-confirm-elisp-link-function nil
+               org-agenda-files (append org-agenda-files (org-projectile-todo-files)))
+
+         (mohkale/declare-prefix*
+           "po" "org-projectile-goto-todos"
+           "pO" "org-projectile-capture")
+
+         (mohkale/set-leader-keys
+           "op" 'org-projectile-find-todo-file
+           ;; "op" 'org-projectile-goto-location-for-project
+           "po" 'org-projectile-goto-location-for-project
+           ;; "pO" 'org-projectile-helm-template-or-project
+           )
+         :config
+         (org-projectile-per-project)
+         (defun org-projectile-find-todo-file (&optional prefix)
+           "find the org file for a given project
+       by default it'll be the current project. If you're not in a project
+       or you pass a PREFIX value, then you'll be prompted for which project
+       to visit the TODO file for."
+           (interactive "P")
+           (let ((project-root (projectile-project-root)))
+             (when (or prefix (not project-root))
+               (setq project-root
+                     ;; (completing-read "Project: " (projectile-relevant-known-projects))
+                     (projectile-completing-read
+                      "Project: " (occ-get-categories org-projectile-strategy))))
+
+             (when project-root
+               (let ((file (org-projectile-get-project-todo-file project-root)))
+                 (when (or (file-exists-p file)
+                           (y-or-n-p (format "Project TODO file '%s' doesn't exist, make now: "
+                                             file)))
+                   (find-file file))))))
+
+         (setq org-projectile-per-project-filepath
+               (defun mohkale--org-projectile-path (project-path)
+                 (let* ((project-path (replace-regexp-in-string "/$" "" project-path)))
+                   (concat (file-name-nondirectory project-path) ".org")))))
      #+END_SRC
 
 *** JSON
