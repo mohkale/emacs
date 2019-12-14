@@ -416,6 +416,9 @@
            tldr-directory-path                                (var "tldr/")
            transient-history-file                             (var "transient/history.el")
            transient-levels-file                              (etc "transient/levels.el")
+           straight-base-dir                                  (bin "") ;; weird way to configure it, but okay
+           straight-bootstrap-file                            (concat straight-base-dir
+                                                                      "straight/repos/straight.el/bootstrap.el")
            transient-values-file                              (etc "transient/values.el")
            treemacs-persist-file                              (var "treemacs/persist.org")
            vimish-fold-dir                                    (var "vimish-fold/")
@@ -431,7 +434,8 @@
                             (join-path lsp-server-root
                                        "kotlin"
                                        "debugger"
-                                       "bin")
+                                       "bin"
+                                       "org")
                             (join-path lsp-server-root
                                        "haskell"))))
             (setq exec-path (append exec-path list)))
@@ -485,12 +489,12 @@
 
       (package-initialize) ;; TODO find a way to remove this... without breaking everything
 
-      (let ((package-sources `(("melpa" . "https://melpa.org/packages/")
-                               ;; ("org"       . "http://orgmode.org/elpa/")
-                               ;; ("marmalade" . "http://marmalade-repo.org/packages/")
-                               ("gnu"       . "http://elpa.gnu.org/packages/"))))
-        (dolist (source package-sources)
-          (push source package-archives)))
+      (defvar package-archives)
+      (setq package-archives
+            (append '(("melpa" . "https://melpa.org/packages/")
+                      ;; ("org"       . "http://orgmode.org/elpa/")
+                      ;; ("marmalade" . "http://marmalade-repo.org/packages/")
+                      ("gnu"       . "http://elpa.gnu.org/packages/"))))
 
       (let ((plist-refreshed nil))
         (dolist (package startup-requires)
@@ -503,6 +507,24 @@
 
             (package-install package))
           (require package)))
+
+      ;; install (then load) the straight package manager.
+      ;; ideally I'd like to use straight exclusively, but
+      ;; it's really slow when you have a lot of packages.
+      (let ((bootstrap-file straight-bootstrap-file)
+            (bootstrap-version 5))
+        (unless (file-exists-p straight-bootstrap-file)
+          (with-current-buffer
+              (url-retrieve-synchronously
+               "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+               'silent 'inhibit-cookies)
+            (goto-char (point-max))
+            (eval-print-last-sexp)))
+        (load straight-bootstrap-file nil 'nomessage))
+
+      (setq straight-use-package-by-default nil
+            use-package-always-ensure       nil
+            straight-allow-recipe-inheritance t)
     #+END_SRC
 
 *** External Packages
@@ -515,7 +537,6 @@
     | hide-comnt          | 0eca097ae073b6536863492eb4d4beeb25b712acd45e21fc0bda9f19d39e963f | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/hide-comnt.el          |
     | imenu-tree          | c4b3ae0d8b5c3e5a50c9c4b3f96fd48e309c2fae9a8902a1d649063c7b3b611c | https://www.emacswiki.org/emacs/download/imenu-tree.el                                    |
     | help-fns+           | c2229229a699d115b91da8692f3b8099c19608728eb402edb6f7cd6e1c81912b | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/help-fns%2B.el         |
-    | vlc-rc              | 0064a388ea85f9fefec74401bbdbc74cdd2c6398a6790dee7f15bda13a758be7 | https://raw.githubusercontent.com/MoHKale/vlc-rc/master/vlc-rc.el                         |
     | lorem-ipsum         | 54cb139d6c88632aaef6364a2a6c6cadbb9a5082eb5032e69b5139dcc7074d88 | https://www.emacswiki.org/emacs/download/lorem-ipsum.el                                   |
     | profile-dotemacs    | 1d903fc16d4ab4716cf8097ddb88a5cbb3746c9e49fa3421ae147b0c383c3e7f | http://www.randomsample.de/profile-dotemacs.el                                            |
     | open-junk-file      | c0b835b329758dced4ccae6c2f3fd5af16af929437110ddde00ea55dc7d47be3 | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/open-junk-file.el      |
@@ -587,7 +608,7 @@
                              (external-packages/validate-package-hash file dest-path hash))
                   (push file failed-installs))))))
 
-        (if (endp failed-installs)
+        (if (eq failed-installs nil)
             (let ((buffer (get-buffer "*external-packages*")))
               (and buffer
                    (kill-buffer buffer))) ;; kill process buffer when nothing failed
@@ -610,9 +631,11 @@
      ;; NOTE the methods in here aren't as long as the ones in spacemacs because I don't
      ;;      use different leader keys for `emacs' config and spacemacs config.
 
-     (require 'general)
-     (require 'bind-map)
-     (require 'which-key)
+     (dolist (package '(general
+                        bind-map
+                        which-key
+                        seq))
+       (require package))
 
      ;; use nicer indentation with general
      (put 'general-define-key 'lisp-indent-function 'defun)
@@ -1219,7 +1242,8 @@
 ** Mohkale
    #+BEGIN_SRC emacs-lisp
      (use-package mohkale
-       :defer t
+       :defer   t
+       :straight (mohkale :type built-in)
        :commands (mohkale/eval-configuration-file
                   mohkale/build-configuration-file
                   mohkale/find-configuration-file
@@ -1326,7 +1350,8 @@
 *** File
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-file
-        :defer t
+        :defer   t
+        :straight (mohkale-file :type built-in)
         :commands (rename-buffer-file
                    delete-buffer-file
                    show-and-copy-buffer-file-name
@@ -1605,7 +1630,8 @@
 *** Text
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-text-query
-        :defer t
+        :defer   t
+        :straight (mohkale-text-query :type built-in)
         :commands (line-width
                    column-number
                    point-to-coordinates
@@ -1613,7 +1639,8 @@
                    list-faces))
 
       (use-package mohkale-text
-        :defer t
+        :defer   t
+        :straight (mohkale-text :type built-in)
         :commands (dos2unix
                    unix2dos
                    pad-line-with-char-to-length
@@ -1901,7 +1928,8 @@
 *** Buffers, Windows & Frames
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-bufwin
-        :defer t
+        :defer   t
+        :straight (mohkale-bufwin :type built-in)
         :commands (switch-to-scratch-buffer
                    kill-this-buffer-and-window-maybe
                    switch-to-last-buffer
@@ -3910,7 +3938,8 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package prog-mode
-        :defer t
+        :defer   t
+        :straight (prog-mode :type built-in)
         :commands (prettify-symbols-mode)
         :delight
         :init
@@ -4070,7 +4099,8 @@
 *** buffer-menu
     #+BEGIN_SRC emacs-lisp
       (use-package buff-menu
-        :defer t
+        :defer   t
+        :straight (buff-menu :type built-in)
         :config
         (evil-set-initial-state 'Buffer-menu-mode 'motion)
 
@@ -4421,7 +4451,8 @@
 *** comint - command interpreter
     #+BEGIN_SRC emacs-lisp
       (use-package comint
-        :defer t
+        :defer   t
+        :straight (comint :type built-in)
         :hook ((comint-mode . (lambda () (setq-local evil-emacs-state-cursor 'bar)))
                ;; (comint-mode . blink-cursor-mode)
                )
@@ -5257,7 +5288,8 @@
 **** dired-x
      #+BEGIN_SRC emacs-lisp
        (use-package dired-x
-         :defer t
+         :defer   t
+         :straight (dired-x :type built-in)
          :commands (dired-jump
                     dired-jump-other-window
                     dired-omit-mode)
@@ -5274,7 +5306,8 @@
 **** epa-dired
      #+BEGIN_SRC emacs-lisp
        (use-package epa-dired
-         :defer t
+         :defer   t
+         :straight (epa-dired :type built-in)
          :commands (epa-dired-do-decrypt
                     epa-dired-do-encrypt
                     epa-dired-do-sign
@@ -5314,7 +5347,8 @@
 **** dired
      #+BEGIN_SRC emacs-lisp
        (use-package dired
-         :defer t
+         :defer   t
+         :straight (dired :type built-in)
          :hook (dired-mode . dired-omit-mode)
          :config
          (setq ls-lisp-dirs-first t
@@ -5479,7 +5513,8 @@
 **** image-dired
      #+BEGIN_SRC emacs-lisp
        (use-package image-dired
-         :defer t
+         :defer   t
+         :straight (image-dired :type built-in)
          :commands (persp-custom-@dired-slideshow)
          :init
          (push 'image-dired-thumbnail-mode mohkale--whitespace-exempt-modes)
@@ -5813,7 +5848,8 @@
 **** eshell-mode
      #+BEGIN_SRC emacs-lisp
        (use-package esh-mode
-         :defer t
+         :defer   t
+         :straight (esh-mode :type built-in)
          :hook (
                 ;;; cursor-type is block... changing to bar
                 ;;; doesn't persist on window change... boo!!!
@@ -6195,6 +6231,7 @@
 *** help
     #+BEGIN_SRC emacs-lisp
       (use-package help
+      :straight (help :type built-in)
         :config
         ;; once was enough, stop repeating the same message please :P
         (advice-add 'help-window-display-message :around #'ignore))
@@ -6203,7 +6240,8 @@
 *** help-fns+
     #+BEGIN_SRC emacs-lisp
       (use-package help-fns+
-        :defer t
+        :defer   t
+        :straight (help-fns+ :type built-in)
         :commands (describe-buffer
                    describe-keymap
                    describe-mode
@@ -6218,6 +6256,7 @@
 
 *** hide-comnt
     toggles the display of comments in the current buffer.
+
     #+BEGIN_SRC emacs-lisp
       (use-package hide-comnt
         :ensure nil
@@ -6273,7 +6312,8 @@
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package hydra-posframe
-        :defer t
+        :defer   t
+        :straight (hydra-posframe :type built-in)
         :commands (hydra-posframe-mode
                    hydra-posframe-enable)
         :init
@@ -7126,8 +7166,8 @@
 **** ibuffer-persp
      #+BEGIN_SRC emacs-lisp
        (use-package ibuffer-persp
-         ;; :ensure t
-         :defer  t
+         :defer   t
+         :straight (ibuffer-persp :type built-in)
          :commands (ibuffer-persp ;; only buffers from current perspective
                     ibuffer-persp-set-filter-groups-by-persp-name-not-nil
                     ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
@@ -7181,7 +7221,9 @@
     #+END_SRC
 
 *** ein - emacs-ipython-notebook
-    #+BEGIN_SRC emacs-lisp
+    org mode is 100% better... prove me wrong :P
+
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package ein
         :ensure t
         :defer  t
@@ -7859,7 +7901,8 @@
 *** occur
     #+BEGIN_SRC emacs-lisp
       (use-package replace
-        :defer t
+        :defer   t
+        :straight (replace :type built-in)
         :config
         ;; occur-mode-display-occurrence
         (advice-add 'occur-mode-display-occurrence :around
@@ -8428,7 +8471,8 @@
 *** process-menu
     #+BEGIN_SRC emacs-lisp
       (use-package simple
-        :defer t
+        :defer   t
+        :straight (simple :type built-in)
         :config
         (evil-set-initial-state 'process-menu-mode 'motion)
 
@@ -8749,7 +8793,8 @@
 *** simple
     #+BEGIN_SRC emacs-lisp
       (use-package simple
-        :defer t
+        :defer   t
+        :straight (simple :type built-in)
         :commands (completion-list-mode
                    smart-universal-argument
                    universal-argument-batch-increment
@@ -9161,13 +9206,15 @@
 *** visual-line
     #+BEGIN_SRC emacs-lisp
       (use-package visual-line
-        :defer t
+        :defer   t
+        :straight (visual-line :type built-in)
         :delight " Ⓛ")
     #+END_SRC
 
 *** vlc-rc
     #+BEGIN_SRC emacs-lisp
       (use-package vlc-rc
+        :straight (vlc-rc :type git :host github :repo "mohkale/vlc-rc")
         :defer t
         ;; can't defer for now, hopefully when use-package
         ;; supports bind-keymap with specific map, change.
@@ -9882,7 +9929,8 @@
 **** elisp-mode
      #+BEGIN_SRC emacs-lisp
        (use-package elisp-mode
-         :defer t
+         :defer   t
+         :straight (elisp-mode :type built-in)
          ;; show lambda as an actual lambda symbol
          :config
          (mohkale//define-pretty-symbols-for-mode 'emacs-lisp-mode
@@ -10090,7 +10138,8 @@
 **** python-mode
      #+BEGIN_SRC emacs-lisp
        (use-package python
-         :defer t
+         :defer   t
+         :straight (python :type built-in)
          :hook (python-mode . flycheck-mode)
          :commands (python-mode
                     run-python)
@@ -10160,8 +10209,8 @@
 **** ruby
      #+BEGIN_SRC emacs-lisp
        (use-package ruby
-         ;; :ensure t
-         :defer  t
+         :defer    t
+         :straight (ruby :type built-in)
          :commands (ruby-mode
                     ruby-toggle-string-quotes
                     ruby-toggle-block)
@@ -10555,8 +10604,8 @@
 **** org-agenda
      #+BEGIN_SRC emacs-lisp
        (use-package org-agenda
-         :ensure nil
-         :defer  t
+         :defer    t
+         :straight (org-agenda :type built-in)
          :config
          (evil-set-initial-state 'org-agenda-mode 'normal)
 
@@ -10677,7 +10726,8 @@
 **** org-link-edit
      #+BEGIN_SRC emacs-lisp
        (use-package org-link-edit
-         :defer  t
+         :defer    t
+         :straight (org-link-edit :type built-in)
          :commands (org-link-edit-forward-slurp
                     org-link-edit-forward-barf
                     org-link-edit-backward-slurp
@@ -10697,8 +10747,8 @@
 **** org-mode
      #+BEGIN_SRC emacs-lisp
        (use-package org
-         :ensure t
-         :defer  t
+         :defer   t
+         :straight (org :type built-in)
          :hook ((org-mode . mohkale//enable-line-numbers-handler))
          :commands (org-capture
                     org-agenda
@@ -11106,7 +11156,8 @@
 **** org-capture
      #+BEGIN_SRC emacs-lisp
        (use-package org-capture
-         :defer t
+         :defer   t
+         :straight (org-capture :type built-in)
          :config
          (mohkale/set-leader-keys-for-minor-mode 'org-capture-mode
            (concat mohkale-major-mode-leader-prefix ",") 'org-capture-finalize
@@ -11117,7 +11168,8 @@
 **** org-src
      #+BEGIN_SRC emacs-lisp
        (use-package org-src
-         :defer t
+         :defer   t
+         :straight (org-src :type built-in)
          :config
          (mohkale/set-leader-keys-for-minor-mode 'org-src-mode
            (concat mohkale-major-mode-leader-prefix ",") 'org-edit-src-exit
@@ -11363,7 +11415,8 @@
 **** shell-script-mode
      #+BEGIN_SRC emacs-lisp
        (use-package sh-script
-         :defer t
+         :defer   t
+         :straight (sh-script :type built-in)
          :hook ((sh-script-mode . electric-pair-mode)
                 (sh-script-mode . flycheck-mode))
          :config
@@ -11662,8 +11715,8 @@
 **** cc-mode
      #+BEGIN_SRC emacs-lisp
        (use-package cc-mode
-         :ensure t
-         :defer  t
+         :defer   t
+         :straight (cc-mode :type built-in)
          :commands (c-mode c++-mode mohkale//set-c-mode-bindings)
          :hook (
                 ;; use global-ycmd-mode manually
@@ -11769,10 +11822,11 @@
 *** java
     java, the language *everyone* tolerates.
 
-**** java mode
+**** java-mode
     #+BEGIN_SRC emacs-lisp
       (use-package cc-mode
-        :defer t
+        :defer   t
+        :straight (cc-mode :type built-in)
         :init
         (with-eval-after-load 'projectile
           ;; see: https://github.com/bbatsov/projectile/blob/master/projectile.el#L2636
