@@ -279,6 +279,7 @@
       (mohkale//initialise-dotemacs-path etc "etc")
       (mohkale//initialise-dotemacs-path bin "bin")
       (mohkale//initialise-dotemacs-path var "var")
+      (mohkale//initialise-dotemacs-path org "org")
 
       (defconst mohkale-config-root (mohkale/join-dotemacs-etc-path "mohkale")
         "path to the configuration directory under which my general purpose
@@ -310,7 +311,8 @@
 
       (cl-letf (((symbol-function #'etc) (symbol-function #'mohkale/join-dotemacs-etc-path))
                 ((symbol-function #'bin) (symbol-function #'mohkale/join-dotemacs-bin-path))
-                ((symbol-function #'var) (symbol-function #'mohkale/join-dotemacs-var-path)))
+                ((symbol-function #'var) (symbol-function #'mohkale/join-dotemacs-var-path))
+                ((symbol-function #'org) (symbol-function #'mohkale/join-dotemacs-org-path)))
         (with-no-warnings
           (setq
            package-user-dir                                   (bin "elpa/")
@@ -397,8 +399,8 @@
            org-ditaa-eps-jar-path                             (var "org/bin/ditaaEps.jar")
            plantuml-jar-path                                  (var "org/bin/plantuml.jar")
            org-plantuml-jar-path                              plantuml-jar-path
-           org-projectile-projects-directory                  (etc "projects/org/")
-           org-projectile-projects-file                       (etc "projects/org/global.org")
+           org-projectile-projects-directory                  (org "projects/")
+           org-projectile-projects-file                       (org "projects/global.org")
            mohkale-library-of-babel-file                      (etc "babel-lib.org")
            multi-compile-history-file                         (var "multi-compile-history.el")
            pcache-directory                                   (var "pcache/")
@@ -525,6 +527,7 @@
     | miniedit            | c632c33c099362b084d965c51ec4b933be1278c7064096ce3b97cc830436055b | https://raw.githubusercontent.com/emacsmirror/miniedit/master/miniedit.el                 |
     | ibuffer-persp       | 6395294e2dd368866d79a81d37c27961e0f871937ccd82cff317e5ad67c52652 | https://raw.githubusercontent.com/rakshasa/ibuffer-persp/master/ibuffer-persp.el          |
     | org-link-edit       | ac84061d951ef9ef82794ba7f4416afb6da4283a182490a11ae455077321814c | https://raw.githubusercontent.com/kyleam/org-link-edit/master/org-link-edit.el            |
+    | hydra-posframe      | a828d588082f0f011459f13aecf04e8a610ab150c566b6a18cd279c006a881a3 | https://raw.githubusercontent.com/Ladicle/hydra-posframe/master/hydra-posframe.el         |
 
     #+BEGIN_SRC emacs-lisp :var package-list=non-melpa-packages
       (defun external-packages/download-external-package (url dest-path)
@@ -852,7 +855,7 @@
       (mohkale/set-leader-keys
         "SPC" 'execute-extended-command
         "TAB" 'switch-to-last-buffer
-        "<C-tab>" 'indent-back-to-normal ;; C-TAB doesn't work
+        ;; "<C-tab>" 'indent-back-to-normal ;; C-TAB doesn't work
         "!" 'shell-command
         "&" 'async-shell-command
         "-" 'line-width
@@ -978,6 +981,7 @@
         "fD" 'delete-buffer-file
         "fF" 'find-file-at-point
         "ff" 'find-file
+        "fo" 'find-file-other-window
         "fl" 'find-file-literally
         "f|" 'find-file-at-point
         ;; "fo" 'open-file-or-directory-in-external-app ;; TODO implement
@@ -1253,31 +1257,28 @@
    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale.el"
      (defmacro mohkale/defun-mohkale-find-package-file (file-type file-path &optional root)
-       "creates a function to visit a file, ideally under the mohkale directory
-     file-type is a symbol, which is substituted into the string `\"mohkale/find-%s-file\"'
-     and then set as the name of this function. file-path is the path of the file the function
-     will open. root is the base directory from which file path can be found. If nil, it defaults
-     to `mohkale-root'. Pass a non string truthy value if `file-path' is an absolute path."
-       (unless (stringp root)
-         (if root
-             (setq root (file-name-directory (eval file-path)))
-           (setq root mohkale-config-root)))
+       (setq file-path (eval file-path))
 
-       (unless (file-name-absolute-p (eval file-path))
-         (setq file-path (concat root "/" (eval file-path))))
+       (when root
+         (setq file-path (concat (eval root) "/" file-path)))
 
-       `(defun ,(intern (concat "mohkale/find-" (symbol-name file-type) "-file")) ()
-         (interactive)
-         (if (not (file-directory-p ,root))
-             (error (format "mohkale::error() : mohkale find file > directory not found: %s" ,root))
-           (find-file ,file-path))))
+       (let ((func-name (intern (concat "mohkale/find-" (symbol-name file-type) "-file"))))
+         `(defun ,func-name (&optional prefix)
+            (interactive "P")
+            (if (not (file-exists-p ,file-path))
+                (progn
+                  (if (not prefix)
+                      (error (concat "mohkale(error) : mohkale-find-file file not found: " ,file-path))
+                    (make-directory (file-name-directory ,file-path))
+                    (find-file ,file-path)))
+              (find-file ,file-path)))))
 
-     (mohkale/defun-mohkale-find-package-file capture-notes "org/notes.org")
-     (mohkale/defun-mohkale-find-package-file org-university "org/university.org")
-     ;; TODO refactor this needless repeated work
-     (mohkale/defun-mohkale-find-package-file dotfile "init.el" user-emacs-directory)
-     (mohkale/defun-mohkale-find-package-file configuration mohkale-mohkale-config-file t)
-     (mohkale/defun-mohkale-find-package-file tangled-config mohkale-mohkale-el-config-file t)
+     (mohkale/defun-mohkale-find-package-file dotfile        "init.el" user-emacs-directory)
+     (mohkale/defun-mohkale-find-package-file configuration  mohkale-mohkale-config-file)
+     (mohkale/defun-mohkale-find-package-file tangled-config mohkale-mohkale-el-config-file)
+
+     (mohkale/defun-mohkale-find-package-file capture-notes  (mohkale/join-dotemacs-org-path "notes.org"))
+     (mohkale/defun-mohkale-find-package-file org-university (mohkale/join-dotemacs-org-path "university.org"))
 
      (defun mohkale/eval-configuration-file ()
        (interactive)
@@ -3288,51 +3289,26 @@
       (use-package spaceline
         :ensure t
         :demand t
-        :hook (helm-mode . spaceline-helm-mode)
-        :config
-        (require 'spaceline-config)
+        ;; :hook (helm-mode . spaceline-helm-mode)
+        :init
         ;; highlight mode line color depending on current evil state... COOL!!!
-        (setq-default spaceline-highlight-face-func       'spaceline-highlight-face-evil-state
-                      mode-line-format                    (spaceline-spacemacs-theme)
-                      spaceline-buffer-id-max-length      20
-                      spaceline-org-clock                 t
-                      powerline-default-separator         'slant)
+        (setq-default spaceline-highlight-face-func  'spaceline-highlight-face-evil-state
+                      spaceline-buffer-id-max-length 25
+                      mode-line-format               (spaceline-spacemacs-theme)
+                      spaceline-org-clock            t
+                      powerline-default-separator    'slant)
 
         ;; by default, colors seem to glitch out on change
         (add-hook 'after-load-theme-hook #'powerline-reset)
 
         (when (display-graphic-p)
           (setq-default spaceline-window-numbers-unicode    t
+                        ;; having two unicode numbers next to each other
+                        ;; is IMO ugly, so disable the workspace one :(.
+                        spaceline-workspace-number-p        nil
                         spaceline-workspace-numbers-unicode t))
-
-        (defun spaceline--this-macro-to-string ()
-          (when defining-kbd-macro
-            (let ((macro-symbol "@"))
-              (if (and (bound-and-true-p evil-mode)
-                       evil-this-macro)
-                  (concat macro-symbol
-                          (string evil-this-macro))
-                macro-symbol))))
-
-        (setq evil-register--register-prefix "\""
-              evil-register--fallback-char   ?_)
-
-        (defmacro evil-register-to-string (register-var)
-          `(when ,register-var
-             (if ,register-var
-                 (concat evil-register--register-prefix
-                         (char-to-string ,register-var))
-               (make-string 2 evil-register--fallback-char))))
-
-        (spaceline-define-segment evil-macro-and-register
-          (let ((macro (spaceline--this-macro-to-string))
-                (register (evil-register-to-string evil-this-register)))
-            (cond
-             ((and macro register)
-              (concat macro " " register))
-             (macro    macro)
-             (register register)))
-          :enabled t)
+        :config
+        (require 'mohkale-spaceline-segments)
 
         (spaceline-compile
           ;;  _       __ _
@@ -3342,54 +3318,169 @@
           ;; |_|\___|_|  \__|
           ;;
 
-         '(((persp-name
-             workspace-number
-             window-number)
-            :fallback evil-state
-            :face highlight-face
-            :priority 100)
-           (anzu :priority 95)
-           auto-compile
-           ((buffer-modified buffer-size buffer-id remote-host)
-            :priority 98)
-           (major-mode :priority 79)
-           (process :when active)
-           ((flycheck-error flycheck-warning flycheck-info)
-            :when active
-            :priority 89)
-           (minor-modes :when active
-                        :priority 9)
-           (mu4e-alert-segment :when active)
-           (erc-track :when active)
-           (version-control :when active
-                            :priority 78)
-           (org-pomodoro :when active)
-           (org-clock :when active)
-           nyan-cat)
+          '(((persp-name
+              workspace-number
+              ;; minibuffer-active
+              window-number)
+             :fallback evil-state
+             :face highlight-face
+             :priority 100)
+            auto-compile
+            (anzu
+             :priority 98)
+            ((buffer-modified buffer-size buffer-id remote-host)
+             :priority 98)
+            (major-mode :priority 79)
+            (process :when active)
+            ((flycheck-error flycheck-warning flycheck-info)
+             :when active
+             :priority 89)
+            (minor-modes :when active
+                         :priority 9)
+            ;; (mu4e-alert-segment :when active)
+            ;; (erc-track :when active)
+            ((;version-control-type-icon
+              version-control-status)
+             :fallback version-control
+             :priority 78)
+            ;; (org-pomodoro :when active)
+            (org-clock :when active)
+            ;; nyan-cat
+            )
 
-         ;;       _       _     _
-         ;;  _ __(_) __ _| |__ | |_
-         ;; | '__| |/ _` | '_ \| __|
-         ;; | |  | | (_| | | | | |_
-         ;; |_|  |_|\__, |_| |_|\__|
-         ;;         |___/
+          ;;       _       _     _
+          ;;  _ __(_) __ _| |__ | |_
+          ;; | '__| |/ _` | '_ \| __|
+          ;; | |  | | (_| | | | | |_
+          ;; |_|  |_|\__, |_| |_|\__|
+          ;;         |___/
 
-         '(which-function
-           (python-pyvenv :fallback python-pyenv)
-           (purpose :priority 94)
-           (battery :when active)
-           (selection-info :priority 95)
-           input-method
-           ((evil-macro-and-register
-             buffer-encoding-abbrev
-             point-position
-             line-column)
-            :separator " | "
-            :priority 96)
-           (global :when active)
-           (buffer-position :priority 99)
-           (hud :priority 99))))
+          '(which-function
+            (python-pyvenv :fallback python-pyenv)
+            (purpose :priority 94)
+            (battery :when active)
+            (selection-info :priority 95)
+            input-method
+            ((evil-macro-and-register
+              buffer-encoding-abbrev
+              point-position
+              line-column)
+             :separator " | "
+             :priority 96)
+            (global :when active)
+            (buffer-position :priority 99)
+            (hud :priority 99))))
     #+END_SRC
+
+**** segments
+    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-spaceline-segments.el"
+      (require 'spaceline-config)
+
+      (defun spaceline--active-macro-to-string ()
+        (when defining-kbd-macro
+          (let ((macro-symbol "@"))
+            (if (and (bound-and-true-p evil-mode)
+                     evil-this-macro)
+                (concat macro-symbol
+                        (string evil-this-macro))
+              macro-symbol))))
+
+      (defvar spaceline-evil-register--always-display-p nil
+        "whether to always show something in the modeline,
+      even when no register is currently active.")
+
+      (defmacro evil-register-to-string (register-var)
+        `(if ,register-var
+             (concat "\"" (char-to-string ,register-var))
+           (when spaceline-evil-register--always-display-p
+             (make-string 2 ?_))))
+
+      (spaceline-define-segment evil-macro-and-register
+        (let ((macro (spaceline--active-macro-to-string))
+              (register (evil-register-to-string evil-this-register)))
+          (cond
+           ((and macro register)
+            (concat macro " " register))
+           (macro    macro)
+           (register register)))
+        :enabled t)
+
+      (defalias 'all-the-icons-available-p #'display-graphic-p
+        "whether your current frame has access to emacs icons.")
+
+      (defun powerline-active-p ()
+        "whether a spaceline segment is being called within
+      the current window... for some reason this was used in
+      `spaceline--render-mode-line' but never put into it's
+      own method :("
+        (or spaceline-always-show-segments
+            (powerline-selected-window-active)))
+
+      (spaceline-define-segment minibuffer-active
+        "show a stop symbol if minibuffer is active"
+        (all-the-icons-faicon "minus-circle"
+                              :v-adjust -0.15
+                              :face '(:inherit))
+        :when (and active (active-minibuffer-window)))
+
+      ;; (spaceline-define-segment buffer-mode-icon
+      ;;   "an `all-the-icons' segment to show the mode of the current buffer"
+      ;;   (all-the-icons-icon-for-mode major-mode
+      ;;                                :v-adjust -0.15
+      ;;                                :face :inherit)
+      ;;   :enabled (all-the-icons-available-p)
+      ;;   :face other-face)
+
+      ;; (let ((vc-icon-face 'font-lock-keyword-face)
+      ;;       (vc-status-icon-face 'font-lock-string-face))
+      ;;   (defun spaceline-vc--git-status ()
+      ;;     "Get the formatted GIT Version Control Icon based on variable `vc-mode'."
+      ;;     (let* ((branch (cadr (split-string vc-mode "Git[:-]")))
+      ;;            (git-branch (all-the-icons-octicon
+      ;;                         (if (string= branch "master")
+      ;;                             "git-merge"
+      ;;                           "git-branch")
+      ;;                         :face `(:family ,(all-the-icons-octicon-family)
+      ;;                                         :inherit (,vc-status-icon-face powerline-active1))))
+      ;;            (local-map (get-text-property 1 'local-map branch)))
+      ;;       (propertize
+      ;;        (concat
+      ;;         (propertize git-branch 'display '(raise 0.1))
+      ;;         " "
+      ;;         (propertize branch 'display '(raise 0.1)))
+      ;;        'mouse-face 'mode-line-highlight
+      ;;        'local-map local-map)))
+
+      ;;   (defun spaceline-vc--svn-status ()
+      ;;     "Get the formatted SVN Version Control Icon based on variable `vc-mode'."
+      ;;     (let ((revision (cadr (split-string vc-mode "-" ))))
+      ;;       (propertize revision
+      ;;                   'display '(raise 0.1)
+      ;;                   'face `(:inherit (,vc-status-icon-face powerline-active1)))))
+
+      ;;   (spaceline-define-segment version-control-type-icon
+      ;;     (cond ((string-match "Git[:-]" vc-mode)
+      ;;            (propertize (all-the-icons-alltheicon
+      ;;                          "git"
+      ;;                          :face `(:family ,(all-the-icons-icon-family "git") :inherit ,vc-icon-face))
+      ;;                         'display '(raise 0.1)))
+      ;;           ((string-match "SVN-" vc-mode)
+      ;;            (all-the-icons-material "cloud_download"
+      ;;                                    :v-adjust -0.2
+      ;;                                    :face `(:family ,(all-the-icons-material-family) :inherit ,vc-icon-face))))
+      ;;     :when (and active vc-mode (all-the-icons-available-p))))
+
+      ;; (spaceline-define-segment version-control-status
+      ;;   "An `all-the-icons' segment to depict the current VC system with an icon"
+      ;;   (cond ((string-match "Git[:-]" vc-mode)
+      ;;          (spaceline-vc--git-status))
+      ;;         ((string-match "SVN-" vc-mode)
+      ;;          (spaceline-vc--svn-status)))
+      ;;   :when (and active vc-mode (all-the-icons-available-p)))
+
+      (provide 'mohkale-spaceline-segments)
+     #+END_SRC
 
 *** persp-mode
     configure an ease of use macro to programatically define custom macros. the general functionality is sourced from [[https://github.com/syl20bnr/spacemacs/blob/master/layers/%25252Bspacemacs/spacemacs-layouts/funcs.el#L161][spacemacs]].
@@ -3808,6 +3899,10 @@
         :commands defhydra
         :config
         (setq lv-use-separator t))
+
+      (use-package pretty-hydra
+        :ensure t
+        :defer  t)
     #+END_SRC
 
 *** prettify-symbols
@@ -3892,8 +3987,24 @@
       (use-package all-the-icons
         :ensure t
         :defer  t
+        :commands (all-the-icons--insert-all-icons)
         :config
-        (setq inhibit-compacting-font-caches t))
+        (setq inhibit-compacting-font-caches t)
+        (defun all-the-icons-insert-all-icons ()
+          (interactive)
+          (dolist (icon-list (list all-the-icons-icon-alist
+                                   all-the-icons-dir-icon-alist
+                                   all-the-icons-weather-icon-alist
+                                   all-the-icons-mode-icon-alist
+                                   ;; all-the-icons-url-alist
+                                   ))
+            (dolist (icon icon-list)
+              (let* ((func (nth 1 icon))
+                     (args (nthcdr 2 icon))
+                     (name (car args))
+                     (type (substring (symbol-name func) 14)))
+                (unless (= (length args) 0)
+                  (insert "\n" (apply func args) " " type " - " name)))))))
     #+END_SRC
 
 *** anzu
@@ -5192,6 +5303,14 @@
            ")" 'dired-git-info-mode))
      #+END_SRC
 
+**** dired-hacks
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (use-package dired-hacks-utils
+         :ensure t
+         :defer  t
+         )
+     #+END_SRC
+
 **** dired
      #+BEGIN_SRC emacs-lisp
        (use-package dired
@@ -5229,6 +5348,11 @@
            :keymaps 'dired-mode-map
            ;; let map override any motion bindings
            "<override-state>" 'motion)
+
+         ;; (defun dired-copy-filename-as-kill--prefix-to-kill-full-path (func &rest args)
+         ;;   )
+
+         ;; (advice-add 'dired-copy-filename-as-kill :around #'dired-copy-filename-as-kill--prefix-to-kill-full-path)
 
          (general-define-key
            :keymaps 'dired-mode-map
@@ -5571,6 +5695,12 @@
           (concat mohkale-major-mode-leader-prefix "q") 'edit-indirect-abort))
     #+END_SRC
 
+*** eldoc
+    #+BEGIN_SRC emacs-lisp
+      (use-package eldoc
+        :delight "")
+    #+END_SRC
+
 *** electric
 **** electric-pair
      electric pair is a built in module which lets auto insert matching pairs. For example, inserting a ( will lead to emacs auto inserting ).
@@ -5890,9 +6020,6 @@
                    eyebrowse-prev-window-config
                    eyebrowse-next-window-config
                    eyebrowse-create-window-config)
-        :init
-        (mohkale/set-leader-keys
-          "L" 'hydra-eyebrowse/body)
         :config
         (eyebrowse-mode +1)
 
@@ -6139,6 +6266,34 @@
       (use-package htmlize
         :ensure t
         :defer  t)
+    #+END_SRC
+
+*** hydra-posframe
+    changes the display of the the hydra popups from some region above the message area into a posframe :) like frog-jump-buffer. That said, posframe seems to still be kind of buggy. The border parameter sometimes works, sometimes it doesn't.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package hydra-posframe
+        :defer t
+        :commands (hydra-posframe-mode
+                   hydra-posframe-enable)
+        :init
+        (when (display-graphic-p)
+          ;; only use posframe when on graphical display
+          ;; my terminals always too short for it to be
+          ;; useful on there.
+          (add-hook 'after-init-hook 'hydra-posframe-mode))
+        :config
+        ;; source for following section: https://github.com/jerrypnz/.emacs.d/blob/master/config/jp-base.el
+        (defun mohkale--frame-bottom-poshandler (info)
+          (cons (car (posframe-poshandler-frame-center info))
+                (- (cdr (posframe-poshandler-frame-bottom-left-corner info)) 20)))
+
+        (setq hydra-posframe-poshandler 'mohkale--frame-bottom-poshandler
+              hydra-posframe-parameters '((alpha 100 100)
+                                          (left-fringe . 10)
+                                          (right-fringe . 10)
+                                          (x-pixel-offset 4)
+                                          (internal-border-width . 2))))
     #+END_SRC
 
 *** ivy
@@ -8295,7 +8450,7 @@
          :ensure t
          :defer  10
          ;; :diminish " Ⓟ"
-         :delight " Projectile"
+         :delight ""
          :hook (prog-mode . projectile-mode)
          :commands (projectile-mode
                     projectile-run-shell-command-in-root
@@ -10573,36 +10728,35 @@
          (advice-add 'org-edit-src-code :after #'org-src--prevent-window-config-being-saved-wrapper)
 
          (when (file-exists-p mohkale-library-of-babel-file)
-           (org-babel-lob-ingest mohkale-library-of-babel-file))
+            (org-babel-lob-ingest mohkale-library-of-babel-file))
 
-         (let ((org-root (concat mohkale-config-root "/org/")))
-           (setq-default org-src-window-setup 'current-window
-                         org-babel-python-command "python3")
+          (setq-default org-src-window-setup 'current-window
+                        org-babel-python-command "python3")
 
-           (setq org-todo-keywords '((sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED"))
-                 org-refile-targets '((nil :maxlevel . 9)
-                                      (org-agenda-files :maxlevel . 9))
-                 org-outline-path-complete-in-steps nil ; refile in a single go
-                 org-refile-use-outline-path t ; show full paths for refiling
-                 org-cycle-separator-lines 0 ; prevents weird coloring of collapsed trees
-                 ;; org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
-                 ;; break org-cycle-seperator-lines from working automatically
-                 ;; org-src-tab-acts-natively t ;; tab is native to block language
-                 ;; native tabs are slow and unreliable... :sad:
-                 org-default-notes-file (concat org-root "notes.org")
-                 org-agenda-files (file-expand-wildcards (concat org-root "*.org")))
+          (setq org-todo-keywords '((sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED"))
+                org-refile-targets '((nil :maxlevel . 9)
+                                     (org-agenda-files :maxlevel . 9))
+                org-outline-path-complete-in-steps nil ; refile in a single go
+                org-refile-use-outline-path t  ; show full paths for refiling
+                org-cycle-separator-lines 0 ; prevents weird coloring of collapsed trees
+                ;; org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
+                ;; break org-cycle-seperator-lines from working automatically
+                ;; org-src-tab-acts-natively t ;; tab is native to block language
+                ;; native tabs are slow and unreliable... :sad:
+                org-default-notes-file (mohkale/join-dotemacs-org-path "notes.org")
+                org-agenda-files (file-expand-wildcards (mohkale/join-dotemacs-org-path "*.org")))
 
-           (setq org-capture-templates
-                 `(("f" "File Task" entry (file ,org-default-notes-file)
-                    "* TODO %?\n  %a"
-                    :kill-buffer t)
-                   ("t" "Todo" entry (file ,org-default-notes-file)
-                    "* TODO %?\n%U")
-                   ("T" "Todo with Clipboard" entry (file ,org-default-notes-file)
-                    "* TODO %?\n%U\n   %c")
-                   ("h" "Homework" entry (file+headline ,(concat org-root "university.org") "Homework")
-                    "* TODO%? %^g\n  DEADLINE: %^{Deadline}t\n  :LOGBOOK:\n  - Added %u\n  :END:"
-                    :kill-buffer t))))
+          (setq org-capture-templates
+                `(("f" "File Task" entry (file ,org-default-notes-file)
+                   "* TODO %?\n  %a"
+                   :kill-buffer t)
+                  ("t" "Todo" entry (file ,org-default-notes-file)
+                   "* TODO %?\n%U")
+                  ("T" "Todo with Clipboard" entry (file ,org-default-notes-file)
+                   "* TODO %?\n%U\n   %c")
+                  ("h" "Homework" entry (file+headline ,(mohkale/join-dotemacs-org-path "university.org") "Homework")
+                   "* TODO%? %^g\n  DEADLINE: %^{Deadline}t\n  :LOGBOOK:\n  - Added %u\n  :END:"
+                   :kill-buffer t)))
 
          (advice-add 'org-edit-src-code :before #'(lambda (&rest args)
                                                     (unless (eq evil-state 'normal)
@@ -10981,7 +11135,7 @@
                     org-projectile-goto-location-for-project
                     org-projectile-find-todo-file)
          :init
-         (push (org-projectile-project-todo-entry) org-capture-templates)
+         (add-to-list 'org-capture-templates (org-projectile-project-todo-entry) t)
          (setq org-confirm-elisp-link-function nil
                org-agenda-files (append org-agenda-files (org-projectile-todo-files)))
 
@@ -12069,10 +12223,13 @@
 
          ;; (setq haskell-process-type 'ghci)
 
-         ;; (general-define-key
-         ;;   :states  '(insert replace)
-         ;;   :keymaps 'haskell-mode-map
-         ;;   "<tab>" 'haskell-indent-cycle)
+         (defun mohkale//enable-haskell-indent-control ()
+           (interactive)
+           (haskell-indent-mode +1)
+           (general-define-key
+             :states  '(insert replace)
+             :keymaps 'haskell-mode-map
+             "<tab>" 'haskell-indent-cycle))
 
          (mohkale/declare-prefix-for-major-mode* 'haskell-mode
            "r" "refactor"
@@ -12425,6 +12582,7 @@
    | black-dim         |            | 240 |  10 |    20 |                                   |
    | black-int         |            | 240 |   6 |    00 |                                   |
    |-------------------+------------+-----+-----+-------+-----------------------------------|
+   | white             |            |   0 | 100 |   100 |                                   |
    | line-highlight-bg |            | 228 |   7 |    21 |                                   |
    | extra-dark-grey   |            | 228 |   7 |    10 | variant for imbedded org blocks   |
    | debug             |            | 198 |  91 |    13 | dark blue                         |
@@ -12501,7 +12659,7 @@
 
 *** Faces
    #+HEADER: :var desc=an-old-hope-theme-description colors=color-assoc-to-rgb-strings() cls=(eval t) rainbow-delims=rainbow-delimeter-shades
-   #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/etc/themes/an-old-hope-theme.el"
+   #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/etc/themes/an-old-hope-theme.el" :results silent
      (require 'dash)
 
      (deftheme an-old-hope
@@ -12526,6 +12684,7 @@
       `(fringe ((,cls (:background ,black)))) ; NOTE: defines bars to the left and right, after line number when applicable
       `(vi-tilde-fringe-face ((,cls ((:inherit default)))))
       `(vertical-border ((,cls (:foreground ,very-light-grey)))) ; NOTE seperator between windows
+      `(internal-border ((,cls (:foreground ,white :background ,white))))
 
       ;; errors, successes and warnings and other highlights
       `(error   ((,cls (:background ,red    :distant-foreground ,red    :foreground ,very-dark-grey :inherit bold))))
@@ -12651,8 +12810,8 @@
       `(avy-lead-face-0 ((,cls (:background ,blue-int :foreground "white"))))
       `(avy-lead-face-1 ((,cls (:background ,very-light-grey :foreground ,very-dark-grey))))
       `(avy-lead-face-2 ((,cls (:background ,purple-int :foreground "white"))))
-      `(frog-menu-border ((,cls (:background ,very-light-grey :foreground ,very-light-grey))))
-      `(frog-menu-posframe-background-face ((,cls (:background ,very-light-grey))))
+      `(frog-menu-border ((,cls (:background ,white :foreground ,white))))
+      `(frog-menu-posframe-background-face ((,cls (:background ,very-dark-grey))))
 
       ;;; company - intellisense
       ;; NOTE foreground-color  very-dark-grey
@@ -12734,6 +12893,11 @@
       ;;; anzu
       `(anzu-mode-line ((,cls (:foreground ,very-dark-grey :inherit bold))))
       `(anzu-mode-line-no-match ((,cls (:foreground ,red-int :inherit bold))))
+
+      ;;; hydra-posframe
+      ;; for some reason... if hydra-posframe-face inherits default, internal border won't work
+      `(hydra-posframe-face ((,cls (:background ,very-dark-grey :foreground ,very-light-grey))))
+      `(hydra-posframe-border-face ((,cls (:inherit internal-border))))
 
       ;;; org-mode
       `(org-link ((,cls (:foreground ,turquoise :inherit bold))))
