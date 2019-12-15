@@ -3313,7 +3313,7 @@
 *** spaceline
     an amazing mode line... needs to be initialised before all others to make sure every buffer inherits the same mode line. otherwise, the message buffer will definitely not use spaceline, you'll have to restart it or re evaluate this in it's context.
 
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :results silent
       (use-package spaceline
         :ensure t
         :demand t
@@ -3408,7 +3408,7 @@
 
 **** segments
     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-spaceline-segments.el"
+    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-spaceline-segments.el" :results silent
       (require 'spaceline-config)
 
       (defun spaceline--active-macro-to-string ()
@@ -3459,10 +3459,12 @@
       (spaceline-define-segment buffer-mode-icon
         "an `all-the-icons' segment to show the mode of the current buffer"
         (unless (member major-mode spaceline-major-mode-icon--skip-modes)
-          (propertize (all-the-icons-icon-for-mode major-mode
-                                                   :v-adjust -0.15)
-                      'help-echo (concat "major-mode: " (symbol-name major-mode))
-                      'face `(:height 1.0 :family ,(all-the-icons-icon-family-for-buffer) :inherit)))
+          (let ((icon (all-the-icons-icon-for-mode major-mode
+                                                   :v-adjust -0.15)))
+            (unless (symbolp icon)
+              (propertize icon
+                          'help-echo (concat "major-mode: " (symbol-name major-mode))
+                          'face `(:height 1.0 :family ,(all-the-icons-icon-family-for-buffer) :inherit)))))
         :enabled (all-the-icons-available-p))
 
       (spaceline-define-segment version-control-type-icon
@@ -8430,6 +8432,29 @@
         (add-hook 'persp-after-load-state-functions #'layouts//load-eyebrowse-after-perspective-load))
     #+END_SRC
 
+
+*** piper
+    #+BEGIN_SRC emacs-lisp
+      (use-package piper
+        :defer t
+        :straight (emacs-piper :type git :host gitlab :repo "howardabrams/emacs-piper")
+        :commands (piper
+                   piper-ui
+                   piper-other
+                   piper-remote
+                   eshell/piper
+                   piper-script)
+        :init
+        (let ((piper-prefix "| "))
+          (mohkale/declare-prefix (s-trim-right piper-prefix) "piper" "interactive emacs pipeline")
+          (mohkale/set-leader-keys
+            (concat piper-prefix "RET") 'piper-ui
+            (concat piper-prefix "|")   'piper
+            (concat piper-prefix "o")   'piper-other
+            (concat piper-prefix "@")   'piper-remote))
+        :config
+        (defalias 'piper-ui #'piper-user-interface))
+    #+END_SRC
 
 *** proced
     #+BEGIN_SRC emacs-lisp
