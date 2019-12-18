@@ -87,9 +87,8 @@
             `(,(user-login-name) "@" ,(system-name) " [%*] %m" major-mode (buffer-file-name " : %f")))
 
       (setq-default indent-tabs-mode nil
-                    evil-want-C-u-scroll t
                     save-place t ; auto enable save-place mode
-                    show-trailing-whitespace t
+                    show-trailing-whitespace nil
                     scroll-conservatively 101 ; smooth... enough scrolling going line by line
                     scroll-preserve-screen-position t
                     cursor-in-non-selected-windows nil ;; hide cursor
@@ -209,17 +208,6 @@
     #+BEGIN_SRC emacs-lisp
       (defvar mohkale-should-compile-config nil
         "when truthy, building the configuration file also compiles the lisp file")
-
-      (defvar mohkale-preferred-indent 4
-        "preferred indentation for all modes")
-
-      (setq tab-width mohkale-preferred-indent)
-
-
-      (setq tab-stop-list (number-sequence mohkale-preferred-indent
-                                           120
-                                           mohkale-preferred-indent))
-
 
       (defun mohkale/refresh-config-file-p ()
         "true if config org file needs to be retangled and/or compiled
@@ -488,6 +476,7 @@
             package--init-file-ensured nil)
 
       (package-initialize) ;; TODO find a way to remove this... without breaking everything
+      (defalias 'package--save-selected-packages #'ignore) ;; stop messing with custom.el :P
 
       (defvar package-archives)
       (setq package-archives
@@ -534,9 +523,9 @@
     | name                | hash            | url                                                                                       |
     |---------------------+-----------------+-------------------------------------------------------------------------------------------|
     |                     | <15>            |                                                                                           |
-    | hide-comnt          | 0eca097ae073b6536863492eb4d4beeb25b712acd45e21fc0bda9f19d39e963f | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/hide-comnt.el          |
+    | hide-comnt          | 9668645eab1fd8d223967ab90d3d34fe6e98aa3af47516f45e18f094137d7c6c | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/hide-comnt.el          |
     | imenu-tree          | c4b3ae0d8b5c3e5a50c9c4b3f96fd48e309c2fae9a8902a1d649063c7b3b611c | https://www.emacswiki.org/emacs/download/imenu-tree.el                                    |
-    | help-fns+           | c2229229a699d115b91da8692f3b8099c19608728eb402edb6f7cd6e1c81912b | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/help-fns%2B.el         |
+    | help-fns+           | e12cc9a3c7bd41ffd5be61a6d7b3f01c4ef094241683f6004fcd5cc5b9b2e51d | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/help-fns%2B.el         |
     | lorem-ipsum         | 54cb139d6c88632aaef6364a2a6c6cadbb9a5082eb5032e69b5139dcc7074d88 | https://www.emacswiki.org/emacs/download/lorem-ipsum.el                                   |
     | profile-dotemacs    | 1d903fc16d4ab4716cf8097ddb88a5cbb3746c9e49fa3421ae147b0c383c3e7f | http://www.randomsample.de/profile-dotemacs.el                                            |
     | open-junk-file      | c0b835b329758dced4ccae6c2f3fd5af16af929437110ddde00ea55dc7d47be3 | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/open-junk-file.el      |
@@ -972,12 +961,6 @@
         "cC" 'toggle-comment-at-point-alt)
     #+END_SRC
 
-*** diff
-    #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix
-        "D" "diff" "interactive diff sessions")
-    #+END_SRC
-
 *** error
     #+BEGIN_SRC emacs-lisp
       (mohkale/declare-prefix "e" "errors")
@@ -1134,6 +1117,7 @@
         "tn" "toggle-line-numbers")
 
       (mohkale/set-leader-keys
+        "t TAB" 'set-indent-offset
         "tl" 'toggle-truncate-lines
         "tL" 'toggle-lexical-binding
         "tw" 'toggle-word-wrap
@@ -1237,13 +1221,26 @@
        "m"   'window-zen
        "C-m" 'window-zen)
 
+     (defmacro defun-save-excursion-insert-char (char-name char)
+       (setq char (eval char))
+
+       (let* ((char-name (symbol-name char-name))
+              (func-name (intern (concat "save-excursion-insert-" char-name))))
+         `(defun ,func-name (prefix)
+            (interactive "P")
+            (save-excursion
+              (insert-char ,char (prefix-numeric-value prefix))))))
+
+     (general-define-key
+      :states mohkale-nnorm-states
+      "S-SPC" (defun-save-excursion-insert-char space ? ))
    #+END_SRC
 
 ** Mohkale
    #+BEGIN_SRC emacs-lisp
      (use-package mohkale
-       :defer   t
        :straight (mohkale :type built-in)
+       :defer t
        :commands (mohkale/eval-configuration-file
                   mohkale/build-configuration-file
                   mohkale/find-configuration-file
@@ -1350,8 +1347,8 @@
 *** File
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-file
-        :defer   t
         :straight (mohkale-file :type built-in)
+        :defer t
         :commands (rename-buffer-file
                    delete-buffer-file
                    show-and-copy-buffer-file-name
@@ -1463,17 +1460,17 @@
 
       (add-hook 'find-file-hook 'no-junk-please-were-unixish)
 
-      (defun mohkale//enable-line-numbers-handler ()
+      (defun enable-line-numbers ()
         "forces the display of line numbers in the current buffer"
         (interactive)
         (display-line-numbers-mode 1)
         (setq display-line-numbers 'relative))
 
-      (add-hook 'prog-mode-hook        #'mohkale//enable-line-numbers-handler)
-      (add-hook 'fundamental-mode-hook #'mohkale//enable-line-numbers-handler)
+      (add-hook 'prog-mode-hook        #'enable-line-numbers)
+      (add-hook 'fundamental-mode-hook #'enable-line-numbers)
 
       (setq command-error-function
-            (defun mohkale/command-error-function (data context caller)
+            (defun mohkale--command-error-function (data context caller)
               "hide some error message"
               (when (not (memq (car data) '(;; buffer-read-only
                                             beginning-of-buffer
@@ -1497,12 +1494,13 @@
         "hook which is executed after loading a theme")
 
       (advice-add 'load-theme
-                  :after (defun load-theme--execute-hooks (&rest args)
+                  :after (defun load-theme-execute-hooks (&rest args)
                            (run-hooks 'after-load-theme-hook)))
 
       ;;; whitespace exemption
       (defvar mohkale--whitespace-exempt-modes '(help-mode
                                                  Buffer-menu-mode
+                                                 ibuffer-mode
                                                  eshell-mode
                                                  term-mode
                                                  minibuffer-inactive-mode
@@ -1524,30 +1522,119 @@
                   regexps (cdr regexps)))
           (not (not match-found))))
 
-      (defun mohkale//hide-trailing-whitespace--mode-based (&rest args)
-        (when (and mohkale--whitespace-exempt-modes
-                   (apply 'derived-mode-p
-                          mohkale--whitespace-exempt-modes))
-          (setq show-trailing-whitespace nil)
+      (defun mohkale--set-trailing-whitespace--mode-based (&optional dont-set)
+        "check the mode of the current buffer, to see whether trailing
+      whitespace should be shown. with the optional parameter `dont-set'
+      trailing whitespace will not be set.
+
+      This function returns what the desired value of `show-trailing-whitespace'
+      should be."
+        (unless (and mohkale--whitespace-exempt-modes
+                     (apply 'derived-mode-p
+                            mohkale--whitespace-exempt-modes))
+          (unless dont-set
+            (setq show-trailing-whitespace t))
           t))
 
-      (defun mohkale//hide-trailing-whitespace--name-based (&rest args)
-        (when (and mohkale--whitespace-exempt-buffers
-                   (apply 'chain-match-regexp
-                          (buffer-name)
-                          mohkale--whitespace-exempt-buffers))
-          (setq show-trailing-whitespace nil)
+      (defun mohkale--set-trailing-whitespace--name-based (&optional dont-set)
+        "check the name of the current buffer, to see whether trailing
+      whitespace should be shown. see `mohkale--set-trailing-whitespace--mode-based'."
+        (unless (and mohkale--whitespace-exempt-buffers
+                     (apply 'chain-match-regexp
+                            (buffer-name)
+                            mohkale--whitespace-exempt-buffers))
+          (unless dont-set
+            (setq show-trailing-whitespace t))
           t))
 
-      (defun mohkale//hide-trailing-whitespace (&rest args)
-        (or (mohkale//hide-trailing-whitespace--mode-based)
-            (mohkale//hide-trailing-whitespace--name-based)))
+      ;; (defun mohkale/set-trailing-whitespace (&rest args)
+      ;;   (setq show-trailing-whitespace
+      ;;         (and (mohkale--set-trailing-whitespace--mode-based t)
+      ;;              (mohkale//set-trailing-whitespace--name-based t))))
 
       ;; add switch-to-buffer hook because some functions, such as ibuffers confirmation
       ;; popup use switch-to-buffer instead of display buffer and there's no easy way
       ;; to modify it.
-      (add-hook 'switch-to-buffer-hook        #'mohkale//hide-trailing-whitespace--name-based)
-      (add-hook 'after-change-major-mode-hook #'mohkale//hide-trailing-whitespace--mode-based)
+      (add-hook 'switch-to-buffer-hook        (lambda (&rest args) (mohkale--set-trailing-whitespace--name-based)))
+      (add-hook 'after-change-major-mode-hook (lambda (&rest args) (mohkale--set-trailing-whitespace--mode-based)))
+
+      ;; indent configuration
+      (defvar mohkale-indent-config '((t . 4))
+        "alist configuring my preferred indentation for buffers.
+      the car of an entry is used to match which buffer it's applied to
+      and cdr is used to determine the value of it.
+
+      the car can be a symbol, a string, a function or some expression
+      which evaluates to t. if it's a symbol, the major mode of the
+      buffer is compared against it. if it's a string the name of the
+      buffer is matched against it.
+
+      the cons can be a number, a function or some expression which
+      evaluates to a number.
+
+      NOTE: indentation is set exclusively when a buffer-mode change
+            occurs, changing the buffer name doesn't alter the indent.
+      ")
+
+      (defun set-indent-offset (&optional desired-indent)
+        "set the indentation level of the current buffer.
+      this method uses `mohkale-indent-config' to determine what
+      the indentation of the current buffer should be and then sets
+      it. Also setting any mode dependent, specific indent bindings,
+      alongside it.
+
+      You can pass a specific value for the indent as an argument and
+      the current buffers indentation will be set to that."
+        (interactive "Nindent: ")
+        (let* ((buffer (current-buffer))
+               (buffer-name (buffer-name buffer))
+               (indent-config mohkale-indent-config)
+               (indent desired-indent)
+               _)
+          (while (and (not indent)
+                      (setq _ (pop indent-config)))
+            (let ((matcher (car _)))
+              (setq indent
+                    (when (cond
+                           ((eq matcher t) t)
+                           ((symbolp matcher)
+                            (eq matcher major-mode))
+                           ((stringp matcher)
+                            (string-match-p matcher buffer-name))
+                           ((functionp matcher)
+                            (funcall matcher))
+                           (t (eval matcher)))
+                      (cdr _)))))
+
+          (if (not indent)
+              (message "mohkale::warn() unable to determine indent for current buffer.")
+            (setq evil-shift-width indent)
+            (setq-local tab-width indent)
+
+            (when (= 0 (% indent 2))
+              (setq-local tab-stop-list (number-sequence indent 40 indent)))
+
+            ;; major mode dependent configurations
+            (cond
+             ((eq major-mode 'python)
+              (setq-local python-indent-offset indent))
+             ((eq major-mode 'ruby)
+              (setq-local ruby-indent-level indent))
+             ((eq major-mode 'enh-ruby-mode)
+              (setq-local enh-ruby-indent-level indent))
+             ((eq major-mode 'c-mode)
+              (setq-local c-basic-offset indent))
+             ((eq major-mode 'plantum-mode)
+              (setq-local plantuml-indent-level indent))
+             ((eq major-mode 'yaml-mode)
+              (setq-local yaml-indent-offset indent))
+             ((eq major-mode 'web-mode)
+              (setq-local css-indent-offset indent)
+              (setq-local web-mode-markup-indent-offset indent)
+              (setq-local web-mode-css-indent-offset indent)
+              (setq-local web-mode-code-indent-offset indent))))))
+
+      (add-hook 'after-change-major-mode-hook #'set-indent-offset)
     #+END_SRC
 
 *** Yank Indent Adjust
@@ -1630,8 +1717,8 @@
 *** Text
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-text-query
-        :defer   t
         :straight (mohkale-text-query :type built-in)
+        :defer t
         :commands (line-width
                    column-number
                    point-to-coordinates
@@ -1639,8 +1726,8 @@
                    list-faces))
 
       (use-package mohkale-text
-        :defer   t
         :straight (mohkale-text :type built-in)
+        :defer t
         :commands (dos2unix
                    unix2dos
                    pad-line-with-char-to-length
@@ -1928,8 +2015,8 @@
 *** Buffers, Windows & Frames
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-bufwin
-        :defer   t
         :straight (mohkale-bufwin :type built-in)
+        :defer t
         :commands (switch-to-scratch-buffer
                    kill-this-buffer-and-window-maybe
                    switch-to-last-buffer
@@ -2037,7 +2124,7 @@
             (kill-this-buffer))))
 
       (defun kill-all-windows-and-return-to-home ()
-        "kills every other window and returns to spacemacs home"
+        "kills every other window and returns to home buffer"
         (interactive)
         (dolist (window (cdr (window-list)))
           ;; window-list starts with current window
@@ -2056,9 +2143,8 @@
         (or  dedicate (setq dedicate nil))    ; rationalise value as nil
 
         (dolist (window (window-list))
-          (if (not (eq dedicate (window-dedicated-p window)))
-              (with-selected-window window
-                (set-window-dedicated-p window dedicate)))))
+          (when (not (eq dedicate (window-dedicated-p window)))
+            (set-window-dedicated-p window dedicate))))
 
       (defun window-zen ()
         "Maximize buffer"
@@ -2146,7 +2232,7 @@
       (defun display-last-buffer ()
         (interactive)
         (display-buffer
-         (last-buffer)
+         (other-buffer)
          '((display-buffer-below-selected-and-focus
             display-buffer-in-previous-window-and-focus
             display-buffer-use-some-window-and-focus
@@ -2155,7 +2241,7 @@
       (defun vertical-display-last-buffer ()
         (interactive)
         (display-buffer
-         (last-buffer)
+         (other-buffer)
          (cons '(display-buffer-in-side-window-and-focus
                  display-buffer-in-previous-window-and-focus
                  display-buffer-use-some-window-and-focus
@@ -2179,6 +2265,7 @@
                        hydra-org-clock
                        hydra-persp
                        hydra-text-zoom
+                       hydra-vdiff
                        hydra-vlc-rc
                        hydra-winman))
         (let ((hydra-func (intern (concat (symbol-name hydra) "/body")))
@@ -3283,6 +3370,54 @@
                   ("<" . hydra-indent/lambda-H))
      #+END_SRC
 
+**** vdiff
+     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-vdiff.el"
+       (defhydra vdiff-toggle-hydra (nil nil :hint nil)
+         "
+       Toggles
+        _c_ ignore case: %s(vdiff--current-case)
+        _w_ ignore whitespace: %s(vdiff--current-whitespace)
+        _q_ back to main hydra"
+         ("c" vdiff-toggle-case)
+         ("w" vdiff-toggle-whitespace)
+         ("q" vdiff-hydra/body :exit t)
+
+       (defhydra vdiff-hydra (nil nil :hint nil :foreign-keys run)
+         (concat (propertize
+                  "\
+        Navigation^^^^          Refine^^   Transmit^^^^             Folds^^^^            Other"
+                  'face 'header-line)
+                 "
+        _n_/_N_ next hunk/fold  _f_ this   _s_/_S_ send (+step)     _o_/_O_ open (all)   _i_ ^ ^ toggles
+        _p_/_P_ prev hunk/fold  _F_ all    _r_/_R_ receive (+step)  _c_/_C_ close (all)  _u_ ^ ^ update diff
+        _g_^ ^  switch buffers  _x_ clear  ^ ^ ^ ^                  _t_ ^ ^ close other  _w_ ^ ^ save buffers
+        ^ ^^ ^                  ^ ^        ^ ^ ^ ^                  ^ ^ ^ ^              _q_/_Q_ quit hydra/vdiff
+        ignore case: %s(vdiff--current-case) | ignore whitespace: %s(vdiff--current-whitespace)")
+         ("j" vdiff-next-hunk)
+         ("k" vdiff-previous-hunk)
+         ("J" vdiff-next-fold)
+         ("K" vdiff-previous-fold)
+         ("g" vdiff-switch-buffer)
+         ("s" vdiff-send-changes)
+         ("S" vdiff-send-changes-and-step)
+         ("r" vdiff-receive-changes)
+         ("R" vdiff-receive-changes-and-step)
+         ("o" vdiff-open-fold)
+         ("O" vdiff-open-all-folds)
+         ("c" vdiff-close-fold)
+         ("C" vdiff-close-all-folds)
+         ("t" vdiff-close-other-folds)
+         ("u" vdiff-refresh)
+         ("w" vdiff-save-buffers)
+         ("f" vdiff-refine-this-hunk)
+         ("F" vdiff-refine-all-hunks)
+         ("x" vdiff-remove-refinements-in-hunk)
+         ("i" vdiff-toggle-hydra/body :exit t)
+         ("q" nil :exit t)
+         ("Q" vdiff-quit :exit t))
+     #+END_SRC
+
 *** Packages
     #+BEGIN_SRC emacs-lisp
       (defun mohkale/get-loaded-packages ()
@@ -3334,15 +3469,38 @@
         (setq-default mode-line-format (spaceline-spacemacs-theme))
 
         (defface spaceline-minibuffer
-          `((t (:inherit (error spaceline-highlight-face))))
+          `((t (:inherit (spaceline-evil-emacs))))
           "highlight face for spaceline when minibuffer is active"
           :group 'spaceline)
+
+        (defface spaceline-evil-operator
+          `((t (:weight normal
+                :inherit (error spaceline-evil-motion))))
+          "evil operator state face"
+          :group 'spaceline)
+
+        (push '(operator . spaceline-evil-operator)
+              spaceline-evil-state-faces)
+
+        (defvar spaceline--highlight-evil-operator-face t
+          "when true, spaceline will highlight operator state
+      like it would any other state.")
 
         (setq spaceline-highlight-face-func
               (defun mohkale-spaceline-highlight-face ()
                 (if (active-minibuffer-window)
                     'spaceline-minibuffer
-                  (spaceline-highlight-face-evil-state))))
+                  ;; (spaceline-highlight-face-evil-state)
+                  ;; redefine spaceline-highlight-face-evil-state here because
+                  ;; it doesn't highlight operator state :(
+                  (if (bound-and-true-p evil-local-mode)
+                      (let* ((state (if (and (eq 'operator evil-state)
+                                            (not spaceline--highlight-evil-operator-face))
+                                       evil-previous-state
+                                     evil-state))
+                             (face (assq state spaceline-evil-state-faces)))
+                        (if face (cdr face) (spaceline-highlight-face-default)))
+                    (spaceline-highlight-face-default)))))
 
         ;; by default, colors seem to glitch out on change
         (add-hook 'after-load-theme-hook #'powerline-reset)
@@ -3453,7 +3611,8 @@
                    (active-minibuffer-window)))
 
       (defvar spaceline-major-mode-icon--skip-modes
-        '(dashboard-mode)
+        '(dashboard-mode
+          ebuku-mode)
         "don't show the icon for modes in this list")
 
       (spaceline-define-segment buffer-mode-icon
@@ -3608,6 +3767,9 @@
          :diminish
          :hook (evil-mode . evil-vimish-fold-mode)
          :commands (evil-vimish-fold-mode
+                    evil-vimish-fold/create
+                    evil-vimish-fold/delete
+                    evil-vimish-fold/delete-all
                     evil-vimish-fold/next-fold
                     evil-vimish-fold/previous-fold)
          :init
@@ -3684,12 +3846,14 @@
          :commands (evil-define-key
                     defun-evil-adjust-to-eol
                     evil-mode)
-         :config
-         (evil-mode 1)
+         :init
          (setq-default evil-cross-lines t
                        evil-want-C-i-jump nil
+                       evil-want-C-u-scroll t
                        evil-want-visual-char-semi-exclusive t)
 
+         :config
+         (evil-mode 1)
          ;; evil-adjust: https://raw.githubusercontent.com/troyp/evil-adjust/master/evil-adjust.el
          (defmacro defun-evil-adjust-to-eol (function-name arglist &optional interactive &rest body)
            `(defun ,function-name ,arglist
@@ -3718,6 +3882,13 @@
            "<S-escape>" 'evil-shift-normal-state)
 
          (general-define-key
+           :keymaps 'override
+           :states mohkale-nnorm-states
+           "C-e" 'evil-copy-from-above
+           "M-e" 'evil-copy-from-below)
+
+         (general-define-key
+           :states mohkale-nnorm-states
            "C->" 'evil-shift-right-line
            "C-<" 'evil-shift-left-line)
 
@@ -3749,8 +3920,6 @@
 
          (general-define-key
            :states 'insert
-           "C-e" nil
-           "M-e" nil
            "<tab>"   'indent-relative
            "<S-tab>"         'tab-to-tab-stop-with-prefix
            "<S-iso-lefttab>" 'tab-to-tab-stop-with-prefix
@@ -3762,7 +3931,6 @@
                      (evil-end-of-line)
                      (unless (line-empty-p)
                        (forward-char)))
-           "C-£"   'evil-beginning-of-line
            "M-k"   nil                  ; erase
            ;; (kbd "C-M-k") 'evil-insert-digraph
            "C-l"   'forward-char
@@ -3777,29 +3945,23 @@
            )
 
          (general-define-key
-           "C-e" 'evil-copy-from-above
-           "M-e" 'evil-copy-from-below)
-
-         (general-define-key
            :states 'visual
            "C-y" 'evil-paste-after)
 
          (general-define-key
-           :states '(visual normal motion)
-           "C-SPC" nil ;; this is evil, we don't need you :P
-           )
-
-         (general-define-key
            :states mohkale-norm-states
            ;; keep hitting C-SPC by accident
-           "C-SPC" (general-simulate-key "SPC"))
+           "C-SPC" (general-simulate-key "SPC")
+           "g=" 'count-words)
 
          (mohkale/declare-prefix "sc" "search-noh")
+
          (mohkale/set-leader-keys
            "id" 'evil-insert-digraph
            "sc" 'evil-ex-nohighlight
            "xu" 'evil-upcase
            "xd" 'evil-downcase)
+
          :bind (:map mohkale-window-map
                 ("+" . evil-window-increase-height)
                 ("-" . evil-window-decrease-height)
@@ -3960,12 +4122,12 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package prog-mode
-        :defer   t
         :straight (prog-mode :type built-in)
+        :defer t
         :commands (prettify-symbols-mode)
         :delight
         :init
-        (defmacro mohkale//define-pretty-symbols-for-mode (mode &rest symbols)
+        (defmacro mohkale/define-pretty-symbols-for-mode (mode &rest symbols)
           "defines a hook and an alist for MODE which pushes SYMBOLS onto
       `prettify-symbols-alist' and enables prettify-symbols-mode in that MODE.
 
@@ -3991,7 +4153,7 @@
                  (prettify-symbols-mode +1))
 
                (add-hook (quote ,mode-hook) (quote ,func-name)))))
-        (put 'mohkale//define-pretty-symbols-for-mode 'lisp-indent-function 'defun)
+        (put 'mohkale/define-pretty-symbols-for-mode 'lisp-indent-function 'defun)
 
         :config
         ;; I'll bind it myself, thank you.
@@ -4122,8 +4284,8 @@
 *** buffer-menu
     #+BEGIN_SRC emacs-lisp
       (use-package buff-menu
-        :defer   t
         :straight (buff-menu :type built-in)
+        :defer t
         :config
         (evil-set-initial-state 'Buffer-menu-mode 'motion)
 
@@ -4474,8 +4636,8 @@
 *** comint - command interpreter
     #+BEGIN_SRC emacs-lisp
       (use-package comint
-        :defer   t
         :straight (comint :type built-in)
+        :defer t
         :hook ((comint-mode . (lambda () (setq-local evil-emacs-state-cursor 'bar)))
                ;; (comint-mode . blink-cursor-mode)
                )
@@ -5116,8 +5278,10 @@
          :defer t
          :commands (diff-mode diff-buffer-with-file)
          :init
+         (mohkale/declare-prefix "=" "diff" "interactive diff sessions")
+
          (mohkale/set-leader-keys
-           "DF" 'diff-buffer-with-file)
+           "= SPC" 'diff-buffer-with-file)
 
          (push 'diff-mode mohkale--whitespace-exempt-modes)
 
@@ -5169,150 +5333,226 @@
 **** ediff
      ediff is a pain to customize. all the help messages are hard coded, some of the keymaps are =magically= bound somewhere I don't know. I can get a reasonably useful out of the box experience with *evil-ediff* but it isn't much help in ediff-meta mode such as for the registry or multiple sessions.
 
-***** ediff
-      #+BEGIN_SRC emacs-lisp
-        (use-package ediff
-          :defer t
-          :commands (ediff-current-file
-                     ediff-buffers
-                     ediff-windows
-                     ediff-files
-                     ediff-backup
-                     ediff-files3
-                     ediff-directories
-                     ediff-directories3
-                     ediff-regions-linewise
-                     ediff-regions-wordwise
-                     ediff-patch-file
-                     ediff-merge-files
-                     ediff-merge-buffers
-                     ediff-merge-directories
+     I'm moving to [[https://github.com/justbur/emacs-vdiff][vdiff]] & I suggest anyone else who can, does so as well.
 
-                     ;; unbound by default
-                     ediff-show-registry ;; ido-choose-ediff-session
-                     ediff-toggle-multiframe
-                     ediff-toggle-use-toolbar
-                     ediff-revert-buffers-then-recompute-diffs
-                     ediff-profile)
-          :init
-          (mohkale/set-leader-keys
-            "Df" 'ediff-current-file
-            "Db" 'ediff-buffers
-            "Dw" 'ediff-windows)
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (use-package ediff
+         :defer t
+         :commands (ediff-current-file
+                    ediff-buffers
+                    ediff-windows
+                    ediff-files
+                    ediff-backup
+                    ediff-files3
+                    ediff-directories
+                    ediff-directories3
+                    ediff-regions-linewise
+                    ediff-regions-wordwise
+                    ediff-patch-file
+                    ediff-merge-files
+                    ediff-merge-buffers
+                    ediff-merge-directories
 
-          (push 'ediff-meta-mode mohkale--whitespace-exempt-modes)
+                    ;; unbound by default
+                    ediff-show-registry ;; ido-choose-ediff-session
+                    ediff-toggle-multiframe
+                    ediff-toggle-use-toolbar
+                    ediff-revert-buffers-then-recompute-diffs
+                    ediff-profile)
+         :init
+         (mohkale/set-leader-keys
+           "=f" 'ediff-current-file
+           "=b" 'ediff-buffers
+           "=w" 'ediff-windows)
 
-          :config
-          (setq-default ediff-window-setup-function       'ediff-setup-windows-plain
-                        ediff-split-window-function       'split-window-horizontally
-                        ediff-merge-split-window-function 'split-window-horizontally
-                        ;; ediff-keep-variants               nil ;; doesn't do anything :(
-                        )
+         (push 'ediff-meta-mode mohkale--whitespace-exempt-modes)
 
-          (defvar mohkale-ediff-kill-temporary-buffers-on-exit t
-            "whether to keep temporary ediff buffers around")
+         :config
+         (setq-default ediff-window-setup-function       'ediff-setup-windows-plain
+                       ediff-split-window-function       'split-window-horizontally
+                       ediff-merge-split-window-function 'split-window-horizontally
+                       ;; ediff-keep-variants               nil ;; doesn't do anything :(
+                       )
 
-          (require 'outline)
-          ;; show org ediffs unfolded
-          (add-hook 'ediff-prepare-buffer-hook #'outline-show-all)
+         (defvar mohkale-ediff-kill-temporary-buffers-on-exit t
+           "whether to keep temporary ediff buffers around")
 
-          ;; ensure window configuration is restored after diff quit
-          (let* ((ediff-window-register ?w)
-                 (register-active (lambda () (cdr (assoc ediff-window-register register-alist)))))
-            (defun ediff--restore-windows-before (&rest args)
-              ;; (message "setting up")
-              (unless (funcall register-active)
-                ;; (message "assigning to register")
-                (window-configuration-to-register ediff-window-register)))
-            (add-hook 'ediff-before-setup-hook #'ediff--restore-windows-before)
+         (require 'outline)
+         ;; show org ediffs unfolded
+         (add-hook 'ediff-prepare-buffer-hook #'outline-show-all)
 
-            (defun ediff--restore-windows-after (&rest args)
-              (if (not (funcall register-active))
-                  (message "ediff-restore-windows : no previous window config found to restore")
-                (jump-to-register ediff-window-register)
-                (set-register ediff-window-register nil)))
-            (add-hook 'ediff-quit-hook #'ediff--restore-windows-after))
+         ;; ensure window configuration is restored after diff quit
+         (let* ((ediff-window-register ?w)
+                (register-active (lambda () (cdr (assoc ediff-window-register register-alist)))))
+           (defun ediff--restore-windows-before (&rest args)
+             ;; (message "setting up")
+             (unless (funcall register-active)
+               ;; (message "assigning to register")
+               (window-configuration-to-register ediff-window-register)))
+           (add-hook 'ediff-before-setup-hook #'ediff--restore-windows-before)
 
-          (defun ediff--kill-ediff-temp-buffers (&rest args)
-            "kills all the spawned ediff buffers... because
-        there's way too many and their named so similairly that
-        there's no point in them existing... Plus I keep ending
-        up editing the wrong diffed buffer."
-            (when mohkale-ediff-kill-temporary-buffers-on-exit
-              ;; kill diff checking buffers when temporary
-              (dolist (buffer (list ediff-buffer-A
-                                    ediff-buffer-B
-                                    ediff-buffer-C))
-                (when (and buffer
-                           (string-prefix-p "FILE=" (buffer-name buffer)))
-                  (kill-buffer buffer)))
+           (defun ediff--restore-windows-after (&rest args)
+             (if (not (funcall register-active))
+                 (message "ediff-restore-windows : no previous window config found to restore")
+               (jump-to-register ediff-window-register)
+               (set-register ediff-window-register nil)))
+           (add-hook 'ediff-quit-hook #'ediff--restore-windows-after))
 
-              ;; kill any hardcoded ediff related buffers
-              (dolist (buffer '("*Ediff Registry*"))
-                (let ((buffer (get-buffer buffer)))
-                  (when buffer
-                    (kill-buffer buffer))))
+         (defun ediff--kill-ediff-temp-buffers (&rest args)
+           "kills all the spawned ediff buffers... because
+       there's way too many and their named so similairly that
+       there's no point in them existing... Plus I keep ending
+       up editing the wrong diffed buffer."
+           (when mohkale-ediff-kill-temporary-buffers-on-exit
+             ;; kill diff checking buffers when temporary
+             (dolist (buffer (list ediff-buffer-A
+                                   ediff-buffer-B
+                                   ediff-buffer-C))
+               (when (and buffer
+                          (string-prefix-p "FILE=" (buffer-name buffer)))
+                 (kill-buffer buffer)))
 
-              ;; kill any uniquely named ediff buffers...
-              ;; Ewwww... O(n*m)... how do I live with myself
-              (dolist (buffer-prefix '("*Ediff Control Panel"
-                                       "*ediff-diff"
-                                       "*ediff-errors"
-                                       "*ediff-fine-diff"))
-                (let ((buffer-prefix-regexp (regexp-quote buffer-prefix)))
-                  (dolist (buffer (buffer-list))
-                    (when (string-match buffer-prefix-regexp
-                                        (buffer-name buffer))
-                      (kill-buffer buffer)))))))
+             ;; kill any hardcoded ediff related buffers
+             (dolist (buffer '("*Ediff Registry*"))
+               (let ((buffer (get-buffer buffer)))
+                 (when buffer
+                   (kill-buffer buffer))))
 
-          (add-hook 'ediff-quit-hook #'ediff--kill-ediff-temp-buffers)
+             ;; kill any uniquely named ediff buffers...
+             ;; Ewwww... O(n*m)... how do I live with myself
+             (dolist (buffer-prefix '("*Ediff Control Panel"
+                                      "*ediff-diff"
+                                      "*ediff-errors"
+                                      "*ediff-fine-diff"))
+               (let ((buffer-prefix-regexp (regexp-quote buffer-prefix)))
+                 (dolist (buffer (buffer-list))
+                   (when (string-match buffer-prefix-regexp
+                                       (buffer-name buffer))
+                     (kill-buffer buffer)))))))
 
-          (defun ediff--customize-ediff-mode-map (&rest args)
-            "give me back my leader keys damn it :P"
-            (general-define-key
-              :keymaps 'ediff-mode-map
-              :states  'motion
-              "SPC" mohkale-leader-map))
+         (add-hook 'ediff-quit-hook #'ediff--kill-ediff-temp-buffers)
 
-          (add-hook 'ediff-keymap-setup-hook #'ediff--customize-ediff-mode-map)
+         (defun ediff--customize-ediff-mode-map (&rest args)
+           "give me back my leader keys damn it :P"
+           (general-define-key
+             :keymaps 'ediff-mode-map
+             :states  'motion
+             "SPC" mohkale-leader-map))
 
-          ;; (evil-set-initial-state 'ediff-meta-mode 'motion)
+         (add-hook 'ediff-keymap-setup-hook #'ediff--customize-ediff-mode-map)
 
-          ;; (general-define-key
-          ;;   :states 'motion
-          ;;   :keymaps 'ediff-meta-buffer-map
-          ;;   "C-j" 'ediff-next-meta-item
-          ;;   "C-k" 'ediff-previous-meta-item
-          ;;   "q" 'ediff-quit-meta-buffer
-          ;;   "o" 'ediff-registry-action
-          ;;   "=" 'ediff-meta-mark-equal-files
-          ;;   "RET" 'ediff-registry-action
-          ;;   "R" 'ediff-show-registry
-          ;;   "S-RET" 'ediff-show-meta-buff-from-registry
-          ;;   "?" 'ediff-toggle-verbose-help-meta-buffer)
+         ;; (evil-set-initial-state 'ediff-meta-mode 'motion)
 
-          (mohkale/set-leader-keys-for-major-mode 'ediff-meta-mode
-            "tf" 'ediff-toggle-filename-truncation
-            "tv" 'ediff-toggle-verbose-help-meta-buffer))
-      #+END_SRC
+         ;; (general-define-key
+         ;;   :states 'motion
+         ;;   :keymaps 'ediff-meta-buffer-map
+         ;;   "C-j" 'ediff-next-meta-item
+         ;;   "C-k" 'ediff-previous-meta-item
+         ;;   "q" 'ediff-quit-meta-buffer
+         ;;   "o" 'ediff-registry-action
+         ;;   "=" 'ediff-meta-mark-equal-files
+         ;;   "RET" 'ediff-registry-action
+         ;;   "R" 'ediff-show-registry
+         ;;   "S-RET" 'ediff-show-meta-buff-from-registry
+         ;;   "?" 'ediff-toggle-verbose-help-meta-buffer)
 
-***** evil-ediff
-      #+BEGIN_SRC emacs-lisp
-       (use-package evil-ediff
+         (mohkale/set-leader-keys-for-major-mode 'ediff-meta-mode
+           "tf" 'ediff-toggle-filename-truncation
+           "tv" 'ediff-toggle-verbose-help-meta-buffer)
+
+         (use-package evil-ediff
+           :ensure t
+           :defer  t
+           :commands (evil-ediff-init)
+           :init
+           (with-eval-after-load 'ediff
+             (evil-ediff-init))))
+     #+END_SRC
+
+**** vdiff
+     #+BEGIN_SRC emacs-lisp
+       (use-package vdiff
          :ensure t
          :defer  t
-         :commands (evil-ediff-init)
+         :commands (vdiff-mode
+                    vdiff-3way-mode
+
+                    vdiff-buffers
+                    vdiff-buffers3
+                    vdiff-files
+                    vdiff-files3
+                    vdiff-current-file
+                    vdiff-merge-conflict)
          :init
-         (with-eval-after-load 'ediff
-           (evil-ediff-init)))
-      #+END_SRC
+         (mohkale/set-leader-keys
+           "= RET" 'vdiff-merge-conflict
+           "==" 'vdiff-current-file
+           "=f" 'vdiff-files
+           "=F" 'vdiff-files3
+           "=b" 'vdiff-buffers
+           "=B" 'vdiff-buffers3)
+
+         (defvar vdiff-use-relative-line-numbers nil
+           "when true, line numbers in vdiff sessions are relative")
+
+         :config
+         (add-hook 'vdiff-mode-hook
+                   (defun mohkale--setup-vdiff (&rest args)
+                     (let ((inhibit-message t))
+                       (toggle-truncate-lines +1))
+
+                     (when vdiff-use-relative-line-numbers
+                       (setq-local display-line-numbers
+                                   (if vdiff-mode
+                                       t
+                                     'relative)))))
+
+         (mohkale/declare-prefix-for-mode* 'vdiff-mode
+           "TAB" "refine"
+           "t"   "toggle"
+           "z"   "folds")
+
+         (mohkale/set-leader-keys-for-minor-mode 'vdiff-mode
+           "=-" 'vdiff-switch-buffer
+           "=j" 'vdiff-next-hunk
+           "=k" 'vdiff-previous-hunk
+           "=." 'vdiff-hydra/body
+           "=r" 'vdiff-refresh
+           "=m" 'vdiff-restore-windows
+           "=q" 'vdiff-quit
+           "=s" 'vdiff-save-buffers
+           "=<left>"  'vdiff-receive-changes
+           "=<right>" 'vdiff-send-changes
+           "=>" 'vdiff-send-changes-and-step
+           "=<" 'vdiff-send-changes
+
+           "= TAB TAB" 'vdiff-refine-this-hunk
+           "= TAB DEL" 'vdiff-remove-refinements-in-hunk
+           "= TAB RET" 'vdiff-refine-all-hunks
+           ;; 'vdiff-refine-this-hunk-symbol
+           ;; 'vdiff-refine-this-hunk-word
+           ;; 'vdiff-refine-all-hunks-symbol
+           ;; 'vdiff-refine-all-hunks-word
+
+           "=ti" 'vdiff-toggle-case
+           "=tw" 'vdiff-toggle-whitespace
+
+           "=zj" 'vdiff-next-fold
+           "=zk" 'vdiff-previous-fold
+           "=zo" 'vdiff-open-fold
+           "=zO" 'vdiff-open-all-folds
+           "=zf" 'vdiff-close-fold
+           "=zc" 'vdiff-close-fold
+           "=zC" 'vdiff-close-all-folds
+           "=z M-c" 'vdiff-close-other-folds))
+     #+END_SRC
 
 *** dired
 **** dired-x
      #+BEGIN_SRC emacs-lisp
        (use-package dired-x
-         :defer   t
          :straight (dired-x :type built-in)
+         :defer t
          :commands (dired-jump
                     dired-jump-other-window
                     dired-omit-mode)
@@ -5329,8 +5569,8 @@
 **** epa-dired
      #+BEGIN_SRC emacs-lisp
        (use-package epa-dired
-         :defer   t
          :straight (epa-dired :type built-in)
+         :defer t
          :commands (epa-dired-do-decrypt
                     epa-dired-do-encrypt
                     epa-dired-do-sign
@@ -5370,8 +5610,8 @@
 **** dired
      #+BEGIN_SRC emacs-lisp
        (use-package dired
-         :defer   t
          :straight (dired :type built-in)
+         :defer t
          :hook (dired-mode . dired-omit-mode)
          :config
          (setq ls-lisp-dirs-first t
@@ -5536,8 +5776,8 @@
 **** image-dired
      #+BEGIN_SRC emacs-lisp
        (use-package image-dired
-         :defer   t
          :straight (image-dired :type built-in)
+         :defer t
          :commands (persp-custom-@dired-slideshow)
          :init
          (push 'image-dired-thumbnail-mode mohkale--whitespace-exempt-modes)
@@ -5726,6 +5966,26 @@
           "C-<down>" 'drag-stuff-down))
     #+END_SRC
 
+*** ebuku
+    #+BEGIN_SRC emacs-lisp
+      (use-package ebuku
+        :defer t
+        :straight (ebuku :type git :host github :repo "flexibeast/ebuku")
+        :commands (ebuku-add-bookmark
+                   ebuku-delete-bookmark
+                   ebuku-edit-bookmark
+                   ebuku-refresh
+                   ebuku-search
+                   ebuku-search-on-all
+                   ebuku-search-on-any
+                   ebuku-search-on-reg
+                   ebuku-search-on-tag
+                   ebuku-mode
+                   ebuku)
+        ;; :config
+        )
+    #+END_SRC
+
 *** edbi
     #+BEGIN_SRC emacs-lisp
       ;; (use-package edbi
@@ -5871,8 +6131,8 @@
 **** eshell-mode
      #+BEGIN_SRC emacs-lisp
        (use-package esh-mode
-         :defer   t
          :straight (esh-mode :type built-in)
+         :defer t
          :hook (
                 ;;; cursor-type is block... changing to bar
                 ;;; doesn't persist on window change... boo!!!
@@ -6254,7 +6514,7 @@
 *** help
     #+BEGIN_SRC emacs-lisp
       (use-package help
-      :straight (help :type built-in)
+        :straight (help :type built-in)
         :config
         ;; once was enough, stop repeating the same message please :P
         (advice-add 'help-window-display-message :around #'ignore))
@@ -6263,8 +6523,8 @@
 *** help-fns+
     #+BEGIN_SRC emacs-lisp
       (use-package help-fns+
-        :defer   t
         :straight (help-fns+ :type built-in)
+        :defer t
         :commands (describe-buffer
                    describe-keymap
                    describe-mode
@@ -6335,8 +6595,8 @@
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package hydra-posframe
-        :defer   t
         :straight (hydra-posframe :type built-in)
+        :defer   t
         :commands (hydra-posframe-mode
                    hydra-posframe-enable)
         :init
@@ -6372,7 +6632,7 @@
                ivy-use-virtual-buffers t
                projectile-completion-system 'ivy
                mohkale--ivy-initial-inputs-alist '((counsel-minor . "^+")
-                                                   (counsel-package . "^+")
+                                                   ;; (counsel-package . "^+")
                                                    ;; (org-refile . "^")
                                                    (org-agenda-refile . "^")
                                                    (org-capture-refile . "^")
@@ -6437,7 +6697,7 @@
          (mohkale/set-leader-keys
            "bb" 'ivy-switch-buffer
            "SPC" 'counsel-M-x
-           "`" 'ivy-resume)
+           "RET" 'ivy-resume)
          :bind* (:map ivy-minibuffer-map
                  ("C-j" . nil) ;; was ivy-alt-done
                  ("M-j" . nil) ;; was ivy-yank-word
@@ -6692,7 +6952,7 @@
            "Mm" 'counsel-major
            "MM" 'counsel-major
 
-           "?"  'counsel-appropos
+           "?"  'counsel-apropos
            "ry" 'counsel-yank-pop
            "rm" 'counsel-mark-ring
            "rn" 'counsel-evil-marks
@@ -6873,6 +7133,23 @@
          :ensure t
          :defer  t
          :commands (counsel-css))
+     #+END_SRC
+
+**** counsel-web
+     #+BEGIN_SRC emacs-lisp
+       (use-package counsel-web
+         :straight (counsel-web :type git :host github :repo "mnewt/counsel-web")
+         :defer  t
+         :commands (counsel-web-suggest ;; async
+                    counsel-web-search
+                    counsel-web-thing-at-point)
+         :init
+         (setq counsel-web-search-action #'browse-url)
+
+         (mohkale/set-leader-keys
+           "se RET"   'counsel-web-search
+           "se M-RET" 'counsel-web-suggest
+           "se TAB"   'counsel-web-thing-at-point))
      #+END_SRC
 
 **** helm-make
@@ -7189,8 +7466,8 @@
 **** ibuffer-persp
      #+BEGIN_SRC emacs-lisp
        (use-package ibuffer-persp
-         :defer   t
          :straight (ibuffer-persp :type built-in)
+         :defer t
          :commands (ibuffer-persp ;; only buffers from current perspective
                     ibuffer-persp-set-filter-groups-by-persp-name-not-nil
                     ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
@@ -7924,8 +8201,8 @@
 *** occur
     #+BEGIN_SRC emacs-lisp
       (use-package replace
-        :defer   t
         :straight (replace :type built-in)
+        :defer t
         :config
         ;; occur-mode-display-occurrence
         (advice-add 'occur-mode-display-occurrence :around
@@ -8517,8 +8794,8 @@
 *** process-menu
     #+BEGIN_SRC emacs-lisp
       (use-package simple
-        :defer   t
         :straight (simple :type built-in)
+        :defer t
         :config
         (evil-set-initial-state 'process-menu-mode 'motion)
 
@@ -8553,6 +8830,7 @@
                     projectile-find-dir
                     projectile-find-file
                     projectile-ivy-persp-switch-project
+                    projectile-show-and-copy-project-dir
                     projectile-regenerate-tags
                     projectile-find-tag
                     projectile-invalidate-cache
@@ -8577,6 +8855,7 @@
            "pI" 'projectile-invalidate-cache
            "pk" 'projectile-kill-buffers
            "pl" 'projectile-ivy-persp-switch-project
+           "py" 'projectile-show-and-copy-project-dir
            "pp" 'projectile-run-project
            "pR" 'projectile-replace
            "pt" 'projectile-test-project)
@@ -8672,7 +8951,20 @@
 
          (advice-add 'projectile-run-project     :around #'projectile-compile--double-prefix-means-run-comint)
          (advice-add 'projectile-compile-project :around #'projectile-compile--double-prefix-means-run-comint)
-         (advice-add 'projectile-test-project    :around #'projectile-compile--double-prefix-means-run-comint))
+         (advice-add 'projectile-test-project    :around #'projectile-compile--double-prefix-means-run-comint)
+
+         (defun projectile-show-and-copy-project-dir (&optional prefix)
+           (interactive "P")
+           (if (not (projectile-project-p))
+               (message "you're not currently in a project")
+             (let ((path (abbreviate-file-name (projectile-project-root))))
+               (when prefix
+                 (if (and (consp prefix) (eq (car prefix) 4))
+                     (insert path)
+                   (save-excursion
+                     (insert path))))
+               (message path)
+               (kill-new path)))))
      #+END_SRC
 
 **** ivy-projectile
@@ -8839,8 +9131,8 @@
 *** simple
     #+BEGIN_SRC emacs-lisp
       (use-package simple
-        :defer   t
         :straight (simple :type built-in)
+        :defer t
         :commands (completion-list-mode
                    smart-universal-argument
                    universal-argument-batch-increment
@@ -9252,8 +9544,8 @@
 *** visual-line
     #+BEGIN_SRC emacs-lisp
       (use-package visual-line
-        :defer   t
         :straight (visual-line :type built-in)
+        :defer t
         :delight " Ⓛ")
     #+END_SRC
 
@@ -9288,22 +9580,84 @@
     #+END_SRC
 
 *** which-key
-    # TODO update which key display delay
     #+BEGIN_SRC emacs-lisp
       (use-package which-key
         :ensure t
         :demand t
         :diminish
         ;; :delight " Ⓚ"
+        :commands (which-key-M-x+)
+        :init
+        (mohkale/set-leader-keys
+          "hk" 'which-key-show-top-level
+          "h RET" 'which-key-M-x+)
+
+        ;; prefix-completion courtesy of clemara
+        ;; see https://with-emacs.com/posts/ui-hacks/prefix-command-completion/
+        (defun which-key-M-x-prefix+ (&optional _)
+          "Completing read and execute command from prefix-map.
+
+      This command can be used as `prefix-help-command'. The optional
+      argument is ignored and only for compatability with
+      `which-key-C-h-dispatch' so this command can be bound in
+      `which-key-C-h-map', too."
+          (interactive)
+          (let* ((evs (cond ((which-key--current-prefix)
+                             (which-key--current-key-list))
+                            (t
+                             (butlast (append (this-command-keys-vector) nil)))))
+                 (key  (and evs (apply #'vector evs))))
+            (which-key-M-x+ key)))
+
+        (setq prefix-help-command #'which-key-M-x-prefix+)
+
         :config
         (which-key-mode 1)
+
         ;; order of keys is case insensetive
         (setq which-key-sort-order 'which-key-key-order-alpha
               which-key-echo-keystrokes 0.02)
-        ;; translate winum-select-window number commands to single command in which key
 
-        (mohkale/set-leader-keys
-          "hk" 'which-key-show-top-level))
+        (defun which-key-M-x+ (&optional key)
+          "Completing read command and execute it.
+
+      Only commands which are bound to keys are considered. If KEY is
+      given it should be the prefix-key for which commands should be
+      completed. Otherwise read command from top-level. "
+          (interactive)
+          (let ((cmd (which-key--completing-read-cmd+ key)))
+            (when (commandp cmd)
+              (which-key--execute-cmd+ cmd))))
+
+        (defun which-key--completing-read-cmd+ (&optional prefix)
+          "Completing read command for PREFIX.
+
+      Read commands for PREFIX or top-level if PREFIX not given."
+          (which-key--hide-popup-ignore-command)
+          (let ((desc
+                 (completing-read
+                  (if prefix
+                      (format "Execute (%s): " (key-description prefix))
+                    "Execute: ")
+                  (mapcar #'which-key--completing-read-format+
+                          (which-key--get-current-bindings prefix)))))
+            (intern (car (split-string desc)))))
+
+        (defun which-key--execute-cmd+ (cmd)
+          "Execute command CMD as if invoked by key sequence."
+          (setq prefix-arg current-prefix-arg)
+          (setq this-command cmd)
+          (setq real-this-command cmd)
+          (command-execute cmd 'record))
+
+        (defun which-key--completing-read-format+ (bnd)
+          "Format binding BND for `completing-read'."
+          (let* ((key (car bnd))
+                 (cmd (cdr bnd))
+                 (desc (format "%s (%s)" cmd
+                               (propertize key 'face 'which-key-key-face))))
+            (which-key--maybe-add-docstring
+             (format "%-50s" desc) cmd))))
     #+END_SRC
 
 *** whitespace
@@ -9627,8 +9981,8 @@
         (mohkale/declare-prefix "V" "version control")
 
         (mohkale/set-leader-keys
-          "Dv" 'vc-ediff
-          "DV" 'vc-diff)
+          ;; "=v" 'vc-ediff
+          "=v" 'vc-diff)
 
         (push 'vc-annotate-mode mohkale--whitespace-exempt-modes)
         (push 'vc-git-log-view-mode mohkale--whitespace-exempt-modes)
@@ -9975,13 +10329,13 @@
 **** elisp-mode
      #+BEGIN_SRC emacs-lisp
        (use-package elisp-mode
-         :defer   t
          :straight (elisp-mode :type built-in)
+         :defer t
          ;; show lambda as an actual lambda symbol
          :config
-         (mohkale//define-pretty-symbols-for-mode 'emacs-lisp-mode
+         (mohkale/define-pretty-symbols-for-mode 'emacs-lisp-mode
            ("lambda" . ?λ))
-         (mohkale//define-pretty-symbols-for-mode 'lisp-interaction-mode
+         (mohkale/define-pretty-symbols-for-mode 'lisp-interaction-mode
            ("lambda" . ?λ))
 
          (defun-evil-adjust-to-eol evil-adjust-eval-print-last-sexp (&optional arg)
@@ -10040,6 +10394,8 @@
          ;;       (display-buffer dest-buffer)))
 
          (dolist (mode '(emacs-lisp-mode lisp-interaction-mode))
+           (push `(,mode . 2) mohkale-indent-config)
+
            (mohkale/declare-prefix-for-major-mode* mode
              "g" '("jump" . "jump to various places in source code")
              "e" "eval"
@@ -10075,14 +10431,14 @@
          (general-define-key
            ;; :states '(normal insert motion replace)
            :keymaps 'lisp-interaction-mode-map
+           "C-j" nil
            "C-)" 'evil-adjust-eval-print-last-sexp
            "C-(" 'evil-adjust-eval-replace-last-sexp
            "C-S-E" 'evil-adjust-eval-print-last-sexp
            "C-S-R" 'evil-adjust-eval-replace-last-sexp)
 
          ;; (add-hook 'lisp-interaction-mode-hook #'(lambda () (paredit-mode -1)))
-         :bind (:map lisp-interaction-mode-map
-                ("C-j" . nil)))
+         )
      #+END_SRC
 
 *** python
@@ -10165,9 +10521,8 @@
        (use-package pip-requirements
          :ensure t
          :defer  t
-         :commands pip-requirements-mode
-         :init
-         (push (cons "^requirements\\.txt$" 'pip-requirements-mode) auto-mode-alist))
+         :mode ("^requirements\\.txt$" . pip-requirements-mode)
+         :commands pip-requirements-mode)
      #+END_SRC
 
 **** yapfify
@@ -10184,8 +10539,8 @@
 **** python-mode
      #+BEGIN_SRC emacs-lisp
        (use-package python
-         :defer   t
          :straight (python :type built-in)
+         :defer t
          :hook (python-mode . flycheck-mode)
          :commands (python-mode
                     run-python)
@@ -10194,7 +10549,7 @@
          (evil-set-initial-state 'inferior-python-mode 'emacs)
          :config
          (setq python--prettify-symbols-alist nil)
-         (mohkale//define-pretty-symbols-for-mode 'python-mode
+         (mohkale/define-pretty-symbols-for-mode 'python-mode
            ("lambda" . ?λ))
 
          (defun python-shell-calculate-command ()
@@ -10255,13 +10610,11 @@
 **** ruby
      #+BEGIN_SRC emacs-lisp
        (use-package ruby
-         :defer    t
          :straight (ruby :type built-in)
+         :defer t
          :commands (ruby-mode
                     ruby-toggle-string-quotes
                     ruby-toggle-block)
-         :init
-         (setq ruby-indent-level mohkale-preferred-indent)
          :config
          (mohkale/set-leader-keys-for-major-mode 'ruby-mode
            "'" 'ruby-toggle-string-quotes
@@ -10273,16 +10626,12 @@
        (use-package enh-ruby-mode
          :ensure t
          :defer  t
-         :commands enh-ruby-mode
+         :mode ("\\.rb$" . enh-ruby-mode)
+         :interpreter "ruby"
          :hook (enh-ruby-mode . flycheck-mode)
-         :init
-         ;; TODO add bindings for rake and others
-         (when (eq mohkale-ruby-mode 'enh-ruby-mode)
-           (push (cons "\\.rb$" 'enh-ruby-mode) auto-mode-alist)
-           (push (cons "ruby" 'enh-ruby-mode) interpreter-mode-alist))
+         :commands enh-ruby-mode
          :config
-         (setq enh-ruby-indent-level mohkale-preferred-indent
-               enh-ruby-deep-indent-paren nil
+         (setq enh-ruby-deep-indent-paren nil
                enh-ruby-hanging-paren-deep-indent-level 2)
          (mohkale/declare-prefix-for-major-mode* 'enh-ruby-mode
            "i" "insert/format"
@@ -10470,16 +10819,8 @@
        (use-package web-mode
          :ensure t
          :defer  t
-         :init
-         (dolist (regexp '("\\.erb"
-                           "\\.html"))
-           (push (cons regexp 'web-mode) auto-mode-alist))
-         (setq css-indent-offset mohkale-preferred-indent)
+         :mode "\\.erb\\|\\.html"
          :config
-         (setq web-mode-markup-indent-offset mohkale-preferred-indent
-               web-mode-css-indent-offset mohkale-preferred-indent
-               web-mode-code-indent-offset mohkale-preferred-indent)
-
          (general-define-key
            :keymaps 'web-mode-map
            :states 'normal
@@ -10650,8 +10991,8 @@
 **** org-agenda
      #+BEGIN_SRC emacs-lisp
        (use-package org-agenda
-         :defer    t
          :straight (org-agenda :type built-in)
+         :defer t
          :config
          (evil-set-initial-state 'org-agenda-mode 'normal)
 
@@ -10772,8 +11113,8 @@
 **** org-link-edit
      #+BEGIN_SRC emacs-lisp
        (use-package org-link-edit
-         :defer    t
          :straight (org-link-edit :type built-in)
+         :defer t
          :commands (org-link-edit-forward-slurp
                     org-link-edit-forward-barf
                     org-link-edit-backward-slurp
@@ -10793,9 +11134,9 @@
 **** org-mode
      #+BEGIN_SRC emacs-lisp
        (use-package org
-         :defer   t
          :straight (org :type built-in)
-         :hook ((org-mode . mohkale//enable-line-numbers-handler))
+         :defer t
+         :hook ((org-mode . enable-line-numbers))
          :commands (org-capture
                     org-agenda
                     org-copy-subtree
@@ -10810,7 +11151,7 @@
            "oy" 'org-copy-subtree
            "oY" 'org-cut-subtree)
          :config
-         (mohkale//define-pretty-symbols-for-mode 'org-mode
+         (mohkale/define-pretty-symbols-for-mode 'org-mode
            ("lambda" . ?λ))
 
          ;; switch to insert state when capturing org templates
@@ -11202,8 +11543,8 @@
 **** org-capture
      #+BEGIN_SRC emacs-lisp
        (use-package org-capture
-         :defer   t
          :straight (org-capture :type built-in)
+         :defer t
          :config
          (mohkale/set-leader-keys-for-minor-mode 'org-capture-mode
            (concat mohkale-major-mode-leader-prefix ",") 'org-capture-finalize
@@ -11214,8 +11555,8 @@
 **** org-src
      #+BEGIN_SRC emacs-lisp
        (use-package org-src
-         :defer   t
          :straight (org-src :type built-in)
+         :defer t
          :config
          (mohkale/set-leader-keys-for-minor-mode 'org-src-mode
            (concat mohkale-major-mode-leader-prefix ",") 'org-edit-src-exit
@@ -11280,6 +11621,7 @@
       (use-package json-mode
         :ensure t
         :defer  t
+        :mode "\\.json$"
         :commands (json-decrement-number-at-point
                    json-increment-number-at-point
 
@@ -11290,9 +11632,6 @@
                    json-toggle-boolean
                    json-mode-kill-path)
         :hook (json-mode . flycheck-mode)
-        :hook (json-mode . flycheck-mode)
-        :init
-        (push (cons "\\.json$" 'json-mode) auto-mode-alist)
         :config
         (mohkale/set-leader-keys-for-major-mode 'json-mode
           "b" 'json-mode-beautify
@@ -11306,11 +11645,10 @@
       (use-package vimrc-mode
         :ensure t
         :defer  t
+        :mode "\\.vim"
         :hook (vimrc-mode . flycheck-mode)
         :commands vimrc-mode
-        :delight (vimrc-mode "vim")
-        :init
-        (push (cons "\\.vim" 'vimrc-mode) auto-mode-alist))
+        :delight (vimrc-mode "vim"))
     #+END_SRC
 
 *** sql
@@ -11319,6 +11657,7 @@
        (use-package sql
          :ensure t
          :defer  t
+         :mode ("\\.sql" . sql-mode)
          :commands (sql-mode
                     sql-connect
                     sql-save-connection
@@ -11327,7 +11666,6 @@
          :hook (sql-mode . flycheck-mode)
          :init
          (setq sql-sqlite-options '("-interactive"))
-         (push (cons "\\.sql" 'sql-mode) auto-mode-alist)
          (push 'sql-interactive-mode mohkale--whitespace-exempt-modes)
 
          (evil-set-initial-state 'sql-interactive-mode 'emacs)
@@ -11393,10 +11731,9 @@
       (use-package yaml-mode
         :ensure t
         :defer  t
+        :mode "\\.yaml"
         :commands (yaml-mode)
         :hook (yaml-mode . flycheck-mode)
-        :init
-        (push (cons "\\.yaml" 'yaml-mode) auto-mode-alist)
         :config
         (general-define-key
           :keymaps 'yaml-mode-map
@@ -11408,7 +11745,7 @@
           "f" 'yaml-fill-paragraph
           "v" 'yaml-mode-version)
 
-        (setq yaml-indent-offset 2))
+        (push '(yaml-mode . 2) mohkale-indent-config))
     #+END_SRC
 
 *** csv
@@ -11461,8 +11798,8 @@
 **** shell-script-mode
      #+BEGIN_SRC emacs-lisp
        (use-package sh-script
-         :defer   t
          :straight (sh-script :type built-in)
+         :defer t
          :hook ((sh-script-mode . electric-pair-mode)
                 (sh-script-mode . flycheck-mode))
          :config
@@ -11501,6 +11838,22 @@
 
          (advice-add 'sh-set-shell :around 'inhibit-messages-wrapper))
      #+END_SRC
+
+*** ssh
+    #+BEGIN_SRC emacs-lisp
+      (use-package ssh-config-mode
+        :ensure t
+        :defer  t
+        :delight (ssh-config-mode "SSH")
+        :config
+        ;; TODO advise last host to behave like org mode
+        (general-define-key
+          :keymaps '(ssh-config-mode-map
+                     ssh-known-hosts-mode-map)
+          :states mohkale-norm-states
+          "gj" 'ssh-config-host-next
+          "gk" 'ssh-config-host-prev))
+    #+END_SRC
 
 *** Markdown
 **** company-emoji
@@ -11548,7 +11901,7 @@
        (use-package markdown-mode
          :ensure t
          :defer  t
-         :hook ((markdown-mode . mohkale//enable-line-numbers-handler)
+         :hook ((markdown-mode . enable-line-numbers)
                 ;; (markdown-mode . emojify-mode)
                 (markdown-mode . flycheck-mode))
          :config
@@ -11730,12 +12083,9 @@
        (use-package cmake-mode
          :ensure t
          :defer  t
+         :mode "CMakeLists\\.txt\\|\\.cmake"
          :commands (cmake-mode)
-         ;; :mode (("CMakeLists\\.txt\\'" . cmake-mode) ("\\.cmake\\'" . cmake-mode))
          :hook (cmake-mode . flycheck-mode)
-         :init
-         (push (cons "CMakeLists\\.txt\\'" 'cmake-mode) auto-mode-alist)
-         (push (cons "\\.cmake\\'" 'cmake-mode) auto-mode-alist)
          :config
          (mohkale/update-company-backends-for-mode cmake t
            '(company-cmake)))
@@ -11761,8 +12111,9 @@
 **** cc-mode
      #+BEGIN_SRC emacs-lisp
        (use-package cc-mode
-         :defer   t
          :straight (cc-mode :type built-in)
+         :defer t
+         :mode ("\\.h$" . c-mode)
          :commands (c-mode c++-mode mohkale//set-c-mode-bindings)
          :hook (
                 ;; use global-ycmd-mode manually
@@ -11770,16 +12121,13 @@
                 ;; (c++-mode . ycmd-mode)
                 (c-mode   . flycheck-mode)
                 (c++-mode . flycheck-mode))
-         :init
-         (push (cons ".*\\.h$" 'c-mode) auto-mode-alist)
          :config
          (c-toggle-auto-newline  +1)
          ;; WARN never do this, it breaks commenting in
          ;;      weird places.
          ;; (c-toggle-comment-style +1)
 
-         (setq c-default-style "stroustrup"
-               c-basic-offset  mohkale-preferred-indent)
+         (setq c-default-style "stroustrup")
 
          ;; (mohkale/update-company-backends-for-mode c t
          ;;   '(company-ycmd company-c-headers))
@@ -11803,9 +12151,10 @@
              (general-define-key
                :map mode-map
                "C-M-a" 'c-beginning-of-defun
-               "C-M-e" 'c-end-of-defun
+               ;; "C-M-e" 'c-end-of-defun
                "M-a"   'c-beginning-of-statement
-               "M-e"   'c-end-of-statement)))
+               ;; "M-e"   'c-end-of-statement
+               )))
 
          (mohkale//set-c-mode-bindings 'c-mode)
          (mohkale//set-c-mode-bindings 'cc-mode))
@@ -11871,8 +12220,8 @@
 **** java-mode
     #+BEGIN_SRC emacs-lisp
       (use-package cc-mode
-        :defer   t
         :straight (cc-mode :type built-in)
+        :defer t
         :init
         (with-eval-after-load 'projectile
           ;; see: https://github.com/bbatsov/projectile/blob/master/projectile.el#L2636
@@ -12014,9 +12363,8 @@
        (use-package js2-mode
          :ensure t
          :defer  t
+         :mode "\\.js$"
          :hook (js2-mode . flycheck-mode)
-         :init
-         (push (cons "\\.js$" 'js2-mode) auto-mode-alist)
          :config
          (mohkale/update-company-backends-for-mode js2-mode t
            '(company-tern))
@@ -12585,9 +12933,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package plantuml-mode
         :ensure t
-        :defer  t
-        :config
-        (setq plantuml-indent-level mohkale-preferred-indent))
+        :defer  t)
     #+END_SRC
 
 ** Unimplemented
@@ -12986,6 +13332,7 @@
        `(hl-todo-keyword-faces '(("TODO"        . ,red)
                                  ("NEXT"        . ,red)
                                  ("RANT"        . ,red)
+                                 ("SEE"         . ,red)
                                  ("THEM"        . ,purple)
                                  ("PROG"        . ,blue-int)
                                  ("OKAY"        . ,blue-int)
