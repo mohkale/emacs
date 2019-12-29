@@ -52,23 +52,47 @@
     make emacs less like... emacs. use saner defaults and make emacs look nicer in general
 
     #+BEGIN_SRC emacs-lisp
-      (setq delete-old-versions -1                                                  ; delete excess backup versions silently
-            version-control t                                                       ; use version control
-            vc-make-backup-files t                                                  ; make backups in vc as well
-            vc-follow-symlinks t                                                    ; no confirmation when opening symlinks
-            ring-bell-function 'ignore                                              ; NO ANNOYING RINGS!!!
-            sentence-end-double-space nil                                           ; sentence SHOULD end with only a fullstop
-            default-fill-column 150                                                 ; toggle wrapping text at given character
-            delete-by-moving-to-trash t                                             ; don't rm, trash my garbage please :)
-            search-whitespace-regexp nil                                            ; SPC means SPC, not any amount of spaces
-            enable-local-variables t                                                ; allow safe variables, even alongside unsafe ones
+      (setq delete-old-versions t                                                  ; delete excess backup versions silently
+            version-control t                                                      ; use version control
+            vc-make-backup-files t                                                 ; make backups in vc as well
+            vc-follow-symlinks t                                                   ; no confirmation when opening symlinks
+            ring-bell-function 'ignore                                             ; NO ANNOYING RINGS!!!
+            sentence-end-double-space nil                                          ; sentence SHOULD end with only a fullstop
+            default-fill-column 150                                                ; toggle wrapping text at given character
+            delete-by-moving-to-trash t                                            ; don't rm, trash my garbage please :)
+            search-whitespace-regexp nil                                           ; SPC means SPC, not any amount of spaces
+            enable-local-variables t                                               ; allow safe variables, even alongside unsafe ones
+            hl-line-sticky-flag nil                                                ; only highlight line in active window
+            auto-save-interval 50                                                  ; auto-save as frequently as possible
+            display-line-numbers-type 'relative                                    ; prefer relative line numbers when available
+            backup-by-copying t                                                    ; don't clobber symlinks
+            kept-new-versions 10                                                   ; keep 10 latest versions of file
             recenter-positions '(top middle bottom)
-
-            display-line-numbers 'relative
 
             enable-recursive-minibuffers t
             kill-whole-line              t ; kill-line includes eol
             help-window-select           t ; always
+
+            recentf-max-saved-items 2048
+            recentf-exclude '("/tmp/"
+                              "/ssh:"
+                              "/sudo:"
+                              ;; ctags
+                              "/TAGS$"
+                              ;; global
+                              "/GTAGS$"
+                              "/GRAGS$"
+                              "/GPATH$"
+                              ;; binary
+                              "\\.mkv$"
+                              "\\.mp[34]$"
+                              "\\.avi$"
+                              "\\.pdf$"
+                              "\\.docx?$"
+                              ;; subtitles
+                              "\\.sub$"
+                              "\\.srt$"
+                              "\\.ass$")
 
             which-key-enable-extended-define-key t
 
@@ -886,7 +910,7 @@
         "u" 'smart-universal-argument)
 
       (general-define-key
-        :keymap universal-argument-map
+        :keymaps 'universal-argument-map
         "M-u" 'universal-argument-batch-increment
         "M-U" 'universal-argument-batch-decrement)
     #+END_SRC
@@ -1146,8 +1170,8 @@
 
       (mohkale/set-leader-keys
         "sg" 'rgrep
-        "sf" 'find-dired
-        "sF" 'find-grep-dired)
+        "sF" 'find-dired
+        "sf" 'find-grep-dired)
     #+END_SRC
 
 *** window
@@ -1233,7 +1257,7 @@
 
      (general-define-key
       :states mohkale-nnorm-states
-      "S-SPC" (defun-save-excursion-insert-char space ? ))
+      "S-M-SPC" (defun-save-excursion-insert-char space ? ))
    #+END_SRC
 
 ** Mohkale
@@ -1529,23 +1553,25 @@
 
       This function returns what the desired value of `show-trailing-whitespace'
       should be."
-        (unless (and mohkale--whitespace-exempt-modes
-                     (apply 'derived-mode-p
-                            mohkale--whitespace-exempt-modes))
-          (unless dont-set
-            (setq show-trailing-whitespace t))
-          t))
+        (let ((show (not (and mohkale--whitespace-exempt-modes
+                              (apply 'derived-mode-p
+                                     mohkale--whitespace-exempt-modes)))))
+          (prog1
+              show
+            (unless dont-set
+              (setq show-trailing-whitespace show)))))
 
       (defun mohkale--set-trailing-whitespace--name-based (&optional dont-set)
         "check the name of the current buffer, to see whether trailing
       whitespace should be shown. see `mohkale--set-trailing-whitespace--mode-based'."
-        (unless (and mohkale--whitespace-exempt-buffers
-                     (apply 'chain-match-regexp
-                            (buffer-name)
-                            mohkale--whitespace-exempt-buffers))
-          (unless dont-set
-            (setq show-trailing-whitespace t))
-          t))
+        (let ((show (not (and mohkale--whitespace-exempt-buffers
+                              (apply 'chain-match-regexp
+                                     (buffer-name)
+                                     mohkale--whitespace-exempt-buffers)))))
+          (prog1
+              show
+            (unless dont-set
+              (setq show-trailing-whitespace show)))))
 
       ;; (defun mohkale/set-trailing-whitespace (&rest args)
       ;;   (setq show-trailing-whitespace
@@ -1576,7 +1602,7 @@
             occurs, changing the buffer name doesn't alter the indent.
       ")
 
-      (defun set-indent-offset (&optional desired-indent)
+      (defun set-indent-offset (&optional indent)
         "set the indentation level of the current buffer.
       this method uses `mohkale-indent-config' to determine what
       the indentation of the current buffer should be and then sets
@@ -1589,7 +1615,6 @@
         (let* ((buffer (current-buffer))
                (buffer-name (buffer-name buffer))
                (indent-config mohkale-indent-config)
-               (indent desired-indent)
                _)
           (while (and (not indent)
                       (setq _ (pop indent-config)))
@@ -1642,7 +1667,6 @@
 
     #+BEGIN_SRC emacs-lisp
       ;; initially sourced from: https://github.com/magnars/.emacs.d/blob/master/defuns/editing-defuns.el#L99-L124
-
       (require 'dash)
 
       (defvar yank-indent-modes '(prog-mode
@@ -1659,16 +1683,16 @@
         (if (<= (- end beg) yank-advised-indent-threshold)
             (indent-region beg end nil)))
 
-      (defmacro with--auto-indent-satisfied (prefix-var &rest body)
+      (defmacro with-auto-indent-satisfied (prefix-var &rest body)
         `(when (and (not ,prefix-var)
                     (--any? (derived-mode-p it) yank-indent-modes))
            ,@body))
-      (put 'with--auto-indent-satisfied 'lisp-indent-function 'defun)
+      (put 'with-auto-indent-satisfied 'lisp-indent-function 'defun)
 
       (defun yank--auto-indent (arg)
         "if mode is in `yank-indent-modes' indent yanked text
       doesn't do anything if a prefix arg is given."
-        (with--auto-indent-satisfied arg
+        (with-auto-indent-satisfied arg
           (let ((transient-mark-mode nil))
             (yank-advised-indent-function
              (region-beginning) (region-end)))))
@@ -1679,7 +1703,7 @@
       (defun evil-visual-paste--auto-indent (count register &optional yank-handler)
         ;; not sure what yank handler is for, leave it in, to avoid errors
         "same as `yank--auto-indent', but for evil visual yank replace."
-        (with--auto-indent-satisfied register
+        (with-auto-indent-satisfied register
           (let ((transient-mark-mode nil))
             (yank-advised-indent-function
              (region-beginning) (region-end)))))
@@ -1695,6 +1719,14 @@
 
 *** Misc
     #+BEGIN_SRC emacs-lisp
+      (use-package mohkale-misc
+        :defer t
+        :commands (toggle-lexical-binding
+                   show-prefix))
+    #+END_SRC
+
+    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-misc.el"
       (defun toggle-lexical-binding (&optional prefix)
         (interactive "P")
         (if (not prefix)
@@ -2279,6 +2311,9 @@
         "w" 'hydra-eyebrowse/body
         "C-w" 'hydra-winman/body)
 
+      (general-define-key
+        "C-x TAB" 'hydra-indent/body)
+
       (mohkale/declare-prefix*
         "x." "hydra-text-zoom"
         "l"  "layouts")
@@ -2286,9 +2321,6 @@
       (mohkale/set-leader-keys
         "x." 'hydra-text-zoom/body
         "l"  'hydra-persp/body)
-
-      (general-define-key
-        "C-x TAB" 'hydra-indent/body)
     #+END_SRC
 
 **** text-zoom
@@ -3363,11 +3395,12 @@
 
          ("q" nil :exit t))
 
-       (bind-keys :map hydra-indent/keymap
-                  ;; that's scroll-up silly?
-                  ("C-u" . nil)
-                  (">" . hydra-indent/lambda-L)
-                  ("<" . hydra-indent/lambda-H))
+       (general-define-key
+         :keymaps 'hydra-indent/keymap
+         ;; that's scroll-up silly?
+         ("C-u" . nil)
+         (">" . hydra-indent/lambda-L)
+         ("<" . hydra-indent/lambda-H))
      #+END_SRC
 
 **** vdiff
@@ -3418,33 +3451,8 @@
          ("Q" vdiff-quit :exit t))
      #+END_SRC
 
-*** Packages
-    #+BEGIN_SRC emacs-lisp
-      (defun mohkale/get-loaded-packages ()
-        "return the number of packages loaded so far"
-        (if (bound-and-true-p package-alist)
-            package-activated-list
-          (if (and (boundp 'straight--profile-cache) (hash-table-p straight--profile-cache))
-              (hash-table-size straight--profile-cache))))
-    #+END_SRC
-
 ** Core Packages
    For packages that're need to properly setup other packages. This list won't be in any sort of order, beyond the messy order needed to ensure everything can be built from scratch.
-*** el-get
-    seems promising... but I'm too lazy to get it up and working yet. Here's the [[https://github.com/dimitri/el-get/blob/master/README.md][README]].
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package el-get
-        :ensure t
-        :defer  t)
-
-      (use-package use-package-el-get
-        :ensure t
-        :demand t
-        :config
-        (use-package-el-get-setup))
-    #+END_SRC
-
 *** spaceline
     an amazing mode line... needs to be initialised before all others to make sure every buffer inherits the same mode line. otherwise, the message buffer will definitely not use spaceline, you'll have to restart it or re evaluate this in it's context.
 
@@ -5103,13 +5111,19 @@
          :commands goto-home-buffer
          :init
          (mohkale/set-leader-keys "bh" 'goto-home-buffer)
-
          (push 'dashboard-mode mohkale--whitespace-exempt-modes)
 
          :config
          (require 'all-the-icons)
 
          (evil-set-initial-state 'dashboard-mode 'emacs)
+
+         (defun mohkale/get-loaded-packages ()
+           "return the number of packages loaded so far"
+           (if (bound-and-true-p package-alist)
+               package-activated-list
+             (if (and (boundp 'straight--profile-cache) (hash-table-p straight--profile-cache))
+                 (hash-table-size straight--profile-cache))))
 
          (let ((dashboard-buffer "*dashboard*")
                (preffered-icon-height 0.75))
@@ -5124,42 +5138,42 @@
                                 ;; switch to buffer with buffer-name
                                 dashboard-buffer-name))))
                (switch-to-buffer buffer)))
-           ;; (defalias 'goto-home-buffer #'dashboard-refresh-buffer)
 
            (setq inhibit-startup-screen t
                  initial-buffer-choice (when (< (length command-line-args) 2)
                                          (lambda () (get-buffer-create dashboard-buffer)))
                  dashboard-banner-logo-title "Welcome to Emacs!"
-                 dashboard-center-content nil
-                 dashboard-show-shortcuts t
                  ;; recents, bookmarks, projects, agenda, registers
                  dashboard-items '((recents  . 5)
                                    (projects . 7)
                                    (agenda   . nil))
-                 dashboard-set-heading-icons nil
+                 dashboard-center-content nil
                  dashboard-set-file-icons t
-                 dashboard-set-navigator t
-                 dashboard-set-init-info t
-                 show-week-agenda-p t
-                 ;; dashboard-buttons-format: (icon title help action face prefix suffix)
-                 dashboard-navigator-buttons `((;; line 01
-                                                (,(all-the-icons-octicon "mark-github" :height preffered-icon-height :v-adjust 0.0)
-                                                 "Homepage"
-                                                 "Browse Homepage"
-                                                 (lambda (&rest _) (browse-url "https://github.com/MoHKale")))
-                                                (,(all-the-icons-faicon "google" :height preffered-icon-height :v-adjust 0.0)
-                                                 "Google"
-                                                 "Browse Google"
-                                                 (lambda (&rest _) (browse-url "https://www.google.co.uk")))
-                                                (,(all-the-icons-fileicon "org" :height preffered-icon-height :v-adjust 0.0)
-                                                 "Manual"
-                                                 "Browse Emacs Manual"
-                                                 (lambda (&rest _) (message "%s" _) (browse-url "https://www.gnu.org/software/emacs/manual/html_node/emacs/index.html")))
-                                                (,(all-the-icons-faicon "cogs" :height preffered-icon-height :v-adjust 0.0)
-                                                 "Update Packages"
-                                                 "Update Packages"
-                                                 #'update-installed-packages)
-                                                ("?" "" "emacs FAQ" #'view-emacs-faq font-lock-builtin-face))))
+                 dashboard-set-navigator  t
+                 dashboard-set-init-info  t
+                 show-week-agenda-p       t
+                 dashboard-show-shortcuts t
+                 dashboard-set-heading-icons nil)
+
+           (setq dashboard-navigator-buttons
+                 `((;; line 01
+                    (,(all-the-icons-octicon "mark-github" :height preffered-icon-height :v-adjust 0.0)
+                     "Homepage"
+                     "Browse Homepage"
+                     (lambda (&rest _) (browse-url "https://github.com/MoHKale")))
+                    (,(all-the-icons-faicon "google" :height preffered-icon-height :v-adjust 0.0)
+                     "Google"
+                     "Browse Google"
+                     (lambda (&rest _) (browse-url "https://www.google.co.uk")))
+                    (,(all-the-icons-fileicon "org" :height preffered-icon-height :v-adjust 0.0)
+                     "Manual"
+                     "Browse Emacs Manual"
+                     (lambda (&rest _) (message "%s" _) (browse-url "https://www.gnu.org/software/emacs/manual/html_node/emacs/index.html")))
+                    (,(all-the-icons-faicon "cogs" :height preffered-icon-height :v-adjust 0.0)
+                     "Update Packages"
+                     "Update Packages"
+                     #'update-installed-packages)
+                    ("?" "" "emacs FAQ" #'view-emacs-faq font-lock-builtin-face))))
 
            (defun dashboard--choose-random-startup-banner ()
              "toggle another banner to be used on the dashboard"
@@ -5225,7 +5239,7 @@
          (general-define-key
            :states 'emacs
            :keymaps 'dashboard-mode-map
-           ;; WARN hardcoded simulated key
+           ;; WARN hardcoded simulated leader key
            mohkale-leader-key (general-simulate-key "C-SPC"))
          :bind* (:map dashboard-mode-map
                  ("g"     . nil)
@@ -5503,9 +5517,7 @@
 
                      (when vdiff-use-relative-line-numbers
                        (setq-local display-line-numbers
-                                   (if vdiff-mode
-                                       t
-                                     'relative)))))
+                                   (if vdiff-mode t 'relative)))))
 
          (mohkale/declare-prefix-for-mode* 'vdiff-mode
            "TAB" "refine"
@@ -5550,61 +5562,66 @@
 *** dired
 **** dired-x
      #+BEGIN_SRC emacs-lisp
-       (use-package dired-x
-         :straight (dired-x :type built-in)
-         :defer t
-         :commands (dired-jump
-                    dired-jump-other-window
-                    dired-omit-mode)
-         :config
-         (setq dired-omit-files (concat dired-omit-files
-                                        "\\|^__pycache__$"
-                                        "\\|^\\.pytest_cache$"
-                                        "\\|^\\.gradle$"
-                                        "\\|^\\.sass-cache$"
-                                        "\\|^\\.git$"
-                                        "\\|^Pipfile")))
+       (with-eval-after-load 'dired
+         (use-package dired-x
+           :straight (dired-x :type built-in)
+           :defer t
+           :hook (dired-mode . dired-omit-mode)
+           :commands (dired-jump
+                      dired-jump-other-window
+                      dired-omit-mode)
+           :config
+           (setq dired-omit-files (concat dired-omit-files
+                                          "\\|^__pycache__$"
+                                          "\\|^\\.pytest_cache$"
+                                          "\\|^\\.gradle$"
+                                          "\\|^\\.sass-cache$"
+                                          "\\|^\\.git$"
+                                          "\\|^Pipfile"))))
      #+END_SRC
 
 **** epa-dired
      #+BEGIN_SRC emacs-lisp
-       (use-package epa-dired
-         :straight (epa-dired :type built-in)
-         :defer t
-         :commands (epa-dired-do-decrypt
-                    epa-dired-do-encrypt
-                    epa-dired-do-sign
-                    epa-dired-do-verify))
+       (with-eval-after-load 'dired
+        (use-package epa-dired
+          :straight (epa-dired :type built-in)
+          :defer t
+          :commands (epa-dired-do-decrypt
+                     epa-dired-do-encrypt
+                     epa-dired-do-sign
+                     epa-dired-do-verify)))
      #+END_SRC
 
 **** diredfl
      #+BEGIN_SRC emacs-lisp :tangle no
-       (use-package diredfl
-         :ensure t
-         :defer  t
-         :commands (diredfl-mode)
-         :hook (dired-mode . diredfl-mode))
+       (with-eval-after-load 'dired
+         (use-package diredfl
+           :ensure t
+           :defer  t
+           :commands (diredfl-mode)
+           :hook (dired-mode . diredfl-mode)))
      #+END_SRC
 
 **** dired-git-info
      #+BEGIN_SRC emacs-lisp
-       (use-package dired-git-info
-         :ensure t
-         :defer  t
-         :commands (dired-git-info-mode)
-         :init
-         (general-define-key
-           :keymaps 'dired-mode-map
-           :states  'motion
-           ")" 'dired-git-info-mode))
+       (with-eval-after-load 'dired
+         (use-package dired-git-info
+           :ensure t
+           :defer  t
+           :commands (dired-git-info-mode)
+           :init
+           (general-define-key
+             :keymaps 'dired-mode-map
+             :states  'motion
+             ")" 'dired-git-info-mode)))
      #+END_SRC
 
 **** dired-hacks
      #+BEGIN_SRC emacs-lisp :tangle no
-       (use-package dired-hacks-utils
-         :ensure t
-         :defer  t
-         )
+       (with-eval-after-load 'dired
+         (use-package dired-hacks-utils
+           :ensure t
+           :defer  t))
      #+END_SRC
 
 **** dired
@@ -5612,7 +5629,6 @@
        (use-package dired
          :straight (dired :type built-in)
          :defer t
-         :hook (dired-mode . dired-omit-mode)
          :config
          (setq ls-lisp-dirs-first t
                ls-lisp-use-insert-directory-program t
@@ -5645,11 +5661,6 @@
            :keymaps 'dired-mode-map
            ;; let map override any motion bindings
            "<override-state>" 'motion)
-
-         ;; (defun dired-copy-filename-as-kill--prefix-to-kill-full-path (func &rest args)
-         ;;   )
-
-         ;; (advice-add 'dired-copy-filename-as-kill :around #'dired-copy-filename-as-kill--prefix-to-kill-full-path)
 
          (general-define-key
            :keymaps 'dired-mode-map
@@ -5775,181 +5786,183 @@
 
 **** image-dired
      #+BEGIN_SRC emacs-lisp
-       (use-package image-dired
-         :straight (image-dired :type built-in)
-         :defer t
-         :commands (persp-custom-@dired-slideshow)
-         :init
-         (push 'image-dired-thumbnail-mode mohkale--whitespace-exempt-modes)
-         (puthash "@dired-slideshow" 'persp-custom-@dired-slideshow mohkale--custom-perspectives)
+       (with-eval-after-load 'dired
+        (use-package image-dired
+          :straight (image-dired :type built-in)
+          :defer t
+          :commands (persp-custom-@dired-slideshow)
+          :init
+          (push 'image-dired-thumbnail-mode mohkale--whitespace-exempt-modes)
+          (puthash "@dired-slideshow" 'persp-custom-@dired-slideshow mohkale--custom-perspectives)
 
-         :config
-         ;;; fixed weird moves line, not thumbnail
-         (defun image-dired-slideshow-step ()
-           "Step to next file, if `image-dired-slideshow-times' has not been reached."
-           (if (< image-dired-slideshow-count image-dired-slideshow-times)
-               (progn
-                 (message "%s" (1+ image-dired-slideshow-count))
-                 (setq image-dired-slideshow-count (1+ image-dired-slideshow-count))
-                 (image-dired-display-next-thumbnail-original))
-             (image-dired-slideshow-stop)))
+          :config
+          ;;; fixed weird moves line, not thumbnail
+          (defun image-dired-slideshow-step ()
+            "Step to next file, if `image-dired-slideshow-times' has not been reached."
+            (if (< image-dired-slideshow-count image-dired-slideshow-times)
+                (progn
+                  (message "%s" (1+ image-dired-slideshow-count))
+                  (setq image-dired-slideshow-count (1+ image-dired-slideshow-count))
+                  (image-dired-display-next-thumbnail-original))
+              (image-dired-slideshow-stop)))
 
-         (general-define-key
-           :keymaps 'image-dired-thumbnail-mode-map
-           :states '(normal visual)
-           "q" nil
+          (general-define-key
+            :keymaps 'image-dired-thumbnail-mode-map
+            :states '(normal visual)
+            "q" nil
 
-           "h" 'image-dired-backward-image
-           "j" 'image-dired-next-line
-           "k" 'image-dired-previous-line
-           "l" 'image-dired-forward-image
-           "<left>"  'image-dired-forward-image
-           "<right>" 'image-dired-previous-image
+            "h" 'image-dired-backward-image
+            "j" 'image-dired-next-line
+            "k" 'image-dired-previous-line
+            "l" 'image-dired-forward-image
+            "<left>"  'image-dired-forward-image
+            "<right>" 'image-dired-previous-image
 
 
-           "x" 'image-dired-delete-char
-           "m" 'image-dired-mark-thumb-original-file
-           "u" 'image-dired-unmark-thumb-original-file
-           "c" 'image-dired-comment-thumbnail
-           "d" 'image-dired-flag-thumb-original-file
-           "D" 'image-dired-thumbnail-set-image-description
-           "s" 'image-dired-slideshow-start
-           "t" 'image-dired-toggle-mark-thumb-original-file
-           "gr" 'image-dired-refresh-thumb
-           "gc" 'image-dired-create-thumbs
-           "gg" #'(lambda () (interactive) (evil-goto-first-line) (evil-beginning-of-line))
-           "G"  #'(lambda () (interactive) (end-of-buffer) (image-dired-backward-image))
+            "x" 'image-dired-delete-char
+            "m" 'image-dired-mark-thumb-original-file
+            "u" 'image-dired-unmark-thumb-original-file
+            "c" 'image-dired-comment-thumbnail
+            "d" 'image-dired-flag-thumb-original-file
+            "D" 'image-dired-thumbnail-set-image-description
+            "s" 'image-dired-slideshow-start
+            "t" 'image-dired-toggle-mark-thumb-original-file
+            "gr" 'image-dired-refresh-thumb
+            "gc" 'image-dired-create-thumbs
+            "gg" #'(lambda () (interactive) (evil-goto-first-line) (evil-beginning-of-line))
+            "G"  #'(lambda () (interactive) (end-of-buffer) (image-dired-backward-image))
 
-           "C-s" 'image-save           ; NOTE originally was bound to o
+            "C-s" 'image-save           ; NOTE originally was bound to o
 
-           "<C-SPC>"    'image-dired-mark-thumb-original-file
-           "<M-SPC>"    'image-dired-unmark-thumb-original-file
+            "<C-SPC>"    'image-dired-mark-thumb-original-file
+            "<M-SPC>"    'image-dired-unmark-thumb-original-file
 
-           "<C-return>" 'image-dired-display-current-image-full
-           "<RET>"      'image-dired-display-thumbnail-original-image
-           "C-l"        'image-dired-display-next-thumbnail-original
-           "C-h"        'image-dired-display-previous-thumbnail-original
-           ;;; column view aliases
-           "J" 'image-dired-display-next-thumbnail-original
-           "K" 'image-dired-display-previous-thumbnail-original
-           ;; "o" 'image-dired-display-thumbnail-original-image
-           "v" 'image-dired-display-thumbnail-original-image
+            "<C-return>" 'image-dired-display-current-image-full
+            "<RET>"      'image-dired-display-thumbnail-original-image
+            "C-l"        'image-dired-display-next-thumbnail-original
+            "C-h"        'image-dired-display-previous-thumbnail-original
+            ;;; column view aliases
+            "J" 'image-dired-display-next-thumbnail-original
+            "K" 'image-dired-display-previous-thumbnail-original
+            ;; "o" 'image-dired-display-thumbnail-original-image
+            "v" 'image-dired-display-thumbnail-original-image
 
-           "<mouse-1>" 'image-dired-mouse-select-thumbnail
-           "<mouse-2>" 'image-dired-mouse-display-image)
+            "<mouse-1>" 'image-dired-mouse-select-thumbnail
+            "<mouse-2>" 'image-dired-mouse-display-image)
 
-         (mohkale/declare-prefix-for-mode* 'image-dired-thumbnail-mode
-           "mt" '("tagging" . "tag/describe images")
-           "me" '("edit"    . "edit images"))
+          (mohkale/declare-prefix-for-mode* 'image-dired-thumbnail-mode
+            "mt" '("tagging" . "tag/describe images")
+            "me" '("edit"    . "edit images"))
 
-         (mohkale/set-leader-keys-for-major-mode 'image-dired-thumbnail-mode
-           "g" 'image-dired-jump-original-dired-buffer
-           "m" 'image-dired
+          (mohkale/set-leader-keys-for-major-mode 'image-dired-thumbnail-mode
+            "g" 'image-dired-jump-original-dired-buffer
+            "m" 'image-dired
 
-           "td" 'image-dired-thumbnail-set-image-description
-           "tt"  'image-dired-tag-thumbnail
-           "tT"  'image-dired-tag-thumbnail-remove
+            "td" 'image-dired-thumbnail-set-image-description
+            "tt"  'image-dired-tag-thumbnail
+            "tT"  'image-dired-tag-thumbnail-remove
 
-           "el" 'image-dired-rotate-thumbnail-left
-           "eL" 'image-dired-rotate-original-left
-           "er" 'image-dired-rotate-thumbnail-right
-           "eR" 'image-dired-rotate-original-right
+            "el" 'image-dired-rotate-thumbnail-left
+            "eL" 'image-dired-rotate-original-left
+            "er" 'image-dired-rotate-thumbnail-right
+            "eR" 'image-dired-rotate-original-right
 
-           "." 'image-dired-track-original-file
-           "o" 'image-dired-thumbnail-display-external
+            "." 'image-dired-track-original-file
+            "o" 'image-dired-thumbnail-display-external
 
-           ;; [re]set number of columns per row
-           "s" 'image-dired-line-up-interactive
-           "S" 'image-dired-line-up-dynamic)
+            ;; [re]set number of columns per row
+            "s" 'image-dired-line-up-interactive
+            "S" 'image-dired-line-up-dynamic)
 
-         ;;; image view
-         (general-define-key
-           :keymaps 'image-dired-display-image-mode-map
-           :states 'normal
-           "f" 'image-dired-display-current-image-full
-           "F" 'image-dired-display-current-image-sized
-           "s" 'image-dired-display-current-image-sized
+          ;;; image view
+          (general-define-key
+            :keymaps 'image-dired-display-image-mode-map
+            :states 'normal
+            "f" 'image-dired-display-current-image-full
+            "F" 'image-dired-display-current-image-sized
+            "s" 'image-dired-display-current-image-sized
 
-           "h" 'image-scroll-right
-           "l" 'image-scroll-left
-           "k" 'image-scroll-down
-           "j" 'image-scroll-up
-           ;; horizontal line by line movement
-           "C-d" 'image-scroll-up
-           "C-u" 'image-scroll-down
-           "C-e" 'image-next-line
-           "C-y" 'image-previous-line
-           ;; Arrow Keys Alias hjkl
-           "<left>"  'image-backward-hscroll
-           "<right>" 'image-forward-hscroll
-           "<up>"    'image-scroll-down
-           "<down>"  'image-scroll-up)
+            "h" 'image-scroll-right
+            "l" 'image-scroll-left
+            "k" 'image-scroll-down
+            "j" 'image-scroll-up
+            ;; horizontal line by line movement
+            "C-d" 'image-scroll-up
+            "C-u" 'image-scroll-down
+            "C-e" 'image-next-line
+            "C-y" 'image-previous-line
+            ;; Arrow Keys Alias hjkl
+            "<left>"  'image-backward-hscroll
+            "<right>" 'image-forward-hscroll
+            "<up>"    'image-scroll-down
+            "<down>"  'image-scroll-up)
 
-         (mohkale/set-leader-keys-for-major-mode 'image-dired-display-image-mode
-           "h" 'image-bol ; far left   edge
-           "j" 'image-eob ; far bottom edge
-           "k" 'image-bob ; far top    edge
-           "l" 'image-eol ; far right  edge
-           "g" 'image-dired-jump-thumbnail-buffer)
-         (defvar dired-slideshow--thumbnail-column-count 2
-           "number of columns of thumbnails shown on each row")
+          (mohkale/set-leader-keys-for-major-mode 'image-dired-display-image-mode
+            "h" 'image-bol ; far left   edge
+            "j" 'image-eob ; far bottom edge
+            "k" 'image-bob ; far top    edge
+            "l" 'image-eol ; far right  edge
+            "g" 'image-dired-jump-thumbnail-buffer)
 
-         (defvar dired-slideshow--dedicate-image-windows nil
-           "whether to dedicate thumbnail and display windows")
+          (defvar dired-slideshow--thumbnail-column-count 2
+            "number of columns of thumbnails shown on each row")
 
-         ;; NOTE keep setq because defvar doesn't work for repeated calls
-         ;; (setq dired-slideshow--thumbnail-column-count 3)
-         ;; (setq dired-slideshow--dedicate-image-windows t)
+          (defvar dired-slideshow--dedicate-image-windows nil
+            "whether to dedicate thumbnail and display windows")
 
-         (mohkale//define-custom-perspective "@dired-slideshow"
-           (kill-all-windows-and-return-to-home) ; splitting issues with layout
+          ;; NOTE keep setq because defvar doesn't work for repeated calls
+          ;; (setq dired-slideshow--thumbnail-column-count 3)
+          ;; (setq dired-slideshow--dedicate-image-windows t)
 
-           (let* ((thumbnails-buffer-name "*image-dired*")
-                  (display-buffer-name "*image-dired-display-image*")
+          (mohkale//define-custom-perspective "@dired-slideshow"
+            (kill-all-windows-and-return-to-home) ; splitting issues with layout
 
-                  ;; only load when buffer doesn't exist and user allows it
-                  (load-directory (and (not (get-buffer thumbnails-buffer-name))
-                                       (y-or-n-p "would you like to load an image directory")))
+            (let* ((thumbnails-buffer-name "*image-dired*")
+                   (display-buffer-name "*image-dired-display-image*")
 
-                  (thumbnails-buffer (get-buffer-create thumbnails-buffer-name))
-                  (display-buffer (get-buffer-create display-buffer-name)))
-             (split-window-right) ; left window is for thumbnails, right for display
+                   ;; only load when buffer doesn't exist and user allows it
+                   (load-directory (and (not (get-buffer thumbnails-buffer-name))
+                                        (y-or-n-p "would you like to load an image directory")))
 
-             (let* ((thumbnails-window (selected-window))
-                    (display-window    (window-right thumbnails-window)))
-               (if load-directory (call-interactively 'image-dired))
+                   (thumbnails-buffer (get-buffer-create thumbnails-buffer-name))
+                   (display-buffer (get-buffer-create display-buffer-name)))
+              (split-window-right) ; left window is for thumbnails, right for display
 
-               (persp-add-buffer `(,thumbnails-buffer ,display-buffer))
+              (let* ((thumbnails-window (selected-window))
+                     (display-window    (window-right thumbnails-window)))
+                (if load-directory (call-interactively 'image-dired))
 
-               ;; setup thumbnail window
-               (with-selected-window thumbnails-window
-                 (switch-to-buffer thumbnails-buffer)
+                (persp-add-buffer `(,thumbnails-buffer ,display-buffer))
 
-                 (unless (eq major-mode 'image-dired-thumbnail-mode)
-                   (image-dired-thumbnail-mode))
+                ;; setup thumbnail window
+                (with-selected-window thumbnails-window
+                  (switch-to-buffer thumbnails-buffer)
 
-                 ;; set number of columns in view
-                 (let ((image-dired-thumbs-per-row dired-slideshow--thumbnail-column-count))
-                   (image-dired-line-up))
+                  (unless (eq major-mode 'image-dired-thumbnail-mode)
+                    (image-dired-thumbnail-mode))
 
-                 (let* ((thumbnail-window-width (* image-dired-thumb-width dired-slideshow--thumbnail-column-count))
-                        (delta-width (- thumbnail-window-width (window-pixel-width))))
-                   (unless (> (abs delta-width) (window-pixel-width))
-                     (window-resize thumbnails-window delta-width t nil t)))
+                  ;; set number of columns in view
+                  (let ((image-dired-thumbs-per-row dired-slideshow--thumbnail-column-count))
+                    (image-dired-line-up))
 
-                 (window-preserve-size thumbnails-window t))
+                  (let* ((thumbnail-window-width (* image-dired-thumb-width dired-slideshow--thumbnail-column-count))
+                         (delta-width (- thumbnail-window-width (window-pixel-width))))
+                    (unless (> (abs delta-width) (window-pixel-width))
+                      (window-resize thumbnails-window delta-width t nil t)))
 
-               ;; setup display window
-               (with-selected-window display-window
-                 (switch-to-buffer display-buffer)
+                  (window-preserve-size thumbnails-window t))
 
-                 (unless (eq major-mode 'image-dired-display-image-mode)
-                   (image-dired-display-image-mode)))
+                ;; setup display window
+                (with-selected-window display-window
+                  (switch-to-buffer display-buffer)
 
-               (and dired-slideshow--dedicate-image-windows (force-set-all-visible-windows-dedication t))
-               (select-window thumbnails-window)
+                  (unless (eq major-mode 'image-dired-display-image-mode)
+                    (image-dired-display-image-mode)))
 
-               (message "completed creation of slideshow layout")))))
+                (and dired-slideshow--dedicate-image-windows (force-set-all-visible-windows-dedication t))
+                (select-window thumbnails-window)
+
+                (message "completed creation of slideshow layout"))))))
      #+END_SRC
 
 
@@ -5982,7 +5995,6 @@
                    ebuku-search-on-tag
                    ebuku-mode
                    ebuku)
-        ;; :config
         )
     #+END_SRC
 
@@ -6238,82 +6250,37 @@
          ;; needs to be in a hook because eshell-mode-map isn't
          ;; defined until the mode is activated, and even then
          ;; it's only buffer-local :(.
-         (add-hook 'eshell-mode-hook #'eshell-mode--setup-bindings)
-
-       ;;   ;; source: https://emacs.stackexchange.com/questions/48205/how-to-execute-external-commands-from-an-eshell-script/48215
-       ;;   (require 'cl-lib)  ;; for macro `cl-pushnew' (not autoloaded ?!)
-       ;;   (require 'esh-cmd) ;; for variable `eshell-complex-commands'
-
-       ;;   (defun eshell-source-string (string &optional args subcommand-p)
-       ;;     "Execute a series of Eshell commands in STRING, passing ARGS.
-       ;; Comments begin with `#'."
-       ;;     (interactive "sString to be evaluated as eshell script: ")
-       ;;     (let ((orig (point))
-       ;;           (here (point-max))
-       ;;           (inhibit-point-motion-hooks t))
-       ;;       (goto-char (point-max))
-       ;;       (with-silent-modifications
-       ;;         ;; FIXME: Why not use a temporary buffer and avoid this
-       ;;         ;; "insert&delete" business?  --Stef
-       ;;         (insert string)
-       ;;         (goto-char (point-max))
-       ;;         (throw 'eshell-replace-command
-       ;;                (prog1
-       ;;                    (list 'let
-       ;;                          (list (list 'eshell-command-name (list 'quote "source-string"))
-       ;;                                (list 'eshell-command-arguments
-       ;;                                      (list 'quote args)))
-       ;;                          (let ((cmd (eshell-parse-command (cons here (point)))))
-       ;;                            (if subcommand-p
-       ;;                                (setq cmd (list 'eshell-as-subcommand cmd)))
-       ;;                            cmd))
-       ;;                  (delete-region here (point))
-       ;;                  (goto-char orig))))))
-
-       ;;   (defun define-eshell-script (cmd doc string)
-       ;;     "Define CMD as eshell script STRING with documentation DOC.
-       ;; CMD can be a string or a symbol."
-       ;;     (let ((fun (intern (concat "eshell/" cmd))))
-       ;;       (fset fun
-       ;;             `(lambda (&rest args)
-       ;;                ,doc
-       ;;                (eshell-source-string ,string args)))
-       ;;       (cl-pushnew cmd (default-value 'eshell-complex-commands) :test #'equal)
-       ;;       (dolist (buffer (buffer-list))
-       ;;         (with-current-buffer buffer
-       ;;           (when (derived-mode-p 'eshell-mode)
-       ;;             (cl-pushnew cmd eshell-complex-commands :test #'equal))))
-       ;;       (put fun 'eshell-no-numeric-conversions t)))
-         )
+         (add-hook 'eshell-mode-hook #'eshell-mode--setup-bindings))
      #+END_SRC
 
 **** eshell-prompt-extras
      #+BEGIN_SRC emacs-lisp
-       (use-package eshell-prompt-extras
-         :ensure t
-         :defer  t
-         :commands (epe-theme-mohkale)
-         :init
-         (with-eval-after-load 'esh-mode
-           (require 'eshell-prompt-extras))
-         :config
+       (with-eval-after-load 'esh-mode
+         (use-package eshell-prompt-extras
+           :ensure t
+           :defer  t
+           :commands (epe-theme-mohkale)
+           :init
+           (with-eval-after-load 'esh-mode
+             (require 'eshell-prompt-extras))
+           :config
 
-         (setq epe-show-python-info t
-               epe-path-style 'full)
+           (setq epe-show-python-info t
+                 epe-path-style 'full)
 
-         (defvar eshell-prompt--enable-git-on-remote-files t
-           "when true, show branch info even on remote files")
+           (defvar eshell-prompt--enable-git-on-remote-files t
+             "when true, show branch info even on remote files")
 
-         (defun epe-git-p ()
-           "If you installed git and in a git project."
-           (when (or eshell-prompt--enable-git-on-remote-files
-                     ;; either enable everywhere, including remote
-                     ;; or enable when not remote
-                     (not (epe-remote-p)))
-             (and (eshell-search-path "git")
-                  (vc-find-root (eshell/pwd) ".git"))))
+           (defun epe-git-p ()
+             "If you installed git and in a git project."
+             (when (or eshell-prompt--enable-git-on-remote-files
+                       ;; either enable everywhere, including remote
+                       ;; or enable when not remote
+                       (not (epe-remote-p)))
+               (and (eshell-search-path "git")
+                    (vc-find-root (eshell/pwd) ".git"))))
 
-         (setq eshell-prompt-function #'epe-theme-lambda))
+           (setq eshell-prompt-function #'epe-theme-lambda)))
      #+END_SRC
 
 *** eyebrowse
@@ -6390,6 +6357,12 @@
         (setq flycheck-python-pycompile-executable "python3")
 
         :config
+        (use-package flycheck-pos-tip
+          :ensure t
+          :defer  t
+          :hook (flycheck-mode-hook . flycheck-pos-tip-mode)
+          :commands flycheck-pos-tip-mode)
+
         (setq-default flycheck-disabled-checkers '(emacs-lisp-checkdoc))
 
         ;; update fringe for flycheck
@@ -6474,16 +6447,10 @@
           "s" 'flycheck-error-list-check-source ;; syntax check buffer
           "f" 'flycheck-error-list-set-filter
           "F" 'flycheck-error-list-reset-filter))
-
-      (use-package flycheck-pos-tip
-        :ensure t
-        :defer  t
-        :hook (flycheck-mode-hook . flycheck-pos-tip-mode)
-        :commands flycheck-pos-tip-mode)
     #+END_SRC
 
 *** font-lock-studio
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package font-lock-studio
         :ensure t
         :defer  t
@@ -6500,7 +6467,6 @@
         (mohkale/set-leader-keys
           "jb" 'frog-jump-buffer))
     #+END_SRC
-
 
 *** grep
     #+BEGIN_SRC emacs-lisp
@@ -6542,8 +6508,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package hide-comnt
-        :ensure nil
-        :defer  t
+        :defer t
         :commands hide/show-comments-toggle
         :init
         (mohkale/set-leader-keys
@@ -6584,10 +6549,13 @@
     #+END_SRC
 
 *** htmlize
+    convert a code buffer to HTML.
+
     #+BEGIN_SRC emacs-lisp
       (use-package htmlize
         :ensure t
-        :defer  t)
+        :defer  t
+        :commands (htmlize-buffer))
     #+END_SRC
 
 *** hydra-posframe
@@ -6685,6 +6653,8 @@
                  (ivy--regex-fuzzy        . "fuzzy")
                  (regexp-quote            . "literal")))
 
+         (setq ivy-magic-tilde nil)
+
          (general-define-key
            "M-x" 'counsel-M-x)
 
@@ -6704,6 +6674,7 @@
                  ("M-v" . nil) ;; was ivy-scroll-down-command
                  ("C-v" . nil) ;; was ivy-scroll-up-command
                  ("C-'" . nil) ;; was ivy-avy
+                 ("C-M-y" . nil) ;; was ivy-insert-current-full
 
                  ("<return>" . ivy-alt-done) ;; also supports tramp expansion
 
@@ -6737,6 +6708,8 @@
                  ("C-j" . next-line)
                  ("C-k" . previous-line)
                  ("C-q" . ivy-avy)
+                 ("M-j" . ivy-next-history-element)
+                 ("M-k" . ivy-previous-history-element)
                  ;; arrow key variants
                  ("<left>"  . backward-char)
                  ("<right>" . forward-char)
@@ -6755,12 +6728,12 @@
                  ("C-i" . ivy-insert-current)
                  ("C-DEL" . evil-delete-backward-word)
                  ;; pull word in from point at buffer
-                 ("M-w" . ivy-yank-word)
+                 ("M-y" . ivy-yank-word)
                  ("C-w" . backward-kill-word)
                  ;; operate on entire input
-                 ("M-k" . ivy-kill-line-backward)
-                 ("M-K" . kill-line) ;; kill forward
-                 ("C-M-k" . kill-whole-line)
+                 ("M-w" . ivy-kill-line-backward)
+                 ("M-W" . kill-line) ;; kill forward
+                 ("M-DEL" . kill-whole-line)
 
                  ;;; history - (C-r/C-s still work fine)
                  ("<S-up>"    . ivy-previous-history-element)
@@ -7009,6 +6982,13 @@
                                    (counsel-find-file (if (string-empty-p dir)
                                                           last-directory
                                                         dir)))))))
+
+         (advice-add 'counsel-company
+                     :before
+                     (defun counsel-company--hide-popup (&rest args)
+                       (company-cancel)))
+
+         (ivy-configure 'counsel-evil-registers :height ivy-height)
          :bind* (:map company-mode-map
                  ("C-:" . counsel-company)
                  :map counsel-describe-map
@@ -7055,8 +7035,42 @@
          :init
          (mohkale/set-leader-keys
            "ss" 'swiper)
+
+         (defvar swiper-persistent-highlight nil
+           "if swiper is using evil-search for searching, determine
+       whether to persistently highlight the search results or not.
+
+       Personally I don't like persistent highlighting with swiper
+       because I generally use it for one off jumping to important
+       lines, so disable it :P")
+
          :config
          (setq swiper-min-highlight 50000000) ;; never highlight
+
+         (advice-add #'swiper--remember-search-history :around
+                     (defun swiper--clear-evil-highlight (func &rest args)
+                       "see `swiper-persistent-highlight'."
+                       (if (bound-and-true-p evil-mode)
+                           (let ((evil-ex-search-persistent-highlight
+                                  swiper-persistent-highlight))
+                             (apply func args))
+                         (apply func args))))
+
+         (advice-add #'swiper--action :around
+                     (defun swiper--action-configure (func &rest args)
+                       ;; disable search highlighting in case of new pattern.
+                       (when (bound-and-true-p evil-mode)
+                         (evil-ex-nohighlight))
+
+                       ;; I don't wanna be told that every time I complete a search
+                       (cl-letf (((symbol-function 'actual-message)
+                                  (symbol-function 'message))
+                                 ((symbol-function 'message)
+                                  (lambda (message &rest message-args)
+                                    (unless (string-equal message "Mark saved where search started")
+                                      (apply actual-message message-args)))))
+                         (apply func args))))
+
          :bind (:map swiper-map
                 ("C-q" . nil)
                 ("C-l" . ivy-forward-char-or-partial-or-done)
@@ -7436,52 +7450,55 @@
 
 **** ibuffer-vc
      #+BEGIN_SRC emacs-lisp
-      (use-package ibuffer-vc
-        :ensure t
-        :defer  t
-        :after ibuffer
-        :commands (ibuffer-vc-set-filter-groups-by-vc-root)
-        :init
-        (defalias 'ibuffer-vc #'ibuffer-vc-set-filter-groups-by-vc-root)
+       (with-eval-after-load 'ibuffer
+         (use-package ibuffer-vc
+           :ensure t
+           :defer  t
+           :after ibuffer
+           :commands (ibuffer-vc-set-filter-groups-by-vc-root)
+           :init
+           (defalias 'ibuffer-vc #'ibuffer-vc-set-filter-groups-by-vc-root)
 
-        (general-define-key
-          :keymaps 'ibuffer-mode-map
-          "sv" 'ibuffer-vc))
+           (general-define-key
+             :keymaps 'ibuffer-mode-map
+             "sv" 'ibuffer-vc)))
      #+END_SRC
 
 **** ibuffer-tramp
      #+BEGIN_SRC emacs-lisp
-      (use-package ibuffer-tramp
-        :ensure t
-        :defer  t
-        :after ibuffer
-        :commands (ibuffer-tramp-set-filter-groups-by-tramp-connection)
-        :init
-        (defalias 'ibuffer-tramp #'ibuffer-tramp-set-filter-groups-by-tramp-connection)
-        (general-define-key
-          :keymaps 'ibuffer-mode-map
-          "s@" 'ibuffer-tramp))
+       (with-eval-after-load 'ibuffer
+         (use-package ibuffer-tramp
+           :ensure t
+           :defer  t
+           :after ibuffer
+           :commands (ibuffer-tramp-set-filter-groups-by-tramp-connection)
+           :init
+           (defalias 'ibuffer-tramp #'ibuffer-tramp-set-filter-groups-by-tramp-connection)
+           (general-define-key
+             :keymaps 'ibuffer-mode-map
+             "s@" 'ibuffer-tramp)))
      #+END_SRC
 
 **** ibuffer-persp
      #+BEGIN_SRC emacs-lisp
-       (use-package ibuffer-persp
-         :straight (ibuffer-persp :type built-in)
-         :defer t
-         :commands (ibuffer-persp ;; only buffers from current perspective
-                    ibuffer-persp-set-filter-groups-by-persp-name-not-nil
-                    ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
-         :init
-         (defalias 'ibuffer-persp-current #'ibuffer-persp-set-filter-groups-by-persp-name-not-nil)
-         (defalias 'ibuffer-persp-other #'ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
-         (general-define-key
-           :keymaps 'ibuffer-mode-map
-           "sp" 'ibuffer-persp-current
-           "sP" 'ibuffer-persp-other)
+       (with-eval-after-load 'ibuffer
+         (use-package ibuffer-persp
+           :straight (ibuffer-persp :type built-in)
+           :defer t
+           :commands (ibuffer-persp ;; only buffers from current perspective
+                      ibuffer-persp-set-filter-groups-by-persp-name-not-nil
+                      ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
+           :init
+           (defalias 'ibuffer-persp-current #'ibuffer-persp-set-filter-groups-by-persp-name-not-nil)
+           (defalias 'ibuffer-persp-other #'ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
+           (general-define-key
+             :keymaps 'ibuffer-mode-map
+             "sp" 'ibuffer-persp-current
+             "sP" 'ibuffer-persp-other)
 
-         ;; (with-eval-after-load 'persp-mode
-         ;;   (mohkale/set-leader-keys "bm" 'ibuffer-persp))
-         )
+           ;; (with-eval-after-load 'persp-mode
+           ;;   (mohkale/set-leader-keys "bm" 'ibuffer-persp))
+           ))
      #+END_SRC
 
 *** imenu
@@ -7491,33 +7508,26 @@
         :commands imenu
         :init
         (mohkale/set-leader-keys
-          "ji" 'imenu))
+          "ji" 'imenu)
 
-      (use-package imenu-list
-        :ensure t
-        :defer  t
-        :commands imenu-list
-        :init
-        (mohkale/set-leader-keys
-          "Mi" 'imenu-list))
-          "MI" 'imenu
+        :config
+        (use-package imenu-list
+          :ensure t
+          :defer  t
+          :commands imenu-list
+          :init
+          (mohkale/set-leader-keys
+            "Mi" 'imenu-list
+            "MI" 'imenu))
 
-      (use-package imenu-anywhere
-        :ensure t
-        :defer  t
-        :commands imenu-anywhere
-        :init
-        (mohkale/set-leader-keys
-          "jI" 'imenu-anywhere))
-    #+END_SRC
+        (use-package imenu-anywhere
+          :ensure t
+          :defer  t
+          :commands imenu-anywhere
+          :init
+          (mohkale/set-leader-keys
+            "jI" 'imenu-anywhere)))
 
-*** isearch
-    prefer evil search over isearch
-    #+BEGIN_SRC emacs-lisp
-      ;; (use-package isearch
-      ;;   ;; TODO look into more bindings
-      ;;   :bind (:map isearch-mode-map
-      ;;          ("DEL" . isearch-delete-char)))
     #+END_SRC
 
 *** ein - emacs-ipython-notebook
@@ -7640,7 +7650,8 @@
          :config
          ;; (push 'company-lsp company-backends)
 
-         (setq lsp-enable-snippet             nil
+         (setq lsp-prefer-flymake             nil
+               lsp-enable-snippet             nil
                lsp-enable-symbol-highlighting nil
                mohkale-lsp-map (make-sparse-keymap))
 
@@ -7684,143 +7695,34 @@
 
 ***** lsp-ui
       #+BEGIN_SRC emacs-lisp
-        (use-package lsp-ui
-          :ensure t
-          :defer  t
-          ;; :hook (lsp-mode-hook . lsp-ui-mode)
-          :commands (lsp-ui-mode)
-          :init
-          ;; only really installed for flycheck support
-          (setq lsp-prefer-flymake nil
-                lsp-ui-sideline-enable nil
-                lsp-ui-doc-enable nil)
-          :config
-          (mohkale/declare-prefix-for-mode 'lsp-mode
-            "yp" "peek")
-          (mohkale/set-leader-keys-for-minor-mode 'lsp-mode
-            "pg" 'lsp-ui-peek-find-definitions
-            "pG" 'lsp-ui-peek-find-definitions))
+        (with-eval-after-load 'lsp-mode
+          (use-package lsp-ui
+            :ensure t
+            :defer  t
+            ;; :hook (lsp-mode-hook . lsp-ui-mode)
+            :commands (lsp-ui-mode)
+            :init
+            ;; only really installed for flycheck support
+            (setq lsp-ui-sideline-enable nil
+                  lsp-ui-doc-enable nil)
+            :config
+            (mohkale/declare-prefix-for-mode 'lsp-mode
+              "yp" "peek")
+            (mohkale/set-leader-keys-for-minor-mode 'lsp-mode
+              "pg" 'lsp-ui-peek-find-definitions
+              "pG" 'lsp-ui-peek-find-definitions)))
       #+END_SRC
 
 ***** company-lsp
       #+BEGIN_SRC emacs-lisp
-        (use-package company-lsp
-          :ensure t
-          :defer  t
-          :commands company-lsp
-          :config
-          ;; reduces write lag
-          (setq company-lsp-cache-candidates t))
-      #+END_SRC
-
-***** lsp-haskell
-      #+BEGIN_SRC emacs-lisp
-        (use-package lsp-haskell
-          :ensure t
-          :defer  t
-          :hook ((haskell-mode . lsp) ;; order of evaluation matters
-                 (haskell-mode . (lambda ()
-                                   (require 'lsp-haskell)
-                                   ;; until there's actually any useful info
-                                   (setq-local lsp-eldoc-enable-hover nil))))
-          :config
-          (setq lsp-haskell-process-args-hie (list "-d" "-l" (make-temp-file "hie." nil ".log")))
-
-          ;;  _   _    _    ____ _  __       _     _            _ _ _
-          ;; | | | |  / \  / ___| |/ /   ___| | __| | ___   ___| | | |
-          ;; | |_| | / _ \| |   | ' /   / _ \ |/ _` |/ _ \ / __| | | |
-          ;; |  _  |/ ___ \ |___| . \  |  __/ | (_| | (_) | (__|_|_|_|
-          ;; |_| |_/_/   \_\____|_|\_\  \___|_|\__,_|\___/ \___(_|_|_)
-          ;;
-
-          ;; thank you @ walseb: https://github.com/walseb/QualityEmacsConfig#hack-in-eldoc-support
-          ;; (setq my/haskell-lsp-eldoc-entries '())
-
-          ;; ;; This function modifies what's displayed in lsp-ui-sideline.
-          ;; ;; Here it is redefined so that it takes what's supposed to be displayed in the sideline,
-          ;; ;; and instead sends it to an eldoc cache.
-          ;; (defun lsp-ui-sideline--push-info (symbol tag bounds info bol eol)
-          ;;   (when (and (= tag (lsp-ui-sideline--calculate-tag))
-          ;;              (not (lsp-ui-sideline--stop-p)))
-          ;;     (let* ((info (concat (thread-first (gethash "contents" info)
-          ;;                            lsp-ui-sideline--extract-info
-          ;;                            lsp-ui-sideline--format-info)))
-          ;;            (current (and (>= (point) (car bounds)) (<= (point) (cdr bounds)))))
-          ;;       (when (and (> (length info) 0)
-          ;;                  (lsp-ui-sideline--check-duplicate symbol info))
-          ;;         (let* ((final-string (lsp-ui-sideline--make-display-string info symbol current))
-          ;;                (pos-ov (lsp-ui-sideline--find-line (length final-string) bol eol))
-          ;;                (ov (when pos-ov (make-overlay (car pos-ov) (car pos-ov)))))
-
-          ;;           ;; My changes:
-          ;;           (let ((final-string-formatted (substring-no-properties final-string)))
-          ;;             (add-to-list 'my/haskell-lsp-eldoc-entries final-string-formatted))
-
-          ;;           (when pos-ov
-          ;;             ;; (overlay-put ov 'info info)
-          ;;             ;; (overlay-put ov 'symbol symbol)
-          ;;             (overlay-put ov 'bounds bounds)
-          ;;             (overlay-put ov 'current current)
-          ;;             ;;(overlay-put ov 'after-string final-string)
-          ;;             (overlay-put ov 'window (get-buffer-window))
-          ;;             (overlay-put ov 'kind 'info)
-          ;;             (push ov lsp-ui-sideline--ovs)))))))
-
-          ;; (defun lsp-ui-sideline--push-info (symbol tag bounds info bol eol)
-          ;;   (when (and (= tag (lsp-ui-sideline--calculate-tag))
-          ;;              (not (lsp-ui-sideline--stop-p)))
-          ;;     (let* ((info (concat (thread-first (gethash "contents" info)
-          ;;                            lsp-ui-sideline--extract-info
-          ;;                            lsp-ui-sideline--format-info)))
-          ;;            (current (and (>= (point) (car bounds)) (<= (point) (cdr bounds)))))
-          ;;       (when (and (> (length info) 0)
-          ;;                  (lsp-ui-sideline--check-duplicate symbol info))
-          ;;         (let* ((final-string (lsp-ui-sideline--make-display-string info symbol current))
-          ;;                (pos-ov (lsp-ui-sideline--find-line (length final-string) bol eol))
-          ;;                (ov (when pos-ov (make-overlay (car pos-ov) (car pos-ov)))))
-          ;;           (when pos-ov
-          ;;             (overlay-put ov 'info info)
-          ;;             (overlay-put ov 'symbol symbol)
-          ;;             (overlay-put ov 'bounds bounds)
-          ;;             (overlay-put ov 'current current)
-          ;;             (overlay-put ov 'after-string final-string)
-          ;;             (overlay-put ov 'window (get-buffer-window))
-          ;;             (overlay-put ov 'kind 'info)
-          ;;             (push ov lsp-ui-sideline--ovs)))))))
-
-          ;; (defun my/haskell-lsp-eldoc-print ()
-          ;;   (interactive)
-          ;;   (when my/haskell-lsp-eldoc-entries
-          ;;     (let ((at-point (thing-at-point 'symbol t)))
-          ;;       (when at-point
-          ;;         (let ((str (seq-find
-          ;;                     (lambda (candidate)
-          ;;                       (let ((candidate-last-word (string-match (rx (not whitespace) (regexp "*") space eol) candidate)))
-          ;;                         (if candidate-last-word
-          ;;                             (progn
-          ;;                               (string=
-          ;;                                (substring candidate candidate-last-word (- (length candidate) 1))
-          ;;                                at-point))
-          ;;                           nil)))
-          ;;                     my/haskell-lsp-eldoc-entries)))
-
-          ;;           (if str
-          ;;               (s-trim str)
-          ;;             nil))))))
-
-          ;; ;; No idea why but eldoc doesn't run the documentation function unless I press escape, this fixes that
-          ;; (add-hook 'haskell-mode-hook '(lambda ()
-          ;;                                 (eldoc-mode -1)
-          ;;                                 (setq-local eldoc-documentation-function 'my/haskell-lsp-eldoc-print)
-
-          ;;                                 (add-hook 'post-command-hook
-          ;;                                           'eldoc-print-current-symbol-info nil t)))
-          )
-      #+END_SRC
-
-***** lsp-kotlin
-      #+BEGIN_SRC emacs-lisp
-        (add-hook 'kotlin-mode-hook 'lsp-mode)
+        (with-eval-after-load 'lsp-mode
+          (use-package company-lsp
+            :ensure t
+            :defer  t
+            :commands company-lsp
+            :config
+            ;; reduces write lag
+            (setq company-lsp-cache-candidates t)))
       #+END_SRC
 
 **** eglot
@@ -8134,41 +8036,40 @@
 
 *** minibuffer
     #+BEGIN_SRC emacs-lisp
-      (bind-keys :map minibuffer-local-map
-                 ("C-h" . previous-matching-history-element)
-                 ("C-j" . next-history-element)
-                 ("C-k" . previous-history-element)
-                 ("C-l" . next-matching-history-element)
-                 ("C-a" . move-beginning-of-line)
-                 ("C-e" . move-end-of-line)
-                 ("C-q" . quoted-insert)
-                 ("C-M-q" . quit-window)
+      (general-define-key
+        :keymaps 'minibuffer-local-map
+        "C-h" 'previous-matching-history-element
+        "C-j" 'next-history-element
+        "C-k" 'previous-history-element
+        "C-l" 'next-matching-history-element
+        "C-a" 'move-beginning-of-line
+        "C-e" 'move-end-of-line
+        "C-q" 'quoted-insert
+        "C-M-q" 'quit-window
 
-                 ("C-w" . backward-kill-word)
-                 ("C-?" . minibuffer-completion-help)
-                 ;; for some reason.. I can't bind Meta keys
-                 ("M-k" . kill-whole-line)
-                 ("M-h" . backward-kill-sentence)
-                 ("M-l" . kill-sentence)
-                 ;; ("M-n" . nil)
-                 ;; ("M-p" . nil)
-                 ;; ("M-r" . nil)
-                 ("<escape>" . abort-recursive-edit))
+        ;; "M-n" nil
+        ;; "M-p" nil
+        ;; "M-r" nil
+        "C-w" 'backward-kill-word
+        "C-?" 'minibuffer-completion-help
+        ;; for some reason.. I can't bind Meta keys
+        "M-k" 'kill-whole-line
+        "M-h" 'backward-kill-sentence
+        "M-l" 'kill-sentence)
 
-      (bind-keys :map minibuffer-local-must-match-map
-                 ("<escape>" . abort-recursive-edit)
-                 ("C-j" . nil)
-                 ("TAB" . minibuffer-complete)
-                 ("C-<tab>" . minibuffer-complete-and-exit))
+      (general-define-key
+        :keymaps 'minibuffer-local-must-match-map
+        "TAB" 'minibuffer-complete
+        "C-<tab>" 'minibuffer-complete-and-exit
+        "C-j" nil)
 
-      (bind-keys :map minibuffer-inactive-mode-map
-                 ("<escape>" . abort-recursive-edit))
-
-      (bind-keys :map minibuffer-local-ns-map
-                 ("<escape>" . abort-recursive-edit))
-
-      (bind-keys :map minibuffer-local-completion-map
-                 ("<escape>" . abort-recursive-edit))
+      (general-define-key
+        :keymaps '(minibuffer-local-map
+                   minibuffer-local-must-match-map
+                   minibuffer-inactive-mode-map
+                   minibuffer-local-ns-map
+                   minibuffer-local-completion-map)
+         "<escape>" 'abort-recursive-edit)
     #+END_SRC
 
 *** miniedit
@@ -8257,7 +8158,9 @@
     #+BEGIN_SRC emacs-lisp
       (use-package open-junk-file
         :defer t
-        :commands open-junk-file
+        :commands (open-junk-file
+                   goto-junk-file-directory
+                   goto-todays-junk-file-directory)
         :init
         (mohkale/set-leader-keys
           "fJ" 'open-junk-file)
@@ -8314,6 +8217,7 @@
         :defer t
         :config
         (evil-set-initial-state 'package-menu-mode 'motion)
+
         (general-define-key
           :keymaps 'package-menu-mode-map
           :states  'motion
@@ -8957,17 +8861,17 @@
            (interactive "P")
            (if (not (projectile-project-p))
                (message "you're not currently in a project")
-             (let ((path (abbreviate-file-name (projectile-project-root))))
+             (let ((path (projectile-project-root)))
                (when prefix
                  (if (and (consp prefix) (eq (car prefix) 4))
                      (insert path)
                    (save-excursion
                      (insert path))))
-               (message path)
+               (message (abbreviate-file-name path))
                (kill-new path)))))
      #+END_SRC
 
-**** ivy-projectile
+**** counsel-projectile
      needs to be loaded after ivy and projectile, including the init function.
 
      #+BEGIN_SRC emacs-lisp
@@ -9022,6 +8926,7 @@
         (mohkale/set-leader-keys
           "cr" 'rake
           "cR" 'rake-rerun)
+
         (defalias 'rake-refresh #'rake-regenerate-cache)
         :config
         (setq rake-completion-system 'ivy-read))
@@ -9085,27 +8990,27 @@
 
 **** company-restclient
      #+BEGIN_SRC emacs-lisp
-       (use-package company-restclient
-         :ensure t
-         :defer  t
-         :commands (company-restclient)
-         :init
-         (with-eval-after-load 'restclient
+       (with-eval-after-load 'restclient
+         (use-package company-restclient
+           :ensure t
+           :defer  t
+           :commands (company-restclient)
+           :init
            (mohkale/update-company-backends-for-mode restclient t
              '(company-restclient))))
-
      #+END_SRC
 
 **** org-babel-restclient
      #+BEGIN_SRC emacs-lisp
-       (use-package ob-restclient
-         :ensure t
-         :defer  t
-         :init
-         (with-eval-after-load 'org
-           (org-babel-do-load-languages
-            'org-babel-load-languages
-            '((restclient . t)))))
+       (with-eval-after-load 'restclient
+         (use-package ob-restclient
+           :ensure t
+           :defer  t
+           :init
+           (with-eval-after-load 'org
+             (org-babel-do-load-languages
+              'org-babel-load-languages
+              '((restclient . t))))))
 
      #+END_SRC
 
@@ -9116,7 +9021,6 @@
       (use-package saveplace
         :commands (save-place-mode)
         :init
-        (setq save-place-forget-unreadable-files nil)
         (save-place-mode +1))
     #+END_SRC
 
@@ -9219,7 +9123,9 @@
     #+END_SRC
 
 *** sudo-edit
-    #+BEGIN_SRC emacs-lisp
+    any machine with SSH makes this kind of obsolete :P.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package sudo-edit
         :ensure t
         :defer  t
@@ -9241,7 +9147,7 @@
 *** rainbow-mode
     highlights hex color strings in their appropriate color. keep it around... though I'll probably never use it.
 
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package rainbow-mode
         :ensure t
         :defer  t)
@@ -9426,6 +9332,7 @@
 
 *** tramp-term
     create remote terminal sessions effortlessly... this should be built into term tbh.
+
     #+BEGIN_SRC emacs-lisp
       (use-package tramp-term
         :ensure t
@@ -9502,7 +9409,7 @@
     #+END_SRC
 
 *** vi-tilde
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package vi-tilde-fringe
         :ensure t
         :defer  t
@@ -9542,7 +9449,7 @@
     #+END_SRC
 
 *** visual-line
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package visual-line
         :straight (visual-line :type built-in)
         :defer t
@@ -9846,9 +9753,10 @@
 **** snippet sources
 ***** yasnippet-snippets
       #+BEGIN_SRC emacs-lisp
-        (use-package yasnippet-snippets
-          :ensure t
-          :defer  t)
+        (with-eval-after-load 'yasnippet
+          (use-package yasnippet-snippets
+            :ensure t
+            :defer  t))
       #+END_SRC
 
 *** ycmd
@@ -10228,7 +10136,7 @@
      #+END_SRC
 
 **** evil-lisp-state
-     #+BEGIN_SRC emacs-lisp
+     #+BEGIN_SRC emacs-lisp :tangle no
        (use-package evil-lisp-state
          :ensure t
          :defer  t
@@ -10444,76 +10352,80 @@
 *** python
 **** company-anaconda
      #+BEGIN_SRC emacs-lisp
-       (use-package company-anaconda
-         :ensure t
-         :defer  t
-         :commands (company-anaconda)
-         :init
-         (with-eval-after-load 'company
-           (mohkale/update-company-backends-for-mode python t
-             '(company-anaconda))))
+       (with-eval-after-load 'python
+         (use-package company-anaconda
+           :ensure t
+           :defer  t
+           :commands (company-anaconda)
+           :init
+           (with-eval-after-load 'company
+             (mohkale/update-company-backends-for-mode python t
+               '(company-anaconda)))))
      #+END_SRC
 
 **** anaconda
      #+BEGIN_SRC emacs-lisp
-       (use-package anaconda-mode
-         :ensure t
-         :defer  t
-         :hook ((python-mode . anaconda-mode)
-                (python-mode . anaconda-eldoc-mode))
-         :commands (anaconda-mode-complete
-                    anaconda-mode-show-doc
-                    anaconda-mode-find-assignments
-                    anaconda-mode-find-references
-                    anaconda-mode-find-definitions
-                    anaconda-mode-find-assignments-other-window
-                    anaconda-mode-find-references-other-window
-                    anaconda-mode-find-definitions-other-window
-                    anaconda-mode-find-assignments-other-frame
-                    anaconda-mode-find-references-other-frame
-                    anaconda-mode-find-definitions-other-frame)
-         :config
-         (mohkale/set-leader-keys-for-major-mode 'python-mode
-           "<tab>" 'anaconda-mode-complete
-           "hh" 'anaconda-mode-show-doc
+       (with-eval-after-load 'python
+         (use-package anaconda-mode
+           :ensure t
+           :defer  t
+           :hook ((python-mode . anaconda-mode)
+                  (python-mode . anaconda-eldoc-mode))
+           :commands (anaconda-mode-complete
+                      anaconda-mode-show-doc
+                      anaconda-mode-find-assignments
+                      anaconda-mode-find-references
+                      anaconda-mode-find-definitions
+                      anaconda-mode-find-assignments-other-window
+                      anaconda-mode-find-references-other-window
+                      anaconda-mode-find-definitions-other-window
+                      anaconda-mode-find-assignments-other-frame
+                      anaconda-mode-find-references-other-frame
+                      anaconda-mode-find-definitions-other-frame)
+           :config
+           (mohkale/set-leader-keys-for-major-mode 'python-mode
+             "TAB" 'anaconda-mode-complete
+             "hh" 'anaconda-mode-show-doc
 
-           "ga" 'anaconda-mode-find-assignments
-           "gr" 'anaconda-mode-find-references
-           "gg" 'anaconda-mode-find-definitions
-           "gA" 'anaconda-mode-find-assignments-other-window
-           "gR" 'anaconda-mode-find-references-other-window
-           "gG" 'anaconda-mode-find-definitions-other-window
-           "g M-a" 'anaconda-mode-find-assignments-other-frame
-           "g M-r" 'anaconda-mode-find-references-other-frame
-           "g M-g" 'anaconda-mode-find-definitions-other-frame))
+             "ga" 'anaconda-mode-find-assignments
+             "gr" 'anaconda-mode-find-references
+             "gg" 'anaconda-mode-find-definitions
+             "gA" 'anaconda-mode-find-assignments-other-window
+             "gR" 'anaconda-mode-find-references-other-window
+             "gG" 'anaconda-mode-find-definitions-other-window
+             "g M-a" 'anaconda-mode-find-assignments-other-frame
+             "g M-r" 'anaconda-mode-find-references-other-frame
+             "g M-g" 'anaconda-mode-find-definitions-other-frame)))
      #+END_SRC
 
 **** pyimport
      #+BEGIN_SRC emacs-lisp
-       (use-package pyimport
-         :ensure t
-         :defer  t
-         :commands (pyimport-remove-unused
-                    pyimport-insert-missing)
-         :init
-         (mohkale/declare-prefix-for-major-mode 'python-mode "i" "imports")
-         (mohkale/set-leader-keys-for-major-mode 'python-mode
-           "ii" 'pytimport-remove-unused
-           "iu" 'pyimport-insert-missing))
+       (with-eval-after-load 'python
+         (use-package pyimport
+           :ensure t
+           :defer  t
+           :commands (pyimport-remove-unused
+                      pyimport-insert-missing)
+           :init
+           (mohkale/declare-prefix-for-major-mode 'python-mode "i" "imports")
+           (mohkale/set-leader-keys-for-major-mode 'python-mode
+             "ii" 'pytimport-remove-unused
+             "iu" 'pyimport-insert-missing)))
      #+END_SRC
 
 **** py-isort
      #+BEGIN_SRC emacs-lisp
-       (use-package py-isort
-         :ensure t
-         :defer  t
-         :commands (py-isort-buffer
-                    py-isort-region)
-         :init
-         (mohkale/declare-prefix-for-major-mode 'python-mode "i" "imports")
-         (mohkale/set-leader-keys-for-major-mode 'python-mode
-           "is" 'py-isort-buffer
-           "ir" 'py-isort-region))
+       (with-eval-after-load 'python
+         (use-package py-isort
+             :ensure t
+             :defer  t
+             :commands (py-isort-buffer
+                        py-isort-region)
+             :init
+             (mohkale/declare-prefix-for-major-mode 'python-mode "i" "imports")
+             (mohkale/set-leader-keys-for-major-mode 'python-mode
+               "is" 'py-isort-buffer
+               "ir" 'py-isort-region)))
      #+END_SRC
 
 **** pip-requirements
@@ -10527,13 +10439,14 @@
 
 **** yapfify
      #+BEGIN_SRC emacs-lisp
-       (use-package yapfify
-         :ensure t
-         :defer  t
-         :init
-         (mohkale/set-leader-keys-for-major-mode 'python-mode
-           "y" 'yapfify-buffer
-           "Y" 'yapfify-region))
+       (with-eval-after-load 'python
+         (use-package yapfify
+           :ensure t
+           :defer  t
+           :init
+           (mohkale/set-leader-keys-for-major-mode 'python-mode
+             "y" 'yapfify-buffer
+             "Y" 'yapfify-region)))
      #+END_SRC
 
 **** python-mode
@@ -10598,20 +10511,26 @@
 
 *** ruby
     #+BEGIN_SRC emacs-lisp
-      (defvar mohkale-ruby-mode (if (eq system-type 'gnu/linux) 'enh-ruby-mode 'ruby-mode)
+      (defvar mohkale-ruby-package (if (eq system-type 'gnu/linux) 'enh-ruby 'ruby)
         "determine which mode to use for ruby... enh-ruby is really slowing everything down on windows
       also, for some reason, creating a symlink to ruby on cygwin makes the process unrunnable from emacs,
       it just spits out exec error... my loathing towards windows grows :P
       TODO test out performance of enhanced ruby on linux.")
+
+      (setq mohkale-ruby-mode      (intern (concat (symbol-name mohkale-ruby-package) "-mode"))
+            mohkale-ruby-mode-hook (intern (concat (symbol-name mohkale-ruby-mode)    "-hook")))
 
       (mohkale/set-leader-keys "Mr" mohkale-ruby-mode)
     #+END_SRC
 
 **** ruby
      #+BEGIN_SRC emacs-lisp
-       (use-package ruby
+       (use-package ruby-mode
+         :if (eq mohkale-ruby-package 'ruby)
          :straight (ruby :type built-in)
          :defer t
+         :mode ("\\.rb$" . ruby-mode)
+         :interpreter "ruby"
          :commands (ruby-mode
                     ruby-toggle-string-quotes
                     ruby-toggle-block)
@@ -10624,6 +10543,7 @@
 **** enhanced ruby
      #+BEGIN_SRC emacs-lisp
        (use-package enh-ruby-mode
+         :if (eq mohkale-ruby-package 'enh-ruby)
          :ensure t
          :defer  t
          :mode ("\\.rb$" . enh-ruby-mode)
@@ -10662,8 +10582,8 @@
            :states '(normal insert)
            "C-{" 'enh-ruby-toggle-block)
          :bind (:map enh-ruby-mode-map
-                ("{" . nil)
-                ("}" . nil)))
+                     ("{" . nil)
+                     ("}" . nil)))
      #+END_SRC
 
 **** solargraph
@@ -10683,34 +10603,35 @@
 **** robe
      # WARN robe won't work unless your project contains some identifying gemfile or what not... so if your not getting any completion help, that's probably why.
 
-     #+BEGIN_SRC emacs-lisp
-       (use-package robe
-         :ensure t
-         :defer  t
-         :commands (robe-mode
-                    robe-start
-                    ruby-load-file
-                    company-robe)
-         :init
-         (with-eval-after-load 'company
-           (mohkale/update-company-backends-for-mode enh-ruby t
-             '(company-robe))
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (with-eval-after-load mohkale-ruby-mode
+         (use-package robe
+           :ensure t
+           :defer  t
+           :commands (robe-mode
+                      robe-start
+                      ruby-load-file
+                      company-robe)
+           :init
+           (with-eval-after-load 'company
+             (mohkale/update-company-backends-for-mode enh-ruby t
+               '(company-robe))
 
-           (mohkale/update-company-backends-for-mode ruby t
-             '(company-robe)))
+             (mohkale/update-company-backends-for-mode ruby t
+               '(company-robe)))
 
-         (add-hook (intern (concat (symbol-name mohkale-ruby-mode) "-hook")) #'robe-mode)
-         :config
-         (mohkale/declare-prefix-for-major-mode mohkale-ruby-mode "g" "jump/goto")
+           ;; (add-hook mohkale-ruby-mode-hook #'robe-mode)
+           :config
+           (mohkale/declare-prefix-for-major-mode mohkale-ruby-mode "g" "jump/goto")
 
-         (mohkale/set-leader-keys-for-major-mode mohkale-ruby-mode
-           "rs" 'robe-start ;; REPL
-           "h" 'robe-doc
+           (mohkale/set-leader-keys-for-major-mode mohkale-ruby-mode
+             "rs" 'robe-start ;; REPL
+             "h" 'robe-doc
 
-           ;; jumping
-           "SPC" 'robe-ask
-           "gg" 'robe-jump
-           "gm" 'robe-jump-to-module))
+             ;; jumping
+             "SPC" 'robe-ask
+             "gg" 'robe-jump
+             "gm" 'robe-jump-to-module)))
      #+END_SRC
 
 **** inf-ruby
@@ -10745,72 +10666,75 @@
 
 **** ruby-tools
      #+BEGIN_SRC emacs-lisp
-       (use-package ruby-tools
-         :ensure t
-         :defer  t
-         :commands (ruby-tools-mode)
-         :init
-         (add-hook (intern (concat (symbol-name mohkale-ruby-mode) "-hook")) #'ruby-tools-mode)
-         :config
-         (mohkale/declare-prefix-for-major-mode
-           mohkale-ruby-mode "i" "insert")
+       (with-eval-after-load mohkale-ruby-mode
+         (use-package ruby-tools
+           :ensure t
+           :defer  t
+           :commands (ruby-tools-mode)
+           :init
+           (add-hook mohkale-ruby-mode-hook #'ruby-tools-mode)
+           :config
+           (mohkale/declare-prefix-for-major-mode
+             mohkale-ruby-mode "i" "insert")
 
-         (mohkale/set-leader-keys-for-major-mode mohkale-ruby-mode
-           "i:" 'ruby-tools-to-symbol
-           "i{" 'ruby-tools-interpolate
-           "i <backspace>" 'ruby-tools-clear-string
-           "i\"" 'ruby-tools-to-double-quote-string
-           "i'" 'ruby-tools-to-single-quote-string))
+           (mohkale/set-leader-keys-for-major-mode mohkale-ruby-mode
+             "i:" 'ruby-tools-to-symbol
+             "i{" 'ruby-tools-interpolate
+             "i <backspace>" 'ruby-tools-clear-string
+             "i\"" 'ruby-tools-to-double-quote-string
+             "i'" 'ruby-tools-to-single-quote-string)))
      #+END_SRC
 
 **** bundle
      #+BEGIN_SRC emacs-lisp
-       (use-package bundler
-         :ensure t
-         :defer  t
-         :commands (bundle-open
-                    bundle-console
-                    bundle-install
-                    bundle-update
-                    bundle-check)
-         :init
-         (mohkale/declare-prefix-for-major-mode*
-           mohkale-ruby-mode "b" "bundler")
+       (with-eval-after-load mohkale-ruby-mode
+         (use-package bundler
+           :ensure t
+           :defer  t
+           :commands (bundle-open
+                      bundle-console
+                      bundle-install
+                      bundle-update
+                      bundle-check)
+           :init
+           (mohkale/declare-prefix-for-major-mode*
+             mohkale-ruby-mode "b" "bundler")
 
-         (mohkale/set-leader-keys-for-major-mode mohkale-ruby-mode
-           "rb" 'bundle-console
-           "bf" 'bundle-open
-           "bi" 'bundle-install
-           "bu" 'bundle-update
-           "bc" 'bundle-check))
+           (mohkale/set-leader-keys-for-major-mode mohkale-ruby-mode
+             "rb" 'bundle-console
+             "bf" 'bundle-open
+             "bi" 'bundle-install
+             "bu" 'bundle-update
+             "bc" 'bundle-check)))
      #+END_SRC
 
 **** ruby-electric
-     #+begin_src emacs-lisp :tangle yes
-       (use-package ruby-electric
-         :ensure t
-         :defer  t
-         :commands (ruby-electric-mode)
-         :init
-         (add-hook (intern (concat (symbol-name mohkale-ruby-mode) "-hook")) #'ruby-electric-mode)
-         :config
-         ;;; why poison the standard ruby map instead of using ruby-electric-mode-map?
-         (defun ruby-electric-setup-keymap ()
-           (general-define-key
-             :keymaps 'ruby-mode-map
-             " " 'ruby-electric-space
-             ;; "{" 'ruby-electric-curlies
-             "(" 'ruby-electric-matching-char
-             "[" 'ruby-electric-matching-char
-             ;; "\"" 'ruby-electric-quote
-             ;; "\'" 'ruby-electric-quote
-             "|" 'ruby-electric-bar
-             (kbd "RET") 'ruby-electric-return
-             ;; (kbd "C-j") 'ruby-electric-return
-             ;; (kbd "C-m") 'ruby-electric-return
-             "}" 'ruby-electric-close-matching-char
-             ")" 'ruby-electric-close-matching-char
-             "]" 'ruby-electric-close-matching-char)))
+     #+begin_src emacs-lisp
+       (with-eval-after-load mohkale-ruby-mode
+         (use-package ruby-electric
+           :ensure t
+           :defer  t
+           :commands (ruby-electric-mode)
+           :init
+           (add-hook mohkale-ruby-mode-hook #'ruby-electric-mode)
+           :config
+           ;;; why poison the standard ruby map instead of using ruby-electric-mode-map?
+           (defun ruby-electric-setup-keymap ()
+             (general-define-key
+               :keymaps 'ruby-mode-map
+               " " 'ruby-electric-space
+               ;; "{" 'ruby-electric-curlies
+               "(" 'ruby-electric-matching-char
+               "[" 'ruby-electric-matching-char
+               ;; "\"" 'ruby-electric-quote
+               ;; "\'" 'ruby-electric-quote
+               "|" 'ruby-electric-bar
+               (kbd "RET") 'ruby-electric-return
+               ;; (kbd "C-j") 'ruby-electric-return
+               ;; (kbd "C-m") 'ruby-electric-return
+               "}" 'ruby-electric-close-matching-char
+               ")" 'ruby-electric-close-matching-char
+               "]" 'ruby-electric-close-matching-char))))
      #+end_src
 
 *** HTML
@@ -10923,39 +10847,41 @@
 
 **** emmet-mode
      #+BEGIN_SRC emacs-lisp
-       (use-package emmet-mode
-         :ensure t
-         :defer  t
-         :hook (web-mode . emmet-mode)
-         :commands (emmet-mode
-                    emmet-expand-yas
-                    emmet-expand-line
-                    emmet-preview-mode
-                    emmet-preview)
-         :config
-         (mohkale/declare-prefix-for-mode 'emmet-mode
-           (concat mohkale-major-mode-leader-prefix "e") "emmet" "emmet mode")
-         (mohkale/set-leader-keys-for-minor-mode 'emmet-mode
-           (concat mohkale-major-mode-leader-prefix ".") 'emmet-expand-line
-           ;; (concat mohkale-major-mode-leader-prefix "'") 'emmet-preview
-           (concat mohkale-major-mode-leader-prefix "ee") 'emmet-expand-line
-           (concat mohkale-major-mode-leader-prefix "ep") 'emmet-preview
-           (concat mohkale-major-mode-leader-prefix "ew") 'emmet-wrap-with-markup
-           (concat mohkale-major-mode-leader-prefix "en") 'emmet-next-edit-point
-           (concat mohkale-major-mode-leader-prefix "eN") 'emmet-prev-edit-point)
-         :bind* (:map emmet-mode-keymap
-                 ("C-j" . nil)))
+       (with-eval-after-load 'web-mode
+         (use-package emmet-mode
+           :ensure t
+           :defer  t
+           :hook (web-mode . emmet-mode)
+           :commands (emmet-mode
+                      emmet-expand-yas
+                      emmet-expand-line
+                      emmet-preview-mode
+                      emmet-preview)
+           :config
+           (mohkale/declare-prefix-for-mode 'emmet-mode
+             (concat mohkale-major-mode-leader-prefix "e") "emmet" "emmet mode")
+           (mohkale/set-leader-keys-for-minor-mode 'emmet-mode
+             (concat mohkale-major-mode-leader-prefix ".") 'emmet-expand-line
+             ;; (concat mohkale-major-mode-leader-prefix "'") 'emmet-preview
+             (concat mohkale-major-mode-leader-prefix "ee") 'emmet-expand-line
+             (concat mohkale-major-mode-leader-prefix "ep") 'emmet-preview
+             (concat mohkale-major-mode-leader-prefix "ew") 'emmet-wrap-with-markup
+             (concat mohkale-major-mode-leader-prefix "en") 'emmet-next-edit-point
+             (concat mohkale-major-mode-leader-prefix "eN") 'emmet-prev-edit-point)
+           :bind* (:map emmet-mode-keymap
+                        ("C-j" . nil))))
      #+END_SRC
 
 **** company-web
      #+BEGIN_SRC emacs-lisp
-       (use-package company-web
-         :ensure t
-         :defer  t
-         :init
-         (with-eval-after-load 'company
-           (mohkale/update-company-backends-for-mode web t
-             '(company-web-html company-yasnippet))))
+       (with-eval-after-load 'web-mode
+         (use-package company-web
+           :ensure t
+           :defer  t
+           :init
+           (with-eval-after-load 'company
+             (mohkale/update-company-backends-for-mode web t
+               '(company-web-html company-yasnippet)))))
      #+END_SRC
 
 **** simple-httpd
@@ -10971,18 +10897,19 @@
 
 **** web-beautify
      #+BEGIN_SRC emacs-lisp
-       (use-package web-beautify
-         :ensure t
-         :defer  t
-         :commands (web-beautify-js
-                    web-beautify-html
-                    web-beautify-css)
-         :init
-         (mohkale/declare-prefix-for-major-mode 'web-mode "rb" "beautify")
-         (mohkale/set-leader-keys-for-major-mode 'web-mode
-           "rbh" 'web-beautify-htlm
-           "rbj" 'web-beautify-js
-           "rbc" 'web-beautify-css))
+       (with-eval-after-load 'web-mode
+         (use-package web-beautify
+           :ensure t
+           :defer  t
+           :commands (web-beautify-js
+                      web-beautify-html
+                      web-beautify-css)
+           :init
+           (mohkale/declare-prefix-for-major-mode 'web-mode "rb" "beautify")
+           (mohkale/set-leader-keys-for-major-mode 'web-mode
+             "rbh" 'web-beautify-htlm
+             "rbj" 'web-beautify-js
+             "rbc" 'web-beautify-css)))
      #+END_SRC
 
 *** org
@@ -11220,6 +11147,7 @@
             (awk . t)
             (C . t)
             (awk . t)
+            (haskell . t)
             (java . t)
             (js . t)
             (ditaa . t)
@@ -11574,9 +11502,13 @@
                     org-projectile-goto-location-for-project
                     org-projectile-find-todo-file)
          :init
-         (add-to-list 'org-capture-templates (org-projectile-project-todo-entry) t)
-         (setq org-confirm-elisp-link-function nil
-               org-agenda-files (append org-agenda-files (org-projectile-todo-files)))
+         (with-eval-after-load 'org
+           (add-to-list 'org-capture-templates (org-projectile-project-todo-entry) t)
+
+           (setq org-confirm-elisp-link-function nil
+                 org-agenda-files (append org-agenda-files
+                                          (delq nil (mapcar (lambda (file) (when (file-exists-p file) file))
+                                                            (org-projectile-todo-files))))))
 
          (mohkale/declare-prefix*
            "po" "org-projectile-goto-todos"
@@ -11589,6 +11521,11 @@
            ;; "pO" 'org-projectile-helm-template-or-project
            )
          :config
+         (setq org-projectile-per-project-filepath
+               (defun mohkale--org-projectile-path (project-path)
+                 (let* ((project-path (replace-regexp-in-string "/$" "" project-path)))
+                   (concat (file-name-nondirectory project-path) ".org"))))
+
          (org-projectile-per-project)
          (defun org-projectile-find-todo-file (&optional prefix)
            "find the org file for a given project
@@ -11608,12 +11545,7 @@
                  (when (or (file-exists-p file)
                            (y-or-n-p (format "Project TODO file '%s' doesn't exist, make now: "
                                              file)))
-                   (find-file file))))))
-
-         (setq org-projectile-per-project-filepath
-               (defun mohkale--org-projectile-path (project-path)
-                 (let* ((project-path (replace-regexp-in-string "/$" "" project-path)))
-                   (concat (file-name-nondirectory project-path) ".org")))))
+                   (find-file file)))))))
      #+END_SRC
 
 *** JSON
@@ -11700,26 +11632,28 @@
      upcases SQL specific keywords after completing them.
 
      #+BEGIN_SRC emacs-lisp
-       (use-package sqlup-mode
-         :ensure t
-         :defer  t
-         :hook ((sql-mode . sqlup-mode)
-                (sql-interactive-mode . sqlup-mode))
-         :commands (sqlup-mode
-                    sqlup-capitalize-keywords-in-buffer
-                    sqlup-capitalize-keywords-in-region)
-         :config
-         (mohkale/declare-prefix-for-mode 'sql-mode
-           "u" "upcase")
-         (mohkale/set-leader-keys-for-major-mode 'sql-mode
-           "ur" 'sqlup-capitalize-keywords-in-region
-           "ub" 'sqlup-capitalize-keywords-in-buffer)
+       (with-eval-after-load 'sql
+         (use-package sqlup-mode
+           :ensure t
+           :defer  t
+           :hook ((sql-mode . sqlup-mode)
+                  (sql-interactive-mode . sqlup-mode))
+           :commands (sqlup-mode
+                      sqlup-capitalize-keywords-in-buffer
+                      sqlup-capitalize-keywords-in-region)
+           :config
+           (mohkale/declare-prefix-for-mode 'sql-mode
+             "u" "upcase")
+           (mohkale/set-leader-keys-for-major-mode 'sql-mode
+             "ur" 'sqlup-capitalize-keywords-in-region
+             "ub" 'sqlup-capitalize-keywords-in-buffer)
 
-         (push "name" sqlup-blacklist))
+           (push "name" sqlup-blacklist)))
      #+END_SRC
 
 **** sqlite-dump
      converts an sqlite database file into the SQL schema required to reproduce it.
+
      #+BEGIN_SRC emacs-lisp
        (use-package sqlite-dump
          :defer t
@@ -11755,8 +11689,8 @@
         :defer  t
         :init
         (setq csv-separators '("," ":" ";" "\t"))
-        :config
 
+        :config
         (general-define-key
           :keymaps 'csv-mode-map
           "<tab>"     'csv-forward-field
@@ -11783,16 +11717,17 @@
 *** shell-script
 **** company-shell
      #+BEGIN_SRC emacs-lisp
-       (use-package company-shell
-         :ensure t
-         :defer  t
-         :commands (company-shell
-                    company-fish-shell
-                    company-shell-env)
-         :init
-         (with-eval-after-load 'company
-           (mohkale/update-company-backends-for-mode sh t
-             '(company-shell company-shell-env))))
+       (with-eval-after-load 'sh-script
+         (use-package company-shell
+           :ensure t
+           :defer  t
+           :commands (company-shell
+                      company-fish-shell
+                      company-shell-env)
+           :init
+           (with-eval-after-load 'company
+             (mohkale/update-company-backends-for-mode sh t
+               '(company-shell company-shell-env)))))
      #+END_SRC
 
 **** shell-script-mode
@@ -11872,19 +11807,6 @@
          :ensure t
          :defer  t
          :commands (emojify-mode))
-     #+END_SRC
-
-**** emoji-cheat-sheet-plus
-     disabled because it requires helm
-
-     #+BEGIN_SRC emacs-lisp
-       ;; requires helm
-       ;; (use-package emoji-cheat-sheet-plus
-       ;;   :ensure t
-       ;;   :defer  t
-       ;;   :commands (emoji-cheat-sheet-plus-echo
-       ;;              emoji-cheat-sheet-plus-echo-and-copy
-       ;;              emoji-cheat-sheet-plus-buffer))
      #+END_SRC
 
 **** gh-md
@@ -12093,19 +12015,21 @@
 
 **** company-cmake
      #+BEGIN_SRC emacs-lisp
-       (use-package company-cmake
-         ;; :ensure t
-         :defer  t
-         :commands (company-cmake))
+       (with-eval-after-load 'cmake-mode
+         (use-package company-cmake
+           ;; :ensure t
+           :defer  t
+           :commands (company-cmake)))
      #+END_SRC
 
 *** C-C++
 **** company-c-headers
      #+BEGIN_SRC emacs-lisp
-       (use-package company-c-headers
-         :ensure t
-         :defer  t
-         :commands (company-c-headers))
+       (with-eval-after-load 'cc-mode
+         (use-package company-c-headers
+           :ensure t
+           :defer  t
+           :commands (company-c-headers)))
      #+END_SRC
 
 **** cc-mode
@@ -12162,27 +12086,15 @@
 
 **** disaster
      #+BEGIN_SRC emacs-lisp
-       (use-package disaster
-         :ensure t
-         :defer  t
-         :commands (disaster)
-         :init
-         (dolist (mode '(c-mode c++-mode))
-           (mohkale/set-leader-keys-for-major-mode mode
-             "D" 'disaster)))
-     #+END_SRC
-
-**** ctags
-     #+BEGIN_SRC emacs-lisp
-       ;; (use-package ctags-update
-       ;;   :ensure t
-       ;;   :defer  t
-       ;;   :config
-       ;;   (ctags-global-auto-update-mode)
-       ;;   (setq tags-revert-without-query 1)
-
-       ;;   ;; you need manually create TAGS in your project
-       ;;   (setq ctags-update-prompt-create-tags nil))
+       (with-eval-after-load 'cc-mode
+         (use-package disaster
+           :ensure t
+           :defer  t
+           :commands (disaster)
+           :init
+           (dolist (mode '(c-mode c++-mode))
+             (mohkale/set-leader-keys-for-major-mode mode
+               "D" 'disaster))))
      #+END_SRC
 
 *** kotlin
@@ -12212,6 +12124,12 @@
 
          (mohkale/update-company-backends-for-mode kotlin t
            '(company-lsp)))
+     #+END_SRC
+
+**** lsp-kotlin
+     #+BEGIN_SRC emacs-lisp
+       (with-eval-after-load 'kotlin-mode
+         (add-hook 'kotlin-mode-hook 'lsp-mode))
      #+END_SRC
 
 *** java
@@ -12358,6 +12276,7 @@
 
 *** javascript
     # NOTE no on the fly syntax checking? make sure eslint is installed no warning or error will be issued if it isn't :(
+
 **** js2-mode
      #+BEGIN_SRC emacs-lisp
        (use-package js2-mode
@@ -12411,104 +12330,108 @@
 
 **** tern
      #+BEGIN_SRC emacs-lisp
-       (use-package tern
-         :ensure t
-         :defer  t
-         :hook (js2-mode . tern-mode)
-         :commands tern-mode)
+       (with-eval-after-load 'js2-mode
+         (use-package tern
+           :ensure t
+           :defer  t
+           :hook (js2-mode . tern-mode)
+           :commands tern-mode))
      #+END_SRC
 
 **** company-tern
      #+BEGIN_SRC emacs-lisp
-       (use-package company-tern
-         :ensure t
-         :defer  t
-         :commands company-tern
-         :hook (js2-mode . (lambda () (require 'company-tern)))
-         :config
-         (mohkale/update-company-backends-for-mode js2 t
-           '(company-tern)))
+       (with-eval-after-load 'js2-mode
+         (use-package company-tern
+           :ensure t
+           :defer  t
+           :commands company-tern
+           :hook (js2-mode . (lambda () (require 'company-tern)))
+           :config
+           (mohkale/update-company-backends-for-mode js2 t
+             '(company-tern))))
      #+END_SRC
 
 **** js-doc
      #+BEGIN_SRC emacs-lisp
-       (use-package js-doc
-         :ensure t
-         :defer  t
-         :commands (js-doc-insert-function-doc
-                    js-doc-insert-function-doc-snippet
-                    js-doc-insert-tag
-                    js-doc-insert-file-doc
-                    js-doc-describe-tag)
-         :init
-         ;; (general-define-key
-         ;;   :keymaps 'js2-mode-map
-         ;;   :states 'insert
-         ;;   "@" 'js-doc-insert-tag)
+       (with-eval-after-load 'js2-mode
+         (use-package js-doc
+           :ensure t
+           :defer  t
+           :commands (js-doc-insert-function-doc
+                      js-doc-insert-function-doc-snippet
+                      js-doc-insert-tag
+                      js-doc-insert-file-doc
+                      js-doc-describe-tag)
+           :init
+           ;; (general-define-key
+           ;;   :keymaps 'js2-mode-map
+           ;;   :states 'insert
+           ;;   "@" 'js-doc-insert-tag)
 
-         (mohkale/set-leader-keys-for-major-mode 'js2-mode
-           "i@" 'js-doc-insert-tag
+           (mohkale/set-leader-keys-for-major-mode 'js2-mode
+             "i@" 'js-doc-insert-tag
                                                ; only works from within method
-           "i)" 'js-doc-insert-function-doc
-           "i(" 'js-doc-insert-function-doc-snippet
-           "if" 'js-doc-insert-file-doc
-           "h@" 'js-doc-describe-tag)
+             "i)" 'js-doc-insert-function-doc
+             "i(" 'js-doc-insert-function-doc-snippet
+             "if" 'js-doc-insert-file-doc
+             "h@" 'js-doc-describe-tag)
 
-         :config
-         (advice-add 'js-doc-insert-function-doc-snippet :after #'(lambda (&rest r)
-                                                                    (evil-insert nil))))
+           :config
+           (advice-add 'js-doc-insert-function-doc-snippet :after #'(lambda (&rest r)
+                                                                      (evil-insert nil)))))
      #+END_SRC
 
 **** js2-refactor
      #+BEGIN_SRC emacs-lisp
        ;; most of this doesn't seem to work very well...
        ;; so I'm only using a few functions with simple features.
-       (use-package js2-refactor
-         :ensure t
-         :defer  t
-         :diminish
-         :hook (js2-mode . js2-refactor-mode)
-         :config
-         (defun js2r-exit-visual-mode-after-func-call (&rest args)
-           (when (evil-visual-state-p)
-             (evil-exit-visual-state)))
+       (with-eval-after-load 'js2-mode
+         (use-package js2-refactor
+           :ensure t
+           :defer  t
+           :diminish
+           :hook (js2-mode . js2-refactor-mode)
+           :config
+           (defun js2r-exit-visual-mode-after-func-call (&rest args)
+             (when (evil-visual-state-p)
+               (evil-exit-visual-state)))
 
-         (advice-add 'js2r-extract-method   :after #'js2r-exit-visual-mode-after-func-call)
-         (advice-add 'js2r-extract-function :after #'js2r-exit-visual-mode-after-func-call)
+           (advice-add 'js2r-extract-method   :after #'js2r-exit-visual-mode-after-func-call)
+           (advice-add 'js2r-extract-function :after #'js2r-exit-visual-mode-after-func-call)
 
-         (mohkale/declare-prefix-for-major-mode 'js2-mode
-           "e" "extract")
+           (mohkale/declare-prefix-for-major-mode 'js2-mode
+             "e" "extract")
 
-         (mohkale/set-leader-keys-for-major-mode 'js2-mode
-           "[" 'js2r-expand-node-at-point
-           "]" 'js2r-contract-node-at-point
+           (mohkale/set-leader-keys-for-major-mode 'js2-mode
+             "[" 'js2r-expand-node-at-point
+             "]" 'js2r-contract-node-at-point
 
-           ; doesn't work unless executed from within a function
-           "ef" 'js2r-extract-function
-           "em" 'js2r-extract-method
-           "ev" 'js2r-extract-var
-           "el" 'js2r-extract-let
-           "ec" 'js2r-extract-const
+                                               ; doesn't work unless executed from within a function
+             "ef" 'js2r-extract-function
+             "em" 'js2r-extract-method
+             "ev" 'js2r-extract-var
+             "el" 'js2r-extract-let
+             "ec" 'js2r-extract-const
 
-           "l" 'js2r-log-this
-           "L" 'js2r-debug-this
+             "l" 'js2r-log-this
+             "L" 'js2r-debug-this
 
-           "v" 'js2r-var-to-this
+             "v" 'js2r-var-to-this
 
-           "s" 'js2r-forward-slurp
-           "b" 'js2r-forward-barf))
+             "s" 'js2r-forward-slurp
+             "b" 'js2r-forward-barf)))
      #+END_SRC
 
 **** xref-js2
      #+BEGIN_SRC emacs-lisp
-       (use-package xref-js2
-         :ensure t
-         :defer  t
-         :commands (xref-js2-xref-backend)
-         :init
-         (with-eval-after-load 'js2-mode
-           (add-hook 'xref-backend-functions #'xref-js2-xref-backend))
-         (setq xref-js2-search-program 'rg))
+       (with-eval-after-load 'js2-mode
+         (use-package xref-js2
+           :ensure t
+           :defer  t
+           :commands (xref-js2-xref-backend)
+           :hook (xref-backend-functions . xref-js2-xref-backend)
+           :init
+           (setq xref-js2-search-program 'rg)))
      #+END_SRC
 
 **** indium
@@ -12619,31 +12542,34 @@
 *** haskell
 **** hindent
      #+BEGIN_SRC emacs-lisp
-       (use-package hindent
-         :ensure t
-         :defer  t
-         :hook (haskell-mode . hindent-mode)
-         :commands (hindent-mode
-                    hindent-reformat-decl
-                    hindent-reformat-buffer
-                    hindent-reformat-decl-or-fill
-                    hindent-reformat-region))
+       (with-eval-after-load 'haskell-mode
+         (use-package hindent
+           :ensure t
+           :defer  t
+           :hook (haskell-mode . hindent-mode)
+           :commands (hindent-mode
+                      hindent-reformat-decl
+                      hindent-reformat-buffer
+                      hindent-reformat-decl-or-fill
+                      hindent-reformat-region)))
      #+END_SRC
 
 **** company-cabal
      #+BEGIN_SRC emacs-lisp
-       (use-package company-cabal
-         :ensure t
-         :defer  t
-         :commands company-cabal)
+       (with-eval-after-load 'haskell-mode
+         (use-package company-cabal
+           :ensure t
+           :defer  t
+           :commands company-cabal))
      #+END_SRC
 
 **** flycheck-haskell
      #+BEGIN_SRC emacs-lisp
-       (use-package flycheck-haskell
-         :ensure t
-         :defer  t
-         :commands (flycheck-haskell-setup))
+       (with-eval-after-load 'haskell-mode
+         (use-package flycheck-haskell
+           :ensure t
+           :defer  t
+           :commands (flycheck-haskell-setup)))
      #+END_SRC
 
 **** haskell-mode
@@ -12659,6 +12585,7 @@
          ;;        )
          :init
          (push 'haskell-interactive-mode mohkale--whitespace-exempt-modes)
+         (push 'inferior-haskell-mode mohkale--whitespace-exempt-modes)
          (defalias 'haskell-repl #'run-haskell)
 
          :config
@@ -12669,7 +12596,7 @@
          (mohkale/update-company-backends-for-mode haskell-cabal t
            '(company-cabal))
 
-         ;; (setq haskell-process-type 'ghci)
+         (setq haskell-process-type 'cabal-repl)
 
          (defun mohkale//enable-haskell-indent-control ()
            (interactive)
@@ -12720,17 +12647,35 @@
 
 **** hs-lint
      #+BEGIN_SRC emacs-lisp
-       (use-package hs-lint
-         :defer  t
-         :commands (hs-lint hs-lint-mode))
+       (with-eval-after-load 'haskell-mode
+         (use-package hs-lint
+           :defer  t
+           :commands (hs-lint hs-lint-mode)))
      #+END_SRC
 
 **** hlint-refactor-mode
      #+BEGIN_SRC emacs-lisp
-       (use-package hlint-refactor-mode
-         :defer t
-         :commands (hlint-refactor-refactor-buffer
-                    hlint-refactor-refactor-at-point))
+       (with-eval-after-load 'haskell-mode
+         (use-package hlint-refactor-mode
+           :defer t
+           :commands (hlint-refactor-refactor-buffer
+                      hlint-refactor-refactor-at-point)))
+     #+END_SRC
+
+**** lsp-haskell
+     #+BEGIN_SRC emacs-lisp
+       (with-eval-after-load 'haskell-mode
+         (with-eval-after-load 'lsp-mode
+           (use-package lsp-haskell
+             :ensure t
+             :defer  t
+             :hook ((haskell-mode . lsp) ;; order of evaluation matters
+                    (haskell-mode . (lambda ()
+                                      (require 'lsp-haskell)
+                                      ;; until there's actually any useful info
+                                      (setq-local lsp-eldoc-enable-hover nil))))
+             :config
+             (setq lsp-haskell-process-args-hie (list "-d" "-l" (make-temp-file "hie." nil ".log"))))))
      #+END_SRC
 
 *** git
@@ -12914,23 +12859,24 @@
 
 **** magit-gitflow
      #+BEGIN_SRC emacs-lisp
-      (use-package magit-gitflow
-        :ensure t
-        :defer  t
-        :hook (magit-mode . turn-on-magit-gitflow)
-        :commands (magit-gitflow-mode
-                   turn-on-magit-gitflow
-                   magit-gitflow-popup)
-        :delight
-        (magit-gitflow-mode "GitFlow")
-        :init
-        (with-eval-after-load 'magit--handle-bookmark
-          (bind-keys :map magit-mode-map
-                     ("%" . magit-gitflow-popup))))
+       (use-package magit-gitflow
+         :ensure t
+         :defer  t
+         :hook (magit-mode . turn-on-magit-gitflow)
+         :commands (magit-gitflow-mode
+                    turn-on-magit-gitflow
+                    magit-gitflow-popup)
+         :delight
+         (magit-gitflow-mode "GitFlow")
+         :init
+         (with-eval-after-load 'magit--handle-bookmark
+           (general-define-key
+             :keymaps 'magit-mode-map
+             "%" 'magit-gitflow-popup)))
      #+END_SRC
 
 *** plantuml
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package plantuml-mode
         :ensure t
         :defer  t)
