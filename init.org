@@ -66,6 +66,7 @@
             auto-save-interval 50                                                  ; auto-save as frequently as possible
             display-line-numbers-type 'relative                                    ; prefer relative line numbers when available
             backup-by-copying t                                                    ; don't clobber symlinks
+            which-key-enable-extended-define-key t                                 ; let's you pass a cons to define-key
             kept-new-versions 10                                                   ; keep 10 latest versions of file
             recenter-positions '(top middle bottom)
 
@@ -93,8 +94,6 @@
                               "\\.sub$"
                               "\\.srt$"
                               "\\.ass$")
-
-            which-key-enable-extended-define-key t
 
             ; Always Use UTF8, NO CARRIAGE RETURNS
             ; this... might be overkill. see setq-default
@@ -632,27 +631,54 @@
 ** leader
    replicate some +basically all+ the built in spacemacs leader features & keys... cause why fix whats not broken.
 
-   #+BEGIN_SRC emacs-lisp :shebang ";; -*- lexical-binding: t -*-"
-     ;; this script is largely just copied from spacemacs/core/core-keybindings.el
-     ;; it's not my intention to steal or claim credit for it, simply to replicate
-     ;; the logic found in spacemacs on my config. To that end, I've renamed most
-     ;; spacemacs variables as my own variables, simply because spacemacs isn't
-     ;; defined in my config. My complete respect goes to the developers of spacemacs
-     ;; who created a binding system so ergonomic and responsive that I have to have it.
-     ;; :)
+   #+BEGIN_SRC emacs-lisp
+     ;; spaceleader.el --- leader-key implementation from spacemacs -*- lexical-binding: t -*-
 
-     ;; NOTE the methods in here aren't as long as the ones in spacemacs because I don't
-     ;;      use different leader keys for `emacs' config and spacemacs config.
+     ;; Copyright (C) 2019 Mohsin Kaleem
 
-     (dolist (package '(general
-                        bind-map
-                        which-key
-                        seq))
-       (require package))
+     ;; Author: Mohsin Kaleem <mohkalsin@gmail.com>
+     ;; Keywords: lisp, internal
+     ;; Version: 0.0.1
+     ;; URL: https://github.com/mohkale/spaceleader
 
-     ;; use nicer indentation with general
+     ;;; License: GPLv3
+     ;; This program is free software; you can redistribute it and/or modify
+     ;; it under the terms of the GNU General Public License as published by
+     ;; the Free Software Foundation, either version 3 of the License, or
+     ;; (at your option) any later version.
+
+     ;; This program is distributed in the hope that it will be useful,
+     ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+     ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+     ;; GNU General Public License for more details.
+
+     ;; You should have received a copy of the GNU General Public License
+     ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+     ;; Package-Requires: ((emacs "26.1") (general "0.1") (bind-map "1.1") (bind-key "2.4))
+
+     ;;; Commentary:
+     ;; This script is largely forked from spacemacs/core/core-keybindings.el and is
+     ;; intended to be a replication of spacemacs' leader key features, without
+     ;; requiring all of spacemacs into your configuration. My complete respect goes
+     ;; to the developers of spacemacs who created the most ergonomic and responsive
+     ;; binding system I've ever seen :)
+
+     ;; mnemonics
+     ;; functions ending with "for-mode" configure settings for a specific mode but
+     ;; still affect the leader-map. If these functions also have a punctuation mark
+     ;; "!" then these functions affect local bindings for the corresponding major-mode
+     ;; map.
+
+     ;;; Code:
+
+     (require 'seq)
+     (require 'general)
+     (require 'bind-map)
+     (require 'bind-key)
+     (require 'which-key nil t)
+
      (put 'general-define-key 'lisp-indent-function 'defun)
-     (put 'general-create-definer 'lisp-indent-function 'defun)
 
      ;;                  _       _     _
      ;; __   ____ _ _ __(_) __ _| |__ | | ___  ___
@@ -661,66 +687,144 @@
      ;;   \_/ \__,_|_|  |_|\__,_|_.__/|_|\___||___/
      ;;
 
-     (defvar mohkale-leader-map (make-sparse-keymap)
+     (defgroup leader nil
+       "A spacemacs like leader key package.")
+
+     (defvar leader-map (make-sparse-keymap)
        "core map for leader key bindings.")
 
-     (defvar mohkale-leader-key "SPC"
-       "key from which you can access all leader bindings.")
+     (defcustom leader-key "SPC"
+       "key from which you can access all leader bindings."
+       :group 'leader)
 
-     (defvar mohkale-nnorm-leader-key "C-SPC"
-       "key from which you can access all leader bindings in non-normal mode.")
+     (defcustom leader-nnorm-key "C-SPC"
+       "key from which you can access all leader bindings in non-normal mode."
+       :group 'leader)
 
-     ;; (setq mohkale-leader-map (make-sparse-keymap)) ;; FIXME delete this
+     (defcustom leader-major-mode-prefix "m"
+       "prefix key in leader map for the active modes map."
+       :group 'leader)
 
-     (defvar mohkale-major-mode-leader-prefix "m"
-       "prefix key in leader map for the active modes map.")
+     (defcustom leader-major-mode-key ","
+       "key shortcut equivalent to `leader-key' then `major-mode-leader-prefix'.
+     set to nil to disable this feature."
+       :group 'leader)
 
-     (defvar mohkale-major-mode-leader-key ","
-       "key shortcut equivalent to leader-key then major-mode-leader-prefix")
+     (defvar leader--prefix nil)
 
-     (defvar mohkale-evil-states '(insert emacs normal visual motion operator outer inner replace iedit iedit-insert)
+     (defcustom leader-simulate-major-mode-key nil
+       (format "simulate '%s %s' when '%s' pressed in some states
+     instead of binding a map to '%s'. By default this is set to
+     behave exactly like spacemacs does.
+
+     This'll probably be quicker and less memory intensive, but you
+     won't recieve any key assistance through `leader-major-mode-key'
+     because a simulated key is actually a command, and not a prefix.
+
+     Notable changes when setting this option are:
+     ,* if your major-mode has no leader keys, the default binding for
+       '%s' will be run, instead of an empty prefix message being issued.
+     ,* if you press '%s' `which-key' will show your input as '%s %s'
+       instead of as '%s'.
+     ,* `substitute-command-keys' won't show any bindings accessed through
+       '%s'. This'll be most noticeable in `org-capture' or `org-edit-src-code'.
+     "
+               leader-key leader-major-mode-prefix leader-major-mode-key
+               leader-major-mode-key leader-major-mode-key
+               leader-major-mode-key leader-key leader-major-mode-prefix
+               leader-major-mode-key leader-major-mode-key)
+       :group 'leader)
+
+     (defvar leader-evil-states '(insert emacs normal visual motion
+                                  operator outer inner replace iedit
+                                  iedit-insert)
        "all the known emacs evil states")
 
-     (defvar mohkale-nnorm-states '(insert emacs hybrid iedit-insert replace)
+     (defvar leader-nnorm-states '(insert emacs hybrid iedit-insert replace)
        "all the known evil states which aren't inherited from normal mode")
 
-     (defvar mohkale-norm-states (seq-filter (lambda (x) (not (member x mohkale-nnorm-states))) mohkale-evil-states)
+     (defvar leader-norm-states (seq-filter (lambda (x) (not (member x leader-nnorm-states))) leader-evil-states)
        "all the known evil states which do inherit from normal mode")
 
-     (defvar mohkale-major-mode-leader-key-states '(normal visual)
+     (defvar leader-major-mode-key-states leader-norm-states
        (format "evil states under which %s can be used to jump to the major modes leader map."
-               mohkale-major-mode-leader-key))
+               leader-major-mode-key))
 
-     (defmacro mohkale//iterate-evil-state-leader-key-tuples (&rest body)
-       "iterates over a list of evil state symbols and their corresponding leader keys.
-     the body of the invoking function will have access to these values under variables of the
-     name steates and leader.
+     (defun leader-key-with-prefix ()
+       (if leader--prefix
+           (concat leader-key " " leader--prefix)
+         leader-key))
 
-     I know, I know, don't even get me started on how it's a terrible design choice to make
-     a macro which changes the local states of its body. This is a mess. Once I come up with
-     a nice optimsed way to do what this does... FIXME I will change it."
-       (let* (;; Tuples mapping states to leader keys in all modes
-              (state-based-tuples `((,mohkale-norm-states  . ,mohkale-leader-key)
-                                    (,mohkale-nnorm-states . ,mohkale-nnorm-leader-key))))
-         `(dolist (tuple (quote ,state-based-tuples))
-            (let ((states (car tuple))
-                  (leader (cdr tuple)))
+     (defun leader-nnorm-key-with-prefix ()
+       (if leader--prefix
+           (concat leader-nnorm-key " " leader--prefix)
+         leader-nnorm-key))
+
+     (defmacro leader-join-key-to-prefix (key)
+       `(if leader--prefix
+            (concat leader--prefix " " key)
+          key))
+
+     ;;;###autoload
+     (defmacro leader/with-prefix (prefix &rest body)
+       "update the prefix used within the body of this macro."
+       `(let ((leader--prefix (if leader--prefix
+                                  (concat leader--prefix " " ,prefix)
+                                ,prefix)))
+          ,@body))
+     (put 'leader/with-prefix 'lisp-indent-function 'defun)
+
+     ;;;###autoload
+     (defmacro leader/with-major-mode-prefix (&rest body)
+       "use the major mode prefix for the body of this macro."
+       `(leader/with-prefix ,leader-major-mode-prefix
+          ,@body))
+     (put 'leader/with-major-mode-prefix 'lisp-indent-function 'defun)
+
+     ;;;###autoload
+     (defmacro leader/without-prefix (&rest body)
+       "undo the affects of any and all `leader/with-prefix' calls."
+       `(let (leader--prefix)
+          ,@body))
+     (put 'leader/without-prefix 'lisp-indent-function 'defun)
+
+     (defun leader//key-in-major-mode-prefix-p (key)
+       (string-prefix-p leader-major-mode-prefix key))
+
+     (cl-defmacro leader//iterate-state-leaders
+         ((leader states &optional include-major) &rest body)
+       "iterates over a list of evil states & their corresponding leader keys.
+     STATES is the name of states variable, LEADER is the name of the leader-key
+     varible.
+
+     when INCLUDE-MAJOR is truthy, the `leader-major-mode-key' will also be
+     returned. "
+       `(let* ((state-based-tuples
+                (list (cons leader-norm-states  leader-key)
+                      (cons leader-nnorm-states leader-nnorm-key))))
+          (when ,include-major
+            (push (cons leader-norm-states leader-major-mode-key)
+                  state-based-tuples))
+
+          (dolist (tuple state-based-tuples)
+            (let ((,states (car tuple))
+                  (,leader (cdr tuple)))
               ,@body))))
-     (put 'mohkale//iterate-evil-state-leader-key-tuples 'lisp-indent-function 'defun)
+     (put 'leader//iterate-state-leaders 'lisp-indent-function 'defun)
 
-     (mohkale//iterate-evil-state-leader-key-tuples ;; (leader states)
-       ;; create bindings to leader map in every mode
+     ;; create bindings to leader map in every state
+     (leader//iterate-state-leaders (leader states)
        (general-define-key
          :states states
-         leader '(:keymap mohkale-leader-map :which-key "emacs-root")))
+         leader '(:keymap leader-map :which-key "emacs-root")))
 
-     (let ((major-leader-sequence (concat mohkale-leader-key
-                                          " "
-                                          mohkale-major-mode-leader-prefix)))
-       (general-define-key
-         ;; WARN hardcoded leader sequence... general-simulate-key can't handle variables yet
-         :states mohkale-major-mode-leader-key-states
-         mohkale-major-mode-leader-key (general-simulate-key "SPC m")))
+     (when (and leader-major-mode-key leader-simulate-major-mode-key)
+       (let ((major-leader-sequence (concat leader-key " " leader-major-mode-prefix)))
+         (general-define-key
+           ;; WARN hardcoded leader sequence... `general-simulate-key'
+           ;;      can't handle variables yet.
+           :states leader-major-mode-key-states
+           leader-major-mode-key (general-simulate-key "SPC m"))))
 
      ;;                  __ _
      ;;  _ __  _ __ ___ / _(_)_  _____  ___
@@ -730,85 +834,98 @@
      ;; |_|
      ;;
 
-     ;; TODO macro this up, there's too much repetition for my liking.
+     (defmacro leader//name-to-prefix-cell (name long-name)
+       "Convert NAME and LONG-NAME to an argument for `which-key'."
+       `(if (consp ,name)
+            ,name
+          (cons ,name (or ,long-name ,name))))
 
-     (defun mohkale/declare-prefix (prefix name &optional long-name)
-       "Declare a leader key prefix `prefix'.
-     `prefix' a string describing a key sequence. `long-name' is
-     shown in the message buffer when the prefix is expanded.
+     ;;;###autoload
+     (defun leader/declare-prefix (prefix name &optional long-name)
+       "Declare a leader key prefix for PREFIX.
+     PREFIX is a string describing a key sequence. `which-key' will
+     automagically substitute the command (or prefix-map) tied to
+     PREFIX with name.
 
-     WARN prefixes are only shown by which key if there's at least one
-          binding accessible through that prefix. kind of obvious in
-          retrospect I guess."
-       (dolist (leader (list mohkale-leader-key
-                             mohkale-nnorm-leader-key))
-         (let ((full-prefix (concat leader " " prefix)))
-             (which-key-add-key-based-replacements full-prefix (cons name (or long-name name))))))
-     (put 'mohkale/declare-prefix 'lisp-indent-function 'defun)
+     If PREFIX relates to a prefix map, `which-key' will display the
+     LONG-NAME in the minibuffer when a user enters that map."
+       (setq name (leader//name-to-prefix-cell name long-name))
 
-     (defun mohkale/declare-prefix* (prefix name &rest remaining)
-       "declares a leader key prefix `prefix'.
-     `prefix' must be a keybinding which can be evaluated by `kbd'.
-     `name' can be either a single string or an alist for (short . long) names.
+       (leader/with-prefix prefix
+         (which-key-add-key-based-replacements (leader-key-with-prefix)       name)
+         (which-key-add-key-based-replacements (leader-nnorm-key-with-prefix) name)))
+     (put 'leader/declare-prefix 'lisp-indent-function 'defun)
 
-     you can pass as many prefix name pairs as you wish to using this variant."
+     ;;;###autoload
+     (defun leader/declare-prefix* (prefix name &rest remaining)
+       "Declares multiple leader key prefixes at once.
+     Accepts pairs of values and basically calls `leader/declare-prefix'
+     on each pair... You can specify a long name for a prefix by passing
+     a cons cell with the car being the NAME and the cons being the
+     LONG-NAME. "
        (while prefix
-         (dolist (leader (list mohkale-leader-key
-                               mohkale-nnorm-leader-key))
-           (let ((full-prefix (concat leader " " prefix)))
-             (which-key-add-key-based-replacements full-prefix name)))
+         (leader/with-prefix prefix
+           (which-key-add-key-based-replacements (leader-key-with-prefix)       name)
+           (which-key-add-key-based-replacements (leader-nnorm-key-with-prefix) name))
          (setq prefix (pop remaining) name (pop remaining))))
-     (put 'mohkale/declare-prefix* 'lisp-indent-function 'defun)
+     (put 'leader/declare-prefix* 'lisp-indent-function 'defun)
 
-     (defun mohkale/declare-prefix-for-mode (mode prefix name &optional long-name major)
-       "declare a leader key prefix which is only active in the given mode
-     this function accepts the same arguments as `mohkale/declare-prefix'
-     alongside an addition symbol argument `mode' for which mode to work in.
+     ;;;###autoload
+     (defun leader/declare-prefix-for-mode (mode prefix name &optional long-name)
+       "declare a prefix within the `leader-map' for MODE.
+     the prefix is only visible while MODE is active.
 
-     this function doesn't distinguish between major and minor modes."
-       (unless (consp name)
-         (if long-name
-             (setq name (cons name long-name))
-           (setq name (cons name name))))
+     WARN which-key doesn't support minor mode based substitutions yet :("
+       (setq name (leader//name-to-prefix-cell name long-name))
 
-       (dolist (leader (list mohkale-leader-key
-                             mohkale-nnorm-leader-key))
-         (let ((full-prefix (concat leader
-                                    " "
-                                    (if major mohkale-major-mode-leader-prefix)
-                                    " "
-                                    prefix)))
-           (which-key-declare-prefixes-for-mode mode full-prefix name)))
+       (leader/with-prefix prefix
+         (which-key-declare-prefixes-for-mode mode (leader-key-with-prefix)       name)
+         (which-key-declare-prefixes-for-mode mode (leader-nnorm-key-with-prefix) name)))
+     (put 'leader/declare-prefix-for-mode 'lisp-indent-function 'defun)
 
-       (when major
-         (let ((major-mode-leader-prefix (concat mohkale-major-mode-leader-key " " prefix)))
+     ;;;###autoload
+     (defun leader/declare-prefix-for-mode* (mode prefix name &rest remaining)
+       "like `leader/declare-prefix*' but for `leader/declare-prefix-for-mode'."
+       (while prefix
+         (leader/declare-prefix-for-mode mode prefix name)
+         (setq prefix (pop remaining) name (pop remaining))))
+     (put 'leader/declare-prefix-for-mode* 'lisp-indent-function 'defun)
+
+     ;;;###autoload
+     (defun leader/declare-prefix-for-mode! (mode prefix name &optional long-name)
+       "declare a prefix within the major-mode leader map for MODE.
+     see also: `leader/declare-prefix-for-mode'."
+       (setq name (leader//name-to-prefix-cell name long-name))
+
+       (leader/with-major-mode-prefix
+         (leader/declare-prefix-for-mode mode prefix name))
+
+       ;; add prefix declaration for the major-mode leader shortcut key: ","
+       (when leader-major-mode-key
+         (let ((major-mode-leader-prefix (concat leader-major-mode-key " " prefix)))
            (which-key-declare-prefixes-for-mode mode major-mode-leader-prefix name))))
-     (put 'mohkale/declare-prefix-for-mode 'lisp-indent-function 'defun)
+     (put 'leader/declare-prefix-for-mode! 'lisp-indent-function 'defun)
 
-     (defun mohkale/declare-prefix-for-mode* (mode prefix name &rest remaining)
-       "declare multiple prefixes that're only active in the given mode.
-     this function is a variant of `mohkale/declare-prefix*' where the prefix
-     is declared using `mohkale/declare-prefix-for-mode'."
+     ;;;###autoload
+     (defun leader/declare-prefix-for-mode!* (mode prefix name &rest remaining)
+       "like `leader/declare-prefix*' but for `leader/declare-prefix-for-mode!'."
        (while prefix
-         (mohkale/declare-prefix-for-mode mode prefix name)
+         (leader/declare-prefix-for-mode! mode prefix name)
          (setq prefix (pop remaining) name (pop remaining))))
-     (put 'mohkale/declare-prefix-for-mode* 'lisp-indent-function 'defun)
+     (put 'leader/declare-prefix-for-mode!* 'lisp-indent-function 'defun)
 
-     (defun mohkale/declare-prefix-for-major-mode (mode prefix name &optional long-name)
-       "declare a prefix under the major-mode-leader-prefix in the leader map.
-     this is simply a shortcut function for `mohkale/declare-prefix-for-mode' where every
-     prefix is also prefixed with `mohkale-major-mode-leader-prefix'."
-       (mohkale/declare-prefix-for-mode mode prefix name long-name t))
-     (put 'mohkale/declare-prefix-for-major-mode 'lisp-indent-function 'defun)
-
-     (defun mohkale/declare-prefix-for-major-mode* (mode prefix name &rest remaining)
-       "declare multiple prefixes which're only active in the given major mode.
-     this function is a variant of `mohkale/declare-prefix*' where the prefix
-     is declared using `mohkale/declare-prefix-for-major-mode'"
-       (while prefix
-         (mohkale/declare-prefix-for-mode mode prefix name nil t)
-         (setq prefix (pop remaining) name (pop remaining))))
-     (put 'mohkale/declare-prefix-for-major-mode* 'lisp-indent-function 'defun)
+     ;; don't bother declaring a prefix when `which-key' isn't installed.
+     (let ((early-cancel (lambda (func &rest args)
+                           (when (featurep 'which-key)
+                             (apply func args))))
+           (prefix-funcs '(leader/declare-prefix
+                           leader/declare-prefix*
+                           leader/declare-prefix-for-mode
+                           leader/declare-prefix-for-mode*
+                           leader/declare-prefix-for-mode!
+                           leader/declare-prefix-for-mode!*)))
+       (dolist (func prefix-funcs)
+         (advice-add func :around early-cancel)))
 
      ;;  _                _                _     _           _ _
      ;; | | ___  __ _  __| | ___ _ __     | |__ (_)_ __   __| (_)_ __   __ _ ___
@@ -817,78 +934,102 @@
      ;; |_|\___|\__,_|\__,_|\___|_|       |_.__/|_|_| |_|\__,_|_|_| |_|\__, |___/
      ;;                                                                |___/
 
-     (defmacro mohkale//set-leader-bindings-iterator (map key def bindings)
-       "iterate for all the bindings in `bindings' and set them in the `map'
-     initial bindings are specified by `key' and `map'."
-       ;; FIXME apply doesn't seem to work with unflattened remaining args
-       ;; `(apply 'general-define-key :keymaps ,map ,key ,def ,bindings)
-       `(while ,key
-          ;; (define-key ,map (kbd ,key) ,def)
-          (bind-key ,key ,def (symbol-value ,map))
-          ;; TODO fix general implementation with which-key
-          ;; (general-define-key :keymaps ,map ,key ,def)
-          (setq ,key (pop ,bindings) ,def (pop ,bindings))))
-     (put 'mohkale//set-leader-bindings-iterator 'lisp-indent-function 'defun)
+     (defmacro leader//set-leader-bindings-iterator (map key def bindings &optional minor)
+       "iterate for all the bindings in BINDINGS and set them in MAP."
+       `(let ((check-major-mode-key
+               (and ,minor ;; major-modes already have bindings in ","
+                    ;; if "," is simulated, this binding will be visible.
+                    (not leader-simulate-major-mode-key)
+                    ;; if not given, then no point in adding to it.
+                    leader-major-mode-key)))
+          (while ,key
+            (setq ,key (leader-join-key-to-prefix ,key))
 
-     (defun mohkale/set-leader-keys (key def &rest bindings)
+            ;; check and then assign key to `leader-major-mode-key'
+            (if (and check-major-mode-key
+                     (>= (length ,key) 1)
+                     (leader//key-in-major-mode-prefix-p key))
+                (bind-key (substring ,key (length leader-major-mode-prefix))
+                          ,def (symbol-value ,map))
+
+              (bind-key ,key ,def (symbol-value ,map)))
+            (setq ,key (pop ,bindings) ,def (pop ,bindings)))))
+     (put 'leader//set-leader-bindings-iterator 'lisp-indent-function 'defun)
+
+     ;;;###autoload
+     (defun leader/set-keys (key def &rest bindings)
        "set bindings in the leader key map for all modes.
      supply as many key binding pairs as you wish to define."
-       (mohkale//set-leader-bindings-iterator 'mohkale-leader-map key def bindings))
-     (put 'mohkale/set-leader-keys 'lisp-indent-function 'defun)
+       (leader//set-leader-bindings-iterator 'leader-map key def bindings))
+     (put 'leader/set-keys 'lisp-indent-function 'defun)
 
-     (defun mohkale//init-leader-mode-prefix-map (mode map &optional minor)
-       "create a prefix map for a leader key prefix that's mode dependent.
-     this function returns whether the desired map exists... it should always
-     return true."
+     (defun leader//init-mode-prefix-map (mode map &optional minor)
+       "Check for MAP-prefix. If it doesn't exist yet, use `bind-map'
+     to create it and bind it to `leader-key'and `leader-nnorm-key'. "
+       (or (boundp mode) (set mode nil)) ;; needed to ensure key lookups work
+
        (let ((prefix-map (intern (format "%s-prefix" map))))
-         ;; needed to ensure key lookups work
-         (unless (boundp mode)
-           (set mode nil))
+         (or (boundp prefix-map)
+             (let ((bind-major-key (and (not leader-simulate-major-mode-key)
+                                        leader-major-mode-key)))
+               (leader//iterate-state-leaders (leader states bind-major-key)
+                 (eval `(bind-map ,map
+                          :prefix-cmd ,prefix-map
+                          :evil-keys (,(if (string-equal leader leader-major-mode-key)
+                                          leader ;; if , don't append m, else do so.
+                                        (concat leader " " leader-major-mode-prefix)))
+                          :evil-states ,states
+                          ,(if minor :minor-modes :major-modes) (,mode))))
+               (boundp prefix-map)))))
 
-         (if (boundp prefix-map) t
-           (mohkale//iterate-evil-state-leader-key-tuples ;; (states leader)
-             (let ((leader (list (if minor
-                                     leader
-                                   (concat leader " " mohkale-major-mode-leader-prefix)))))
-               ;; WARN why this needs to be in an eval block... I have no idea
-               ;;      I've tried to move it out and I always encounter one error
-               ;;      or another. Just leave it in for now.
-               (eval
-                `(bind-map ,map
-                   :prefix-cmd ,prefix-map
-                   ,(if minor :minor-modes :major-modes) (,mode)
-                   :evil-keys ,leader
-                   :evil-states ,states))))
-           (boundp prefix-map))))
+     ;;;###autoload
+     (defun leader/set-keys-for-mode (mode key def &rest bindings)
+       "set keys in the leader map for the given mode MODE.
+     see also: `leader/set-keys'"
+       (let* ((map (intern (format "leader-%s-map" mode))))
+         (when (leader//init-mode-prefix-map mode map t)
+           (leader//set-leader-bindings-iterator map key def bindings t))))
+     (put 'leader/set-keys-for-mode 'lisp-indent-function 'defun)
 
-     (defun mohkale/set-leader-keys-for-minor-mode (mode key def &rest bindings)
-       "set bindings in the leader key map for only the given minor mode.
-     this function has the same body as mohkale/set-leader-keys but also accepts
-     a symbol as an initial argument specifying the mode in question."
-       (let* ((map (intern (format "mohkale-leader-%s-map" mode))))
-         (when (mohkale//init-leader-mode-prefix-map mode map t)
-           (mohkale//set-leader-bindings-iterator map key def bindings))))
-     (put 'mohkale/set-leader-keys-for-minor-mode 'lisp-indent-function 'defun)
+     ;;;###autoload
+     (defun leader/set-keys-for-mode! (mode key def &rest bindings)
+       "set keys in the leader map for the given major mode MODE.
+     see also: `leader/set-keys'"
+       (let* ((map (intern (format "leader-%s-map" mode))))
+         (when (leader//init-mode-prefix-map mode map nil)
+           (leader//set-leader-bindings-iterator map key def bindings nil))))
+     (put 'leader/set-keys-for-mode! 'lisp-indent-function 'defun)
 
-     (defun mohkale/set-leader-keys-for-major-mode (mode key def &rest bindings)
-       "set bindings in the leader key map for only the given major mode.
-     this function has the same body as mohkale/set-leader-keys but also accepts
-     a symbol as an initial argument specifying the mode in question."
-       (let* ((map (intern (format "mohkale-leader-%s-map" mode))))
-         (when (mohkale//init-leader-mode-prefix-map mode map)
-           (mohkale//set-leader-bindings-iterator map key def bindings))))
-     (put 'mohkale/set-leader-keys-for-major-mode 'lisp-indent-function 'defun)
+     ;; pass mode argument as list to repeat for every member of list.
+     (let* ((multi-mode-batch-call
+             (lambda (func mode &rest args)
+               (if (listp mode)
+                   (mapcar (lambda (m) (apply func m args))
+                           mode)
+                 (apply func mode args))))
+            (mode-funcs '(leader/set-keys-for-mode
+                          leader/set-keys-for-mode!
+                          leader/declare-prefix-for-mode
+                          leader/declare-prefix-for-mode*
+                          leader/declare-prefix-for-mode!
+                          leader/declare-prefix-for-mode!*)))
+       (dolist (mode-func mode-funcs)
+         (advice-add mode-func :around multi-mode-batch-call)))
 
-     (mohkale/declare-prefix mohkale-major-mode-leader-prefix "major-mode" "major mode commands")
+     (leader/declare-prefix leader-major-mode-prefix "major-mode" "major mode commands")
+
+     (provide 'spaceleader)
+
+     ;;; spaceleader.el ends here
    #+END_SRC
 
 *** emacs-root
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix*
+      (leader/declare-prefix*
         "SPC" "M-x"
         "TAB" "last-buffer")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "SPC" 'execute-extended-command
         "TAB" 'switch-to-last-buffer
         ;; "<C-tab>" 'indent-back-to-normal ;; C-TAB doesn't work
@@ -917,11 +1058,11 @@
 
 *** applications
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix*
+      (leader/declare-prefix*
         "a" "applications"
         "au" "undo tree")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "a:" 'eshell
         "aC" 'calc-dispatch
         "ac" 'calendar
@@ -937,11 +1078,11 @@
 
 *** buffers
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix*
+      (leader/declare-prefix*
         "b" "buffers"
         "bt" "buffer-read-only-mode")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "b RET" 'create-new-empty-buffer
         "b DEL" 'bury-buffer
         "bb" 'switch-to-buffer
@@ -965,9 +1106,9 @@
 
 *** compile/comments
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix "c" "compile/comments")
+      (leader/declare-prefix "c" "compile/comments")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         ;; compile
         "c M-SPC" 'compile
         "cd" 'close-compilation-window ;; WARN not yet implemented
@@ -987,9 +1128,9 @@
 
 *** error
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix "e" "errors")
+      (leader/declare-prefix "e" "errors")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         ;; TODO make flycheck aliases
         "en" 'next-error
         "eN" 'previous-error
@@ -998,7 +1139,7 @@
 
 *** files
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix*
+      (leader/declare-prefix*
         "f"  "files"
         "fC" "files/convert"
         "fe" '("emacs" . "emacs files")
@@ -1006,7 +1147,7 @@
 
         "fv" "variables")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "fc" 'copy-file
         "fD" 'delete-buffer-file
         "fF" 'find-file-at-point
@@ -1033,11 +1174,11 @@
 
 *** help
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix*
+      (leader/declare-prefix*
         "h"  "help"
         "hd" "help-describe")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "hn" 'view-emacs-news
 
         "hdb" 'describe-bindings
@@ -1053,10 +1194,10 @@
 
 *** hydras
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix
+      (leader/declare-prefix
         "H" "hydras" "cut off one head, two more shall take it's place")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "H TAB" 'hydra-indent/body
         "He"   'hydra-flycheck/body
         "Hc"   'hydra-org-clock/body
@@ -1070,25 +1211,25 @@
 
 *** insert
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix "i" "insert")
+      (leader/declare-prefix "i" "insert")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "ij" 'custom-insert-line-below
         "ik" 'custom-insert-line-above)
     #+END_SRC
 
 *** jump
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix "j" "jump")
+      (leader/declare-prefix "j" "jump")
     #+END_SRC
 
 *** modes
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix*
+      (leader/declare-prefix*
         "M" "modes"
         "Md" "dired")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "Mz" 'zone
         "Ml" 'emacs-lisp-mode
         "ML" 'lisp-interaction-mode
@@ -1112,9 +1253,9 @@
 
 *** narrowing & numbers
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix "n" "narrrow/numbers")
+      (leader/declare-prefix "n" "narrrow/numbers")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "nr" 'narrow-to-region
         "np" 'narrow-to-page
         "nw" 'widen)
@@ -1122,10 +1263,10 @@
 
 *** text
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix*
+      (leader/declare-prefix*
         "x" "text")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "xa" 'describe-text-properties
         "xf" 'list-faces
         "xc" 'capitalize-region
@@ -1136,11 +1277,11 @@
 
 *** toggles
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix*
+      (leader/declare-prefix*
         "t" "toggles"
         "tn" "toggle-line-numbers")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "t TAB" 'set-indent-offset
         "tl" 'toggle-truncate-lines
         "tL" 'toggle-lexical-binding
@@ -1165,10 +1306,10 @@
 
 *** search
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix*
+      (leader/declare-prefix*
         "s" "search/symbol")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "sg" 'rgrep
         "sF" 'find-dired
         "sf" 'find-grep-dired)
@@ -1176,10 +1317,10 @@
 
 *** window
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix "w" "windows")
+      (leader/declare-prefix "w" "windows")
 
       (with-eval-after-load mohkale-mohkale-el-config-file
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "w" mohkale-window-map))
     #+END_SRC
 
@@ -1228,12 +1369,12 @@
        "<C-backspace>"   'evil-delete-backward-word)
 
      (general-define-key
-       :states mohkale-norm-states
+       :states leader-norm-states
        "gr"    'revert-buffer
        "gz"    'recenter-top-bottom)
 
      (general-define-key
-       :states mohkale-nnorm-states
+       :states leader-nnorm-states
        ;; "S-SPC" 'insert-whitespace-after-point
        "M-DEL"   'delete-forward-char
        "<C-S-backspace>" 'kill-word)
@@ -1256,7 +1397,7 @@
               (insert-char ,char (prefix-numeric-value prefix))))))
 
      (general-define-key
-      :states mohkale-nnorm-states
+      :states leader-nnorm-states
       "S-M-SPC" (defun-save-excursion-insert-char space ? ))
    #+END_SRC
 
@@ -1279,7 +1420,7 @@
        :init
        (setq mohkale--server-leader-key "y")
 
-       (mohkale/declare-prefix*
+       (leader/declare-prefix*
          "on" "find-notes-file"
          "ou" "find-uni-file"
          "feb" "build-config"
@@ -1288,7 +1429,7 @@
          "fet" "find-tangled-config"
          "fed" "find-dotfile")
 
-       (mohkale/set-leader-keys
+       (leader/set-keys
          "on" 'mohkale/find-capture-notes-file
          "ou" 'mohkale/find-org-university-file
          "feb" 'mohkale/build-configuration-file
@@ -1380,7 +1521,7 @@
                    jump-to-directory
                    jump-to-directory-other-window)
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "fj" 'jump-to-directory
           "jd" 'jump-to-directory
           "jD" 'jump-to-directory-other-window))
@@ -2314,11 +2455,11 @@
       (general-define-key
         "C-x TAB" 'hydra-indent/body)
 
-      (mohkale/declare-prefix*
+      (leader/declare-prefix*
         "x." "hydra-text-zoom"
         "l"  "layouts")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "x." 'hydra-text-zoom/body
         "l"  'hydra-persp/body)
     #+END_SRC
@@ -3760,7 +3901,7 @@
          :commands evilmi-jump-items
          :init
          (general-define-key
-           :states mohkale-norm-states
+           :states leader-norm-states
            ;; "g%" 'evilmi-select-items
            "g%" 'evilmi--simple-jump)
          :config
@@ -3891,12 +4032,12 @@
 
          (general-define-key
            :keymaps 'override
-           :states mohkale-nnorm-states
+           :states leader-nnorm-states
            "C-e" 'evil-copy-from-above
            "M-e" 'evil-copy-from-below)
 
          (general-define-key
-           :states mohkale-nnorm-states
+           :states leader-nnorm-states
            "C->" 'evil-shift-right-line
            "C-<" 'evil-shift-left-line)
 
@@ -3957,14 +4098,14 @@
            "C-y" 'evil-paste-after)
 
          (general-define-key
-           :states mohkale-norm-states
+           :states leader-norm-states
            ;; keep hitting C-SPC by accident
            "C-SPC" (general-simulate-key "SPC")
            "g=" 'count-words)
 
-         (mohkale/declare-prefix "sc" "search-noh")
+         (leader/declare-prefix "sc" "search-noh")
 
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "id" 'evil-insert-digraph
            "sc" 'evil-ex-nohighlight
            "xu" 'evil-upcase
@@ -4050,7 +4191,7 @@
            :states '(motion normal)
            "K" 'evil-jump-out-args)
 
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "g(" 'evil-backward-arg
            "g)" 'evil-forward-arg
            "gk" 'evil-jump-out-args)
@@ -4106,7 +4247,7 @@
           (toggle-comment-at-point beg end))
 
         (general-define-key
-          :states mohkale-norm-states
+          :states leader-norm-states
           "gc" 'evil-toggle-comment)
       #+END_SRC
 
@@ -4270,7 +4411,7 @@
                    avy-pop-mark
                    avy-resume)
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "jB" 'avy-pop-mark
           "jj" 'avy-goto-char
           "jJ" 'avy-goto-char-2
@@ -4297,7 +4438,7 @@
         :config
         (evil-set-initial-state 'Buffer-menu-mode 'motion)
 
-        (mohkale/set-leader-keys-for-major-mode 'Buffer-menu-mode
+        (leader/set-keys-for-mode! 'Buffer-menu-mode
           "1" 'Buffer-menu-1-window
           "2" 'Buffer-menu-2-window
           "f" 'Buffer-menu-toggle-files-only
@@ -4390,10 +4531,10 @@
       (use-package calc
         :defer t
         :init
-        (mohkale/declare-prefix
+        (leader/declare-prefix
           "*" "calculator")
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "*." 'calc-dispatch
           "**" 'calc
           "*y" 'calc-copy-to-buffer)
@@ -4403,7 +4544,7 @@
           :keymaps 'calc-mode-map
           "C-w" mohkale-window-map
           ;; WARN hard coded leader key
-          mohkale-leader-key (general-simulate-key "C-SPC")))
+          leader-key (general-simulate-key "C-SPC")))
     #+END_SRC
 
 *** calendar
@@ -4467,7 +4608,7 @@
         :config
         (evil-set-initial-state 'change-log-mode 'motion)
 
-        (mohkale/set-leader-keys-for-major-mode 'change-log-mode
+        (leader/set-keys-for-mode! 'change-log-mode
           "SPC" 'change-log-goto-source
           "f" 'change-log-find-file
           "j" 'add-log-edit-next-comment
@@ -4507,7 +4648,7 @@
         the window will not be autokilled.")
 
         (defun mohkale/set-compilation-bindings (mode map)
-          (mohkale/set-leader-keys-for-major-mode mode
+          (leader/set-keys-for-mode! mode
             "RET" 'recompile
             "k" 'kill-compilation
             "f" 'next-error-follow-minor-mode)
@@ -4774,11 +4915,11 @@
         (mohkale--comint-set-bindings 'comint-mode-map)
 
         (defun mohkale--comint-set-leader-keys (mode)
-          (mohkale/declare-prefix-for-major-mode* mode
+          (leader/declare-prefix-for-mode!* mode
             "k" "kill"
             "s" "subjob")
 
-          (mohkale/set-leader-keys-for-major-mode mode
+          (leader/set-keys-for-mode! mode
             "kz" 'comint-send-eof
             "*" 'comint-insert-previous-argument
             "r" 'comint-dynamic-list-input-ring
@@ -5110,7 +5251,7 @@
          :demand t
          :commands goto-home-buffer
          :init
-         (mohkale/set-leader-keys "bh" 'goto-home-buffer)
+         (leader/set-keys "bh" 'goto-home-buffer)
          (push 'dashboard-mode mohkale--whitespace-exempt-modes)
 
          :config
@@ -5240,7 +5381,7 @@
            :states 'emacs
            :keymaps 'dashboard-mode-map
            ;; WARN hardcoded simulated leader key
-           mohkale-leader-key (general-simulate-key "C-SPC"))
+           leader-key (general-simulate-key "C-SPC"))
          :bind* (:map dashboard-mode-map
                  ("g"     . nil)
                  ("DEL"   . nil)
@@ -5292,9 +5433,9 @@
          :defer t
          :commands (diff-mode diff-buffer-with-file)
          :init
-         (mohkale/declare-prefix "=" "diff" "interactive diff sessions")
+         (leader/declare-prefix "=" "diff" "interactive diff sessions")
 
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "= SPC" 'diff-buffer-with-file)
 
          (push 'diff-mode mohkale--whitespace-exempt-modes)
@@ -5302,7 +5443,7 @@
          :config
          (evil-set-initial-state 'diff-mode 'motion)
 
-         (mohkale/set-leader-keys-for-major-mode 'diff-mode
+         (leader/set-keys-for-mode! 'diff-mode
            "r" 'diff-refine-hunk
            "c" 'diff-kill-applied-hunks ;; clean displayed hunks only works on hunks below point.
            "k" 'diff-file-kill
@@ -5374,7 +5515,7 @@
                     ediff-revert-buffers-then-recompute-diffs
                     ediff-profile)
          :init
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "=f" 'ediff-current-file
            "=b" 'ediff-buffers
            "=w" 'ediff-windows)
@@ -5451,7 +5592,7 @@
            (general-define-key
              :keymaps 'ediff-mode-map
              :states  'motion
-             "SPC" mohkale-leader-map))
+             "SPC" leader-map))
 
          (add-hook 'ediff-keymap-setup-hook #'ediff--customize-ediff-mode-map)
 
@@ -5470,7 +5611,7 @@
          ;;   "S-RET" 'ediff-show-meta-buff-from-registry
          ;;   "?" 'ediff-toggle-verbose-help-meta-buffer)
 
-         (mohkale/set-leader-keys-for-major-mode 'ediff-meta-mode
+         (leader/set-keys-for-mode! 'ediff-meta-mode
            "tf" 'ediff-toggle-filename-truncation
            "tv" 'ediff-toggle-verbose-help-meta-buffer)
 
@@ -5498,7 +5639,7 @@
                     vdiff-current-file
                     vdiff-merge-conflict)
          :init
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "= RET" 'vdiff-merge-conflict
            "==" 'vdiff-current-file
            "=f" 'vdiff-files
@@ -5519,12 +5660,12 @@
                        (setq-local display-line-numbers
                                    (if vdiff-mode t 'relative)))))
 
-         (mohkale/declare-prefix-for-mode* 'vdiff-mode
+         (leader/declare-prefix-for-mode* 'vdiff-mode
            "TAB" "refine"
            "t"   "toggle"
            "z"   "folds")
 
-         (mohkale/set-leader-keys-for-minor-mode 'vdiff-mode
+         (leader/set-keys-for-mode 'vdiff-mode
            "=-" 'vdiff-switch-buffer
            "=j" 'vdiff-next-hunk
            "=k" 'vdiff-previous-hunk
@@ -5701,7 +5842,7 @@
            "C-k" 'dired-prev-subdir
            "C-l" 'dired-goto-max-subdir)
 
-         (mohkale/declare-prefix-for-major-mode* 'dired-mode
+         (leader/declare-prefix-for-mode!* 'dired-mode
            "r" "rename"
            "d" '("delete" . "mark for deletion")
            "m" "mark"
@@ -5711,7 +5852,7 @@
            "f/" '("search" . "on regexp matches")
            "fp" '("EasyPG" . "GNU Pretty Good Privacy"))
 
-         (mohkale/set-leader-keys-for-major-mode 'dired-mode
+         (leader/set-keys-for-mode! 'dired-mode
            "?" 'dired-summary ;; like transient state
            "#" 'dired-clean-directory
            "o" 'browse-url-of-dired-file ;; open in external app
@@ -5850,11 +5991,11 @@
             "<mouse-1>" 'image-dired-mouse-select-thumbnail
             "<mouse-2>" 'image-dired-mouse-display-image)
 
-          (mohkale/declare-prefix-for-mode* 'image-dired-thumbnail-mode
+          (leader/declare-prefix-for-mode* 'image-dired-thumbnail-mode
             "mt" '("tagging" . "tag/describe images")
             "me" '("edit"    . "edit images"))
 
-          (mohkale/set-leader-keys-for-major-mode 'image-dired-thumbnail-mode
+          (leader/set-keys-for-mode! 'image-dired-thumbnail-mode
             "g" 'image-dired-jump-original-dired-buffer
             "m" 'image-dired
 
@@ -5897,7 +6038,7 @@
             "<up>"    'image-scroll-down
             "<down>"  'image-scroll-up)
 
-          (mohkale/set-leader-keys-for-major-mode 'image-dired-display-image-mode
+          (leader/set-keys-for-mode! 'image-dired-display-image-mode
             "h" 'image-bol ; far left   edge
             "j" 'image-eob ; far bottom edge
             "k" 'image-bob ; far top    edge
@@ -6019,10 +6160,11 @@
                    edit-indirect-save
                    edit-indirect-abort)
         :config
-        (mohkale/set-leader-keys-for-minor-mode 'edit-indirect--overlay
-          (concat mohkale-major-mode-leader-prefix ",") 'edit-indirect-commit
-          (concat mohkale-major-mode-leader-prefix "s") 'edit-indirect-save
-          (concat mohkale-major-mode-leader-prefix "q") 'edit-indirect-abort))
+        (leader/with-major-mode-prefix
+          (leader/set-keys-for-mode 'edit-indirect--overlay
+            "," 'edit-indirect-commit
+            "s" 'edit-indirect-save
+            "q" 'edit-indirect-abort)))
     #+END_SRC
 
 *** eldoc
@@ -6105,7 +6247,7 @@
         :defer  t
         :init
         (let ((engine-prefix "se"))
-          (mohkale/declare-prefix engine-prefix "engines")
+          (leader/declare-prefix engine-prefix "engines")
 
           (dolist (engine engines)
             (let* ((key               (nth 1 engine))
@@ -6118,14 +6260,14 @@
                    (key (unless (string-empty-p key)
                           (concat engine-prefix key))))
               (when key
-                (mohkale/declare-prefix  key engine)
-                (mohkale/set-leader-keys key function-identifier))
+                (leader/declare-prefix  key engine)
+                (leader/set-keys key function-identifier))
               (autoload function-identifier "engine-mode.el" nil t)))
 
           (dolist (alias prefix-aliases)
             (let* ((prefix (concat engine-prefix (car alias)))
                    (name   (nth 1 alias)))
-              (mohkale/declare-prefix prefix name))))
+              (leader/declare-prefix prefix name))))
         :config
         (dolist (engine engines)
           (let* ((identifier-string (nth 2 engine))
@@ -6152,7 +6294,7 @@
                 ;;; disable company-mode in eshell-mode
                 (eshell-mode . (lambda () (company-mode -1))))
          :init
-         (mohkale/set-leader-keys ":" 'eshell-command)
+         (leader/set-keys ":" 'eshell-command)
 
          :config
          (evil-set-initial-state 'eshell-mode 'emacs)
@@ -6178,11 +6320,11 @@
              (when (>= beginning-word-point bol)
                (call-interactively 'backward-kill-word))))
 
-         (mohkale/declare-prefix-for-major-mode* 'eshell-mode
+         (leader/declare-prefix-for-mode!* 'eshell-mode
            "i" "insert"
            "k" "kill/signal")
 
-         (mohkale/set-leader-keys-for-major-mode 'eshell-mode
+         (leader/set-keys-for-mode! 'eshell-mode
            "o"   'eshell-show-output
            "O"   'eshell-mark-output
            "TAB" 'counsel-esh-history
@@ -6342,7 +6484,7 @@
                    flycheck-select-checker
                    flycheck-verify-setup)
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "e." 'hydra-flycheck/body
           "ec" 'flycheck-clear
           "ee" 'flycheck-explain-error-at-point
@@ -6442,7 +6584,7 @@
           "gg" 'flycheck-error-list-goto-first-error
           "G"  'flycheck-error-list-goto-last-error)
 
-        (mohkale/set-leader-keys-for-major-mode 'flycheck-error-list-mode
+        (leader/set-keys-for-mode! 'flycheck-error-list-mode
           "e" 'flycheck-error-list-explain-error
           "s" 'flycheck-error-list-check-source ;; syntax check buffer
           "f" 'flycheck-error-list-set-filter
@@ -6464,7 +6606,7 @@
         :defer  t
         :commands frog-jump-buffer
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "jb" 'frog-jump-buffer))
     #+END_SRC
 
@@ -6496,8 +6638,8 @@
                    describe-mode
                    describe-function)
         :init
-        (mohkale/declare-prefix "hdm" "describe-mode")
-        (mohkale/set-leader-keys
+        (leader/declare-prefix "hdm" "describe-mode")
+        (leader/set-keys
           "hdm" 'describe-buffer
           "hdf" 'describe-function
           "hdK" 'describe-keymap))
@@ -6511,7 +6653,7 @@
         :defer t
         :commands hide/show-comments-toggle
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "th" 'hide/show-comments-toggle))
     #+END_SRC
 
@@ -6539,7 +6681,7 @@
                    hl-todo-insert
                    hl-todo-insert-keyword)
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "jt" 'hl-todo-next
           "jT" 'hl-todo-previous
           "et" 'hl-todo-occur
@@ -6664,7 +6806,7 @@
            ;;                 (minibuffer-prompt-end))
            "C-h" 'counsel-up-directory)
 
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "bb" 'ivy-switch-buffer
            "SPC" 'counsel-M-x
            "RET" 'ivy-resume)
@@ -6901,11 +7043,11 @@
          (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
          (fset 'describe-bindings (symbol-function 'counsel-descbinds))
 
-         (mohkale/declare-prefix*
+         (leader/declare-prefix*
            "r" "registers/rings/resume"
            "fs" "recursive-find")
 
-         (mohkale/set-leader-keys-for-major-mode 'org-mode
+         (leader/set-keys-for-mode! 'org-mode
            "gg" 'counsel-org-goto
            "gG" 'counsel-org-goto-all)
 
@@ -6914,11 +7056,11 @@
            "^" 'counsel-wmctrl)
 
          (with-eval-after-load 'org
-           (mohkale/set-leader-keys
+           (leader/set-keys
              "oc" 'counsel-org-capture
              "oh" 'counsel-org-agenda-headlines))
 
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "ae" 'counsel-package
            "ic" 'counsel-unicode-char
            "ie" 'counsel-org-entity
@@ -7033,7 +7175,7 @@
                     swiper-isearch-backward
                     swiper-isearch-toggle)
          :init
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "ss" 'swiper)
 
          (defvar swiper-persistent-highlight nil
@@ -7085,7 +7227,7 @@
          :defer  t
          :commands ivy-yasnippet
          :init
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "is" 'ivy-yasnippet)
          (general-define-key
            :states 'insert
@@ -7099,7 +7241,7 @@
          :defer  t
          :commands counsel-pydoc
          :init
-         (mohkale/set-leader-keys-for-major-mode 'python-mode
+         (leader/set-keys-for-mode! 'python-mode
            "hd" 'counsel-pydoc))
      #+END_SRC
 
@@ -7118,7 +7260,7 @@
                     counsel-gtags-update-tags
                     counsel-gtags-dwim)
          :init
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "Tg" 'counsel-gtags-find-definition
            "TG" 'counsel-gtags-find-reference
            "Ts" 'counsel-gtags-find-symbol
@@ -7137,7 +7279,7 @@
          :defer  t
          :commands (counsel-tramp)
          :init
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "f@" 'counsel-tramp))
      #+END_SRC
 
@@ -7160,7 +7302,7 @@
          :init
          (setq counsel-web-search-action #'browse-url)
 
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "se RET"   'counsel-web-search
            "se M-RET" 'counsel-web-suggest
            "se TAB"   'counsel-web-thing-at-point))
@@ -7177,7 +7319,7 @@
                     helm-make-projectile)
          :init
          (setq helm-make-completion-method 'ivy)
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "c SPC" 'helm-make-projectile
            "cm"    'helm-make))
      #+END_SRC
@@ -7207,7 +7349,7 @@
          :defer t
          :commands (ibuffer)
          :init
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "bm" 'ibuffer)
          :config
          (evil-set-initial-state 'ibuffer-mode 'motion)
@@ -7254,12 +7396,12 @@
            "<S-up>" 'ibuffer-pop-filter-group
            "<up>"   'ibuffer-pop-filter)
 
-         (mohkale/declare-prefix-for-major-mode* 'ibuffer-mode
+         (leader/declare-prefix-for-mode!* 'ibuffer-mode
            "G" "jump/goto"
            "m" "mark"
            "/" "filter")
 
-         (mohkale/set-leader-keys-for-major-mode 'ibuffer-mode
+         (leader/set-keys-for-mode! 'ibuffer-mode
            ;; unbound:
            ;;  * ibuffer-do-print
            "1"   'ibuffer-visit-buffer-1-window
@@ -7497,7 +7639,7 @@
              "sP" 'ibuffer-persp-other)
 
            ;; (with-eval-after-load 'persp-mode
-           ;;   (mohkale/set-leader-keys "bm" 'ibuffer-persp))
+           ;;   (leader/set-keys "bm" 'ibuffer-persp))
            ))
      #+END_SRC
 
@@ -7507,7 +7649,7 @@
         :defer t
         :commands imenu
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "ji" 'imenu)
 
         :config
@@ -7516,7 +7658,7 @@
           :defer  t
           :commands imenu-list
           :init
-          (mohkale/set-leader-keys
+          (leader/set-keys
             "Mi" 'imenu-list
             "MI" 'imenu))
 
@@ -7525,7 +7667,7 @@
           :defer  t
           :commands imenu-anywhere
           :init
-          (mohkale/set-leader-keys
+          (leader/set-keys
             "jI" 'imenu-anywhere)))
 
     #+END_SRC
@@ -7548,7 +7690,7 @@
 
         (advice-add 'evil-write :before-until #'evil-write--ein-save-buffer)
 
-        (mohkale/set-leader-keys-for-major-mode 'ein:notebooklist-mode
+        (leader/set-keys-for-mode! 'ein:notebooklist-mode
           "f" 'ein:file-open
           "n" 'ein:notebook-open
           "r" 'ein:notebooklist-reload)
@@ -7566,10 +7708,10 @@
           "gp" 'ein:notebooklist-prev-item)
 
         (dolist (mode '(ein:notebook-mode ein:notebook-multilang-mode))
-          (mohkale/set-leader-keys-for-major-mode mode
+          (leader/set-keys-for-mode! mode
             "." 'hydra-ein/body
             "'" 'ein:edit-cell-contents
-            mohkale-major-mode-leader-key 'ein:worksheet-execute-cell
+            leader-major-mode-key 'ein:worksheet-execute-cell
 
             "c" 'ein:notebook-close
             "f" 'ein:file-open
@@ -7608,7 +7750,7 @@
 
         (general-define-key
           :keymaps 'ein:notebook-mode-map
-          :states  mohkale-norm-states
+          :states  leader-norm-states
           "go" 'ein:worksheet-insert-cell-above
           "gO" 'ein:worksheet-insert-cell-below
           "gJ" 'ein:worksheet-merge-cell
@@ -7632,9 +7774,9 @@
                    Lorem-ipsum-insert-paragraphs
                    Lorem-ipsum-insert-sentences)
         :init
-        (mohkale/declare-prefix "il" "lorem-ipsum")
+        (leader/declare-prefix "il" "lorem-ipsum")
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "ill" 'Lorem-ipsum-insert-list
           "ilp" 'Lorem-ipsum-insert-paragraphs
           "ils" 'Lorem-ipsum-insert-sentences))
@@ -7655,11 +7797,18 @@
                lsp-enable-symbol-highlighting nil
                mohkale-lsp-map (make-sparse-keymap))
 
-         (mohkale/declare-prefix-for-mode* 'lsp-mode
-           (concat mohkale--server-leader-key "w") "workspaces"
-           (concat mohkale--server-leader-key "l") "lens"
-           (concat mohkale--server-leader-key "r") "refactor"
-           (concat mohkale--server-leader-key "g") "goto")
+         (leader/with-prefix mohkale--server-leader-key
+           (leader/declare-prefix-for-mode* 'lsp-mode
+             "w" "workspaces"
+             "l" "lens"
+             "r" "refactor"
+             "g" "goto"))
+
+         (leader/declare-prefix-for-mode* 'lsp-mode
+           mohkale--server-leader-key "server")
+
+         (leader/set-keys-for-mode 'lsp-mode
+           mohkale--server-leader-key mohkale-lsp-map)
 
          (general-define-key
            :keymaps 'mohkale-lsp-map
@@ -7684,13 +7833,7 @@
            "gg" 'lsp-goto-type-definition
            "gG" 'lsp-goto-implementation
            "gF" 'lsp-find-implementation
-           "gf" 'lsp-find-type-definition)
-
-         (mohkale/declare-prefix-for-mode* 'lsp-mode
-           mohkale--server-leader-key "server")
-
-         (mohkale/set-leader-keys-for-minor-mode 'lsp-mode
-           mohkale--server-leader-key mohkale-lsp-map))
+           "gf" 'lsp-find-type-definition))
      #+END_SRC
 
 ***** lsp-ui
@@ -7706,9 +7849,9 @@
             (setq lsp-ui-sideline-enable nil
                   lsp-ui-doc-enable nil)
             :config
-            (mohkale/declare-prefix-for-mode 'lsp-mode
+            (leader/declare-prefix-for-mode 'lsp-mode
               "yp" "peek")
-            (mohkale/set-leader-keys-for-minor-mode 'lsp-mode
+            (leader/set-keys-for-mode 'lsp-mode
               "pg" 'lsp-ui-peek-find-definitions
               "pG" 'lsp-ui-peek-find-definitions)))
       #+END_SRC
@@ -7998,11 +8141,11 @@
       #+END_SRC
 *** macro/kmacro/edmacro
     #+BEGIN_SRC emacs-lisp
-      (mohkale/declare-prefix*
+      (leader/declare-prefix*
         "k"  "macros/lisp"
         "kc" "counter")
 
-      (mohkale/set-leader-keys
+      (leader/set-keys
         "kk" 'eval-last-sexp
         "k(" 'eval-replace-last-sexp
         "k)" 'eval-print-last-sexp
@@ -8029,7 +8172,7 @@
         :defer t
         :commands (edmacro-mode)
         :config
-        (mohkale/set-leader-keys-for-major-mode 'edmacro-mode
+        (leader/set-keys-for-mode! 'edmacro-mode
           "k," 'edmacro-finish-edit
           "ki" 'edmacro-insert-key))
     #+END_SRC
@@ -8095,8 +8238,9 @@
         :config
         (setq miniedit-show-help-p nil) ;; thanks... but no thanks
 
-        (mohkale/set-leader-keys-for-minor-mode 'miniedit-mode
-          (concat mohkale-major-mode-leader-prefix ",") 'exit-recursive-edit))
+        (leader/with-prefix leader-major-mode-prefix
+          (leader/set-keys-for-mode 'miniedit-mode
+            "," 'exit-recursive-edit)))
     #+END_SRC
 
 *** occur
@@ -8110,7 +8254,7 @@
                     #'display-buffer--restore-default-actions)
 
         (dolist (mode '(occur-mode occur-edit-mode))
-          (mohkale/set-leader-keys-for-major-mode mode
+          (leader/set-keys-for-mode! mode
             "e" 'occur-edit-mode
             "R" 'occur-rename-buffer
             "g" 'occur-mode-goto-occurrence
@@ -8162,7 +8306,7 @@
                    goto-junk-file-directory
                    goto-todays-junk-file-directory)
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "fJ" 'open-junk-file)
         :config
         (setq open-junk-file-format (join-path junk-file-directory "%Y/%m/%d-%H%M%S"))
@@ -8236,10 +8380,10 @@
           "~"   'package-menu-mark-obsolete-for-deletion
           "gr"  'package-menu-refresh)
 
-        (mohkale/declare-prefix-for-major-mode* 'package-menu-mode
+        (leader/declare-prefix-for-mode!* 'package-menu-mode
           "m" "mark")
 
-        (mohkale/set-leader-keys-for-major-mode 'package-menu-mode
+        (leader/set-keys-for-mode! 'package-menu-mode
           "h" 'package-menu-hide-package
           "?" 'package-menu-quick-help
           "/" 'package-menu-filter
@@ -8291,12 +8435,12 @@
                    rxt-pcre-to-elisp
                    rxt-pcre-to-rx)
         :init
-        (mohkale/declare-prefix*
+        (leader/declare-prefix*
           "xr" "regular expressions"
           "xre" "elisp"
           "xrp" "pcre")
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "xr'"  'rxt-convert-to-strings
           "xr/"  'rxt-explain
           "xrc"  'rxt-convert-syntax
@@ -8353,13 +8497,13 @@
                    persp-load-from-file-by-names
                    persp-save-and-kill)
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "ba" 'persp-add-current-buffer
           "bA" 'persp-add-buffer
           "br" 'persp-remove-buffer
           "bR" 'persp-remove-current-buffer)
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "fl" 'ivy-find-file-new-perspective)
 
         :config
@@ -8626,13 +8770,14 @@
                    eshell/piper
                    piper-script)
         :init
-        (let ((piper-prefix "| "))
-          (mohkale/declare-prefix (s-trim-right piper-prefix) "piper" "interactive emacs pipeline")
-          (mohkale/set-leader-keys
-            (concat piper-prefix "RET") 'piper-ui
-            (concat piper-prefix "|")   'piper
-            (concat piper-prefix "o")   'piper-other
-            (concat piper-prefix "@")   'piper-remote))
+        (leader/declare-prefix "|" "piper" "interactive emacs pipeline")
+
+        (leader/with-prefix "|"
+          (leader/set-keys
+            "RET" 'piper-ui
+            "|"   'piper
+            "o"   'piper-other
+            "@"   'piper-remote))
         :config
         (defalias 'piper-ui #'piper-user-interface))
     #+END_SRC
@@ -8643,10 +8788,10 @@
         :config
         (evil-set-initial-state 'proced-mode 'motion)
 
-        (mohkale/declare-prefix-for-major-mode* 'proced-mode
+        (leader/declare-prefix-for-mode!* 'proced-mode
           "m" "mark")
 
-        (mohkale/set-leader-keys-for-major-mode 'proced-mode
+        (leader/set-keys-for-mode! 'proced-mode
           "ma" 'proced-mark-all
           "mu" 'proced-unmark-all
           "mp" 'proced-mark-parents
@@ -8743,8 +8888,8 @@
                     projectile-replace
                     projectile-test-project)
          :init
-         (mohkale/declare-prefix "p" "projectile" "project management")
-         (mohkale/set-leader-keys
+         (leader/declare-prefix "p" "projectile" "project management")
+         (leader/set-keys
            "p!" 'projectile-run-shell-command-in-root
            "p%" 'projectile-replace-regexp
            "p&" 'projectile-run-async-shell-command-in-root
@@ -8894,9 +9039,9 @@
                     counsel-projectile-org-capture
                     counsel-projectile-org-agenda)
          :init
-         (mohkale/declare-prefix "ps" "search")
+         (leader/declare-prefix "ps" "search")
 
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "fp"    'counsel-projectile-switch-project
            "pP"    'counsel-projectile-switch-project
            "pf"    'counsel-projectile-find-file
@@ -8923,7 +9068,7 @@
                    rake-compilation-mode
                    rake-regenerate-cache)
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "cr" 'rake
           "cR" 'rake-rerun)
 
@@ -8940,11 +9085,11 @@
          :defer  t
          :commands (restclient)
          :init
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "ar" 'restclient)
          :config
-         (let ((leader mohkale-major-mode-leader-key))
-           (mohkale/set-leader-keys-for-major-mode 'restclient-mode
+         (let ((leader leader-major-mode-key))
+           (leader/set-keys-for-mode! 'restclient-mode
              "RET"   'restclient-http-send-current
              "M-RET" 'restclient-http-send-current-raw
              leader  'restclient-http-send-current-stay-in-window
@@ -8953,7 +9098,7 @@
              "n"     'restclient-narrow-to-current
              "w"     'widen)
 
-           (mohkale/declare-prefix-for-major-mode* 'restclient-mode
+           (leader/declare-prefix-for-mode!* 'restclient-mode
              "RET"   "execute-current"
              "M-RET" "execute-current-raw"
              leader  "execute-current-same-window"
@@ -9086,9 +9231,9 @@
                         message-mode))
           (evil-set-initial-state mode 'motion))
 
-        (mohkale/declare-prefix "i TAB" "indent" "indentation")
+        (leader/declare-prefix "i TAB" "indent" "indentation")
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "i TAB <tab>" 'indent-region
           "i TAB RET"   'split-line
           "i TAB SPC"   'just-one-space
@@ -9131,7 +9276,7 @@
         :defer  t
         :commands sudo-edit
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "fE" 'sudo-edit))
     #+END_SRC
 
@@ -9287,16 +9432,16 @@
                    ggtags-find-file
                    ggtags-query-replace)
         :init
-        (mohkale/declare-prefix "T" "tags")
+        (leader/declare-prefix "T" "tags")
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "TD" 'ggtags-delete-tags
           "T/" 'ggtags-grep)
 
         :config
         ;; NOTE ggtags-global-mode is not a global mode... global is
         ;;      for GNU *global* tagging system
-        (mohkale/set-leader-keys-for-major-mode 'ggtags-global-mode
+        (leader/set-keys-for-mode! 'ggtags-global-mode
           "r" 'recompile
           "f" 'next-error-follow-minor-mode))
     #+END_SRC
@@ -9399,7 +9544,7 @@
         :defer  t
         :commands uuidgen
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "iU" 'uuidgen
           ;; "U" '(:prefix-command mohkale-insert-uuid-map :which-key "uuid")
           ;; "U1" 'uuidgen-1
@@ -9468,8 +9613,8 @@
         :init
         (setq vlc-rc-map (make-sparse-keymap))
 
-        (mohkale/set-leader-keys "v" vlc-rc-map)
-        (mohkale/declare-prefix*
+        (leader/set-keys "v" vlc-rc-map)
+        (leader/declare-prefix*
           "v" '("VLC" . "VideoLanCodec")
           "vs" "set"
           "vt" "toggle")
@@ -9480,7 +9625,7 @@
           "v"  nil
           "vv" 'vlc/dired-add-file
           "vq" 'vlc/dired-enqueue-file)
-        ;; :bind-keymap* (:map mohkale-leader-map
+        ;; :bind-keymap* (:map leader-map
         ;;                ("v" . vlc-rc-map))
         :bind (:map vlc-rc-map
                ("C-." . hydra-vlc-rc/body)))
@@ -9495,7 +9640,7 @@
         ;; :delight " Ⓚ"
         :commands (which-key-M-x+)
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "hk" 'which-key-show-top-level
           "h RET" 'which-key-M-x+)
 
@@ -9650,9 +9795,9 @@
                    xref-quit-and-goto-xref
                    xref-quit)
         :init
-        (mohkale/declare-prefix "ax" "xref")
+        (leader/declare-prefix "ax" "xref")
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "axx" 'xref-find-references
           "axX" 'xref-find-definitions
           "ax/" 'xref-find-apropos
@@ -9672,7 +9817,7 @@
           "M-RET" 'xref-show-location-at-point
           "TAB" 'xref-quit-and-goto-xref)
 
-        (mohkale/set-leader-keys-for-major-mode 'xref--xref-buffer-mode
+        (leader/set-keys-for-mode! 'xref--xref-buffer-mode
           "s" 'xref-query-replace-in-results)
         :bind (;; erase global xref bindings
                ("M-." . nil)   ; xref-find-definitions
@@ -9706,7 +9851,7 @@
                     yas-tryout-snippet)
          :delight (yas-minor-mode "YAS")
          :init
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "iSn" 'yas-new-snippet
            "iSv" 'yas-visit-snippet-file)
          (general-define-key
@@ -9721,7 +9866,7 @@
            "C-l" 'yas-next-field
            "C-h" 'yas-prev-field)
 
-         (mohkale/set-leader-keys-for-major-mode 'snippet-mode
+         (leader/set-keys-for-mode! 'snippet-mode
            "m" 'yas-load-snippet-buffer-and-close
            "l" 'load-snippet-buffer
            "t" 'yas-tryout-snippet)
@@ -9740,8 +9885,8 @@
                     aya-expand
                     aya-persist-snippet)
          :init
-         (mohkale/declare-prefix "iS" "auto-yasnippet")
-         (mohkale/set-leader-keys
+         (leader/declare-prefix "iS" "auto-yasnippet")
+         (leader/set-keys
            "iSc" 'aya-create
            "iSe" 'aya-expand
            "iSw" 'aya-persist-snippet)
@@ -9820,42 +9965,40 @@
                ycmd-server-command `("python3" "-u" ,(expand-file-name "~/.vim/plugged/YouCompleteMe/third_party/ycmd/ycmd"))
                mohkale-ycmd-map (make-sparse-keymap))
 
+         :config
          ;; (ycmd-toggle-force-semantic-completion)
 
-         (general-define-key
-           :keymaps 'mohkale-ycmd-map
-           "y" 'ycmd-mode
-           "Y" 'global-ycmd-mode
-           "n" 'ycmd-open
-           "k" 'ycmd-close
-           "v" 'ycmd-version
-           "b" 'ycmd-parse-buffer
-           "c" 'ycmd-load-conf-file
-           "C" 'ycmd-clear-compilation-flag-cache
-           "s" 'ycmd-show-debug-info
-           "d" 'ycmd-show-documentation
-           "l" 'ycmd-toggle-log-enabled
-           "r" 'ycmd-restart-semantic-server
-           "t" 'ycmd-get-type
-           "." 'ycmd-completer ;; completing-read all ycmd requests
-           "SPC" 'ycmd-toggle-force-semantic-completion
-           "C-r" 'ycmd-refactor-rename
-           "C-c" 'ycmd-display-completions
-           "gg" 'ycmd-goto
-           "gG" 'ycmd-goto-imprecise
-           "gt" 'ycmd-goto-type
-           "gd" 'ycmd-goto-definition
-           "gD" 'ycmd-goto-declaration
-           "gr" 'ycmd-goto-references
-           "gi" 'ycmd-goto-include
-           "gI" 'ycmd-goto-implementation)
+         (leader/with-prefix mohkale--server-leader-key
+           (leader/set-keys-for-mode 'ycmd-mode
+             "y" 'ycmd-mode
+             "Y" 'global-ycmd-mode
+             "n" 'ycmd-open
+             "k" 'ycmd-close
+             "v" 'ycmd-version
+             "b" 'ycmd-parse-buffer
+             "c" 'ycmd-load-conf-file
+             "C" 'ycmd-clear-compilation-flag-cache
+             "s" 'ycmd-show-debug-info
+             "d" 'ycmd-show-documentation
+             "l" 'ycmd-toggle-log-enabled
+             "r" 'ycmd-restart-semantic-server
+             "t" 'ycmd-get-type
+             "." 'ycmd-completer ;; completing-read all ycmd requests
+             "SPC" 'ycmd-toggle-force-semantic-completion
+             "C-r" 'ycmd-refactor-rename
+             "C-c" 'ycmd-display-completions
+             "gg" 'ycmd-goto
+             "gG" 'ycmd-goto-imprecise
+             "gt" 'ycmd-goto-type
+             "gd" 'ycmd-goto-definition
+             "gD" 'ycmd-goto-declaration
+             "gr" 'ycmd-goto-references
+             "gi" 'ycmd-goto-include
+             "gI" 'ycmd-goto-implementation)
 
-         (mohkale/declare-prefix-for-mode* 'ycmd-mode
-           mohkale--server-leader-key              "ycmd"
-           (concat mohkale--server-leader-key "g") "jump")
-
-         (mohkale/set-leader-keys-for-minor-mode 'ycmd-mode
-           mohkale--server-leader-key mohkale-ycmd-map))
+           (leader/declare-prefix-for-mode* 'ycmd-mode
+             ""  "ycmd"
+             "g" "jump")))
      #+END_SRC
 
 *** vc
@@ -9886,9 +10029,9 @@
                    vc-update-change-log)
         :init
         ;;; include vc leader key in defaults leader keys
-        (mohkale/declare-prefix "V" "version control")
+        (leader/declare-prefix "V" "version control")
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           ;; "=v" 'vc-ediff
           "=v" 'vc-diff)
 
@@ -9899,7 +10042,7 @@
         :config
         (require 'vc-git) ;; supported
 
-        (mohkale/set-leader-keys "V" vc-prefix-map)
+        (leader/set-keys "V" vc-prefix-map)
 
         (general-define-key
           :keymaps 'vc-prefix-map
@@ -9933,10 +10076,10 @@
           "D" 'vc-annotate-show-changeset-diff-revision-at-line
           "t" 'vc-annotate-toggle-annotation-visibility)
 
-        (mohkale/declare-prefix-for-major-mode* 'vc-annotate-mode
+        (leader/declare-prefix-for-mode!* 'vc-annotate-mode
           "g" "goto")
 
-        (mohkale/set-leader-keys-for-major-mode 'vc-annotate-mode
+        (leader/set-keys-for-mode! 'vc-annotate-mode
           "m"     'vc-next-action
           "l"     'vc-annotate-show-log-revision-at-line
           "d"     'vc-annotate-show-diff-revision-at-line
@@ -9986,7 +10129,7 @@
           "M-j" 'vc-dir-next-directory
           "M-k" 'vc-dir-previous-directory)
 
-        (mohkale/set-leader-keys-for-major-mode 'vc-dir-mode
+        (leader/set-keys-for-mode! 'vc-dir-mode
           "i" 'vc-log-incoming
           "o" 'vc-log-incoming
           "l" 'vc-print-log
@@ -10041,7 +10184,7 @@
               ;;                 (evil-previous-line 3))
               "C-M-k" #'(lambda () (interactive) (diff-hunk-prev) (evil-previous-line 3)))
 
-            (mohkale/set-leader-keys-for-major-mode mode
+            (leader/set-keys-for-mode! mode
               "p" 'log-view-diff-changeset
               "a" 'log-view-annotate-version
               "m" 'log-view-toggle-mark-entry
@@ -10065,11 +10208,11 @@
 
             ;; (evil-redirect-digit-argument kmap "0" 'log-edit-beginning-of-line)
 
-            (mohkale/declare-prefix-for-mode* mode
+            (leader/declare-prefix-for-mode* mode
               "mi" '("insert" . "insert shortcuts")
               "mt" '("toggle" . "toggle commit status"))
 
-            (mohkale/set-leader-keys-for-major-mode mode
+            (leader/set-keys-for-mode! mode
               "d" 'log-edit-show-diff
               "f" 'log-edit-show-files
               "?" 'log-edit-mode-help
@@ -10108,7 +10251,7 @@
           "M-TAB" 'ztree-perform-soft-action
           "DEL"   'ztree-move-up-in-tree)
 
-        (mohkale/set-leader-keys-for-major-mode 'ztree-mode
+        (leader/set-keys-for-mode! 'ztree-mode
           "TAB" 'ztree-jump-side
           "n"   'ztree-dir-widen-to-parent
           "w"   'ztree-dir-narrow-to-dir
@@ -10127,10 +10270,10 @@
                     elisp-slime-nav-describe-elisp-thing-at-point)
          :hook (elisp-mode . elisp-slime-nav-mode)
          :config
-         (mohkale/declare-prefix-for-major-mode 'emacs-lisp-mode
+         (leader/declare-prefix-for-mode! 'emacs-lisp-mode
            "h"  "describe-symbol-at-point")
 
-         (mohkale/set-leader-keys-for-major-mode 'emacs-lisp-mode
+         (leader/set-keys-for-mode! 'emacs-lisp-mode
            "gp" 'elisp-slime-nav-find-elisp-thing-at-point
            "h" 'elisp-slime-nav-describe-elisp-thing-at-point))
      #+END_SRC
@@ -10144,7 +10287,7 @@
                     lisp-state-toggle-lisp-state
                     lisp-state-eval-sexp-end-of-line)
          :init
-         (mohkale/set-leader-keys-for-major-mode 'emacs-lisp-mode
+         (leader/set-keys-for-mode! 'emacs-lisp-mode
            "el" 'lisp-state-eval-sexp-end-of-line
            "." 'lisp-state-toggle-lisp-state))
      #+END_SRC
@@ -10158,7 +10301,7 @@
                     pp-eval-last-sexp
                     pp-macroexpand-last-sexp)
          :init
-         (mohkale/set-leader-keys-for-major-mode 'emacs-lisp-mode
+         (leader/set-keys-for-mode! 'emacs-lisp-mode
            "em" 'pp-macroexpand-expression
            "eM" 'pp-macroexpand-last-sexp
            "ex" 'pp-eval-expression
@@ -10304,7 +10447,7 @@
          (dolist (mode '(emacs-lisp-mode lisp-interaction-mode))
            (push `(,mode . 2) mohkale-indent-config)
 
-           (mohkale/declare-prefix-for-major-mode* mode
+           (leader/declare-prefix-for-mode!* mode
              "g" '("jump" . "jump to various places in source code")
              "e" "eval"
              "t" "test"
@@ -10314,7 +10457,7 @@
              "gG" "jump-to-definition-other-window"
              "eE" "eval-replace-last-sexp")
 
-           (mohkale/set-leader-keys-for-major-mode mode
+           (leader/set-keys-for-mode! mode
              ;; NOTE cl was bound to auto-compile-display-log
              "'" 'ielm
              "c" 'emacs-lisp-byte-compile
@@ -10383,7 +10526,7 @@
                       anaconda-mode-find-references-other-frame
                       anaconda-mode-find-definitions-other-frame)
            :config
-           (mohkale/set-leader-keys-for-major-mode 'python-mode
+           (leader/set-keys-for-mode! 'python-mode
              "TAB" 'anaconda-mode-complete
              "hh" 'anaconda-mode-show-doc
 
@@ -10407,8 +10550,8 @@
            :commands (pyimport-remove-unused
                       pyimport-insert-missing)
            :init
-           (mohkale/declare-prefix-for-major-mode 'python-mode "i" "imports")
-           (mohkale/set-leader-keys-for-major-mode 'python-mode
+           (leader/declare-prefix-for-mode! 'python-mode "i" "imports")
+           (leader/set-keys-for-mode! 'python-mode
              "ii" 'pytimport-remove-unused
              "iu" 'pyimport-insert-missing)))
      #+END_SRC
@@ -10422,8 +10565,8 @@
              :commands (py-isort-buffer
                         py-isort-region)
              :init
-             (mohkale/declare-prefix-for-major-mode 'python-mode "i" "imports")
-             (mohkale/set-leader-keys-for-major-mode 'python-mode
+             (leader/declare-prefix-for-mode! 'python-mode "i" "imports")
+             (leader/set-keys-for-mode! 'python-mode
                "is" 'py-isort-buffer
                "ir" 'py-isort-region)))
      #+END_SRC
@@ -10444,7 +10587,7 @@
            :ensure t
            :defer  t
            :init
-           (mohkale/set-leader-keys-for-major-mode 'python-mode
+           (leader/set-keys-for-mode! 'python-mode
              "y" 'yapfify-buffer
              "Y" 'yapfify-region)))
      #+END_SRC
@@ -10468,14 +10611,14 @@
          (defun python-shell-calculate-command ()
            "python3 -i")
 
-         (mohkale/declare-prefix-for-major-mode* 'python-mode
+         (leader/declare-prefix-for-mode!* 'python-mode
            "n" '("navigate" . "move-point")
            "e" "eval/exec"
            "h" "help"
            "g" "jump"
 
            "d" "method-signature")
-         (mohkale/set-leader-keys-for-major-mode 'python-mode
+         (leader/set-keys-for-mode! 'python-mode
            "r" 'run-python ;; REPL
            "R" 'python-shell-switch-to-shell
            "m" 'python-mark-defun
@@ -10520,7 +10663,7 @@
       (setq mohkale-ruby-mode      (intern (concat (symbol-name mohkale-ruby-package) "-mode"))
             mohkale-ruby-mode-hook (intern (concat (symbol-name mohkale-ruby-mode)    "-hook")))
 
-      (mohkale/set-leader-keys "Mr" mohkale-ruby-mode)
+      (leader/set-keys "Mr" mohkale-ruby-mode)
     #+END_SRC
 
 **** ruby
@@ -10535,7 +10678,7 @@
                     ruby-toggle-string-quotes
                     ruby-toggle-block)
          :config
-         (mohkale/set-leader-keys-for-major-mode 'ruby-mode
+         (leader/set-keys-for-mode! 'ruby-mode
            "'" 'ruby-toggle-string-quotes
            "{" 'ruby-toggle-block))
      #+END_SRC
@@ -10553,10 +10696,10 @@
          :config
          (setq enh-ruby-deep-indent-paren nil
                enh-ruby-hanging-paren-deep-indent-level 2)
-         (mohkale/declare-prefix-for-major-mode* 'enh-ruby-mode
+         (leader/declare-prefix-for-mode!* 'enh-ruby-mode
            "i" "insert/format"
            "n" "navigate")
-         (mohkale/set-leader-keys-for-major-mode 'enh-ruby-mode
+         (leader/set-keys-for-mode! 'enh-ruby-mode
            "m" 'enh-ruby-mark-defun
            "f" 'enh-ruby-find-file
            "e" 'enh-ruby-find-error
@@ -10622,9 +10765,9 @@
 
            ;; (add-hook mohkale-ruby-mode-hook #'robe-mode)
            :config
-           (mohkale/declare-prefix-for-major-mode mohkale-ruby-mode "g" "jump/goto")
+           (leader/declare-prefix-for-mode! mohkale-ruby-mode "g" "jump/goto")
 
-           (mohkale/set-leader-keys-for-major-mode mohkale-ruby-mode
+           (leader/set-keys-for-mode! mohkale-ruby-mode
              "rs" 'robe-start ;; REPL
              "h" 'robe-doc
 
@@ -10652,8 +10795,8 @@
          (defalias 'ruby-repl 'inf-ruby)
          (push 'inf-ruby-mode mohkale--whitespace-exempt-modes)
 
-         (mohkale/declare-prefix-for-major-mode mohkale-ruby-mode "r" "REPL")
-         (mohkale/set-leader-keys-for-major-mode mohkale-ruby-mode
+         (leader/declare-prefix-for-mode! mohkale-ruby-mode "r" "REPL")
+         (leader/set-keys-for-mode! mohkale-ruby-mode
            "rr" 'inf-ruby
            "rg" 'inf-ruby-console-gem
            "rz" 'inf-ruby-console-zues
@@ -10674,10 +10817,10 @@
            :init
            (add-hook mohkale-ruby-mode-hook #'ruby-tools-mode)
            :config
-           (mohkale/declare-prefix-for-major-mode
+           (leader/declare-prefix-for-mode!
              mohkale-ruby-mode "i" "insert")
 
-           (mohkale/set-leader-keys-for-major-mode mohkale-ruby-mode
+           (leader/set-keys-for-mode! mohkale-ruby-mode
              "i:" 'ruby-tools-to-symbol
              "i{" 'ruby-tools-interpolate
              "i <backspace>" 'ruby-tools-clear-string
@@ -10697,10 +10840,10 @@
                       bundle-update
                       bundle-check)
            :init
-           (mohkale/declare-prefix-for-major-mode*
+           (leader/declare-prefix-for-mode!*
              mohkale-ruby-mode "b" "bundler")
 
-           (mohkale/set-leader-keys-for-major-mode mohkale-ruby-mode
+           (leader/set-keys-for-mode! mohkale-ruby-mode
              "rb" 'bundle-console
              "bf" 'bundle-open
              "bi" 'bundle-install
@@ -10750,7 +10893,7 @@
            :states 'normal
            "<tab>" 'web-mode-fold-or-unfold)
 
-         (mohkale/declare-prefix-for-major-mode* 'web-mode
+         (leader/declare-prefix-for-mode!* 'web-mode
            "m" "mark"
            "d" "delete/kill"
            "D" "DOM"
@@ -10760,7 +10903,7 @@
            "r" "refactor"
            "i" "insert")
 
-         (mohkale/set-leader-keys-for-major-mode 'web-mode
+         (leader/set-keys-for-mode! 'web-mode
            ;; unbound:
            ;;   * web-mode-buffer-highlight
            ;;   * web-mode-element-mute-blanks
@@ -10858,18 +11001,19 @@
                       emmet-preview-mode
                       emmet-preview)
            :config
-           (mohkale/declare-prefix-for-mode 'emmet-mode
-             (concat mohkale-major-mode-leader-prefix "e") "emmet" "emmet mode")
-           (mohkale/set-leader-keys-for-minor-mode 'emmet-mode
-             (concat mohkale-major-mode-leader-prefix ".") 'emmet-expand-line
-             ;; (concat mohkale-major-mode-leader-prefix "'") 'emmet-preview
-             (concat mohkale-major-mode-leader-prefix "ee") 'emmet-expand-line
-             (concat mohkale-major-mode-leader-prefix "ep") 'emmet-preview
-             (concat mohkale-major-mode-leader-prefix "ew") 'emmet-wrap-with-markup
-             (concat mohkale-major-mode-leader-prefix "en") 'emmet-next-edit-point
-             (concat mohkale-major-mode-leader-prefix "eN") 'emmet-prev-edit-point)
+           (leader/with-major-mode-prefix
+             (leader/declare-prefix-for-mode 'emmet-mode
+               "e" "emmet" "emmet mode")
+             (leader/set-keys-for-mode 'emmet-mode
+               "." 'emmet-expand-line
+               ;; "'" 'emmet-preview
+               "ee" 'emmet-expand-line
+               "ep" 'emmet-preview
+               "ew" 'emmet-wrap-with-markup
+               "en" 'emmet-next-edit-point
+               "eN" 'emmet-prev-edit-point))
            :bind* (:map emmet-mode-keymap
-                        ("C-j" . nil))))
+                   ("C-j" . nil))))
      #+END_SRC
 
 **** company-web
@@ -10905,8 +11049,8 @@
                       web-beautify-html
                       web-beautify-css)
            :init
-           (mohkale/declare-prefix-for-major-mode 'web-mode "rb" "beautify")
-           (mohkale/set-leader-keys-for-major-mode 'web-mode
+           (leader/declare-prefix-for-mode! 'web-mode "rb" "beautify")
+           (leader/set-keys-for-mode! 'web-mode
              "rbh" 'web-beautify-htlm
              "rbj" 'web-beautify-js
              "rbc" 'web-beautify-css)))
@@ -10923,13 +11067,13 @@
          :config
          (evil-set-initial-state 'org-agenda-mode 'normal)
 
-         (mohkale/declare-prefix-for-major-mode* 'org-agenda-mode
+         (leader/declare-prefix-for-mode!* 'org-agenda-mode
            "c" '("clock/calendar" . "time management based prefix keys")
            "m" '("modes" . "minor modes to support agenda mode")
            "p" '("priority" . "alter/view an entries priority")
            "/" '("search/filter" . "search / filter org agenda"))
 
-         (mohkale/set-leader-keys-for-major-mode 'org-agenda-mode
+         (leader/set-keys-for-mode! 'org-agenda-mode
            "." 'hydra-org-agenda/body
            "A" 'org-agenda-append-agenda
            "C" 'org-agenda-columns
@@ -11071,8 +11215,8 @@
                     org-outline-smart-up-level)
          :init
          ;;; leader keys outside of org mode
-         (mohkale/declare-prefix "o" "org")
-         (mohkale/set-leader-keys
+         (leader/declare-prefix "o" "org")
+         (leader/set-keys
            "oc" 'org-capture
            "oa" 'org-agenda
            "oy" 'org-copy-subtree
@@ -11319,7 +11463,7 @@
          ;; |_|\___|\__,_|\__,_|\___|_|       |_|\_\___|\__, |___/
          ;;                                             |___/
 
-         (mohkale/declare-prefix-for-major-mode* 'org-mode
+         (leader/declare-prefix-for-mode!* 'org-mode
            "c" "clock/calendar"
            "e" "export"
            "h" "headings"
@@ -11335,7 +11479,7 @@
            "ti" "insert"
            "tt" "toggle")
 
-         (mohkale/set-leader-keys-for-major-mode 'org-mode
+         (leader/set-keys-for-mode! 'org-mode
            "RET" 'org-ctrl-c-ret
            "SPC" 'org-display-outline-path
            "!" 'org-time-stamp-inactive
@@ -11474,10 +11618,22 @@
          :straight (org-capture :type built-in)
          :defer t
          :config
-         (mohkale/set-leader-keys-for-minor-mode 'org-capture-mode
-           (concat mohkale-major-mode-leader-prefix ",") 'org-capture-finalize
-           (concat mohkale-major-mode-leader-prefix "q") 'org-capture-kill
-           (concat mohkale-major-mode-leader-prefix "r") 'org-capture-refile))
+         ;; for some reason, the header for org-capture specifically uses
+         ;; the org-capture-mode-map, meaning my leader key shortcuts won't
+         ;; show up in it :(. Fix that here.
+         (add-hook 'org-capture-mode-hook
+                   (defun org-capture--fix-header (&rest args)
+                     (setq-local
+                      header-line-format
+                      (substitute-command-keys
+                       "Capture buffer. Finish `\\[org-capture-finalize]', \
+       refile `\\[org-capture-refile]', abort `\\[org-capture-kill]'."))))
+
+         (leader/with-major-mode-prefix
+           (leader/set-keys-for-mode 'org-capture-mode
+             "," 'org-capture-finalize
+             "q" 'org-capture-kill
+             "r" 'org-capture-refile)))
      #+END_SRC
 
 **** org-src
@@ -11486,10 +11642,11 @@
          :straight (org-src :type built-in)
          :defer t
          :config
-         (mohkale/set-leader-keys-for-minor-mode 'org-src-mode
-           (concat mohkale-major-mode-leader-prefix ",") 'org-edit-src-exit
-           (concat mohkale-major-mode-leader-prefix "q") 'org-edit-src-abort
-           (concat mohkale-major-mode-leader-prefix "s") 'org-edit-src-save))
+         (leader/with-major-mode-prefix
+           (leader/set-keys-for-mode 'org-src-mode
+             "," 'org-edit-src-exit
+             "q" 'org-edit-src-abort
+             "s" 'org-edit-src-save)))
      #+END_SRC
 
 **** org-projectile
@@ -11510,11 +11667,11 @@
                                           (delq nil (mapcar (lambda (file) (when (file-exists-p file) file))
                                                             (org-projectile-todo-files))))))
 
-         (mohkale/declare-prefix*
+         (leader/declare-prefix*
            "po" "org-projectile-goto-todos"
            "pO" "org-projectile-capture")
 
-         (mohkale/set-leader-keys
+         (leader/set-keys
            "op" 'org-projectile-find-todo-file
            ;; "op" 'org-projectile-goto-location-for-project
            "po" 'org-projectile-goto-location-for-project
@@ -11565,7 +11722,7 @@
                    json-mode-kill-path)
         :hook (json-mode . flycheck-mode)
         :config
-        (mohkale/set-leader-keys-for-major-mode 'json-mode
+        (leader/set-keys-for-mode! 'json-mode
           "b" 'json-mode-beautify
           "/" 'json-mode-kill-path
           "t" 'json-toggle-boolean
@@ -11606,11 +11763,11 @@
          ;; for a guide on how to make quick database access easier. or if you've already got
          ;; an interactive session running, use sql-save-connection to append it to a local
          ;; variable from which you can just paste it in here.
-         (mohkale/declare-prefix-for-mode* 'sql-mode
+         (leader/declare-prefix-for-mode* 'sql-mode
            "e" "eval/exec"
            "l" "list")
 
-         (mohkale/set-leader-keys-for-major-mode 'sql-mode
+         (leader/set-keys-for-mode! 'sql-mode
            "0" 'sql-beginning-of-statement
            "$" 'sql-end-of-statement
            "i" 'sql-show-sqli-buffer
@@ -11622,7 +11779,7 @@
            "ll" 'sql-list-all
            "lt" 'sql-list-table)
 
-         (mohkale/set-leader-keys-for-major-mode 'sql-interactive-mode
+         (leader/set-keys-for-mode! 'sql-interactive-mode
            "t" 'sql-list-table
            "a" 'sql-list-all))
 
@@ -11642,9 +11799,9 @@
                       sqlup-capitalize-keywords-in-buffer
                       sqlup-capitalize-keywords-in-region)
            :config
-           (mohkale/declare-prefix-for-mode 'sql-mode
+           (leader/declare-prefix-for-mode 'sql-mode
              "u" "upcase")
-           (mohkale/set-leader-keys-for-major-mode 'sql-mode
+           (leader/set-keys-for-mode! 'sql-mode
              "ur" 'sqlup-capitalize-keywords-in-region
              "ub" 'sqlup-capitalize-keywords-in-buffer)
 
@@ -11674,7 +11831,7 @@
           :states 'insert
           "<tab>" 'yaml-indent-line)
 
-        (mohkale/set-leader-keys-for-major-mode 'yaml-mode
+        (leader/set-keys-for-mode! 'yaml-mode
           "n" 'yaml-narrow-to-block-literal
           "f" 'yaml-fill-paragraph
           "v" 'yaml-mode-version)
@@ -11696,11 +11853,11 @@
           "<tab>"     'csv-forward-field
           "<backtab>" 'csv-backward-field)
 
-        (mohkale/declare-prefix-for-major-mode* 'csv-mode
+        (leader/declare-prefix-for-mode!* 'csv-mode
           "s" "sort"
           "v" "yank")
 
-        (mohkale/set-leader-keys-for-major-mode 'csv-mode
+        (leader/set-keys-for-mode! 'csv-mode
           "a"  'csv-align-fields
           "d"  'csv-kill-fields
           "i"  'csv-toggle-invisibility
@@ -11738,9 +11895,9 @@
          :hook ((sh-script-mode . electric-pair-mode)
                 (sh-script-mode . flycheck-mode))
          :config
-         (mohkale/declare-prefix-for-major-mode* 'sh-mode
+         (leader/declare-prefix-for-mode!* 'sh-mode
            "<tab>" "indentation")
-         (mohkale/set-leader-keys-for-major-mode 'sh-mode
+         (leader/set-keys-for-mode! 'sh-mode
            ":" 'sh-set-shell
            "0" 'sh-beginning-of-command
            "$" 'sh-end-of-command
@@ -11785,7 +11942,7 @@
         (general-define-key
           :keymaps '(ssh-config-mode-map
                      ssh-known-hosts-mode-map)
-          :states mohkale-norm-states
+          :states leader-norm-states
           "gj" 'ssh-config-host-next
           "gk" 'ssh-config-host-prev))
     #+END_SRC
@@ -11873,7 +12030,7 @@
                                                              (evil-append nil)
                                                            (evil-insert nil))))
 
-         (mohkale/declare-prefix-for-major-mode* 'markdown-mode
+         (leader/declare-prefix-for-mode!* 'markdown-mode
            "c" "check/complete"
            "e" "export"
            "i" "insert"
@@ -11889,7 +12046,7 @@
            "ti" "insert"
            "td" "delete")
 
-         (mohkale/set-leader-keys-for-major-mode 'markdown-mode
+         (leader/set-keys-for-mode! 'markdown-mode
          ;;; unbound commands:
          ;;;  * markdown-outdent-region
          ;;;  * markdown-indent-region
@@ -12060,7 +12217,7 @@
          ;;   '(company-ycmd company-c-headers))
 
          (defun mohkale//set-c-mode-bindings (mode)
-           (mohkale/set-leader-keys-for-major-mode mode
+           (leader/set-keys-for-mode! mode
              "S" 'c-set-style
              "D" 'c-display-defun-name
              "m" 'c-mark-function
@@ -12093,7 +12250,7 @@
            :commands (disaster)
            :init
            (dolist (mode '(c-mode c++-mode))
-             (mohkale/set-leader-keys-for-major-mode mode
+             (leader/set-keys-for-mode! mode
                "D" 'disaster))))
      #+END_SRC
 
@@ -12108,10 +12265,10 @@
          :config
          (setq kotlin-tab-width 4)
 
-         (mohkale/declare-prefix-for-major-mode 'kotlin-mode
+         (leader/declare-prefix-for-mode! 'kotlin-mode
            "e" "eval")
 
-         (mohkale/set-leader-keys-for-major-mode 'kotlin-mode
+         (leader/set-keys-for-mode! 'kotlin-mode
            "r" 'kotlin-repl
            "e-" 'kotlin-send-line
            "e|" 'kotlin-send-block
@@ -12168,10 +12325,7 @@
           :ensure t
           :defer  t
           :delight (meghanada "MEG")
-          :hook ((java-mode . meghanada-mode)
-                  ;; yasnippet offers progressive completion
-                  ;; of function arguments like snippets.
-                  )
+          :hook ((java-mode . meghanada-mode))
           :commands (meghanada-mode
                      meghanada-install-server
                      meghanada-update-server
@@ -12249,24 +12403,23 @@
             "t SPC"   'meghanada-run-junit-test-case
             "t C-SPC" 'meghanada-debug-junit-test-case)
 
-          (let ((prefixes (list (concat mohkale--server-leader-key "c") "compile/run"
-                                (concat mohkale--server-leader-key "t") "test"
-                                (concat mohkale--server-leader-key "S") "server"
-                                (concat mohkale--server-leader-key "i") "insert/refactor")))
-            (apply 'mohkale/declare-prefix-for-mode* 'meghanada-mode prefixes)
-            (apply 'mohkale/declare-prefix-for-major-mode* 'java-mode prefixes))
+          (leader/with-prefix mohkale--server-leader-key
+            (let ((prefixes (list "c" "compile/run"
+                                  "t" "test"
+                                  "S" "server"
+                                  "i" "insert/refactor")))
+              (apply 'leader/declare-prefix-for-mode* '(java-mode meghanada-mode) prefixes))
 
-          (mohkale/declare-prefix-for-major-mode* 'java-mode
-            mohkale--server-leader-key "meghanada")
+            (leader/declare-prefix-for-mode!* '(java-mode meghanada-mode)
+              mohkale--server-leader-key "meghanada")
 
-          (mohkale/set-leader-keys-for-major-mode 'java-mode
-            mohkale--server-leader-key mohkale-meghanada-map)
+            ;; major-mode bindings
+            (leader/set-keys-for-mode! 'java-mode
+              mohkale--server-leader-key mohkale-meghanada-map)
 
-          (mohkale/declare-prefix-for-mode* 'meghanada-mode
-            mohkale--server-leader-key "meghanada")
-
-          (mohkale/set-leader-keys-for-minor-mode 'meghanada-mode
-            mohkale--server-leader-key mohkale-meghanada-map)))
+            ;; global server-key bindings
+            (leader/set-keys-for-mode 'meghanada-mode
+              mohkale--server-leader-key mohkale-meghanada-map))))
 
       (mohkale/load-meghanada)
     #+END_SRC
@@ -12298,14 +12451,14 @@
            ;; properly formets javadocs
            "<return>" 'js2-line-break)
 
-         (mohkale/declare-prefix-for-major-mode* 'js2-mode
+         (leader/declare-prefix-for-mode!* 'js2-mode
            "i" "insert"
            "h" "help"
            "H" "hide/show"
            "Hh" "hide"
            "Hs" "show")
 
-         (mohkale/set-leader-keys-for-major-mode 'js2-mode
+         (leader/set-keys-for-mode! 'js2-mode
            "gg" 'js2-jump-to-definition
 
            ;; toggle hide-show
@@ -12368,7 +12521,7 @@
            ;;   :states 'insert
            ;;   "@" 'js-doc-insert-tag)
 
-           (mohkale/set-leader-keys-for-major-mode 'js2-mode
+           (leader/set-keys-for-mode! 'js2-mode
              "i@" 'js-doc-insert-tag
                                                ; only works from within method
              "i)" 'js-doc-insert-function-doc
@@ -12399,10 +12552,10 @@
            (advice-add 'js2r-extract-method   :after #'js2r-exit-visual-mode-after-func-call)
            (advice-add 'js2r-extract-function :after #'js2r-exit-visual-mode-after-func-call)
 
-           (mohkale/declare-prefix-for-major-mode 'js2-mode
+           (leader/declare-prefix-for-mode! 'js2-mode
              "e" "extract")
 
-           (mohkale/set-leader-keys-for-major-mode 'js2-mode
+           (leader/set-keys-for-mode! 'js2-mode
              "[" 'js2r-expand-node-at-point
              "]" 'js2r-contract-node-at-point
 
@@ -12454,6 +12607,8 @@
          :commands (skewer-mode
                     skewer-css-mode
                     skewer-html-mode)
+         :init
+         (setq skewer-leader-prefix (concat leader-major-mode-prefix "S"))
          :config
          ;; once required, enable skewer in all
          ;; compatible buffers
@@ -12463,41 +12618,40 @@
 
          ;; (run-skewer) ;; and begin server
 
-         (let ((_ (concat mohkale-major-mode-leader-prefix
-                          "S")))
-           (mohkale/set-leader-keys-for-minor-mode 'skewer-mode
-             (concat _ "e") 'skewer-eval-last-expression
-             (concat _ "E") 'skewer-eval-print-last-expression
-             (concat _ "(") 'skewer-eval-defun
-             (concat _ "b") 'skewer-load-buffer
+         (leader/with-prefix skewer-leader-prefix
+           (leader/set-keys-for-mode 'skewer-mode
+             "e" 'skewer-eval-last-expression
+             "E" 'skewer-eval-print-last-expression
+             "(" 'skewer-eval-defun
+             "b" 'skewer-load-buffer
 
-             (concat _ "R") 'skewer-repl
-             (concat _ "L") 'skewer-bower-load
-             (concat _ "B") 'skewer-bower-refresh
-             (concat _ "p") 'skewer-run-phantomjs
-             (concat _ "P") 'skewer-phantomjs-kill)
+             "R" 'skewer-repl
+             "L" 'skewer-bower-load
+             "B" 'skewer-bower-refresh
+             "p" 'skewer-run-phantomjs
+             "P" 'skewer-phantomjs-kill)
 
-           (mohkale/set-leader-keys-for-minor-mode 'skewer-html-mode
-             (concat _ "s") 'skewer-html-fetch-selector-into-buffer
-             (concat _ "e") 'skewer-html-eval-tag
+           (leader/set-keys-for-mode 'skewer-html-mode
+             "s" 'skewer-html-fetch-selector-into-buffer
+             "e" 'skewer-html-eval-tag
 
-             (concat _ "R") 'skewer-repl
-             (concat _ "L") 'skewer-bower-load
-             (concat _ "B") 'skewer-bower-refresh
-             (concat _ "p") 'skewer-run-phantomjs
-             (concat _ "P") 'skewer-phantomjs-kill)
+             "R" 'skewer-repl
+             "L" 'skewer-bower-load
+             "B" 'skewer-bower-refresh
+             "p" 'skewer-run-phantomjs
+             "P" 'skewer-phantomjs-kill)
 
-           (mohkale/set-leader-keys-for-minor-mode 'skewer-css-mode
-             (concat _ "e") 'skewer-css-eval-current-rule
-             (concat _ "b") 'skewer-css-eval-buffer
-             (concat _ "c") 'skewer-css-clear-all
-             (concat _ "d") 'skewer-css-eval-current-declaration
+           (leader/set-keys-for-mode 'skewer-css-mode
+             "e" 'skewer-css-eval-current-rule
+             "b" 'skewer-css-eval-buffer
+             "c" 'skewer-css-clear-all
+             "d" 'skewer-css-eval-current-declaration
 
-             (concat _ "R") 'skewer-repl
-             (concat _ "L") 'skewer-bower-load
-             (concat _ "B") 'skewer-bower-refresh
-             (concat _ "p") 'skewer-run-phantomjs
-             (concat _ "P") 'skewer-phantomjs-kill)))
+             "R" 'skewer-repl
+             "L" 'skewer-bower-load
+             "B" 'skewer-bower-refresh
+             "p" 'skewer-run-phantomjs
+             "P" 'skewer-phantomjs-kill)))
      #+END_SRC
 
 *** css/less
@@ -12506,7 +12660,7 @@
        (use-package css-mode
          :defer t
          :config
-         (mohkale/set-leader-keys-for-major-mode 'css-mode
+         (leader/set-keys-for-mode! 'css-mode
            "?" 'css-lookup-symbol
            "b" 'web-beautify-css)
 
@@ -12520,7 +12674,7 @@
          :defer t
          :commands (less-css-mode)
          :config
-         (mohkale/set-leader-keys-for-minor-mode 'less-css-mode
+         (leader/set-keys-for-mode 'less-css-mode
            "c" 'less-css-compile))
      #+END_SRC
 
@@ -12534,9 +12688,10 @@
          (with-eval-after-load 'skewer-mode
            (add-hook 'less-css-mode-hook 'skewer-less-mode))
 
-         (mohkale/set-leader-keys-for-minor-mode 'skewer-less-mode
-           (concat mohkale-major-mode-leader-prefix "Sb") 'skewer-less-eval-buffer
-           (concat mohkale-major-mode-leader-prefix "Sr") 'skewer-less-eval-region))
+         (leader/with-prefix skewer-leader-prefix
+           (leader/set-keys-for-mode 'skewer-less-mode
+             "b" 'skewer-less-eval-buffer
+             "r" 'skewer-less-eval-region)))
      #+END_SRC
 
 *** haskell
@@ -12606,12 +12761,12 @@
              :keymaps 'haskell-mode-map
              "<tab>" 'haskell-indent-cycle))
 
-         (mohkale/declare-prefix-for-major-mode* 'haskell-mode
+         (leader/declare-prefix-for-mode!* 'haskell-mode
            "r" "refactor"
            "i" "insert"
            "s" "session")
 
-         (mohkale/set-leader-keys-for-major-mode 'haskell-mode
+         (leader/set-keys-for-mode! 'haskell-mode
            "TAB"   'haskell-indent-cycle
            "S-TAB" 'haskell-delete-indentation
 
@@ -12720,12 +12875,12 @@
         (when (eq window-system 'w32)
           (setenv "GIT_ASKPASS" "git-gui--askpass"))
 
-        (mohkale/declare-prefix*
+        (leader/declare-prefix*
           "g" "magit"
           "gd" "diff"
           "gf" "file")
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "gm" 'magit-dispatch
           "g!" 'magit-run
           "gfh" 'magit-log-buffer-file
@@ -12736,30 +12891,30 @@
         :config
         (require 'evil-magit)
 
-        (dolist (map '(magit-mode-map
-                       magit-diff-mode-map))
-          ;; GIVE ME BACK MY LEADER!!!
-          (define-key (eval map) (kbd mohkale-leader-key) nil))
+        ;; GIVE ME BACK MY LEADER!!!
+        (general-define-key
+          :keymaps '(magit-mode-map magit-diff-mode-map)
+          leader-key nil)
 
-        (mohkale/declare-prefix-for-mode* 'git-commit-mode
-          (concat mohkale-major-mode-leader-prefix "i") "insert")
+        (leader/with-major-mode-prefix
+          (leader/declare-prefix-for-mode* 'git-commit-mode
+            "i" "insert")
 
-        (mohkale/set-leader-keys-for-minor-mode 'git-commit-mode
-          (concat mohkale-major-mode-leader-prefix ",")  'with-editor-finish
-          (concat mohkale-major-mode-leader-prefix "q")  'with-editor-cancel
-          (concat mohkale-major-mode-leader-prefix "s")  'git-commit-save-message
-          (concat mohkale-major-mode-leader-prefix "d")  'magit-diff-while-committing
-          (concat mohkale-major-mode-leader-prefix "j")  'git-commit-next-message
-          (concat mohkale-major-mode-leader-prefix "k")  'git-commit-prev-message
-          (concat mohkale-major-mode-leader-prefix "ia") 'git-commit-ack ;; knowledgement
-          (concat mohkale-major-mode-leader-prefix "iS") 'git-commit-suggested
-          (concat mohkale-major-mode-leader-prefix "im") 'git-commit-modified
-          (concat mohkale-major-mode-leader-prefix "ic") 'git-commit-cc
-          (concat mohkale-major-mode-leader-prefix "ir") 'git-commit-reported
-          (concat mohkale-major-mode-leader-prefix "iR") 'git-commit-review
-          (concat mohkale-major-mode-leader-prefix "is") 'git-commit-signoff
-          (concat mohkale-major-mode-leader-prefix "it") 'git-commit-test)
-
+          (leader/set-keys-for-mode 'git-commit-mode
+            ","  'with-editor-finish
+            "q"  'with-editor-cancel
+            "s"  'git-commit-save-message
+            "d"  'magit-diff-while-committing
+            "j"  'git-commit-next-message
+            "k"  'git-commit-prev-message
+            "ia" 'git-commit-ack ;; knowledgement
+            "iS" 'git-commit-suggested
+            "im" 'git-commit-modified
+            "ic" 'git-commit-cc
+            "ir" 'git-commit-reported
+            "iR" 'git-commit-review
+            "is" 'git-commit-signoff
+            "it" 'git-commit-test))
         :bind* (:map magit-mode-map
                 ("M-j" . magit-section-forward-sibling)
                 ("M-k" . magit-section-backward-sibling)
@@ -12810,9 +12965,9 @@
                    git-link-commit
                    git-link-homepage)
         :init
-        (mohkale/declare-prefix "gl" "links")
+        (leader/declare-prefix "gl" "links")
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "gll" 'spacemacs/git-link
           "glL" 'spacemacs/git-link-copy-url-only
           "glc" 'spacemacs/git-link-commit
@@ -13346,13 +13501,13 @@
           :states 'insert
           "<tab>" 'indent-relative)
 
-        (mohkale/declare-prefix*
+        (leader/declare-prefix*
           "C-?" "appropos"
           "am"  "man-woman"
           "at"  "top"
           "r" "registers/rings/resume")
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "SPC" 'helm-M-x
           "C-?" 'helm-apropos
 
@@ -13499,7 +13654,7 @@
           (interactive)
           (with-persp-buffer-list ()
             (helm-mini)))
-        (mohkale/set-leader-keys-for-minor-mode 'persp-mode
+        (leader/set-keys-for-mode 'persp-mode
           "bb" 'persp-helm-mini))
 
 
@@ -13590,10 +13745,10 @@
         :defer  t
         :commands helm-descbinds
         :init
-        ;; (mohkale/declare-prefix*
+        ;; (leader/declare-prefix*
         ;;   "hdB" "describe-bindings-buffer"
         ;;   "hdb" "describe-bindings")
-        (mohkale/set-leader-keys
+        (leader/set-keys
           ;; "hdB" 'describe-bindings
           ;; "hdb" 'helm-descbinds
 
@@ -13609,7 +13764,7 @@
         :commands (helm-make
                    helm-make-projectile)
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "cc" 'helm-make-projectile
           "cm" 'helm-make))
     #+END_SRC
@@ -13642,10 +13797,10 @@
                    helm-projectile-ag
                    helm-projectile-rg)
         :init
-        (mohkale/declare-prefix*
+        (leader/declare-prefix*
           "ps" '("search" . "project-search"))
 
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "pb" 'helm-projectile-switch-to-buffer
           "pd" 'helm-projectile-find-dir
           "pf" 'helm-projectile-find-file
@@ -13669,7 +13824,7 @@
         :defer  t
         :commands helm-yas-complete
         :init
-        (mohkale/set-leader-keys
+        (leader/set-keys
           "is" 'helm-yas-complete)
         (general-define-key
           :states 'insert
@@ -13684,7 +13839,7 @@
         :commands helm-pydoc
         :init
         (with-eval-after-load 'helm
-          (mohkale/set-leader-keys-for-major-mode 'python-mode
+          (leader/set-keys-for-mode! 'python-mode
             "hd" 'helm-pydoc)))
     #+END_SRC
 
