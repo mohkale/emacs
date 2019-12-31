@@ -1004,8 +1004,8 @@
      (let* ((multi-mode-batch-call
              (lambda (func mode &rest args)
                (if (listp mode)
-                   (mapcar (lambda (m) (apply func m args))
-                           mode)
+                   (dolist (m mode)
+                     (apply func m args))
                  (apply func mode args))))
             (mode-funcs '(leader/set-keys-for-mode
                           leader/set-keys-for-mode!
@@ -1339,7 +1339,7 @@
        "M-&"             'async-shell-command-on-region
        "C-M-&"           'async-shell-command-on-buffer
 
-       ;; "C-SPC"           'nil ;; emacs like binding
+       ;; "C-SPC"           nil ;; emacs like binding
        "C-@" (general-simulate-key "C-SPC") ;; C-SPC in terminal
 
        "M-l"             'recenter-top-bottom
@@ -1358,7 +1358,7 @@
        "M-j"             'custom-insert-line-below
        "M-k"             'custom-insert-line-above
        "M-r"             'revert-buffer
-       "C-k"             'nil
+       "C-k"             nil
        "C-q"             'quit-window
        "C-j"             'newline-and-indent
        "C-<tab>"         'next-buffer
@@ -1371,6 +1371,7 @@
      (general-define-key
        :states leader-norm-states
        "gr"    'revert-buffer
+       "gR"    'read-only-mode
        "gz"    'recenter-top-bottom)
 
      (general-define-key
@@ -1687,7 +1688,7 @@
                   regexps (cdr regexps)))
           (not (not match-found))))
 
-      (defun mohkale--set-trailing-whitespace--mode-based (&optional dont-set)
+      (defun mohkale//set-trailing-whitespace--mode-based (&optional dont-set)
         "check the mode of the current buffer, to see whether trailing
       whitespace should be shown. with the optional parameter `dont-set'
       trailing whitespace will not be set.
@@ -1702,9 +1703,9 @@
             (unless dont-set
               (setq show-trailing-whitespace show)))))
 
-      (defun mohkale--set-trailing-whitespace--name-based (&optional dont-set)
+      (defun mohkale//set-trailing-whitespace--name-based (&optional dont-set)
         "check the name of the current buffer, to see whether trailing
-      whitespace should be shown. see `mohkale--set-trailing-whitespace--mode-based'."
+      whitespace should be shown. see `mohkale//set-trailing-whitespace--mode-based'."
         (let ((show (not (and mohkale--whitespace-exempt-buffers
                               (apply 'chain-match-regexp
                                      (buffer-name)
@@ -1714,16 +1715,16 @@
             (unless dont-set
               (setq show-trailing-whitespace show)))))
 
-      ;; (defun mohkale/set-trailing-whitespace (&rest args)
-      ;;   (setq show-trailing-whitespace
-      ;;         (and (mohkale--set-trailing-whitespace--mode-based t)
-      ;;              (mohkale//set-trailing-whitespace--name-based t))))
+      (defun mohkale/set-trailing-whitespace (&rest args)
+        (setq show-trailing-whitespace
+              (and (mohkale//set-trailing-whitespace--mode-based t)
+                   (mohkale//set-trailing-whitespace--name-based t))))
 
       ;; add switch-to-buffer hook because some functions, such as ibuffers confirmation
       ;; popup use switch-to-buffer instead of display buffer and there's no easy way
       ;; to modify it.
-      (add-hook 'switch-to-buffer-hook        (lambda (&rest args) (mohkale--set-trailing-whitespace--name-based)))
-      (add-hook 'after-change-major-mode-hook (lambda (&rest args) (mohkale--set-trailing-whitespace--mode-based)))
+      (add-hook 'switch-to-buffer-hook #'mohkale/set-trailing-whitespace)
+      (add-hook 'after-change-major-mode-hook (lambda (&rest args) (mohkale//set-trailing-whitespace--mode-based)))
 
       ;; indent configuration
       (defvar mohkale-indent-config '((t . 4))
@@ -1773,7 +1774,7 @@
                       (cdr _)))))
 
           (if (not indent)
-              (message "mohkale::warn() unable to determine indent for current buffer.")
+              (message "set-indent-offset::warn() unable to determine indent for current buffer.")
             (setq evil-shift-width indent)
             (setq-local tab-width indent)
 
@@ -1801,6 +1802,43 @@
               (setq-local web-mode-code-indent-offset indent))))))
 
       (add-hook 'after-change-major-mode-hook #'set-indent-offset)
+
+      ;; auto clear echo area after given delay... when the echo area just
+      ;; remains static for a while, I can't tell whether emacs is still
+      ;; working or is active and just waiting for input. This should make
+      ;; it clearer after a little while.
+      (defun clear-echo-area ()
+        (message nil))
+
+      (defvar auto-clear-echo-area-interval 5
+        "clear the echo area after this many seconds have elapsed.
+      set to nil to not disable echo area auto clear.")
+
+      (defvar auto-clear-echo-area--timer nil)
+
+      (advice-add 'message :after
+                  (defun auto-clear-echo-area (string &rest args)
+                    (when (and string
+                               auto-clear-echo-area-interval)
+                      (when auto-clear-echo-area--timer
+                        (cancel-timer auto-clear-echo-area--timer))
+
+                      (setq auto-clear-echo-area--timer
+                            (run-with-idle-timer
+                             auto-clear-echo-area-interval
+                             nil
+                             #'clear-echo-area)))))
+
+      ;; eldoc should't be removed after idle delay... it's designed to be looked at.
+      (advice-add 'eldoc-message :around
+                  (defun eldoc-message--disable-auto-clear-echo-area (func &rest args)
+                    (when auto-clear-echo-area--timer
+                      ;; cancel any existing timers beforehand.
+                      (cancel-timer auto-clear-echo-area--timer)
+                      (setq auto-clear-echo-area--timer nil))
+
+                    (let (auto-clear-echo-area-interval) ;; disable interval
+                      (apply func args))))
     #+END_SRC
 
 *** Yank Indent Adjust
@@ -2207,12 +2245,14 @@
                    copy-whole-buffer-to-clipboard
                    split-window-right-and-focus
                    split-window-below-and-focus)
-        :bind (:map mohkale-window-map
-               ("T" . force-set-all-visible-windows-dedication)
-               ("o"   . display-last-buffer)
-               ("C-o" . display-last-buffer)
-               ("O"   . vertical-display-last-buffer)
-               ("M-o" . vertical-display-last-buffer)))
+        :init
+        (general-define-key
+          :keymaps 'mohkale-window-map
+          "T" 'force-set-all-visible-windows-dedication
+          "o"   'display-last-buffer
+          "C-o" 'display-last-buffer
+          "O"   'vertical-display-last-buffer
+          "M-o" 'vertical-display-last-buffer))
     #+END_SRC
 
     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
@@ -3605,6 +3645,7 @@
         :init
         (setq spaceline-buffer-id-max-length 25
               spaceline-org-clock            t
+              winum-auto-setup-mode-line     nil
               powerline-default-separator    'slant)
 
         (when (display-graphic-p)
@@ -3954,12 +3995,13 @@
                          (?t . evil-surround-read-tag)
                          (?< . evil-surround-read-tag)
                          (?f . evil-surround-function)))
+
          ;; only allow surrounding via selections or
          ;; explicitly using gS
-         :bind (:map evil-visual-state-map
-                ("s" . evil-surround-region)
-                :map evil-surround-mode-map
-                ("S" . nil)))
+         (general-define-key
+           :states 'visual
+           "s" 'evil-surround-region)
+         :bind (:map evil-surround-mode-map ("S" . nil)))
      #+END_SRC
 
 **** evil-anzu
@@ -4069,8 +4111,8 @@
 
          (general-define-key
            :states 'insert
-           "<tab>"   'indent-relative
-           "<S-tab>"         'tab-to-tab-stop-with-prefix
+           "TAB"             'indent-relative
+           "S-TAB"           'tab-to-tab-stop-with-prefix
            "<S-iso-lefttab>" 'tab-to-tab-stop-with-prefix
            ;; "<S-backspace>" 'back-to-tab-stop
            "<S-backspace>" 'evil-delete-char
@@ -4101,7 +4143,9 @@
            :states leader-norm-states
            ;; keep hitting C-SPC by accident
            "C-SPC" (general-simulate-key "SPC")
-           "g=" 'count-words)
+           "g=" 'count-words
+           "g;" 'evil-repeat-find-char-reverse)
+
 
          (leader/declare-prefix "sc" "search-noh")
 
@@ -4111,63 +4155,66 @@
            "xu" 'evil-upcase
            "xd" 'evil-downcase)
 
-         :bind (:map mohkale-window-map
-                ("+" . evil-window-increase-height)
-                ("-" . evil-window-decrease-height)
-                ("<" . evil-window-decrease-width)
-                (">" . evil-window-increase-width)
-                ("=" . balance-windows)
-                ("-" . evil-window-set-width)
-                ("|" . evil-window-set-height)
-                ("n" . evil-window-next)
-                ("p" . evil-window-previous)
+         (general-define-key
+           :keymaps 'mohkale-window-map
+           "+" 'evil-window-increase-height
+           "-" 'evil-window-decrease-height
+           "<" 'evil-window-decrease-width
+           ">" 'evil-window-increase-width
+           "=" 'balance-windows
+           "-" 'evil-window-set-width
+           "|" 'evil-window-set-height
+           "n" 'evil-window-next
+           "p" 'evil-window-previous
 
-                ("C-1" . evil-window-top-left)
-                ("C-0" . evil-window-bottom-right)
+           "C-1" 'evil-window-top-left
+           "C-0" 'evil-window-bottom-right
 
-                ;; ("u" . evil-window-rotate-upwards)
-                ;; ("i" . evil-window-rotate-downwards)
-                ("C-q" . evil-window-mru) ;; last buffer, new window
+           ;; ("u" . evil-window-rotate-upwards)
+           ;; ("i" . evil-window-rotate-downwards)
+           "C-q" 'evil-window-mru ;; last buffer, new window
 
-                ;; TODO maximise buffer
-                ("C-M-h" . evil-window-move-far-left)
-                ("C-M-j" . evil-window-move-far-down)
-                ("C-M-k" . evil-window-move-far-up)
-                ("C-M-l" . evil-window-move-far-right)
+           ;; TODO maximise buffer
+           "C-M-h" 'evil-window-move-far-left
+           "C-M-j" 'evil-window-move-far-down
+           "C-M-k" 'evil-window-move-far-up
+           "C-M-l" 'evil-window-move-far-right
 
-                ;; NOTE bindings with control variants
-                ("s"   . evil-window-split)
-                ("M-s" . evil-window-split)
-                ("v"   . evil-window-vsplit)
-                ("M-v" . evil-window-vsplit)
-                ("S"   . split-window-below-and-focus)
-                ("C-s" . split-window-below-and-focus)
-                ("V"   . split-window-right-and-focus)
-                ("C-v" . split-window-right-and-focus)
-                ("d"   . evil-window-delete)
-                ("C-d" . evil-window-delete)
-                ("h"   . evil-window-left)
-                ;; ("C-h" . evil-window-left)
-                ("j"   . evil-window-down)
-                ;; ("C-j" . evil-window-down)
-                ("k"   . evil-window-up)
-                ;; ("C-k" . evil-window-up)
-                ("l"   . evil-window-right)
-                ;; ("C-l" . evil-window-right)
-                ("c"   . evil-window-create)
-                ("C-c" . evil-window-create)
+           ;; NOTE bindings with control variants
+           "s"   'evil-window-split
+           "M-s" 'evil-window-split
+           "v"   'evil-window-vsplit
+           "M-v" 'evil-window-vsplit
+           "S"   'split-window-below-and-focus
+           "C-s" 'split-window-below-and-focus
+           "V"   'split-window-right-and-focus
+           "C-v" 'split-window-right-and-focus
+           "d"   'evil-window-delete
+           "C-d" 'evil-window-delete
+           "h"   'evil-window-left
+           ;; "C-h" 'evil-window-left
+           "j"   'evil-window-down
+           ;; "C-j" 'evil-window-down
+           "k"   'evil-window-up
+           ;; "C-k" 'evil-window-up
+           "l"   'evil-window-right
+           ;; "C-l" 'evil-window-right
+           "c"   'evil-window-create
+           "C-c" 'evil-window-create)
 
-                :map evil-motion-state-map
-                ("C-w" . nil)
-                ("-"   . negative-argument)
-                ("C-;" . evil-repeat-find-char)
-                ("M-;" . evil-repeat-find-char-reverse)
+         (general-define-key
+           :states 'motion
+           "C-w" nil
+           "-"   'negative-argument
+           "C-;" 'evil-repeat-find-char
+           "M-;" 'evil-repeat-find-char-reverse)
 
-                :map evil-ex-completion-map
-                ("C-a" . move-beginning-of-line)
-                ("C-e" . move-end-of-line)
-                ("C-q" . quoted-insert)
-                ("C-M-q" . quit-window)))
+         (general-define-key
+           :keymaps 'evil-ex-completion-map
+           "C-a" 'move-beginning-of-line
+           "C-e" 'move-end-of-line
+           "C-q" 'quoted-insert
+           "C-M-q" 'quit-window))
      #+END_SRC
 
 **** evil-args
@@ -4445,38 +4492,40 @@
           "/" 'Buffer-menu-isearch-buffers-regexp
           "o" 'Buffer-menu-multi-occur
           "T" 'Buffer-menu-visit-tags-table)
-        :bind (:map Buffer-menu-mode-map
-               ("0"         . nil)
-               ("1"         . nil)
-               ("2"         . nil)
-               ("<"         . nil)
-               (">"         . nil)
-               ("?"         . nil)
-               ("C-d"       . nil)
-               ("C-k"       . nil)
-               ("S-SPC"     . nil)
-               ("SPC"       . nil)
-               ("<backtab>" . nil)
-               ("TAB"       . nil)
-               ("T"         . nil)
-               ("b"         . nil)
-               ("e"         . nil)
-               ("f"         . nil)
-               ("g"         . nil)
-               ("h"         . nil)
-               ("n"         . nil)
-               ("p"         . nil)
-               ("t"         . nil)
-               ("v"         . nil)
 
-               ("C-SPC" . Buffer-menu-mark)
-               ("S-DEL" . Buffer-menu-bury)
-               ("r"   . Buffer-menu-toggle-read-only)
-               ("C-j" . Buffer-menu-this-window)
-               ("gr"  . revert-buffer)
-               ("gf" . Buffer-menu-toggle-files-only)
-               ("C-l" . tabulated-list-next-column)
-               ("C-M-<return>" . Buffer-menu-select)))
+        (general-define-key
+          :keymaps 'Buffer-menu-mode-map
+          "0"         nil
+          "1"         nil
+          "2"         nil
+          "<"         nil
+          ">"         nil
+          "?"         nil
+          "C-d"       nil
+          "C-k"       nil
+          "S-SPC"     nil
+          "SPC"       nil
+          "<backtab>" nil
+          "TAB"       nil
+          "T"         nil
+          "b"         nil
+          "e"         nil
+          "f"         nil
+          "g"         nil
+          "h"         nil
+          "n"         nil
+          "p"         nil
+          "t"         nil
+          "v"         nil
+
+          "C-SPC" 'Buffer-menu-mark
+          "S-DEL" 'Buffer-menu-bury
+          "r"   'Buffer-menu-toggle-read-only
+          "C-j" 'Buffer-menu-this-window
+          "gr"  'revert-buffer
+          "gf" 'Buffer-menu-toggle-files-only
+          "C-l" 'tabulated-list-next-column
+          "C-M-<return>" 'Buffer-menu-select))
     #+END_SRC
 
 *** buffer-move
@@ -4489,6 +4538,18 @@
                    buf-move-left
                    buf-move-right
                    rotate-windows)
+        :init
+        (general-define-key
+          :keymaps 'mohkale-window-map
+          "H"   'buf-move-left
+          "M-h" 'buf-move-left
+          "J"   'buf-move-down
+          "M-j" 'buf-move-down
+          "K"   'buf-move-up
+          "M-k" 'buf-move-up
+          "L"   'buf-move-right
+          "M-l" 'buf-move-right)
+
         :config
         ;; https://www.emacswiki.org/emacs/TransposeWindows
         (defun rotate-windows (arg)
@@ -4510,19 +4571,7 @@
                          (p1 (window-point w1))
                          (p2 (window-point w2)))
                     (set-window-buffer-start-and-point w1 b2 s2 p2)
-                    (set-window-buffer-start-and-point w2 b1 s1 p1)))))))
-        :bind (:map mohkale-window-map
-               ("H"   . 'buf-move-left)
-               ("M-h" . 'buf-move-left)
-
-               ("J"   . 'buf-move-down)
-               ("M-j" . 'buf-move-down)
-
-               ("K"   . 'buf-move-up)
-               ("M-k" . 'buf-move-up)
-
-               ("L"   . 'buf-move-right)
-               ("M-l" . 'buf-move-right)))
+                    (set-window-buffer-start-and-point w2 b1 s1 p1))))))))
     #+END_SRC
 
 
@@ -5074,25 +5123,29 @@
         (add-hook 'company-completion-finished-hook 'mohkale/unset-company-bindings)
         (add-hook 'company-completion-cancelled-hook 'mohkale/unset-company-bindings)
 
-        :bind* (:map company-search-map
-                ("C-1"       . company-complete-number)
-                ("C-2"       . company-complete-number)
-                ("C-3"       . company-complete-number)
-                ("C-4"       . company-complete-number)
-                ("C-5"       . company-complete-number)
-                ("C-6"       . company-complete-number)
-                ("C-7"       . company-complete-number)
-                ("C-8"       . company-complete-number)
-                ("C-9"       . company-complete-number)
-                ;; ("C-j"       . company-select-next)
-                ;; ("C-k"       . company-select-previous)
-                ;; ("<tab>"     . company-complete-selection)
-                ("C-v"       . company-search-toggle-filtering) ; show filtered/all
-                ("ESC"       . company-search-abort)
-                ("<escape>"  . company-search-abort)
-                :map company-active-map
-                ("C-w" . nil) ;; was company-show-location
-                ))
+        (general-define-key
+          :keymaps 'company-search-map
+          "C-1"    'company-complete-number
+          "C-2"    'company-complete-number
+          "C-3"    'company-complete-number
+          "C-4"    'company-complete-number
+          "C-5"    'company-complete-number
+          "C-6"    'company-complete-number
+          "C-7"    'company-complete-number
+          "C-8"    'company-complete-number
+          "C-9"    'company-complete-number
+          ;; "C-j"       'company-select-next
+          ;; "C-k"       'company-select-previous
+          ;; "TAB"       'company-complete-selection
+          "C-v"    'company-search-toggle-filtering ; show filtered/all
+          "ESC"    'company-search-abort
+          "ESC"    'company-search-abort)
+
+        (general-define-key
+          :keymaps 'company-active-map
+          "C-w" nil ;; was company-show-location)
+          )
+      )
     #+END_SRC
 
 *** company-quickhelp
@@ -5103,11 +5156,61 @@
         :commands (company-quickhelp-mode
                    company-quickhelp-manual-begin)
         :hook (company-mode . company-quickhelp-mode)
+        :init
+        (setq company-quickhelp-delay nil)
+
         :config
         (company-quickhelp-mode)
-        (setq company-quickhelp-delay nil)
-        :bind* (:map company-active-map
-                ("C-h"   . company-quickhelp-manual-begin)))
+
+        (general-define-key
+          :keymaps 'company-active-map
+          "C-h" 'company-quickhelp-manual-begin))
+    #+END_SRC
+
+*** custom
+    #+BEGIN_SRC emacs-lisp
+      (use-package custom
+        :defer t
+        :init
+        (push 'Custom-mode mohkale--whitespace-exempt-modes)
+        (push 'customize-mode mohkale--whitespace-exempt-modes)
+
+        :config
+        (evil-set-initial-state 'Custom-mode 'normal)
+
+        (leader/set-keys-for-mode! 'Custom-mode
+          "SPC" 'customize-apropos
+          "g" 'customize-group
+          "f" 'customize-face
+          "h" 'Custom-goto-parent
+          "j" 'widget-forward
+          "k" 'widget-backward
+          "l" 'widget-forward)
+
+        (general-define-key
+          :states  'normal
+          :keymaps 'Custom-mode-map
+
+          ;; motion
+          "TAB"       'widget-forward
+          "S-TAB"     'widget-backward
+          "<backtab>" 'widget-backward
+
+          "RET" 'Custom-newline
+
+          "]]" 'widget-forward
+          "[[" 'widget-backward
+
+          "C-h" 'Custom-goto-parent
+          "C-j" 'widget-forward
+          "C-k" 'widget-backward
+          "C-l" 'widget-forward
+
+          "gj" 'widget-forward
+          "gk" 'widget-backward
+
+          ;; quit
+          "q" 'Custom-buffer-done))
     #+END_SRC
 
 *** dashboard
@@ -5257,7 +5360,7 @@
          :config
          (require 'all-the-icons)
 
-         (evil-set-initial-state 'dashboard-mode 'emacs)
+         (evil-set-initial-state 'dashboard-mode 'motion)
 
          (defun mohkale/get-loaded-packages ()
            "return the number of packages loaded so far"
@@ -5377,34 +5480,45 @@
 
          (advice-add 'dashboard-choose-banner :before-until #'dashboard-choose-banner--allow-custom-banners)
 
-         (general-define-key
-           :states 'emacs
-           :keymaps 'dashboard-mode-map
-           ;; WARN hardcoded simulated leader key
-           leader-key (general-simulate-key "C-SPC"))
-         :bind* (:map dashboard-mode-map
-                 ("g"     . nil)
-                 ("DEL"   . nil)
-                 ("S-SPC" . nil)
+         (defmacro dashboard-defun-shortcut-function (shortcut-char search-label &optional no-next-line)
+           "translation of `dashboard-insert-shortcut' but less bizarre.
+       see dashboard-widgets.el for details."
+           (let* ((func-name (intern (concat "dashboard-" shortcut-char "-shortcut"))))
+             `(defun ,func-name ()
+                (interactive)
+                (unless (search-forward ,search-label (point-max) t)
+                  (search-backward ,search-label (point-min) t))
+                ,@(unless no-next-line
+                    '((forward-line 1)))
+                (back-to-indentation))))
 
-                 ("0"     . evil-digit-argument-or-evil-beginning-of-line)
-                 (":"     . evil-ex)
-                 ("h"     . backward-char)
-                 ("l"     . forward-char)
-                 ("gj"    . dashboard-next-section)
-                 ("gk"    . dashboard-previous-section)
-                 ("gg"    . beginning-of-buffer)
-                 ("G"     . end-of-buffer)
-                 ("/"     . evil-ex-forward-search)
-                 ("n"     . 'evil-ex-search-next)
-                 ("N"     . 'evil-ex-search-previous)
-                 ("M-r"   . dashboard-refresh-buffer)
-                 ("C-d"   . scroll-down-command)
-                 ("C-u"   . scroll-up-command)
-                 ("C-e"   . scroll-down-line)
-                 ("C-y"   . scroll-up-line)
-                 ("TAB"   . widget-forward)
-                 ("S-TAB" . widget-backward)))
+         (general-define-key
+           :keymaps 'dashboard-mode-map
+           :states  'motion
+           "j"     'dashboard-next-line
+           "k"     'dashboard-previous-line
+           "}"     'dashboard-next-section
+           "{"     'dashboard-previous-section
+           "gj"    'dashboard-next-section
+           "gk"    'dashboard-previous-section
+           "gg"    'beginning-of-buffer
+           "gr"    'dashboard-refresh-buffer
+           "M-r"   'dashboard-refresh-buffer
+           "C-d"   'scroll-down-command
+           "C-u"   'scroll-up-command
+           "C-e"   'scroll-down-line
+           "C-y"   'scroll-up-line
+           "RET"   'dashboard-return
+           "TAB"   'widget-forward
+           "S-TAB" 'widget-backward
+
+           "r" (dashboard-defun-shortcut-function "r" "Recent Files:")
+           ;; "m" (dashboard-defun-shortcut-function "m" "Bookmarks:")
+           "p" (dashboard-defun-shortcut-function "p" "Projects:")
+           ;; "e" (dashboard-defun-shortcut-function "e" "Registers:")
+           "a" (dashboard-defun-shortcut-function "a" (if (bound-and-true-p show-week-agenda-p)
+                                                          "Agenda for the coming week:"
+                                                        "Agenda for today:"))))
      #+END_SRC
 
 *** debugger
@@ -6733,29 +6847,36 @@
 **** ivy
      #+BEGIN_SRC emacs-lisp
        (use-package ivy
-         :ensure t
-         :defer nil
-         :config
-         (ivy-mode +1)
+         :demand t
+         :init
          (setq ivy-height 15
                counsel-evil-registers-height 15
                ivy-use-virtual-buffers t
                projectile-completion-system 'ivy
-               mohkale--ivy-initial-inputs-alist '((counsel-minor . "^+")
-                                                   ;; (counsel-package . "^+")
-                                                   ;; (org-refile . "^")
-                                                   (org-agenda-refile . "^")
-                                                   (org-capture-refile . "^")
-                                                   ;; (counsel-M-x . "^")
-                                                   ;; (counsel-describe-function . "^")
-                                                   ;; (counsel-describe-variable . "^")
-                                                   ;; (counsel-org-capture . "^")
-                                                   ;; (org-refile . "^")
-                                                   ;; (org-agenda-refile . "^")
-                                                   ;; (org-capture-refile . "^")
-                                                   (Man-completion-table . "^")
-                                                   (woman . "^"))
-               ivy-initial-inputs-alist mohkale--ivy-initial-inputs-alist)
+               ivy-magic-tilde nil
+               ivy-initial-inputs-alist '((counsel-minor . "^+")
+                                          ;; (counsel-package . "^+")
+                                          ;; (org-refile . "^")
+                                          (org-agenda-refile . "^")
+                                          (org-capture-refile . "^")
+                                          ;; (counsel-M-x . "^")
+                                          ;; (counsel-describe-function . "^")
+                                          ;; (counsel-describe-variable . "^")
+                                          ;; (counsel-org-capture . "^")
+                                          ;; (org-refile . "^")
+                                          ;; (org-agenda-refile . "^")
+                                          ;; (org-capture-refile . "^")
+                                          (Man-completion-table . "^")
+                                          (woman . "^")))
+
+         (setq ivy-preferred-re-builders
+               '((ivy--regex-plus         . "ivy")
+                 (ivy--regex-ignore-order . "order")
+                 (ivy--regex-fuzzy        . "fuzzy")
+                 (regexp-quote            . "literal")))
+
+         :config
+         (ivy-mode +1)
 
          (defun ivy-kill-line-backward ()
            (interactive)
@@ -6789,105 +6910,124 @@
                            (persp-window-switch . nil)
                            (persp-frame-switch  . nil)))))
 
-         (setq ivy-preferred-re-builders
-               '((ivy--regex-plus         . "ivy")
-                 (ivy--regex-ignore-order . "order")
-                 (ivy--regex-fuzzy        . "fuzzy")
-                 (regexp-quote            . "literal")))
-
-         (setq ivy-magic-tilde nil)
-
-         (general-define-key
-           "M-x" 'counsel-M-x)
+         (general-define-key "M-x" 'counsel-M-x)
 
          (general-define-key
            :keymaps 'counsel-find-file-map
-           ;; :predicate '(eq (point)
-           ;;                 (minibuffer-prompt-end))
            "C-h" 'counsel-up-directory)
 
          (leader/set-keys
            "bb" 'ivy-switch-buffer
            "SPC" 'counsel-M-x
            "RET" 'ivy-resume)
-         :bind* (:map ivy-minibuffer-map
-                 ("C-j" . nil) ;; was ivy-alt-done
-                 ("M-j" . nil) ;; was ivy-yank-word
-                 ("M-v" . nil) ;; was ivy-scroll-down-command
-                 ("C-v" . nil) ;; was ivy-scroll-up-command
-                 ("C-'" . nil) ;; was ivy-avy
-                 ("C-M-y" . nil) ;; was ivy-insert-current-full
 
-                 ("<return>" . ivy-alt-done) ;; also supports tramp expansion
+         (general-define-key
+           :keymaps 'ivy-minibuffer-map
+           "C-j" nil ;; was ivy-alt-done
+           "M-j" nil ;; was ivy-yank-word
+           "M-v" nil ;; was ivy-scroll-down-command
+           "C-v" nil ;; was ivy-scroll-up-command
+           "C-'" nil ;; was ivy-avy
+           "C-M-y" nil ;; was ivy-insert-current-full
 
-                 ;;; misc
-                 ("C-?" . describe-mode)
-                 ("M-d" . kill-ring-save) ;; save all candidates to kill ring
-                 ;; erase input, but start filtering from current candidates
-                 ("S-SPC" . ivy-restrict-to-matches) ; also bound to M-SPC
+           "<return>" 'ivy-alt-done ;; also supports tramp expansion
 
-                 ;;; selection execution
-                 ;; exit with current input, not selection
-                 ("<S-return>"   . ivy-immediate-done)
-                 ("C-c <return>" . ivy-immediate-done)
-                 ;; prompt for action, then done
-                 ("C-<return>" . ivy-dispatching-done)
-                 ;; invoke default action. but exit the minibuffer
-                 ("M-<return>" . ivy-call)
-                 ;; prompt for action, then call
-                 ("C-M-<return>" . ivy-dispatching-call)
-                 ;; move down, then call default action
-                 ("C-M-j" . ivy-next-line-and-call)
-                 ;; move down, then call default action
-                 ("C-M-k" . ivy-previous-line-and-call)
-                 ("<escape>" . minibuffer-keyboard-quit)
+           ;;; misc
+           "C-?" 'describe-mode
+           "M-d" 'kill-ring-save ;; save all candidates to kill ring
+           ;; erase input, but start filtering from current candidates
+           "S-SPC" 'ivy-restrict-to-matches ; also bound to M-SPC
 
-                 ;;; movement commands
-                 ("C-a" . move-beginning-of-line)
-                 ("C-e" . move-end-of-line)
-                 ("C-h" . backward-char)
-                 ("C-l" . ivy-forward-char-or-partial-or-done)
-                 ("C-j" . next-line)
-                 ("C-k" . previous-line)
-                 ("C-q" . ivy-avy)
-                 ("M-j" . ivy-next-history-element)
-                 ("M-k" . ivy-previous-history-element)
-                 ;; arrow key variants
-                 ("<left>"  . backward-char)
-                 ("<right>" . forward-char)
-                 ("<up>"    . previous-line)
-                 ("<down>"  . next-line)
-                 ;; suprisingly enough, these are bound correctly
-                 ("C-d" . scroll-up-command)
-                 ("C-u" . scroll-down-command)
-                 ;; taken from helm, shadows C-o hydra-ivy/body
-                 ("M-o" . beginning-of-buffer)
-                 ("C-o" . end-of-buffer)
+           ;;; selection execution
+           ;; exit with current input, not selection
+           "<S-return>"   'ivy-immediate-done
+           "C-c <return>" 'ivy-immediate-done
+           ;; prompt for action, then done
+           "C-RET" 'ivy-dispatching-done
+           ;; invoke default action'but exit the minibuffer
+           "M-RET" 'ivy-call
+           ;; prompt for action, then call
+           "C-M-<return>" 'ivy-dispatching-call
+           ;; move down, then call default action
+           "C-M-j" 'ivy-next-line-and-call
+           ;; move down, then call default action
+           "C-M-k" 'ivy-previous-line-and-call
+           "<escape>" 'minibuffer-keyboard-quit
 
-                 ;;; insertion/deletion
-                 ;; complete current selection into minibuffer
-                 ;; leave prompt active to build on it.
-                 ("C-i" . ivy-insert-current)
-                 ("C-DEL" . evil-delete-backward-word)
-                 ;; pull word in from point at buffer
-                 ("M-y" . ivy-yank-word)
-                 ("C-w" . backward-kill-word)
-                 ;; operate on entire input
-                 ("M-w" . ivy-kill-line-backward)
-                 ("M-W" . kill-line) ;; kill forward
-                 ("M-DEL" . kill-whole-line)
+           ;;; movement commands
+           "C-a" 'move-beginning-of-line
+           "C-e" 'move-end-of-line
+           "C-h" 'backward-char
+           "C-l" 'ivy-forward-char-or-partial-or-done
+           "C-j" 'next-line
+           "C-k" 'previous-line
+           "C-q" 'ivy-avy
+           "M-j" 'ivy-next-history-element
+           "M-k" 'ivy-previous-history-element
+           ;; arrow key variants
+           "<left>"  'backward-char
+           "<right>" 'forward-char
+           "<up>"    'previous-line
+           "<down>"  'next-line
+           ;; suprisingly enough, these are bound correctly
+           "C-d" 'scroll-up-command
+           "C-u" 'scroll-down-command
+           ;; taken from helm, shadows C-o hydra-ivy/body
+           "M-o" 'beginning-of-buffer
+           "C-o" 'end-of-buffer
 
-                 ;;; history - (C-r/C-s still work fine)
-                 ("<S-up>"    . ivy-previous-history-element)
-                 ("<S-down>"  . ivy-next-history-element)
+           ;;; insertion/deletion
+           ;; complete current selection into minibuffer
+           ;; leave prompt active to build on it.
+           "C-i" 'ivy-insert-current
+           "C-DEL" 'evil-delete-backward-word
+           ;; pull word in from point at buffer
+           "M-y" 'ivy-yank-word
+           "C-w" 'backward-kill-word
+           ;; operate on entire input
+           "M-w" 'ivy-kill-line-backward
+           "M-W" 'kill-line ;; kill forward
+           "M-DEL" 'kill-whole-line
 
-                 :map ivy-switch-buffer-map
-                 ("C-k" . previous-line)
-                 ("M-d" . ivy-switch-buffer-kill)
+           ;;; history - (C-r/C-s still work fine)
+           "<S-up>"    'ivy-previous-history-element
+           "<S-down>"  'ivy-next-history-element )
 
-                 :map ivy-reverse-i-search-map
-                 ("C-k" . previous-line)
-                 ("C-d" . ivy-reverse-i-search-kill)))
+         (general-define-key
+           :keymaps 'ivy-switch-buffer-map
+           "C-k" 'previous-line
+           "M-d" 'ivy-switch-buffer-kill)
+
+         (general-define-key
+           :keymaps 'ivy-reverse-i-search-map
+           "C-k" 'previous-line
+           "C-d" 'ivy-reverse-i-search-kill)
+
+         ;; ivy-occur
+         (evil-set-initial-state 'ivy-occur-mode 'motion)
+         (evil-set-initial-state 'ivy-occur-grep-mode 'motion)
+
+         (leader/set-keys-for-mode! '(ivy-occur-mode
+                                      ivy-occur-grep-mode)
+           ;; 'ivy-wgrep-change-to-wgrep-mode
+           "SPC" 'ivy-occur-read-action
+           "m"   'ivy-occur-toggle-calling)
+
+         (general-define-key
+           :keymaps 'ivy-occur-mode-map
+           :states 'motion
+           "RET" 'ivy-occur-press-and-switch
+           "M-<return>" 'ivy-occur-press
+           "C-<return>" 'ivy-occur-dispatch
+           "gj" 'ivy-occur-next-line
+           "gk" 'ivy-occur-previous-line
+           "}" 'ivy-occur-next-line
+           "{" 'ivy-occur-previous-line
+           "d" 'ivy-occur-delete-candidate
+           "o" 'compilation-display-error
+
+           "gr" 'ivy-occur-revert-buffer
+           "q" 'quit-window))
      #+END_SRC
 
 **** collapse directories
@@ -6985,7 +7125,7 @@
        (use-package counsel
          :ensure t
          :defer  t
-         :after  (ivy org)
+         :after  ivy
          :diminish
          :commands (counsel-M-x
                     counsel-descbinds
@@ -7038,13 +7178,15 @@
                     counsel-mode)
          :init
          (setq counsel-find-file-occur-use-find t
-               counsel-rg-base-command "rg --with-filename --no-heading --line-number --path-separator // --color never %s .")
+               counsel-rg-base-command "rg --with-filename --no-heading --line-number --path-separator // --color never %s ."
+               counsel-evil-registers-height ivy-height
+               counsel-find-file-ignore-regexp "\\.#.+")
 
          (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
          (fset 'describe-bindings (symbol-function 'counsel-descbinds))
 
          (leader/declare-prefix*
-           "r" "registers/rings/resume"
+           "r"  "register/rings/resume"
            "fs" "recursive-find")
 
          (leader/set-keys-for-mode! 'org-mode
@@ -7059,6 +7201,11 @@
            (leader/set-keys
              "oc" 'counsel-org-capture
              "oh" 'counsel-org-agenda-headlines))
+
+         (with-eval-after-load 'company
+           (general-define-key
+             :keymaps 'company-mode-map
+             "C-:" 'counsel-company))
 
          (leader/set-keys
            "ae" 'counsel-package
@@ -7099,17 +7246,10 @@
            "hdB" 'describe-bindings-buffer)
 
          (general-define-key
-           :keymaps 'counsel-find-file-map
-           "C-b" 'counsel-find-file--jump-to-bookmark)
-
-         (general-define-key
            "C-M-y" 'counsel-yank-pop)
+
          :config
          (counsel-mode +1)
-         ;; (push (cons 'counsel-evil-registers ivy-height) ivy-height-alist)
-         (setq counsel-evil-registers-height ivy-height
-               counsel-find-file-ignore-regexp "\\.#.+"
-               ivy-initial-inputs-alist mohkale--ivy-initial-inputs-alist)
 
          (defun counsel-find-file--jump-to-bookmark ()
            "jumpt to a bookmark directory from a `counsel-find-file' session"
@@ -7125,17 +7265,20 @@
                                                           last-directory
                                                         dir)))))))
 
-         (advice-add 'counsel-company
-                     :before
+         (advice-add 'counsel-company :before
                      (defun counsel-company--hide-popup (&rest args)
                        (company-cancel)))
 
          (ivy-configure 'counsel-evil-registers :height ivy-height)
-         :bind* (:map company-mode-map
-                 ("C-:" . counsel-company)
-                 :map counsel-describe-map
-                 ("C-." . hydra-ivy/body)
-                 ("C-S-." . counsel-find-symbol)))
+
+         (general-define-key
+           :keymaps 'counsel-find-file-map
+           "C-b" 'counsel-find-file--jump-to-bookmark)
+
+         (general-define-key
+           :keymaps 'counsel-describe-map
+           "C-."   'hydra-ivy/body
+           "C-S-." 'counsel-find-symbol))
      #+END_SRC
 
 **** ivy-hydra
@@ -7143,13 +7286,16 @@
        (use-package ivy-hydra
          :ensure t
          :defer  t
-         ;; :after  counsel
+         :after ivy
          :commands hydra-ivy/body
+         :init
+         (general-define-key
+           :keymaps 'ivy-minibuffer-map
+           "C-." 'hydra-ivy/body)
+
          :config
          (when (autoloadp (symbol-function 'hydra-ivy-custom/body))
-           (autoload-do-load (symbol-function 'hydra-ivy-custom/body)))
-         :bind* (:map ivy-minibuffer-map
-                 ("C-." . hydra-ivy/body)))
+           (autoload-do-load (symbol-function 'hydra-ivy-custom/body))))
      #+END_SRC
 
 **** swiper
@@ -7157,6 +7303,7 @@
        (use-package swiper
          :ensure t
          :defer  t
+         :after ivy
          :commands (swiper-query-replace
                     swiper-all-query-replace
                     swiper-avy
@@ -7186,9 +7333,9 @@
        because I generally use it for one off jumping to important
        lines, so disable it :P")
 
-         :config
          (setq swiper-min-highlight 50000000) ;; never highlight
 
+         :config
          (advice-add #'swiper--remember-search-history :around
                      (defun swiper--clear-evil-highlight (func &rest args)
                        "see `swiper-persistent-highlight'."
@@ -7213,11 +7360,12 @@
                                       (apply actual-message message-args)))))
                          (apply func args))))
 
-         :bind (:map swiper-map
-                ("C-q" . nil)
-                ("C-l" . ivy-forward-char-or-partial-or-done)
-                ("C-q" . swiper-avy)
-                ("C-s" . swiper-query-replace)))
+         (general-define-key
+           :keymaps 'swiper-map
+           "C-q" nil
+           "C-l" 'ivy-forward-char-or-partial-or-done
+           "C-q" 'swiper-avy
+           "C-s" 'swiper-query-replace))
      #+END_SRC
 
 **** ivy-yasnippet
@@ -7225,6 +7373,7 @@
        (use-package ivy-yasnippet
          :ensure t
          :defer  t
+         :after ivy
          :commands ivy-yasnippet
          :init
          (leader/set-keys
@@ -7239,6 +7388,7 @@
        (use-package counsel-pydoc
          :ensure t
          :defer  t
+         :after counsel
          :commands counsel-pydoc
          :init
          (leader/set-keys-for-mode! 'python-mode
@@ -7250,6 +7400,7 @@
        (use-package counsel-gtags
          :ensure t
          :defer  t
+         :after counsel
          :commands (counsel-gtags-find-definition
                     counsel-gtags-find-reference
                     counsel-gtags-find-symbol
@@ -7277,6 +7428,7 @@
        (use-package counsel-tramp
          :ensure t
          :defer  t
+         :after counsel
          :commands (counsel-tramp)
          :init
          (leader/set-keys
@@ -7288,6 +7440,7 @@
        (use-package counsel-css
          :ensure t
          :defer  t
+         :after counsel
          :commands (counsel-css))
      #+END_SRC
 
@@ -7296,6 +7449,7 @@
        (use-package counsel-web
          :straight (counsel-web :type git :host github :repo "mnewt/counsel-web")
          :defer  t
+         :after counsel
          :commands (counsel-web-suggest ;; async
                     counsel-web-search
                     counsel-web-thing-at-point)
@@ -7315,10 +7469,12 @@
        (use-package helm-make
          :ensure t
          :defer  t
+         :after ivy
          :commands (helm-make
                     helm-make-projectile)
          :init
          (setq helm-make-completion-method 'ivy)
+
          (leader/set-keys
            "c SPC" 'helm-make-projectile
            "cm"    'helm-make))
@@ -8159,6 +8315,7 @@
         "kb" 'kmacro-bind-to-key
         "kl" 'kmacro-edit-lossage ;; edit last 300 strokes as macro
         "kd" 'kmacro-step-edit-macro ;; debug last macro
+        "kM" 'pp-macroexpand-last-sexp
 
         "kcs" 'kmacro-set-counter
         "kc=" 'kmacro-set-counter
@@ -8253,12 +8410,15 @@
         (advice-add 'occur-mode-display-occurrence :around
                     #'display-buffer--restore-default-actions)
 
-        (dolist (mode '(occur-mode occur-edit-mode))
-          (leader/set-keys-for-mode! mode
-            "e" 'occur-edit-mode
-            "R" 'occur-rename-buffer
-            "g" 'occur-mode-goto-occurrence
-            "G" 'occur-mode-goto-occurrence-other-window))
+        (leader/set-keys-for-mode! '(occur-mode occur-edit-mode)
+          "e" 'occur-edit-mode
+          "R" 'occur-rename-buffer
+          "g" 'occur-mode-goto-occurrence
+          "G" 'occur-mode-goto-occurrence-other-window
+          "l" 'occur-mode-display-occurrence)
+
+        (leader/set-keys-for-mode! 'occur-edit-mode
+          "," 'occur-cease-edit)
 
         (defun-evil-adjust-to-eol evil-adjust-occur-next (&optional prefix)
           (interactive "P")
@@ -9300,120 +9460,94 @@
 
 *** tabulated-list-mode
     #+BEGIN_SRC emacs-lisp
-     (use-package tabulated-list
-       :defer t
-       :commands (tabulated-list-mode
-                  tabulated-list-next-column)
-       :config
-       (evil-set-initial-state 'tabulated-list-mode 'motion)
+      (use-package tabulated-list
+        :defer t
+        :commands (tabulated-list-mode
+                   tabulated-list-next-column)
+        :config
+        (evil-set-initial-state 'tabulated-list-mode 'motion)
 
-       (defun tabulated-list--get-column-widths ()
-         "return a list of all the "
-         (mapcar (lambda (x) (+ (nth 1 x)
-                                (or (plist-get (cdr x) :pad-right) 1)))
-                 tabulated-list-format))
+        (defun tabulated-list--get-column-widths ()
+          "return a list of all the "
+          (mapcar (lambda (x) (+ (nth 1 x)
+                                 (or (plist-get (cdr x) :pad-right) 1)))
+                  tabulated-list-format))
 
-       (defun tabulated-list--get-column-pivots ()
-         (let (prev values)
-           (setq values (mapcar (lambda (x)
-                                  (let ((new-val (+ x (or prev 0))))
-                                    (setq prev new-val)
-                                    new-val))
-                                (tabulated-list--get-column-widths)))
-           ;; (mapcar (lambda (x) (- x 1)) values)
-           values))
+        (defun tabulated-list--get-column-pivots ()
+          (let (prev values)
+            (setq values (mapcar (lambda (x)
+                                   (let ((new-val (+ x (or prev 0))))
+                                     (setq prev new-val)
+                                     new-val))
+                                 (tabulated-list--get-column-widths)))
+            ;; (mapcar (lambda (x) (- x 1)) values)
+            values))
 
-       (defun tabulated-list--properties ()
-         (let* ((current-column-position (- (point)
-                                            (line-beginning-position)))
-                (column-pivots (tabulated-list--get-column-pivots))
-                (column-count (length column-pivots))
-                (preceding-columns (seq-filter
-                                    (lambda (x)
-                                      (<= x current-column-position))
-                                    column-pivots))
-                (following-columns (nthcdr (length preceding-columns)
-                                           column-pivots))
-                (current-column (car following-columns))
-                (following-columns (cdr following-columns)))
-           `(:current-column-position ,current-column-position
-                                      :column-pivots           ,column-pivots
-                                      :column-count            ,column-count
-                                      :preceding-cols          ,preceding-columns
-                                      :current-column          ,current-column
-                                      :following-cols          ,following-columns)))
+        (defun tabulated-list--properties ()
+          (let* ((current-column-position (- (point)
+                                             (line-beginning-position)))
+                 (column-pivots (tabulated-list--get-column-pivots))
+                 (column-count (length column-pivots))
+                 (preceding-columns (seq-filter
+                                     (lambda (x)
+                                       (<= x current-column-position))
+                                     column-pivots))
+                 (following-columns (nthcdr (length preceding-columns)
+                                            column-pivots))
+                 (current-column (car following-columns))
+                 (following-columns (cdr following-columns)))
+            `(:current-column-position ,current-column-position
+                                       :column-pivots           ,column-pivots
+                                       :column-count            ,column-count
+                                       :preceding-cols          ,preceding-columns
+                                       :current-column          ,current-column
+                                       :following-cols          ,following-columns)))
 
-       ;; doesn't work when row contains truncated entries, such as
-       ;; buffers with a "name..." entry, because those dots aren't
-       ;; included in the width of the column.
-       (defun tabulated-list-next-column (&optional count)
-         "moves to the next column shown by tabulated list mode"
-         (interactive)
-         (or count (setq count 1))
+        ;; doesn't work when row contains truncated entries, such as
+        ;; buffers with a "name..." entry, because those dots aren't
+        ;; included in the width of the column.
+        (defun tabulated-list-next-column (&optional count)
+          "moves to the next column shown by tabulated list mode"
+          (interactive)
+          (or count (setq count 1))
 
-         (when tabulated-list-format
-           (let* ((properties (tabulated-list--properties))
-                  (line-step (floor (/ count
-                                       (plist-get properties :column-count)))))
-             ;; move however many lines it takes to reach row with desired column
-             (unless (zerop line-step)
-               (next-line line-step))
+          (when tabulated-list-format
+            (let* ((properties (tabulated-list--properties))
+                   (line-step (floor (/ count
+                                        (plist-get properties :column-count)))))
+              ;; move however many lines it takes to reach row with desired column
+              (unless (zerop line-step)
+                (next-line line-step))
 
-             (unless (eobp)
-               (cond
-                ((eq (point) (line-end-position))
-                 ;; when at the end of the last column, goto next row
-                 (next-line)
-                 (goto-char (line-beginning-position)))
-                ((not (plist-get properties :following-cols))
-                 ;; no next column, goto end of current
-                 (goto-char (line-end-position)))
-                (t
-                 ;; goto next column from the end of the current one
-                 (goto-char (+ (line-beginning-position)
-                               (plist-get properties :current-column)))))))))
+              (unless (eobp)
+                (cond
+                 ((eq (point) (line-end-position))
+                  ;; when at the end of the last column, goto next row
+                  (next-line)
+                  (goto-char (line-beginning-position)))
+                 ((not (plist-get properties :following-cols))
+                  ;; no next column, goto end of current
+                  (goto-char (line-end-position)))
+                 (t
+                  ;; goto next column from the end of the current one
+                  (goto-char (+ (line-beginning-position)
+                                (plist-get properties :current-column)))))))))
 
-       ;; ;; doesn't work for some stupid reason :(
-       ;; (defun tabulated-list-prev-column (&optional count)
-       ;;   (interactive)
-       ;;   (or count (setq count 1))
-
-       ;;   (when tabulated-list-format
-       ;;     (let* ((properties (tabulated-list--properties))
-       ;;            (line-step (floor (/ count
-       ;;                                 (plist-get properties :column-count))))
-       ;;            (line-number (string-to-number (format-mode-line "%l"))))
-       ;;       ;; move however many lines it takes to reach row with desired column
-       ;;       (unless (zerop line-step)
-       ;;         (if (> line-step line-number)
-       ;;             (goto-char (point-min))
-       ;;           (previous-line line-step)))
-
-       ;;       (unless (bobp)
-       ;;         (cond
-       ;;          ((eq (point) (line-beginning-position))
-       ;;           ;; when at first column, goto previous row
-       ;;           (previous-line)
-       ;;           (goto-char (line-end-position)))
-       ;;          ((not (plist-get properties :preceding-cols))
-       ;;           (goto-char (line-beginning-position)))
-       ;;          (t
-       ;;           (goto-char (+ (line-beginning-position)
-       ;;                            (car (last (plist-get properties :preceding-cols)))))))))))
-       :bind (:map tabulated-list-mode-map
-              ("SPC"   . nil)
-              ("ESC"   . nil)
-              ("0"     . nil)
-              ("<"     . nil)
-              (">"     . nil)
-              ("?"     . nil)
-              ("g"     . nil)
-              ("h"     . nil)
-              ("n"     . nil)
-              ("p"     . nil)
-              ("DEL"   . nil)
-              ("S-SPC" . nil)
-              ("gr" . revert-buffer)))
+        (general-define-key
+          :keymaps 'tabulated-list-mode-map
+          "SPC"   nil
+          "ESC"   nil
+          "0"     nil
+          "<"     nil
+          ">"     nil
+          "?"     nil
+          "g"     nil
+          "h"     nil
+          "n"     nil
+          "p"     nil
+          "DEL"   nil
+          "S-SPC" nil
+          "gr" 'revert-buffer))
     #+END_SRC
 
 *** tags
@@ -9511,16 +9645,16 @@
                    rotate-frame-clockwise ;; 90 degrees
                    rotate-frame-anti-clockwise ;; 90 degrees
                    )
-        :bind (:map mohkale-window-map
-               ("C-t" . transpose-frame)
-               ("t" . transpose-frame)
-               ("(" . rotate-frame-clockwise)
-               (")" . rotate-frame-anti-clockwise)
-               ("*" . rotate-frame)
-               ("C-f" . flip-frame)
-               ("f" . flip-frame)
-               ("C-S-F" . flop-frame)
-               ("F" . flop-frame)))
+        :init
+        (general-define-key
+          :keymaps 'mohkale-window-map
+          "C-t"   'transpose-frame
+          "t"     'transpose-frame
+          "("     'rotate-frame-clockwise
+          ")"     'rotate-frame-anti-clockwise
+          "*"     'rotate-frame
+          "f"     'flip-frame
+          "F"     'flop-frame))
     #+END_SRC
 
 *** undo-tree
@@ -9531,10 +9665,12 @@
         :diminish
         :init
         (push 'undo-tree-visualizer-mode mohkale--whitespace-exempt-modes)
-        :bind* (:map undo-tree-map
-                ("C-/" . nil)
-                ("C-_" . nil)
-                ("C-?" . nil)))
+        :config
+        (general-define-key
+          :keymaps 'undo-tree-map
+          "C-/" nil
+          "C-_" nil
+          "C-?" nil))
     #+END_SRC
 
 *** uuidgen
@@ -9613,11 +9749,13 @@
         :init
         (setq vlc-rc-map (make-sparse-keymap))
 
-        (leader/set-keys "v" vlc-rc-map)
-        (leader/declare-prefix*
-          "v" '("VLC" . "VideoLanCodec")
-          "vs" "set"
-          "vt" "toggle")
+        (leader/with-prefix "v"
+          (leader/declare-prefix*
+            "" '("VLC" . "VideoLanCodec")
+            "s" "set"
+            "t" "toggle")
+
+          (leader/set-keys "" vlc-rc-map))
 
         (general-define-key
           :keymaps 'dired-mode-map
@@ -9625,10 +9763,10 @@
           "v"  nil
           "vv" 'vlc/dired-add-file
           "vq" 'vlc/dired-enqueue-file)
-        ;; :bind-keymap* (:map leader-map
-        ;;                ("v" . vlc-rc-map))
-        :bind (:map vlc-rc-map
-               ("C-." . hydra-vlc-rc/body)))
+
+        (general-define-key
+          :keymaps 'vlc-rc-map
+          "C-." 'hydra-vlc-rc/body))
     #+END_SRC
 
 *** which-key
@@ -9728,11 +9866,14 @@
         :commands (winner-mode
                    winner-undo
                    winner-redo)
+        :init
+        (general-define-key
+          :keymaps 'mohkale-window-map
+          "<left>"  'winner-undo
+          "<right>" 'winner-redo)
+
         :config
-        (winner-mode +1)
-        :bind (:map mohkale-window-map
-               ("<left>"  . winner-undo)
-               ("<right>" . winner-redo)))
+        (winner-mode +1))
     #+END_SRC
 
 *** winum
@@ -9751,28 +9892,37 @@
                    winum-select-window-8
                    winum-select-window-9
                    winum-select-window-by-number)
+        :init
+        (general-define-key
+          :keymaps 'mohkale-window-map
+          "1" 'winum-select-window-1
+          "2" 'winum-select-window-2
+          "3" 'winum-select-window-3
+          "4" 'winum-select-window-4
+          "5" 'winum-select-window-5
+          "6" 'winum-select-window-6
+          "7" 'winum-select-window-7
+          "8" 'winum-select-window-8
+          "9" 'winum-select-window-9
+          "0" 'winum-select-window-by-number
+          )
+
         :config
-        (setq winum-auto-setup-mode-line nil)
+        (winum-mode)
 
         ;; reset 1st window number option to window by number
-        (push '(("\\(.*\\) 1" . "winum-select-window-1") . ("\\1 1..9" . "window-by-number")) which-key-replacement-alist)
-        ;; hide numbers 2 through to nine
-        (push '((nil . "winum-select-window-[2-9]") . t) which-key-replacement-alist)
-        ;; abbreviate 0 value
-        (push '(("\\(.*\\) 0" . "winum-select-window-by-number") . ("\\1 0" . "window-by-prompt")) which-key-replacement-alist)
+        (push (cons '("\\(.*\\) 1" . "winum-select-window-1")
+                    '("\\1 1..9"   . "window-by-number"))
+              which-key-replacement-alist)
 
-        (winum-mode)
-        :bind (:map mohkale-window-map
-               ("1" . 'winum-select-window-1)
-               ("2" . 'winum-select-window-2)
-               ("3" . 'winum-select-window-3)
-               ("4" . 'winum-select-window-4)
-               ("5" . 'winum-select-window-5)
-               ("6" . 'winum-select-window-6)
-               ("7" . 'winum-select-window-7)
-               ("8" . 'winum-select-window-8)
-               ("9" . 'winum-select-window-9)
-               ("0" . 'winum-select-window-by-number)))
+        ;; hide numbers 2 through to nine
+        (push (cons '(nil . "winum-select-window-[2-9]") t)
+              which-key-replacement-alist)
+
+        ;; abbreviate 0 value
+        (push (cons '("\\(.*\\) 0" . "winum-select-window-by-number")
+                    '("\\1 0"      . "window-by-prompt"))
+              which-key-replacement-alist))
     #+END_SRC
 
 *** xref
@@ -9805,6 +9955,14 @@
           "axf" 'xref-find-definitions-other-frame
           "ax SPC" 'xref-pop-marker-stack)
 
+        ;; erase global xref bindings
+        (general-define-key
+          "M-."   nil ; xref-find-definitions
+          "M-,"   nil ; xref-pop-marker-stack
+          "M-?"   nil ; xref-find-references
+          "C-M-." nil ; xref-find-apropos
+          )
+
         :init
         (evil-set-initial-state 'xref--xref-buffer-mode 'motion)
 
@@ -9818,13 +9976,7 @@
           "TAB" 'xref-quit-and-goto-xref)
 
         (leader/set-keys-for-mode! 'xref--xref-buffer-mode
-          "s" 'xref-query-replace-in-results)
-        :bind (;; erase global xref bindings
-               ("M-." . nil)   ; xref-find-definitions
-               ("M-," . nil)   ; xref-pop-marker-stack
-               ("M-?" . nil)   ; xref-find-references
-               ("C-M-." . nil) ; xref-find-apropos
-               ))
+          "s" 'xref-query-replace-in-results))
     #+END_SRC
 
 *** yasnippet
@@ -10314,9 +10466,16 @@
          :ensure t
          :defer  t
          :hook (emacs-lisp-mode . paredit-mode)
-         :init
-         (add-hook 'emacs-lisp-mode-hook #'electric-pair-mode)
          :config
+         (general-define-key
+           :keymaps 'paredit-mode-map
+           "C-<up>"    nil
+           "C-<down>"  nil
+           "C-<left>"  nil
+           "C-<right>" nil
+           "C-("       nil
+           "C-)"       nil)
+
          ;; M-( wraps the next argument in parentheses
          ;; M-) closes the current argument, trims any
          ;;     trailing whitespace and inserts a newline
@@ -10332,11 +10491,13 @@
            ;; just use paredit forward, then kill backward
            "C-M-k" 'paredit-kill ;; forward body
            "<return>" 'paredit-newline)
+
          (general-define-key
            :keymaps 'paredit-mode-map
            :states 'normal
            "gsh" '(paredit-splice-sexp-killing-backward :which-key "splice-sexp-forward")
            "gsl" '(paredit-splice-sexp-killing-forward :which-key "splice-sexp-backward"))
+
          (general-define-key
            :keymaps 'paredit-mode-map
            :states '(normal insert)
@@ -10367,14 +10528,7 @@
            ;; arguments both before and after it
            ;; a cool shortcut, but not really necessary
            ;; "M-r"   'paredit-raise-sexp
-           )
-         :bind (:map paredit-mode-map
-                ("C-<up>"    . nil)
-                ("C-<down>"  . nil)
-                ("C-<left>"  . nil)
-                ("C-<right>" . nil)
-                ("C-("       . nil)
-                ("C-)"       . nil)))
+           ))
      #+END_SRC
 
 **** elisp-mode
@@ -10382,8 +10536,11 @@
        (use-package elisp-mode
          :straight (elisp-mode :type built-in)
          :defer t
-         ;; show lambda as an actual lambda symbol
+         :init
+         (add-hook 'emacs-lisp-mode-hook #'electric-pair-mode)
+
          :config
+         ;; show lambda as an actual lambda symbol
          (mohkale/define-pretty-symbols-for-mode 'emacs-lisp-mode
            ("lambda" . ?λ))
          (mohkale/define-pretty-symbols-for-mode 'lisp-interaction-mode
@@ -10696,9 +10853,11 @@
          :config
          (setq enh-ruby-deep-indent-paren nil
                enh-ruby-hanging-paren-deep-indent-level 2)
+
          (leader/declare-prefix-for-mode!* 'enh-ruby-mode
            "i" "insert/format"
            "n" "navigate")
+
          (leader/set-keys-for-mode! 'enh-ruby-mode
            "m" 'enh-ruby-mark-defun
            "f" 'enh-ruby-find-file
@@ -10715,18 +10874,22 @@
            "n$" 'enh-ruby-end-of-block
            "n M-0" 'enh-ruby-beginning-of-defun
            "n M-$" 'enh-ruby-end-of-defun)
+
+         (general-define-key
+           :keymaps 'enh-ruby-mode-map
+           "{" nil
+           "}" nil)
+
          (general-define-key
            :keymaps 'enh-ruby-mode-map
            :states 'insert
            "{" 'enh-ruby-electric-brace
            "}" 'enh-ruby-electric-brace)
+
          (general-define-key
            :keymaps 'enh-ruby-mode-map
            :states '(normal insert)
-           "C-{" 'enh-ruby-toggle-block)
-         :bind (:map enh-ruby-mode-map
-                     ("{" . nil)
-                     ("}" . nil)))
+           "C-{" 'enh-ruby-toggle-block))
      #+END_SRC
 
 **** solargraph
@@ -11001,9 +11164,14 @@
                       emmet-preview-mode
                       emmet-preview)
            :config
+           (general-define-key
+             :keymaps 'emmet-mode-keymap
+             "C-j" nil)
+
            (leader/with-major-mode-prefix
              (leader/declare-prefix-for-mode 'emmet-mode
                "e" "emmet" "emmet mode")
+
              (leader/set-keys-for-mode 'emmet-mode
                "." 'emmet-expand-line
                ;; "'" 'emmet-preview
@@ -11011,9 +11179,7 @@
                "ep" 'emmet-preview
                "ew" 'emmet-wrap-with-markup
                "en" 'emmet-next-edit-point
-               "eN" 'emmet-prev-edit-point))
-           :bind* (:map emmet-mode-keymap
-                   ("C-j" . nil))))
+               "eN" 'emmet-prev-edit-point))))
      #+END_SRC
 
 **** company-web
@@ -11221,6 +11387,7 @@
            "oa" 'org-agenda
            "oy" 'org-copy-subtree
            "oY" 'org-cut-subtree)
+
          :config
          (mohkale/define-pretty-symbols-for-mode 'org-mode
            ("lambda" . ?λ))
@@ -11301,9 +11468,6 @@
             (sed . t)
             (shell . t)
             (R . t)))
-
-         (push '("ditaa" . fundamental)
-               org-src-lang-modes)
 
          ;;             _ _       _     _           _ _
          ;;   _____   _(_) |     | |__ (_)_ __   __| (_)_ __   __ _ ___
@@ -11411,6 +11575,16 @@
                                  (org-metaleft)
                                (org-metaright)))
            "C-." 'org-toggle-heading)
+
+         (general-define-key
+           :keymaps 'org-mode-map
+           ;; "C-M-<return>" 'org-meta-return
+           "C-s"          'org-sort
+           "M-S-<return>" nil
+           "C-e"          nil
+           "M-e"          nil
+           "M-h"          nil
+           "C-j"          nil)
 
          (general-define-key
            ;; most bindings stolen from: https://github.com/edwtjo/evil-org-mode
@@ -11601,15 +11775,7 @@
            ;; "xs" 'org-strike-through
            ;; "xu" 'org-underline
            ;; "xv" 'org-verbose
-           )
-         :bind* (:map org-mode-map
-                 ;; "C-M-<return>" org-meta-return)
-                 ("C-s" . org-sort)
-                 ("M-S-<return>" . nil)
-                 ("C-e" . nil)
-                 ("M-e" . nil)
-                 ("M-h" . nil)
-                 ("C-j" . nil)))
+           ))
      #+END_SRC
 
 **** org-capture
@@ -12230,7 +12396,7 @@
            (let ((mode-map (intern (concat (symbol-name mode)
                                            "mode"))))
              (general-define-key
-               :map mode-map
+               :keymaps 'mode-map
                "C-M-a" 'c-beginning-of-defun
                ;; "C-M-e" 'c-end-of-defun
                "M-a"   'c-beginning-of-statement
@@ -12744,6 +12910,9 @@
          (defalias 'haskell-repl #'run-haskell)
 
          :config
+         (use-package haskell-indent
+           :commands (haskell-indent-cycle))
+
          ;; (mohkale/update-company-backends-for-mode haskell t
          ;;   '(company-ghci))
          (mohkale/update-company-backends-for-mode haskell t
@@ -12752,6 +12921,12 @@
            '(company-cabal))
 
          (setq haskell-process-type 'cabal-repl)
+
+         (evil-set-initial-state 'haskell-interactive-mode 'emacs)
+
+         (general-define-key
+           :keymaps 'haskell-mode-map
+           "C-M-i" nil)
 
          (defun mohkale//enable-haskell-indent-control ()
            (interactive)
@@ -12782,14 +12957,9 @@
            "sc" 'haskell-session-change
            "sC" 'haskell-session-change-target
            "sk" 'haskell-session-kill
-           "sK" 'haskell-kill-session-process)
+           "sK" 'haskell-kill-session-process))
 
-         (evil-set-initial-state 'haskell-interactive-mode 'emacs)
-         :bind (:map haskell-mode-map
-                ("C-M-i" . nil)))
 
-       (use-package haskell-indent
-         :commands (haskell-indent-cycle))
      #+END_SRC
 
 **** company-ghci
@@ -12888,13 +13058,34 @@
           "gs"  'magit-status
           "gS"  'magit-stage-file
           "gU"  'magit-unstage-file)
+
         :config
-        (require 'evil-magit)
+        (use-package evil-magit :demand t)
 
         ;; GIVE ME BACK MY LEADER!!!
         (general-define-key
           :keymaps '(magit-mode-map magit-diff-mode-map)
           leader-key nil)
+
+        (general-define-key
+          :keymaps 'magit-mode-map
+          "M-j" 'magit-section-forward-sibling
+          "M-k" 'magit-section-backward-sibling
+
+          ;; ;; toggle children doesn't seem to work
+          ;; "C-r" 'magit-section-hide-children ; recursive close
+          ;; "C-e" 'magit-section-show-children ; recursive expand
+          ;; "M-r" 'magit-section-hide-children ; Meta aliases
+          ;; "M-e" 'magit-section-show-children ; Meta aliases
+
+          ;; visit and expand
+          "RET"   'magit-section-toggle
+          "TAB"   'magit-section-toggle
+          "M-RET" 'magit-visit-thing)
+
+        (general-define-key
+          :keymaps 'magit-log-mode-map
+          "RET" 'magit-visit-thing)
 
         (leader/with-major-mode-prefix
           (leader/declare-prefix-for-mode* 'git-commit-mode
@@ -12914,22 +13105,7 @@
             "ir" 'git-commit-reported
             "iR" 'git-commit-review
             "is" 'git-commit-signoff
-            "it" 'git-commit-test))
-        :bind* (:map magit-mode-map
-                ("M-j" . magit-section-forward-sibling)
-                ("M-k" . magit-section-backward-sibling)
-                ;; ;; toggle children doesn't seem to work
-                ;; ("C-r" . magit-section-hide-children) ; recursive close
-                ;; ("C-e" . magit-section-show-children) ; recursive expand
-                ;; ("M-r" . magit-section-hide-children) ; Meta aliases
-                ;; ("M-e" . magit-section-show-children) ; Meta aliases
-                ;; visit and expand
-                ("RET"   . magit-section-toggle)
-                ("TAB"   . magit-section-toggle)
-                ("M-RET" . magit-visit-thing)
-
-                :map magit-log-mode-map
-                ("RET" . magit-visit-thing)))
+            "it" 'git-commit-test)))
     #+END_SRC
 
 **** gitattributes-mode
@@ -12979,19 +13155,14 @@
 
 **** transient
      #+BEGIN_SRC emacs-lisp
-     (use-package transient
-        :ensure t
-        :defer  t
-        :bind* (:map transient-base-map
-                ;;; Escape means quit too you know
-                ("ESC" . transient-quit-one)))
-     #+END_SRC
-
-**** evil-magit
-     #+BEGIN_SRC emacs-lisp
-      (use-package evil-magit
-        :ensure t
-        :defer  t)
+       (use-package transient
+          :ensure t
+          :defer  t
+          :config
+          (general-define-key
+            :keymaps 'transient-base-map
+            ;;; escape means quit too
+            "ESC" 'transient-quit-one))
      #+END_SRC
 
 **** magit-svn
@@ -13048,7 +13219,7 @@
     #+END_SRC
 
 *** realgud
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package realgud
         :ensure t
         :defer  t
@@ -13070,9 +13241,12 @@
               (switch-to-buffer nil) ;; last buffer
               (display-buffer debugger-buffer))))
 
-        (advice-add #'realgud:gdb :around #'realgud--display-realgud-buffer-instead-of-switch)
-        :bind (:map realgud-track-mode-map
-               ("<override-state>" . nil)))
+        (advice-add #'realgud:gdb :around
+                    #'realgud--display-realgud-buffer-instead-of-switch)
+
+        (general-define-key
+          :keymaps 'realgud-track-mode-map
+          "<override-state>" nil))
     #+END_SRC
 
 * Themes
@@ -13461,385 +13635,3 @@
   :PROPERTIES:
   :header-args+: :tangle no
   :END:
-** helm
-*** helm-mode
-    #+BEGIN_SRC emacs-lisp
-      (use-package helm
-        :ensure t
-        :defer  10
-        ;; :delight
-        ;; (helm-mode " Ⓗ")
-        :commands (helm-M-x
-                   helm-apropos
-                   helm-resume
-                   helm-all-mark-rings
-                   helm-register
-                   helm-show-kill-ring
-                   helm-info-at-point
-                   helm-filtered-bookmarks
-                   helm-find-files
-                   helm-locate
-                   helm-recent-file
-                   helm-man-woman
-                   helm-help
-                   helm-top
-                   helm-mini
-                   helm-regexp)
-        :init
-        (setq helm-split-window-inside-p t)
-
-        (general-define-key
-          ;; :states '(normal emacs insert motion)
-          "C-M-y" 'helm-show-kill-ring
-          "M-x"   'helm-M-x)
-
-        ;; TODO move to helm map
-        (bind-keys :map minibuffer-local-map
-                   ("C-r" . helm-minibuffer-history))
-
-        (general-define-key
-          :states 'insert
-          "<tab>" 'indent-relative)
-
-        (leader/declare-prefix*
-          "C-?" "appropos"
-          "am"  "man-woman"
-          "at"  "top"
-          "r" "registers/rings/resume")
-
-        (leader/set-keys
-          "SPC" 'helm-M-x
-          "C-?" 'helm-apropos
-
-          "iu" 'helm-ucs
-
-          "rl" 'helm-resume
-          "rm" 'helm-all-mark-rings
-          "rr" 'helm-register
-          "ry" 'helm-show-kill-ring
-
-          "hi" 'helm-info-at-point
-
-          "fb" 'helm-filtered-bookmarks
-          "ff" 'helm-find-files
-          "fL" 'helm-locate
-          "fr" 'helm-recentf
-
-          "am" 'helm-man-woman
-          "at" 'helm-top
-
-          "bb" 'helm-mini
-          "bS" 'helm-regexp)
-        :config
-        (require 'helm-config)
-        (helm-mode 1)
-
-        ;;; minibuffer is unecessary when input is shown at the top of helm
-        (defun helm-hide-minibuffer-maybe ()
-          "https://www.reddit.com/r/emacs/comments/3asbyn/new_and_very_useful_helm_feature_enter_search/"
-          (when (with-helm-buffer helm-echo-input-in-header-line)
-            (let ((ov (make-overlay (point-min) (point-max) nil nil t)))
-              (overlay-put ov 'window (selected-window))
-              (overlay-put ov 'face (let ((bg-color (face-background 'default nil)))
-                                      `(:background ,bg-color :foreground ,bg-color)))
-              (setq-local cursor-type nil))))
-
-        (add-hook 'helm-minibuffer-set-up-hook 'helm-hide-minibuffer-maybe)
-
-        ;;; always show helm window at the bottom of the frame
-        ;; source https://www.reddit.com/r/emacs/comments/345vtl/make_helm_window_at_the_bottom_without_using_any/
-        (push `(,(rx bos "*helm" (* not-newline) "*" eos)
-                (display-buffer-in-side-window)
-                (inhibit-same-window . t)
-                (window-height . 0.4))
-              display-buffer-alist)
-
-        ;; fuzzy match... fuzzy match EVERYTHING
-        (setq-default helm-mode-fuzzy-match t
-                      helm-completion-in-region-fuzzy-match t
-
-                      helm-recentf-fuzzy-match    t
-                      helm-buffers-fuzzy-matching t
-                      helm-recentf-fuzzy-match    t
-                      helm-buffers-fuzzy-matching t
-                      helm-locate-fuzzy-match     t
-                      helm-M-x-fuzzy-match        t
-                      helm-semantic-fuzzy-match   t
-                      helm-imenu-fuzzy-match      t
-                      helm-apropos-fuzzy-match    t
-                      helm-lisp-fuzzy-completion  t
-                      helm-session-fuzzy-match    t
-                      helm-etags-fuzzy-match      t)
-
-        (defun helm-eol-or-confirm-and-exit-minibuffer ()
-          "moves to the end of the helm minibuffer or confirm and exit
-      exists as a parrallel to backward-sentence binding below"
-          (interactive)
-          (if (not (eolp))
-              (end-of-line)
-            (helm-confirm-and-exit-minibuffer)))
-
-        :bind* (:map helm-map
-                ("C-h" . nil)
-                ("TAB" . helm-maybe-exit-minibuffer)
-                ;; ("C-z" . helm-help)
-                ;; helm-help doesn't work anyway
-                ("C-z" . helm-select-action)
-                ;;; movement bindings in normal mode
-                ("<left>"  . evil-backward-char)
-                ("<right>" . evil-forward-char)
-                ;; "C-d" 'helm-buffer-run-kill-buffers
-                ("C-j" . helm-next-line)
-                ("C-k" . helm-previous-line)
-                ("C-h" . backward-sentence)
-                ;; TODO check if end of line, if not then
-                ;;      exit minibuffer, else goto EOL
-                ("C-l" . helm-eol-or-confirm-and-exit-minibuffer)
-                ("C-w"   . backward-kill-word)
-                ("M-k"   . backward-kill-sentence)
-                ("C-M-k" . kill-sentence) ;; kill forward
-                ("M-h" . backward-word)
-                ("M-l" . forward-word)
-                ("M-j"   . ace-jump-helm-line) ; Alternative = C-q
-                ("C-d"   . helm-next-page)
-                ("C-u"   . helm-previous-page)
-                ;; NOTE C-w reads a word in from buffer at point
-                ("M-("   . helm-prev-visible-mark)
-                ("M-)"   . helm-next-visible-mark)
-
-                :map helm--minor-mode-map
-                ("<C-backspace>" . evil-delete-backward-word)))
-
-      (use-package helm-files
-        ;; :ensure t
-        :defer  t
-        :bind (:map helm-find-files-map
-               ("<C-backspace>" . nil) ;; delete override
-               ("C-h" . helm-find-files-up-one-level)
-               ("C-l" . helm-ff-RET)
-               ("TAB" . helm-ff-RET)))
-
-      (use-package helm-buffers
-        ;; :ensure t
-        :defer  t
-        :bind (:map helm-buffer-map
-              ("M-d" . helm-buffer-run-kill-buffers)
-              ("M-D" . nil) ;; delete uppercase variant
-              ("M-s" . helm-buffer-save-persistent) ; save but don't kill helm
-              ("C-." . helm-buffers-toggle-show-hidden-buffers)))
-
-      (use-package helm-company
-        :ensure t
-        :defer  t
-        :commands helm-company)
-
-      (add-hook 'eshell-mode-hook (lambda ()
-                                    (require 'helm-eshell)
-                                    (eshell-cmpl-initialize)
-                                    ))
-
-      (use-package helm-eshell
-        :defer t
-        :config
-        (eshell-cmpl-initialize)
-        :bind* (:map eshell-mode-map
-                ([remap eshell-pcomplete] . helm-esh-pcomplete)
-                ;; helm-eshell-prompts-all
-                ;; helm-eshell-history
-                ))
-
-      (with-eval-after-load 'helm
-        (defun persp-helm-mini ()
-          "helm-mini, but using only the perspectives buffers"
-          (interactive)
-          (with-persp-buffer-list ()
-            (helm-mini)))
-        (leader/set-keys-for-mode 'persp-mode
-          "bb" 'persp-helm-mini))
-
-
-
-      ;; (general-define-key
-      ;;  :keymaps mohkale-search-map
-      ;;  "`" 'helm-ag-pop-stack
-      ;;  "B" 'helm-buffers-smart-do-search
-      ;;  "c" 'evil-search-clear-highlight
-      ;;  "e" 'evil-iedit-state/iedit-mode
-      ;;  "F" 'helm-files-smart-do-search-region
-      ;;  "f" 'helm-files-smart-do-search
-      ;;  "H" 'goto-last-searched-ahs-symbol
-      ;;  "h" 'symbol-highlight
-      ;;  "j" 'helm-jump-in-buffer
-      ;;  "S" 'helm-swoop-region-or-symbol
-      ;;  "s" 'helm-swoop
-      ;;  "C-s" 'helm-multi-swoop-all)
-
-      ;; (general-define-key
-      ;;  :keymaps mohkale-search-ag-map
-      ;;  "A" 'helm-file-do-ag-region-or-symbol
-      ;;  "a" 'helm-ag-this-file
-      ;;  "B" 'helm-buffers-do-ag-region-or-symbol
-      ;;  "b" 'helm-do-ag-buffers
-      ;;  "F" 'helm-files-do-ag-region-or-symbol
-      ;;  "f" 'helm-do-ag
-      ;;  "P" 'helm-project-do-ag-region-or-symbol
-      ;;  "p" 'helm-project-do-ag)
-
-      ;; (general-define-key
-      ;;  :keymaps mohkale-search-ack-map
-      ;;  "B" 'helm-buffers-do-ack-region-or-symbol
-      ;;  "b" 'helm-buffers-do-ack
-      ;;  "F" 'helm-files-do-ack-region-or-symbol
-      ;;  "f" 'helm-files-do-ack
-      ;;  "P" 'helm-project-do-ack-region-or-symbol
-      ;;  "p" 'helm-project-do-ack)
-
-      ;; (general-define-key
-      ;;  :keymaps mohkale-search-ack-map
-      ;;  "B" 'helm-buffers-do-grep-region-or-symbol
-      ;;  "b" 'helm-buffers-do-grep
-      ;;  "F" 'helm-files-do-grep-region-or-symbol
-      ;;  "f" 'helm-files-do-grep
-      ;;  "G" 'helm-file-do-grep-region-or-symbol
-      ;;  "g" 'helm-file-do-grep
-      ;;  "P" 'helm-projectile-grep)
-
-      ;; (general-define-key
-      ;;  :keymaps mohkale-search-pt-map
-      ;;  "B" 'helm-buffers-do-pt-region-or-symbol
-      ;;  "b" 'helm-buffers-do-pt
-      ;;  "F" 'helm-files-do-apt-region-or-symbol
-      ;;  "f" 'helm-files-do-apt
-      ;;  "P" 'helm-project-do-pt-region-or-symbol
-      ;;  "p" 'helm-project-do-pt)
-
-      ;; (general-define-key
-      ;;  :keymaps mohkale-search-pt-map
-      ;;  "g" 'helm-google-suggest
-      ;;  "w" 'helm-wikipedia-suggest)
-
-      ;; (general-define-key
-      ;;  :keymaps mohkale-help-map
-      ;;  "T" 'evil-tutor-start
-      ;;  )
-
-      ;; (general-define-key
-      ;;   ;; depends on dired-x
-      ;;   :keymaps emacs-leader-keys-files-map
-      ;;   "d" 'dired-jump
-      ;;  )
-
-      ;; (general-define-key
-      ;;   :keymaps 'mohkale-buffers-map
-      ;;   "A" 'persp-add-buffer
-      ;;   "a" 'persp-add-current-buffer
-      ;;   "R" 'persp-remove-buffer
-      ;;   "r" 'persp-remove-current-buffer
-      ;;  )
-    #+END_SRC
-
-*** helm-descbinds
-    #+BEGIN_SRC emacs-lisp
-      (use-package helm-descbinds
-        :ensure t
-        :defer  t
-        :commands helm-descbinds
-        :init
-        ;; (leader/declare-prefix*
-        ;;   "hdB" "describe-bindings-buffer"
-        ;;   "hdb" "describe-bindings")
-        (leader/set-keys
-          ;; "hdB" 'describe-bindings
-          ;; "hdb" 'helm-descbinds
-
-          "?" 'helm-descbinds)
-        (defalias 'describe-bindings 'helm-descbinds))
-    #+END_SRC
-
-*** helm-make
-    #+BEGIN_SRC emacs-lisp
-      (use-package helm-make
-        :ensure t
-        :defer  t
-        :commands (helm-make
-                   helm-make-projectile)
-        :init
-        (leader/set-keys
-          "cc" 'helm-make-projectile
-          "cm" 'helm-make))
-    #+END_SRC
-
-*** ace-jump-helm-line
-    #+BEGIN_SRC emacs-lisp
-      (use-package ace-jump-helm-line
-        :ensure t
-        :defer  t
-        :commands ace-jump-helm-line
-        :bind (:map helm-map
-               ("C-q" . ace-jump-helm-line)))
-    #+END_SRC
-
-*** helm-projectile
-    #+BEGIN_SRC emacs-lisp
-      (use-package helm-projectile
-        :ensure t
-        :defer  t
-        :after (projectile helm)
-        :commands (helm-projectile-on
-                   helm-projectile-switch-project
-                   helm-projectile-find-file
-                   helm-projectile-find-file-in-known-projects
-                   helm-projectile-find-file-dwim
-                   helm-projectile-find-dir
-                   helm-projectile-recentf
-                   helm-projectile-switch-to-buffer
-                   helm-projectile-grep
-                   helm-projectile-ag
-                   helm-projectile-rg)
-        :init
-        (leader/declare-prefix*
-          "ps" '("search" . "project-search"))
-
-        (leader/set-keys
-          "pb" 'helm-projectile-switch-to-buffer
-          "pd" 'helm-projectile-find-dir
-          "pf" 'helm-projectile-find-file
-          "ph" 'helm-projectile
-          ;; "pl" 'helm-persp-switch-project
-          "pP" 'helm-projectile-switch-project
-          "pr" 'helm-projectile-recentf
-          "psg" 'helm-projectile-grep
-          "psa" 'helm-projectile-ag
-          "psr" 'helm-projectile-rg)
-        :config
-        (helm-projectile-on))
-    #+END_SRC
-
-*** helm-yasnippet
-    access snippets from helm... really cool tbh
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package helm-c-yasnippet
-        :ensure t
-        :defer  t
-        :commands helm-yas-complete
-        :init
-        (leader/set-keys
-          "is" 'helm-yas-complete)
-        (general-define-key
-          :states 'insert
-          "C-M-i" 'helm-yas-complete))
-    #+END_SRC
-
-*** helm-pydoc
-    #+BEGIN_SRC emacs-lisp
-      (use-package helm-pydoc
-        :ensure t
-        :defer  t
-        :commands helm-pydoc
-        :init
-        (with-eval-after-load 'helm
-          (leader/set-keys-for-mode! 'python-mode
-            "hd" 'helm-pydoc)))
-    #+END_SRC
-
