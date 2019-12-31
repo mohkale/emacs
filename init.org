@@ -4391,6 +4391,63 @@
         :defer  t)
     #+END_SRC
 
+*** align
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package align
+        :straight (align :type built-in)
+        :defer t
+        :commands (align
+                   align-current
+                   align-entire
+                   align-newline-and-indent
+                   align-regexp))
+    #+END_SRC
+
+**** ialign
+     #+BEGIN_SRC emacs-lisp
+       (use-package ialign
+         :ensure t
+         :defer  t
+         :commands (ialign evil-ialign)
+         :init
+         (leader/set-keys
+           "x TAB" 'evil-ialign)
+
+         (general-define-key
+           :states leader-norm-states
+           "g TAB" 'evil-ialign)
+
+         :config
+         ;; run ialign using evil motions
+         (evil-define-operator evil-ialign (beg end)
+           :type        line
+           :repeat      nil
+           :move-point  t
+           :keep-visual nil
+           (ialign beg end))
+
+         (general-define-key
+           :keymaps 'ialign-minibuffer-keymap
+           ;; "" 'ialign-toggle-repeat
+           "M-k"        'ialign-increment-spacing
+           "M-j"        'ialign-decrement-spacing
+           "M-h"        'ialign-decrement-group
+           "M-l"        'ialign-increment-group
+           "<M-up>"     'ialign-increment-spacing
+           "<M-down>"   'ialign-decrement-spacing
+           "<M-left>"   'ialign-decrement-group
+           "<M-right>"  'ialign-increment-group
+           "C-SPC"      'ialign-set-spacing
+           "<C-tab>"    'ialign-toggle-tabs
+           "<C-return>" 'ialign-set-group
+           "C-h"        'backward-char
+           "C-l" (lambda ()
+                   (interactive)
+                   (call-interactively (if (eolp)
+                                           'exit-minibuffer
+                                         'forward-char)))))
+     #+END_SRC
+
 *** all-the-icons
     #+BEGIN_SRC emacs-lisp
       (use-package all-the-icons
@@ -5138,7 +5195,6 @@
           ;; "C-k"       'company-select-previous
           ;; "TAB"       'company-complete-selection
           "C-v"    'company-search-toggle-filtering ; show filtered/all
-          "ESC"    'company-search-abort
           "ESC"    'company-search-abort)
 
         (general-define-key
@@ -5753,13 +5809,16 @@
                     vdiff-current-file
                     vdiff-merge-conflict)
          :init
+         (leader/declare-prefix
+           "d" "diff")
+
          (leader/set-keys
-           "= RET" 'vdiff-merge-conflict
-           "==" 'vdiff-current-file
-           "=f" 'vdiff-files
-           "=F" 'vdiff-files3
-           "=b" 'vdiff-buffers
-           "=B" 'vdiff-buffers3)
+           "d RET" 'vdiff-merge-conflict
+           "dd" 'vdiff-current-file
+           "df" 'vdiff-files
+           "dF" 'vdiff-files3
+           "db" 'vdiff-buffers
+           "dB" 'vdiff-buffers3)
 
          (defvar vdiff-use-relative-line-numbers nil
            "when true, line numbers in vdiff sessions are relative")
@@ -6853,30 +6912,32 @@
                counsel-evil-registers-height 15
                ivy-use-virtual-buffers t
                projectile-completion-system 'ivy
-               ivy-magic-tilde nil
-               ivy-initial-inputs-alist '((counsel-minor . "^+")
-                                          ;; (counsel-package . "^+")
-                                          ;; (org-refile . "^")
-                                          (org-agenda-refile . "^")
-                                          (org-capture-refile . "^")
-                                          ;; (counsel-M-x . "^")
-                                          ;; (counsel-describe-function . "^")
-                                          ;; (counsel-describe-variable . "^")
-                                          ;; (counsel-org-capture . "^")
-                                          ;; (org-refile . "^")
-                                          ;; (org-agenda-refile . "^")
-                                          ;; (org-capture-refile . "^")
-                                          (Man-completion-table . "^")
-                                          (woman . "^")))
+               ivy-magic-tilde nil)
+
+         :config
+         (ivy-mode +1)
 
          (setq ivy-preferred-re-builders
                '((ivy--regex-plus         . "ivy")
                  (ivy--regex-ignore-order . "order")
                  (ivy--regex-fuzzy        . "fuzzy")
-                 (regexp-quote            . "literal")))
+                 (regexp-quote            . "literal"))
 
-         :config
-         (ivy-mode +1)
+               ivy-initial-inputs-alist
+               '((counsel-minor . "^+")
+                 ;; (counsel-package . "^+")
+                 ;; (org-refile . "^")
+                 (org-agenda-refile . "^")
+                 (org-capture-refile . "^")
+                 ;; (counsel-M-x . "^")
+                 ;; (counsel-describe-function . "^")
+                 ;; (counsel-describe-variable . "^")
+                 ;; (counsel-org-capture . "^")
+                 ;; (org-refile . "^")
+                 ;; (org-agenda-refile . "^")
+                 ;; (org-capture-refile . "^")
+                 (Man-completion-table . "^")
+                 (woman . "^")))
 
          (defun ivy-kill-line-backward ()
            (interactive)
@@ -6943,7 +7004,7 @@
            "<S-return>"   'ivy-immediate-done
            "C-c <return>" 'ivy-immediate-done
            ;; prompt for action, then done
-           "C-RET" 'ivy-dispatching-done
+           "<C-return>" 'ivy-dispatching-done
            ;; invoke default action'but exit the minibuffer
            "M-RET" 'ivy-call
            ;; prompt for action, then call
@@ -6964,6 +7025,7 @@
            "C-q" 'ivy-avy
            "M-j" 'ivy-next-history-element
            "M-k" 'ivy-previous-history-element
+           "M-u" 'ivy-occur
            ;; arrow key variants
            "<left>"  'backward-char
            "<right>" 'forward-char
@@ -7127,55 +7189,6 @@
          :defer  t
          :after  ivy
          :diminish
-         :commands (counsel-M-x
-                    counsel-descbinds
-                    counsel-describe-function
-                    counsel-describe-variable
-                    counsel-apropos
-                    counsel-describe-face
-                    counsel-faces
-                    counsel-find-file
-                    counsel-find-library
-                    counsel-imenu
-                    counsel-load-library
-                    counsel-load-theme
-                    counsel-yank-pop
-                    counsel-esh-history
-                    counsel-mark-ring
-                    counsel-bookmark
-                    counsel-company
-                    counsel-compile
-                    ;; counsel-dired ;; same as find-file
-                    counsel-dired-jump
-                    counsel-evil-registers
-                    counsel-evil-marks
-                    counsel-file-jump
-                    counsel-file-register
-                    counsel-fzf
-                    ;; counsel-git...
-                    counsel-git
-                    counsel--find-file-1
-                    counsel-git-change-work-tree
-                    counsel-git-checkout
-                    counsel-git-grep
-                    counsel-git-grep-query-replace
-                    counsel-git-grep-switch-cmd
-                    counsel-git-log
-                    counsel-git-stash
-                    counsel-jedi
-                    counsel-list-processes
-                    counsel-outline
-                    counsel-register
-                    counsel-grep...
-                    counsel-pt ;; WARN doesn't work
-                    counsel-rg
-                    counsel-ag
-                    counsel-wmctrl
-                    counsel-locate
-                    counsel-unicode-char
-                    counsel-info-lookup-symbol
-                    counsel-recentf
-                    counsel-mode)
          :init
          (setq counsel-find-file-occur-use-find t
                counsel-rg-base-command "rg --with-filename --no-heading --line-number --path-separator // --color never %s ."
@@ -9356,8 +9369,10 @@
              (prefix-command-preserve-state)
              (if (not prefix-arg)
                  (universal-argument)
-               ,@body)))
+               ,@body)
 
+             (when prefix-arg
+               (universal-argument--mode))))
         (put 'defun-universal-argument-operation 'lisp-indent-function 'defun)
 
         (defun-universal-argument-operation smart-universal-argument
@@ -13209,15 +13224,6 @@
     #+END_SRC
 
 ** Unimplemented
-*** iallign
-    #+BEGIN_SRC emacs-lisp
-      (use-package ialign
-        :ensure t
-        :defer  t
-        :commands (ialign)
-        )
-    #+END_SRC
-
 *** realgud
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package realgud
