@@ -84,6 +84,7 @@
                               "/GTAGS$"
                               "/GRAGS$"
                               "/GPATH$"
+                              "tmp\\.[^/\\]*$"
                               ;; binary
                               "\\.mkv$"
                               "\\.mp[34]$"
@@ -6923,7 +6924,9 @@
                  (ivy--regex-fuzzy        . "fuzzy")
                  (regexp-quote            . "literal"))
 
-               ivy-initial-inputs-alist
+               ;; store as unique variable because counsel
+               ;; will just end up adding to it anyways.
+               mohkale--ivy-initial-inputs-alist
                '((counsel-minor . "^+")
                  ;; (counsel-package . "^+")
                  ;; (org-refile . "^")
@@ -6937,7 +6940,9 @@
                  ;; (org-agenda-refile . "^")
                  ;; (org-capture-refile . "^")
                  (Man-completion-table . "^")
-                 (woman . "^")))
+                 (woman . "^"))
+
+               ivy-initial-inputs-alist mohkale--ivy-initial-inputs-alist)
 
          (defun ivy-kill-line-backward ()
            (interactive)
@@ -7262,6 +7267,8 @@
            "C-M-y" 'counsel-yank-pop)
 
          :config
+         (setq ivy-initial-inputs-alist mohkale--ivy-initial-inputs-alist)
+
          (counsel-mode +1)
 
          (defun counsel-find-file--jump-to-bookmark ()
@@ -9344,10 +9351,49 @@
 
 *** server
     #+BEGIN_SRC emacs-lisp
-      (require 'server)
+      (use-package server
+        :demand t
+        :commands (server-kill-clients-for-buffer)
+        :config
+        ;; see http://emacshorrors.com/posts/determining-if-the-server-is-started-or-the-wonders-of-server-running-p.html
+        ;; for why this is basically useless :(
+        (or (server-running-p) (server-start))
 
-      (unless (server-running-p)
-        (server-start))
+        ;; see https://superuser.com/questions/295156/how-to-set-the-exit-status-for-emacsclient
+        (defun server-kill-clients-for-buffer (&optional prefix)
+          "Sends error exit command to every client for the current buffer."
+          (interactive "P")
+          (if (not server-buffer-clients)
+              (error "current buffer has no server clients")
+            (dolist (proc server-buffer-clients)
+              (server-send-string proc "-error die"))
+            (unless prefix (kill-buffer))))
+
+        (defalias 'server-abort #'server-kill-clients-for-buffer)
+
+        ;; add ,, and ,q like bindings in server edit sessions, like org-edit-src-code
+        (define-minor-mode mohkale-server-mode
+          "a dummy minor mode for files being edited by `server'.
+      makes it easier to bind keys (& leaders :grinning: for them)."
+          nil
+          "ServerEdit"
+          '(([remap evil-write] . server-edit)
+            ([remap evil-save-and-close] . server-edit)
+            ([remap evil-quit-all-with-error-code] . server-abort))
+          (when mohkale-server-mode
+            (setq header-line-format
+                  (substitute-command-keys
+                   "Editing an emacsclient sesssion.  Exit with '\\[server-edit]' or abort with '\\[server-abort]'"))))
+
+        (add-hook 'server-switch-hook (lambda () (when server-buffer-clients
+                                              (mohkale-server-mode))))
+
+        (add-hook 'server-done-hook (lambda () (mohkale-server-mode -1)))
+
+        (leader/with-major-mode-prefix
+          (leader/set-keys-for-mode 'mohkale-server-mode
+            "," 'server-edit
+            "q" 'server-abort)))
     #+END_SRC
 
 *** simple
