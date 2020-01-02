@@ -1,4 +1,4 @@
-12   Choose buffers: 12   Choose buffers: # -*- mode: org; coding: utf-8-unix -*-
+# -*- mode: org; coding: utf-8-unix -*-
 
 #+TITLE: mohkale.org
 #+STARTUP: content
@@ -119,8 +119,10 @@
                     default-buffer-file-coding-system 'utf-8-unix
                     buffer-file-coding-system 'utf-8-unix
                     echo-keystrokes 0.02)
+    #+END_SRC
 
-      (put 'narrow-to-region 'disabled nil)
+    #+BEGIN_SRC emacs-lisp
+      (put 'narrow-to-region 'disabled nil) ;; re-enable
 
       (set-face-attribute 'default nil
                           :family "Source Code Pro"
@@ -129,6 +131,23 @@
                           :weight 'normal
                           :width 'normal)
 
+      ;; to make string based hash tables easier to make
+      (define-hash-table-test 'string-hash-table-test
+        'string-equal 'sxhash-equal)
+    #+END_SRC
+
+    Disable annoying GUI enhancemants. minimal emacs is *best* emacs.
+
+    #+BEGIN_SRC emacs-lisp
+      (menu-bar-mode -1)     ; dropdown menu list below frame title
+      (scroll-bar-mode -1)   ; scrolling bar shown on frames right side
+      (tool-bar-mode -1)     ; short mini menu showed below the menu bar
+      (blink-cursor-mode -1) ; cursor flashes annoyingly
+    #+END_SRC
+
+    Create some aliases for functions that're are hard to remember or weirdly named or just too long.
+
+    #+BEGIN_SRC emacs-lisp
       (defalias 'yes-or-no-p 'y-or-n-p)
       (defalias 'regexp-string-match #'string-match)
 
@@ -142,17 +161,13 @@
       (defalias 'gud-gnu-debugger #'gud-gdb)
       (defalias 'perl-debugger    #'perldb)
       (defalias 'java-debugger    #'jdb)
+    #+END_SRC
 
-      ;;; disable annoying GUI enhancements
-      (menu-bar-mode -1)     ; dropdown menu list below frame title
-      (scroll-bar-mode -1)   ; scrolling bar shown on frames right side
-      (tool-bar-mode -1)     ; short mini menu showed below the menu bar
-      (blink-cursor-mode -1) ; cursor flashes annoyingly
+    customise display-buffer-alist to prioritise switching focus to displayed
+    buffers, instead of showing them and then making me have to switch to them
+    and then exit.
 
-      ;; to make string based hash tables easier to make
-      (define-hash-table-test 'string-hash-table-test
-        'string-equal 'sxhash-equal)
-
+    #+BEGIN_SRC emacs-lisp
       ;; frankly, display buffers alist is badly documented.
       ;; there's a quick and simple article exploring how it
       ;; works [[https://www.simplify.ba/articles/2016/01/25/display-buffer-alist/][here]]
@@ -483,7 +498,8 @@
     #+END_SRC
 
 *** package-initialise
-    initialise installed packages and ensure packages needed to setup configuration from scratch is installed.
+    initialise installed packages and ensure packages needed to setup configuration
+    from scratch is installed.
 
     #+NAME: setup-packages-list
     - which-key
@@ -541,7 +557,8 @@
     #+END_SRC
 
 *** External Packages
-    Install the following the packages directly, compare against the hash value when given and then begin package initialisation.
+    Install the following the packages directly, compare against the hash value when given
+    and then begin package initialisation.
 
     #+NAME: non-melpa-packages
     | name                | hash            | url                                                                                       |
@@ -630,7 +647,8 @@
     #+END_SRC
 
 ** leader
-   replicate some +basically all+ the built in spacemacs leader features & keys... cause why fix whats not broken.
+   replicate some +basically all+ the built in spacemacs leader features &
+   keys... cause why fix whats not broken.
 
    #+BEGIN_SRC emacs-lisp
      ;; spaceleader.el --- leader-key implementation from spacemacs -*- lexical-binding: t -*-
@@ -12728,9 +12746,6 @@
 
       (mohkale/load-meghanada)
     #+END_SRC
-
-    #+RESULTS:
-    | meghanada |
 
 *** javascript
     # NOTE no on the fly syntax checking? make sure eslint is installed no warning or error will be issued if it isn't :(
