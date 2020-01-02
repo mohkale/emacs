@@ -412,8 +412,6 @@ if !File.exists?(options[:"config-file"])
     exit 2
 end
 
-
-
 begin
     uptodate = FileUtils.uptodate?(options[:"tangled-file"], [options[:"config-file"]])
 
@@ -425,8 +423,6 @@ begin
         TangleCommand.new(options[:"config-file"], suppress?(options, :tangle), options[:"error-file"]).run
     end
 end
-
-
 
 begin
     if options[:"compile"]
@@ -440,7 +436,6 @@ begin
         end
     end
 end
-
 
 unless options[:"keep-log"]
     if options[:"error-file"] && File.exists?(options[:"error-file"])

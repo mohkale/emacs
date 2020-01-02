@@ -1,4 +1,4 @@
-# -*- mode: org; coding: utf-8-unix -*-
+12   Choose buffers: 12   Choose buffers: # -*- mode: org; coding: utf-8-unix -*-
 
 #+TITLE: mohkale.org
 #+STARTUP: content
@@ -2360,13 +2360,17 @@
           (when (not (eq dedicate (window-dedicated-p window)))
             (set-window-dedicated-p window dedicate))))
 
-      (defun window-zen ()
-        "Maximize buffer"
+      (defun window-zen (&optional prefix)
+        "Maximize buffer or undo maximize buffer
+      pass prefix to also restore original point."
         ;; from https://gist.github.com/3402786
-        (interactive)
+        (interactive "P")
         (if (and (= 1 (length (window-list)))
                  (assoc ?_ register-alist))
-            (jump-to-register ?_)
+            (if prefix
+                (jump-to-register ?_)
+              (save-excursion
+                (jump-to-register ?_)))
           (window-configuration-to-register ?_)
           (delete-other-windows)))
 
@@ -3140,6 +3144,11 @@
        (setq ivy-dispatching-done-hydra-exit-keys '(("ESC" nil) ("C-g" nil)))
 
        (defalias 'hydra-ivy-custom #'hydra-ivy)
+
+       (with-eval-after-load 'ivy
+         (advice-add 'ivy-read :after
+                     (defun hydra-ivy--auto-exit-with-ivy (&rest args)
+                       (hydra-ivy/nil))))
 
        (provide 'hydra-ivy-custom)
      #+END_SRC
@@ -6957,6 +6966,14 @@
                                    'ivy-alt-done
                                  'forward-char)))
 
+         (defun ivy-toggle-mark ()
+           (interactive)
+           (if (ivy--marked-p)
+               (when (ivy--marked-p)
+                 (ivy--unmark (ivy-state-current ivy-last)))
+             (unless (ivy--marked-p)
+               (ivy--mark (ivy-state-current ivy-last)))))
+
          (with-eval-after-load "persp-mode"
            ;; thanks https://gist.github.com/Bad-ptr/1aca1ec54c3bdb2ee80996eb2b68ad2d#file-persp-ivy-el
            (add-hook 'ivy-ignore-buffers
@@ -6989,11 +7006,11 @@
 
          (general-define-key
            :keymaps 'ivy-minibuffer-map
-           "C-j" nil ;; was ivy-alt-done
-           "M-j" nil ;; was ivy-yank-word
-           "M-v" nil ;; was ivy-scroll-down-command
-           "C-v" nil ;; was ivy-scroll-up-command
-           "C-'" nil ;; was ivy-avy
+           "C-j"   nil ;; was ivy-alt-done
+           "M-j"   nil ;; was ivy-yank-word
+           "M-v"   nil ;; was ivy-scroll-down-command
+           "C-v"   nil ;; was ivy-scroll-up-command
+           "C-'"   nil ;; was ivy-avy
            "C-M-y" nil ;; was ivy-insert-current-full
 
            "<return>" 'ivy-alt-done ;; also supports tramp expansion
@@ -7002,7 +7019,13 @@
            "C-?" 'describe-mode
            "M-d" 'kill-ring-save ;; save all candidates to kill ring
            ;; erase input, but start filtering from current candidates
-           "S-SPC" 'ivy-restrict-to-matches ; also bound to M-SPC
+           "S-SPC" 'ivy-restrict-to-matches
+
+           ;;; marking
+           "C-SPC"         'ivy-mark
+           "M-SPC"         'ivy-toggle-mark
+           "C-M-SPC"       'ivy-toggle-marks
+           "<S-backspace>" 'ivy-unmark-backward
 
            ;;; selection execution
            ;; exit with current input, not selection
@@ -7058,7 +7081,7 @@
 
            ;;; history - (C-r/C-s still work fine)
            "<S-up>"    'ivy-previous-history-element
-           "<S-down>"  'ivy-next-history-element )
+           "<S-down>"  'ivy-next-history-element)
 
          (general-define-key
            :keymaps 'ivy-switch-buffer-map
@@ -7337,13 +7360,16 @@
                     swiper-from-isearch
                     swiper-multi
                     swiper-all
+                    swiper-multibuffer
                     swiper-isearch-thing-at-point
                     swiper-isearch
                     swiper-isearch-backward
                     swiper-isearch-toggle)
          :init
          (leader/set-keys
-           "ss" 'swiper)
+           "ss" 'swiper
+           "s*" 'swiper-all
+           "sS" 'swiper-multibuffer)
 
          (defvar swiper-persistent-highlight nil
            "if swiper is using evil-search for searching, determine
@@ -7385,7 +7411,55 @@
            "C-q" nil
            "C-l" 'ivy-forward-char-or-partial-or-done
            "C-q" 'swiper-avy
-           "C-s" 'swiper-query-replace))
+           "C-s" 'swiper-query-replace)
+
+         (defvar swiper-multibuffer-respect-filter nil
+           "respect `swiper-all-buffer-p'")
+
+         (defun swiper-multibuffer (&optional initial-input)
+           "use `swiper-all' on a subset of active buffers"
+           (interactive)
+           (cl-letf* (((symbol-function 'swiper-all-buffer-p)
+                       (if swiper-multibuffer-respect-filter
+                           (symbol-function 'swiper-all-buffer-p)
+                         (lambda (&rest args) t)))
+                      ((symbol-function 'actual-buffer-list)
+                       (symbol-function 'buffer-list))
+                      ((symbol-function 'ivy-choose-buffers)
+                       (lambda ()
+                         (let ((current-buffer (current-buffer))
+                               (current-window (selected-window))
+                               chosen-buffers)
+                           ;; dumb implementation of counsel-switch-to-buffer, but
+                           ;; doesn't actually switch, simply shows preview.
+                           (ivy-read "Choose buffers: " #'internal-complete-buffer
+                                     :keymap ivy-switch-buffer-map
+                                     :preselect (buffer-name (other-buffer current-buffer))
+                                     :action (lambda (_) (push _ chosen-buffers))
+                                     :matcher #'ivy--switch-buffer-matcher
+                                     :update-fn (lambda ()
+                                                  (with-selected-window current-window
+                                                    (let ((cand (nth ivy--index ivy--all-candidates)))
+                                                      (switch-to-buffer (if (ivy--marked-p)
+                                                                            (substring cand 1)
+                                                                          cand)))))
+                                     :unwind (lambda () (switch-to-buffer current-buffer))
+                                     :require-match t
+                                     :caller 'swiper-multibuffer)
+                           chosen-buffers)))
+                      ((symbol-function 'buffer-list)
+                       (let ((buffers
+                              (mapcar #'get-buffer
+                                      (cond
+                                       ((eq major-mode 'ibuffer-mode)
+                                        (or (ibuffer-get-marked-buffers)
+                                            (ivy-choose-buffers)))
+                                       ((eq major-mode 'Buffer-menu-mode)
+                                        (or (Buffer-menu-marked-buffers)
+                                            (ivy-choose-buffers)))
+                                       (t (ivy-choose-buffers))))))
+                         (lambda () buffers)))) ;; keep in closure
+             (swiper-all initial-input))))
      #+END_SRC
 
 **** ivy-yasnippet
@@ -7527,6 +7601,7 @@
          :init
          (leader/set-keys
            "bm" 'ibuffer)
+
          :config
          (evil-set-initial-state 'ibuffer-mode 'motion)
 
@@ -7540,6 +7615,7 @@
            "&"      'ibuffer-and-filter
            "*"      'ibuffer-filter-by-starred-name
            "."      'ibuffer-filter-by-file-extension
+           ","      'ibuffer-filter-by-used-mode
            "/"      'ibuffer-filter-disable
            "<"      'ibuffer-filter-by-size-lt
            ">"      'ibuffer-filter-by-size-gt
@@ -7569,11 +7645,11 @@
            "v"      'ibuffer-filter-by-visiting-file
            "x"      'ibuffer-delete-saved-filters
            "|"      'ibuffer-or-filter
-           "<S-up>" 'ibuffer-pop-filter-group
+           "<down>" 'ibuffer-pop-filter-group
            "<up>"   'ibuffer-pop-filter)
 
          (leader/declare-prefix-for-mode!* 'ibuffer-mode
-           "G" "jump/goto"
+           "g" "jump/goto"
            "m" "mark"
            "/" "filter")
 
@@ -7596,9 +7672,8 @@
            ;; "s"   'ibuffer-do-replace-regexp
            "T"   'ibuffer-visit-tags-table
            "f"   'ibuffer-find-file
-           "g"   'ibuffer-jump-to-buffer
-           "Gb"  'ibuffer-jump-to-buffer
-           "Gf"  'ibuffer-jump-to-filter-group
+           "gg"  'ibuffer-jump-to-buffer
+           "gf"  'ibuffer-jump-to-filter-group
            "|"   'ibuffer-do-shell-command-pipe-replace
            "~"   'ibuffer-do-toggle-modified
 
@@ -7779,7 +7854,8 @@
 
            (general-define-key
              :keymaps 'ibuffer-mode-map
-             "sv" 'ibuffer-vc)))
+             "sv" 'ibuffer-vc
+             ")" 'ibuffer-vc)))
      #+END_SRC
 
 **** ibuffer-tramp
@@ -7809,6 +7885,7 @@
            :init
            (defalias 'ibuffer-persp-current #'ibuffer-persp-set-filter-groups-by-persp-name-not-nil)
            (defalias 'ibuffer-persp-other #'ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
+
            (general-define-key
              :keymaps 'ibuffer-mode-map
              "sp" 'ibuffer-persp-current
@@ -11641,6 +11718,7 @@
            :keymaps 'org-mode-map
            ;; "C-M-<return>" 'org-meta-return
            "C-s"          'org-sort
+           "<C-tab>"      nil
            "M-S-<return>" nil
            "C-e"          nil
            "M-e"          nil
