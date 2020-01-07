@@ -1856,6 +1856,12 @@
 
       (add-hook 'after-change-major-mode-hook #'set-indent-offset)
 
+    #+END_SRC
+
+    A neat idea, but feels like more hassle than it's worth. Maybe recheck if I face
+    any more issues where this would come in useful.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
       ;; auto clear echo area after given delay... when the echo area just
       ;; remains static for a while, I can't tell whether emacs is still
       ;; working or is active and just waiting for input. This should make
@@ -3132,22 +3138,21 @@
          ("j" ivy-next-line)
          ("k" ivy-previous-line)
          ("l" ivy-end-of-buffer)
-         ("J" ivy-scroll-down-command)
-         ("K" ivy-scroll-up-command)
+         ("J" ivy-scroll-up-command)
+         ("K" ivy-scroll-down-command)
 
          ;; finish + marking
          ("RET"   ivy-alt-done :exit t)
          ("d"     ivy-alt-done :exit t)
-         ("C-RET" ivy-dispatching-done-hydra :exit t)
-         ("C-j"   ivy-dispatching-done-hydra :exit t)
+         ("C-RET" ivy-dispatching-done :exit t)
          ("M-RET" ivy-call :exit t)
-         ("M-j"   ivy-call :exit t)
          ("S-SPC" ivy-restrict-to-matches)
          ("SPC"   ivy-mark)
          ("m"     ivy-mark)
          ("DEL"   ivy-unmark-backward)
          ("u"     ivy-unmark)
-         ("t"     ivy-toggle-marks)
+         ("t"     ivy-toggle-mark)
+         ("T"     ivy-toggle-marks)
 
          ;; actions
          ("n" ivy-next-action)
@@ -3187,20 +3192,23 @@
          ;; keyboard-escape-quit means exit the ivy session
          ("q"        nil :exit t)
          ("i"        nil :exit t)
-         ("ESC"      nil :exit t)
          ("<escape>" nil :exit t)
          ("C-."      nil :exit t)
          ("C-g" keyboard-escape-quit :exit t))
+
+       ;; for some reason, can't be bound within hydra
+       (general-define-key
+         :keymaps 'hydra-ivy/keymap
+         "M-o" 'ivy-beginning-of-buffer)
 
        ;; escape keys for ivy-dispatching-done-hydra
        (setq ivy-dispatching-done-hydra-exit-keys '(("ESC" nil) ("C-g" nil)))
 
        (defalias 'hydra-ivy-custom #'hydra-ivy)
 
-       (with-eval-after-load 'ivy
-         (advice-add 'ivy-read :after
-                     (defun hydra-ivy--auto-exit-with-ivy (&rest args)
-                       (hydra-ivy/nil))))
+       (advice-add 'ivy-read :after
+                   (defun hydra-ivy--auto-exit-with-ivy (&rest args)
+                     (hydra-ivy/nil)))
 
        (provide 'hydra-ivy-custom)
      #+END_SRC
@@ -5983,6 +5991,7 @@
                                           "\\|^\\.pytest_cache$"
                                           "\\|^\\.gradle$"
                                           "\\|^\\.sass-cache$"
+                                          "\\|^\\.jekyll-cache$"
                                           "\\|^\\.git$"
                                           "\\|^Pipfile"))))
      #+END_SRC
@@ -7000,6 +7009,7 @@
      #+BEGIN_SRC emacs-lisp
        (use-package ivy
          :demand t
+         :commands (ivy-toggle-mark)
          :init
          (setq ivy-height 15
                counsel-evil-registers-height 15
@@ -7190,8 +7200,8 @@
            :keymaps 'ivy-occur-mode-map
            :states 'motion
            "RET" 'ivy-occur-press-and-switch
-           "M-<return>" 'ivy-occur-press
-           "C-<return>" 'ivy-occur-dispatch
+           "M-RET" 'ivy-occur-press
+           "<C-return>" 'ivy-occur-dispatch
            "gj" 'ivy-occur-next-line
            "gk" 'ivy-occur-previous-line
            "}" 'ivy-occur-next-line
@@ -8085,41 +8095,35 @@
 
          (leader/with-prefix mohkale--server-leader-key
            (leader/declare-prefix-for-mode* 'lsp-mode
+             "" "server"
              "w" "workspaces"
              "l" "lens"
              "r" "refactor"
-             "g" "goto"))
+             "g" "goto")
 
-         (leader/declare-prefix-for-mode* 'lsp-mode
-           mohkale--server-leader-key "server")
+           (leader/set-keys-for-mode 'lsp-mode
+             "?"   'lsp-describe-session
+             "|"   'lsp-describe-thing-at-point
+             "e"   'lsp-execute-code-action
+             "h"   'lsp-document-highlight
+             "wR"  'lsp-restart-workspace
+             "wa"  'lsp-workspace-folders-add
+             "wr"  'lsp-workspace-folders-remove
+             "ws"  'lsp-workspace-folders-switch
+             "DEL" 'lsp-disconnect
 
-         (leader/set-keys-for-mode 'lsp-mode
-           mohkale--server-leader-key mohkale-lsp-map)
+             "ll" 'lsp-lens-mode
+             "ls" 'lsp-lens-show
+             "lh" 'lsp-lens-hide
 
-         (general-define-key
-           :keymaps 'mohkale-lsp-map
-           "?"   'lsp-describe-session
-           "|"   'lsp-describe-thing-at-point
-           "e"   'lsp-execute-code-action
-           "h"   'lsp-document-highlight
-           "wR"  'lsp-restart-workspace
-           "wa"  'lsp-workspace-folders-add
-           "wr"  'lsp-workspace-folders-remove
-           "ws"  'lsp-workspace-folders-switch
-           "DEL" 'lsp-disconnect
+             "rr" 'lsp-format-buffer
+             "ri" 'lsp-organize-imports
+             "rc" 'lsp-rename
 
-           "ll" 'lsp-lens-mode
-           "ls" 'lsp-lens-show
-           "lh" 'lsp-lens-hide
-
-           "rr" 'lsp-format-buffer
-           "ri" 'lsp-organize-imports
-           "rc" 'lsp-rename
-
-           "gg" 'lsp-goto-type-definition
-           "gG" 'lsp-goto-implementation
-           "gF" 'lsp-find-implementation
-           "gf" 'lsp-find-type-definition))
+             "gg" 'lsp-goto-type-definition
+             "gG" 'lsp-goto-implementation
+             "gF" 'lsp-find-implementation
+             "gf" 'lsp-find-type-definition)))
      #+END_SRC
 
 ***** lsp-ui
@@ -8135,11 +8139,13 @@
             (setq lsp-ui-sideline-enable nil
                   lsp-ui-doc-enable nil)
             :config
-            (leader/declare-prefix-for-mode 'lsp-mode
-              "yp" "peek")
-            (leader/set-keys-for-mode 'lsp-mode
-              "pg" 'lsp-ui-peek-find-definitions
-              "pG" 'lsp-ui-peek-find-definitions)))
+            (leader/with-prefix mohkale--server-leader-key
+              (leader/declare-prefix-for-mode 'lsp-mode
+                "p" "peek")
+
+              (leader/set-keys-for-mode 'lsp-mode
+                "pg" 'lsp-ui-peek-find-definitions
+                "pG" 'lsp-ui-peek-find-definitions))))
       #+END_SRC
 
 ***** company-lsp
@@ -8267,6 +8273,7 @@
         "C-e" 'move-end-of-line
         "C-q" 'quoted-insert
         "C-M-q" 'quit-window
+        "M-DEL" 'kill-whole-line
 
         ;; "M-n" nil
         ;; "M-p" nil
@@ -8949,27 +8956,10 @@
          ;; :diminish " Ⓟ"
          :delight ""
          :hook (prog-mode . projectile-mode)
-         :commands (projectile-mode
-                    projectile-run-shell-command-in-root
-                    projectile-replace-regexp
-                    projectile-run-async-shell-command-in-root
-                    projectile-toggle-between-implementation-and-test
-                    projectile-switch-to-buffer
-                    projectile-compile-project
-                    projectile-dired
-                    projectile-find-dir
-                    projectile-find-file
-                    projectile-ivy-persp-switch-project
-                    projectile-show-and-copy-project-dir
-                    projectile-regenerate-tags
-                    projectile-find-tag
-                    projectile-invalidate-cache
-                    projectile-kill-buffers
-                    projectile-run-project
-                    projectile-replace
-                    projectile-test-project)
          :init
-         (leader/declare-prefix "p" "projectile" "project management")
+         (leader/declare-prefix*
+           "p" '("projectile" . "project management")
+           "px" "execute")
          (leader/set-keys
            "p!" 'projectile-run-shell-command-in-root
            "p%" 'projectile-replace-regexp
@@ -8977,9 +8967,11 @@
            "pa" 'projectile-toggle-between-implementation-and-test
            "pb" 'projectile-switch-to-buffer
            "pc" 'projectile-compile-project
-           "pD" 'projectile-dired
+           "ph" 'projectile-dired ;; dired in project home directory
            "pd" 'projectile-find-dir
+           "pD" 'projectile-discover-projects-in-directory
            "pf" 'projectile-find-file
+           "pF" 'projectile-find-file-in-known-projects
            "pG" 'projectile-regenerate-tags
            "pg" 'projectile-find-tag
            "pI" 'projectile-invalidate-cache
@@ -8987,8 +8979,21 @@
            "pl" 'projectile-ivy-persp-switch-project
            "py" 'projectile-show-and-copy-project-dir
            "pp" 'projectile-run-project
-           "pR" 'projectile-replace
-           "pt" 'projectile-test-project)
+           "pr" 'projectile-recentf
+           "p[" 'projectile-previous-project-buffer
+           "p]" 'projectile-next-project-buffer
+           "pt" 'projectile-test-project
+           "xe" 'projectile-run-eshell
+           "xi" 'projectile-run-ielm
+           "xt" 'projectile-run-term
+           "xs" 'projectile-run-shell
+           "xv" 'projectile-run-vterm
+           "pso" 'projectile-multi-occur
+           "psR" 'projectile-replace
+           "p TAB" 'projectile-find-other-file
+           "P DEL" 'projectile-browse-dirty-projects
+           "p RET" 'projectile-find-file-dwim
+           "p M-RET" 'projectile-find-file-dwim-other-window)
 
          (advice-add 'delete-buffer-file :after #'(lambda (&rest r)
                                                     (when (projectile-project-p)
@@ -9257,7 +9262,7 @@
         :commands (server-kill-clients-for-buffer)
         :config
         ;; see http://emacshorrors.com/posts/determining-if-the-server-is-started-or-the-wonders-of-server-running-p.html
-        ;; for why this is basically useless :(
+        ;; for why this is sometimes useless :(
         (or (server-running-p) (server-start))
 
         ;; see https://superuser.com/questions/295156/how-to-set-the-exit-status-for-emacsclient
@@ -9287,7 +9292,8 @@
                    "Editing an emacsclient sesssion.  Exit with '\\[server-edit]' or abort with '\\[server-abort]'"))))
 
         (add-hook 'server-switch-hook (lambda () (when server-buffer-clients
-                                              (mohkale-server-mode))))
+                                              (unless (derived-mode-p magit-mode)
+                                                (mohkale-server-mode)))))
 
         (add-hook 'server-done-hook (lambda () (mohkale-server-mode -1)))
 
@@ -10934,7 +10940,8 @@
          (defalias 'ruby-repl 'inf-ruby)
          (push 'inf-ruby-mode mohkale--whitespace-exempt-modes)
 
-         (leader/declare-prefix-for-mode! mohkale-ruby-mode "r" "REPL")
+         (leader/declare-prefix-for-mode!
+           mohkale-ruby-mode "r" "REPL")
          (leader/set-keys-for-mode! mohkale-ruby-mode
            "rr" 'inf-ruby
            "rg" 'inf-ruby-console-gem
@@ -12415,16 +12422,13 @@
            "e S--" 'kotlin-send-line-and-focus
            "e S-|" 'kotlin-send-block-and-focus
            "eR"    'kotlin-send-region-and-focus
-           "eB"    'kotlin-send-buffer-and-focus)
-
-         (mohkale/update-company-backends-for-mode kotlin t
-           '(company-lsp)))
+           "eB"    'kotlin-send-buffer-and-focus))
      #+END_SRC
 
 **** lsp-kotlin
      #+BEGIN_SRC emacs-lisp
        (with-eval-after-load 'kotlin-mode
-         (add-hook 'kotlin-mode-hook 'lsp-mode))
+         (add-hook 'kotlin-mode-hook 'lsp))
      #+END_SRC
 
 *** java
@@ -12866,10 +12870,6 @@
          :defer  t
          :commands (haskell-mode
                     run-haskell)
-         ;; :hook (;; disable indentation mode... super ugly
-         ;;        (haskell-mode . haskell-indent-mode)
-         ;;        ;; (haskell-mode . haskell-indentation-mode)
-         ;;        )
          :init
          (push 'haskell-interactive-mode mohkale--whitespace-exempt-modes)
          (push 'inferior-haskell-mode mohkale--whitespace-exempt-modes)
@@ -12978,9 +12978,7 @@
       (use-package magit
         :ensure t
         :defer  t
-        :commands (evil-search-previous
-                   evil-search-next
-                   magit-push
+        :commands (magit-push
                    magit-section-forward-sibling
                    magit-section-backward-sibling
                    magit-section-hide-children
@@ -12996,9 +12994,7 @@
         (setq magit-completing-read-function 'ivy-completing-read
               magit-revision-show-gravatars  '("^Author:     " . "^Commit:     ")
               ;; show magit status in a full screen window.
-              magit-display-buffer-function 'magit-display-buffer-fullframe-status-v1
-              evil-magit-state 'motion
-              evil-magit-use-y-for-yank t)
+              magit-display-buffer-function 'magit-display-buffer-fullframe-status-v1)
 
         ;; On Windows, we must use Git GUI to enter username and password
         ;; See: https://github.com/magit/magit/wiki/FAQ#windows-cannot-push-via-https
@@ -13020,7 +13016,19 @@
           "gU"  'magit-unstage-file)
 
         :config
-        (use-package evil-magit :demand t)
+        (use-package evil-magit
+          :ensure t
+          :init
+          (setq evil-magit-state 'motion
+                evil-magit-use-y-for-yank t))
+
+        (require 'evil-magit)
+
+        (setq mohkale--whitespace-exempt-modes
+              (append '(magit-status-mode
+                        magit-log-mode
+                        magit-diff-mode)
+                      mohkale--whitespace-exempt-modes))
 
         ;; GIVE ME BACK MY LEADER!!!
         (general-define-key
