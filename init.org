@@ -1836,9 +1836,9 @@
 
             ;; major mode dependent configurations
             (cond
-             ((eq major-mode 'python)
+             ((eq major-mode 'python-mode)
               (setq-local python-indent-offset indent))
-             ((eq major-mode 'ruby)
+             ((eq major-mode 'ruby-mode)
               (setq-local ruby-indent-level indent))
              ((eq major-mode 'enh-ruby-mode)
               (setq-local enh-ruby-indent-level indent))
@@ -5124,80 +5124,111 @@
         global-company-mode
         :commands (company-mode
                    global-company-mode
-                   mohkale/update-company-backends-for-mode)
-        :config
-        (global-company-mode)
-        (setq company-backends (cl-remove 'company-clang company-backends))
-
-        (defvar mohkale/universal-major-mode-backends
-          '(company-capf company-semantic company-files)
-          "backends that you should always use with `mohkale/update-company-backends-for-mode'")
-
-        (defmacro mohkale/update-company-backends-for-mode (mode major backends &optional dont-use-universal)
-          "adds mode dependent company backends to the front of `company-backends'
-      works by using hooks to update `company-backends' every time a mode change is
-      encountered. Try to use sparingly, too many hooks can slow down changes.
-
-      You have to pass the mode name as an unquoted symbol, whether the mode is a
-      major mode or a minor mode and which backends you want the mode to have. The
-      backends is added to `company-backends' as is, without any formatting or quoting."
-          (let* ((backends (if dont-use-universal
-                               (eval backends)
-                             (append mohkale/universal-major-mode-backends (eval backends))))
-                 (mode-name (symbol-name mode))
-                 (mode-sym (intern (concat mode-name "-mode")))
-                 (hook-sym (intern (concat mode-name "-mode-hook")))
-                 (func-str (concat "mohkale//update-"
-                                   mode-name
-                                   "-mode-company-backends")))
-            (if (eval major)
-                ;; major modes don't call the modes hook on exit, only on entry.
-                ;; Two methods and two hooks need to be bound to. The modes hook
-                ;; on entry, and 'change-major-mode-hook for exit.
-                (let* ((push-func-str (concat func-str "-push"))
-                       (pop-func-str  (concat func-str "-pop"))
-                       (push-func-sym (intern push-func-str))
-                       (pop-func-sym (intern pop-func-str)))
-                  `(progn
-                     (defun ,push-func-sym ()
-                       (unless (local-variable-p 'company-backends)
-                         (setq-local company-backends company-backends))
-                       (add-to-list 'company-backends (quote ,backends)))
-
-                     (defun ,pop-func-sym ()
-                       (when (eq major-mode (quote ,mode-sym))
-                         (setq-local company-backends (remove (quote ,backends) company-backends))))
-
-                     ;; push backends onto list on mode entry
-                     (add-hook (quote ,hook-sym) (quote ,push-func-sym))
-                     ;; strip backends from list on mode exit
-                     (add-hook 'change-major-mode-hook (quote ,pop-func-sym))
-                     nil))
-              ;; minor modes call the modes hook both on startup and exit
-              ;; so only one function needs to be defined which can handle
-              ;; both entry and exit for the mode.
-              ;; TODO test minor mode backend generator
-              (let ((func-sym (intern func-str)))
-                `(progn
-                   (defun ,func-sym ()
-                     ,(format "toggles the inclusion of specified company backends for `%s-mode'
-      this function is invoked both when `%s-mode' is activated and deactivated. On activation
-      it pushes the following backends onto the company-backends variable: %s
-
-      on exit, this function will remove the given backends from the list."
-                              mode-name mode-name backends)
-                     (if (eq major-mode (quote ,mode-sym))
-                         (add-to-list 'company-backends (quote ,backends))
-                       (setq company-backends (remove (quote ,backends) company-backends))))
-
-                   (add-hook (quote ,hook-sym) (quote ,func-sym))
-                   nil)))))
-
-        (put 'mohkale/update-company-backends-for-mode 'lisp-indent-function 'defun)
-
+                   company/configure-mode)
+        :init
         (general-define-key
           :states 'insert
           "M-SPC" 'company-complete)
+
+        :config
+        (global-company-mode)
+
+        (defvar universal-company-backends+
+          '(company-capf company-semantic company-files)
+          "backends that you should always use with `company/configure-mode'")
+
+        (defvar company-backends-alist+ nil
+          "alist of mode to backend associations.
+      DO NOT assign or modify this list directly, you should interact
+      with it using `company/configure-mode'.")
+
+        (defvar company-configured-mode-stack+ nil
+          "modes for which company has been configured in this buffer.")
+        (make-variable-buffer-local 'company-configured-mode-stack+)
+
+        (defun company/configure-mode--push-backends+ (mode backends)
+          "push backends for MODE into `company-backends'"
+          (when (member :universal backends)
+            (setq backends (append (delete :universal backends)
+                                   universal-company-backends+)))
+
+          (let ((backends-exist (local-variable-p 'company-backends)))
+            (unless backends-exist
+              (setq-local company-backends nil))
+
+            (condition-case err
+                (setq company-backends (remove-duplicates
+                                        (append backends
+                                                company-backends)))
+              (error
+               (unless backends-exist
+                 (kill-local-variable 'company-backends))
+               (signal (car err) (cdr err)))))
+
+          (push mode company-configured-mode-stack+))
+
+        (defun company/configure-mode--pop-backends+ (mode)
+          "pop configured company backends for MODE.
+      replacing the default backend list when MODE is the last
+      mode for which backends were configured."
+          ;; should be an always correct check, but just in case.
+          (when (member mode company-configured-mode-stack+)
+            (if (eq 1 (length company-configured-mode-stack+))
+                ;; erase company backends and configuration stack
+                (progn
+                  (kill-local-variable 'company-backends)
+                  (setq company-configured-mode-stack+ nil))
+              ;; remove backends for current mode, but replace with
+              ;; every other mode in the configured mode stack.
+              (setq company-configured-mode-stack+
+                    (remove mode company-configured-mode-stack+))
+              (let ((remaining-backends (-flatten
+                                         (mapcar
+                                          (lambda (mode)
+                                            (cdr (assoc mode company-backends-alist+)))
+                                          company-configured-mode-stack+))))
+                (when (member :universal remaining-backends)
+                  (setq remaining-backends (append (delete :universal remaining-backends)
+                                                   universal-company-backends+)))
+                (setq-local company-backends (remove-duplicates remaining-backends))))))
+
+        (add-hook 'change-major-mode-hook
+                  (defun configure-company--pop-for-major-mode+ ()
+                    "pop configured company backends for the current MAJOR-MODE"
+                    (company/configure-mode--pop-backends+ major-mode)))
+
+        ;; inspired by this issue: https://github.com/company-mode/company-mode/issues/839
+        (cl-defmacro company/configure-mode ((mode &key major (use-universal t) predicate) &rest backends)
+          "configure company backends for a given mode
+      MODE can be a major or a minor mode & activation can be predicated using PREDICATE.
+      backends are passed as the remaining argument list after the mode declaration.
+      when USE-UNIVERSAL is true, `universal-company-backends+' will be appended to
+      the list of backends supplied. "
+          (when backends
+            (let ((func-name (intern (concat "company/configure-" (symbol-name mode))))
+                  (mode-hook (intern (concat (symbol-name mode) "-hook")))
+                  (backends (if use-universal
+                                (push :universal backends)
+                              backends))
+                  ;; convert predicate to a callable
+                  (predicate (cond
+                              ((and (listp predicate)
+                                    (eq (car predicate)
+                                        'lambda))
+                               predicate)
+                              (t (eval `(lambda () ,(or predicate t)))))))
+              (push (cons mode backends) company-backends-alist+)
+              `(add-hook ',mode-hook
+                         (if ,major
+                             (defun ,func-name ()
+                               (when (funcall ,predicate)
+                                 (company/configure-mode--push-backends+ ',mode ',backends)))
+                           (defun ,func-name ()
+                             (if ,mode
+                                 (when (funcall ,predicate)
+                                   (company/configure-mode--push-backends+ ',mode ',backends))
+                               (company/configure-mode--pop-backends+ ',mode))))))))
+        (put 'company/configure-mode 'lisp-indent-function 'defun)
 
         (setq company-require-match nil)
 
@@ -8047,8 +8078,6 @@
          :defer  t
          :commands (lsp lsp-deferred lsp-mode) ;; never use lsp-mode, use lsp.
          :config
-         ;; (push 'company-lsp company-backends)
-
          (setq lsp-prefer-flymake             nil
                lsp-enable-snippet             nil
                lsp-enable-symbol-highlighting nil
@@ -8122,32 +8151,20 @@
             :commands company-lsp
             :config
             ;; reduces write lag
-            (setq company-lsp-cache-candidates t)))
+            (setq company-lsp-cache-candidates t)
+            (company/configure-mode (lsp-mode)
+              company-lsp)))
       #+END_SRC
 
 **** eglot
-     seems cool, but the lack of good documentation and support for flycheck is off putting. Also doesn't seem to highlight errors using eldoc when possible, which is a feature I quite like from lsp-mode. Give it some time, check back again.
+     seems cool, but the lack of good documentation and support for flycheck is off putting.
+     Also doesn't seem to highlight errors using eldoc when possible, which is a feature I
+     quite like from lsp-mode. Give it some time, check back again.
 
      #+BEGIN_SRC emacs-lisp :tangle no
        (use-package eglot
          :ensure t
          :defer  t
-         :commands (eglot
-                    eglot-format
-                    eglot-format-buffer
-                    eglot-rename
-                    eglot-shutdown
-                    eglot-reconnect
-                    eglot-clear-status
-                    eglot-code-actions
-                    eglot-events-buffer
-                    eglot-stderr-buffer
-                    eglot-help-at-point
-                    eglot-find-declaration
-                    eglot-find-implementation
-                    eglot-find-typeDefinition
-                    eglot-forget-pending-continuations
-                    eglot-signal-didChangeConfiguration)
          :init
          (defalias 'eglot-rename-symbol 'eglot-rename)
          :config
@@ -9204,9 +9221,9 @@
            :ensure t
            :defer  t
            :commands (company-restclient)
-           :init
-           (mohkale/update-company-backends-for-mode restclient t
-             '(company-restclient))))
+           :config
+           (company/configure-mode (restclient-mode :major t)
+             company-restclient)))
      #+END_SRC
 
 **** org-babel-restclient
@@ -10602,10 +10619,9 @@
            :ensure t
            :defer  t
            :commands (company-anaconda)
-           :init
-           (with-eval-after-load 'company
-             (mohkale/update-company-backends-for-mode python t
-               '(company-anaconda)))))
+           :config
+           (company/configure-mode (python-mode :major t)
+             company-anaconda)))
      #+END_SRC
 
 **** anaconda
@@ -10762,10 +10778,27 @@
       it just spits out exec error... my loathing towards windows grows :P
       TODO test out performance of enhanced ruby on linux.")
 
+      (defvar mohkale-ruby-use-lsp 'projectile
+        "whether to use `lsp-mode' with ruby-mode.
+      set to 'projectile to only activate if in a projectile project with a Gemfile.
+
+      NOTE solargraph... and basically every other ruby completion framework is
+           useless if your project doesn't have a Gemfile... that means for simple
+           scripts like ~/.emacs.d/bin/tangle, solargraph won't be of any use.
+      ")
+
       (setq mohkale-ruby-mode      (intern (concat (symbol-name mohkale-ruby-package) "-mode"))
             mohkale-ruby-mode-hook (intern (concat (symbol-name mohkale-ruby-mode)    "-hook")))
 
+      (push (cons mohkale-ruby-mode 2) mohkale-indent-config)
+
       (leader/set-keys "Mr" mohkale-ruby-mode)
+
+      (defmacro when-project-has-gemfile (&rest body)
+        `(let ((project-dir (projectile-project-p)))
+           (when (and project-dir
+                      (file-exists-p (concat project-dir "Gemfile")))
+             ,@body)))
     #+END_SRC
 
 **** ruby
@@ -10840,19 +10873,17 @@
 **** solargraph
      language server implementation for ruby.
 
-     #+BEGIN_SRC emacs-lisp :tangle no
-       (add-hook 'ruby-mode-hook #'lsp)
-
-       (with-eval-after-load 'company
-         (mohkale/update-company-backends-for-mode enh-ruby t
-           '(company-lsp))
-
-         (mohkale/update-company-backends-for-mode ruby t
-           '(company-lsp)))
+     #+BEGIN_SRC emacs-lisp
+       (add-hook mohkale-ruby-mode-hook
+                 (defun ruby-enable-lsp-in-projects (&rest args)
+                   (when (eq mohkale-ruby-use-lsp 'projectile)
+                     (when-project-has-gemfile
+                       (call-interactively 'lsp)))))
      #+END_SRC
 
 **** robe
-     # WARN robe won't work unless your project contains some identifying gemfile or what not... so if your not getting any completion help, that's probably why.
+     WARN robe won't work unless your project contains some identifying gemfile
+          so if your not getting any completion help, that's probably why.
 
      #+BEGIN_SRC emacs-lisp :tangle no
        (with-eval-after-load mohkale-ruby-mode
@@ -10864,15 +10895,15 @@
                       ruby-load-file
                       company-robe)
            :init
-           (with-eval-after-load 'company
-             (mohkale/update-company-backends-for-mode enh-ruby t
-               '(company-robe))
-
-             (mohkale/update-company-backends-for-mode ruby t
-               '(company-robe)))
-
-           ;; (add-hook mohkale-ruby-mode-hook #'robe-mode)
+           (add-hook mohkale-ruby-mode-hook
+                     (defun ruby-robe-enable-in-projects (&rest args)
+                       (unless (eq mohkale-ruby-use-lsp 'projectile)
+                         (when-project-has-gemfile
+                           (call-interactively 'robe-mode)))))
            :config
+           (company/configure-mode (robe-mode)
+             company-robe)
+
            (leader/declare-prefix-for-mode! mohkale-ruby-mode "g" "jump/goto")
 
            (leader/set-keys-for-mode! mohkale-ruby-mode
@@ -11133,10 +11164,9 @@
          (use-package company-web
            :ensure t
            :defer  t
-           :init
-           (with-eval-after-load 'company
-             (mohkale/update-company-backends-for-mode web t
-               '(company-web-html company-yasnippet)))))
+           :config
+           (company/configure-mode (web-mode :major t)
+             company-web-html company-yasnippet)))
      #+END_SRC
 
 **** simple-httpd
@@ -11993,10 +12023,9 @@
            :commands (company-shell
                       company-fish-shell
                       company-shell-env)
-           :init
-           (with-eval-after-load 'company
-             (mohkale/update-company-backends-for-mode sh t
-               '(company-shell company-shell-env)))))
+           :config
+           (company/configure-mode (sh-mode :major t)
+             company-shell company-shell-env)))
      #+END_SRC
 
 **** shell-script-mode
@@ -12133,8 +12162,8 @@
            "<S-tab>"         'markdown-shifttab
            "<backtab>"       'markdown-shifttab)
 
-         (mohkale/update-company-backends-for-mode markdown t
-           '(company-emoji))
+         (company/configure-mode (markdown-mode :major t)
+           company-emoji)
 
          (advice-add 'markdown-insert-list-item :after (lambda (&rest args)
                                                          (if (eq (char-before)
@@ -12278,8 +12307,8 @@
          :commands (cmake-mode)
          :hook (cmake-mode . flycheck-mode)
          :config
-         (mohkale/update-company-backends-for-mode cmake t
-           '(company-cmake)))
+         (company/configure-mode (cmake-mode :major t)
+           company-cmake))
      #+END_SRC
 
 **** company-cmake
@@ -12322,11 +12351,8 @@
 
          (setq c-default-style "stroustrup")
 
-         ;; (mohkale/update-company-backends-for-mode c t
-         ;;   '(company-ycmd company-c-headers))
-
-         ;; (mohkale/update-company-backends-for-mode c++ t
-         ;;   '(company-ycmd company-c-headers))
+         ;; (company/configure-mode ((c-mode c++-mode) :major t :predicate ycmd-mode)
+         ;;   company-ycmd company-c-headers)
 
          (defun mohkale//set-c-mode-bindings (mode)
            (leader/set-keys-for-mode! mode
@@ -12475,8 +12501,8 @@
           :config
           (require 'yasnippet)
 
-          (mohkale/update-company-backends-for-mode meghanada nil
-            '(company-meghanada))
+          (company/configure-mode (meghanada-mode)
+            company-meghanada)
 
           (setq mohkale-meghanada-map (make-sparse-keymap))
 
@@ -12547,9 +12573,6 @@
          :mode "\\.js$"
          :hook (js2-mode . flycheck-mode)
          :config
-         (mohkale/update-company-backends-for-mode js2-mode t
-           '(company-tern))
-
          (setq js2-mode-show-parse-errors      nil
                js2-mode-show-strict-warnings   nil
                js2-strict-missing-semi-warning nil)
@@ -12609,8 +12632,8 @@
            :commands company-tern
            :hook (js2-mode . (lambda () (require 'company-tern)))
            :config
-           (mohkale/update-company-backends-for-mode js2 t
-             '(company-tern))))
+           (company/configure-mode (js2-mode :major t)
+             company-tern)))
      #+END_SRC
 
 **** js-doc
@@ -12773,8 +12796,8 @@
            "?" 'css-lookup-symbol
            "b" 'web-beautify-css)
 
-         (mohkale/update-company-backends-for-mode css t
-           '(company-css)))
+         (company/configure-mode (css-mode :major t)
+           company-css))
      #+END_SRC
 
 **** less-css-mode
@@ -12856,12 +12879,8 @@
          (use-package haskell-indent
            :commands (haskell-indent-cycle))
 
-         ;; (mohkale/update-company-backends-for-mode haskell t
-         ;;   '(company-ghci))
-         (mohkale/update-company-backends-for-mode haskell t
-           '(company-lsp))
-         (mohkale/update-company-backends-for-mode haskell-cabal t
-           '(company-cabal))
+         (company/configure-mode (haskell-cabal-mode :major t)
+           company-cabal)
 
          (setq haskell-process-type 'cabal-repl)
 
@@ -12901,8 +12920,6 @@
            "sC" 'haskell-session-change-target
            "sk" 'haskell-session-kill
            "sK" 'haskell-kill-session-process))
-
-
      #+END_SRC
 
 **** company-ghci
