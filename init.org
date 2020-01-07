@@ -7421,7 +7421,7 @@
          (leader/set-keys
            "ss" 'swiper
            "s*" 'swiper-all
-           "sS" 'swiper-multibuffer)
+           "sS" 'swiper-multi)
 
          (defvar swiper-persistent-highlight nil
            "if swiper is using evil-search for searching, determine
@@ -7463,55 +7463,7 @@
            "C-q" nil
            "C-l" 'ivy-forward-char-or-partial-or-done
            "C-q" 'swiper-avy
-           "C-s" 'swiper-query-replace)
-
-         (defvar swiper-multibuffer-respect-filter nil
-           "respect `swiper-all-buffer-p'")
-
-         (defun swiper-multibuffer (&optional initial-input)
-           "use `swiper-all' on a subset of active buffers"
-           (interactive)
-           (cl-letf* (((symbol-function 'swiper-all-buffer-p)
-                       (if swiper-multibuffer-respect-filter
-                           (symbol-function 'swiper-all-buffer-p)
-                         (lambda (&rest args) t)))
-                      ((symbol-function 'actual-buffer-list)
-                       (symbol-function 'buffer-list))
-                      ((symbol-function 'ivy-choose-buffers)
-                       (lambda ()
-                         (let ((current-buffer (current-buffer))
-                               (current-window (selected-window))
-                               chosen-buffers)
-                           ;; dumb implementation of counsel-switch-to-buffer, but
-                           ;; doesn't actually switch, simply shows preview.
-                           (ivy-read "Choose buffers: " #'internal-complete-buffer
-                                     :keymap ivy-switch-buffer-map
-                                     :preselect (buffer-name (other-buffer current-buffer))
-                                     :action (lambda (_) (push _ chosen-buffers))
-                                     :matcher #'ivy--switch-buffer-matcher
-                                     :update-fn (lambda ()
-                                                  (with-selected-window current-window
-                                                    (let ((cand (nth ivy--index ivy--all-candidates)))
-                                                      (switch-to-buffer (if (ivy--marked-p)
-                                                                            (substring cand 1)
-                                                                          cand)))))
-                                     :unwind (lambda () (switch-to-buffer current-buffer))
-                                     :require-match t
-                                     :caller 'swiper-multibuffer)
-                           chosen-buffers)))
-                      ((symbol-function 'buffer-list)
-                       (let ((buffers
-                              (mapcar #'get-buffer
-                                      (cond
-                                       ((eq major-mode 'ibuffer-mode)
-                                        (or (ibuffer-get-marked-buffers)
-                                            (ivy-choose-buffers)))
-                                       ((eq major-mode 'Buffer-menu-mode)
-                                        (or (Buffer-menu-marked-buffers)
-                                            (ivy-choose-buffers)))
-                                       (t (ivy-choose-buffers))))))
-                         (lambda () buffers)))) ;; keep in closure
-             (swiper-all initial-input))))
+           "C-s" 'swiper-query-replace))
      #+END_SRC
 
 **** ivy-yasnippet
