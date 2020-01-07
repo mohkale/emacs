@@ -8199,203 +8199,6 @@
          )
      #+END_SRC
 
-**** server-installation-scripts
-     #+NAME: server-install-path
-     #+BEGIN_SRC emacs-lisp :results value :tangle no
-       (expand-file-name "~/.emacs.d/var/lsp/servers")
-     #+END_SRC
-
-     #+NAME: set_shell_banner
-     #+BEGIN_SRC emacs-lisp :var varname="BANNER" text="" width=80 char="@" :results value :tangle no
-       (let* ((text-width (length text))
-              (width (max width
-                          (+ 4 text-width)))
-              (header-string (make-string width
-                                          (string-to-char char)))
-              (pad-width (/ (- width 4 text-width)
-                            2))
-              (pad-string (make-string pad-width ? ))
-
-              (banner (concat "\n"
-                              char
-                              " "
-                              (unless (zerop (% text-width 2))
-                                " ")
-                              pad-string
-                              text
-                              pad-string
-                              " "
-                              char
-                              "\n")))
-         (format "%s='\n%s\n'"
-                 varname
-                 (concat header-string
-                         banner
-                         header-string)))
-     #+END_SRC
-
-***** kotlin-language-server
-      :PROPERTIES:
-      :header-args+: :tangle ~/.emacs.d/bin/install/kotlin-language-server.sh
-      :END:
-
-      #+BEGIN_SRC bash :shebang #!/usr/bin/bash
-        <<set_shell_banner(varname="INSTALLATION_ALREADY_DONE_BANNER",text="kotlin language server already installed",char="#")>>
-        <<set_shell_banner(varname="CLONING_LANGUAGE_SERVER_BANNER",text="cloning fwcd/kotlin-language-server",char="#")>>
-        <<set_shell_banner(varname="CLONING_FAILED_BANNER",text="failed to clone repository, program terminated",char="*")>>
-        <<set_shell_banner(varname="CLONING_ALREADY_DONE_BANNER",text="fwcd/kotlin-language-server already cloned",char="#")>>
-        <<set_shell_banner(varname="RUNNING_GRADLE_BUILD_BANNER",text="running gradle build process",char="#")>>
-        <<set_shell_banner(varname="GRADLE_BUILD_FAILED_BANNER",text="failed to build kotlin language server",char="*")>>
-        <<set_shell_banner(varname="FINISHED_BANNER",text="finished installing the kotlin language server",char="*")>>
-
-        DEST_PATH="<<server-install-path()>>/kotlin"
-      #+END_SRC
-
-      #+BEGIN_SRC bash
-        if [ -f "${DEST_PATH}/bin/kotlin-language-server" ]; then
-            echo "${INSTALLATION_ALREADY_DONE_BANNER}"
-        else
-            mkdir -p "${DEST_PATH}"
-            pushd "${DEST_PATH}"
-
-            CLONE_PATH="./.server"
-            if [ ! -d "${CLONE_PATH}/.git" ]; then
-                echo "${CLONING_LANGUAGE_SERVER_BANNER}"
-
-                if ! git clone "https://github.com/fwcd/kotlin-language-server" "${CLONE_PATH}"; then
-                    echo "${CLONING_FAILED_BANNER}"
-                    exit 1
-                fi
-            else
-                echo "${CLONING_ALREADY_DONE_BANNER}"
-            fi
-
-            echo "${RUNNING_GRADLE_BUILD_BANNER}"
-
-            pushd "${CLONE_PATH}"
-            if ! ./gradlew :server:installDist; then
-                echo "${GRADLE_BUILD_FAILED_BANNER}"
-                exit 2
-            fi
-            popd
-
-            mv ${CLONE_PATH}/server/build/install/server/* ./
-            rm -rf "${CLONE_PATH}"
-            echo "${FINISHED_BANNER}"
-        fi
-      #+END_SRC
-
-***** kotlin-debug-adapter
-      :PROPERTIES:
-      :header-args+: :tangle ~/.emacs.d/bin/install/kotlin-debug-adapter.sh
-      :END:
-
-      #+BEGIN_SRC bash :shebang #!/usr/bin/bash
-        <<set_shell_banner(varname="INSTALLATION_ALREADY_DONE_BANNER",text="kotlin debug adapter already installed",char="#")>>
-        <<set_shell_banner(varname="CLONING_DEBUG_ADAPTER_BANNER",text="cloning fwcd/kotlin-debug-adapter",char="#")>>
-        <<set_shell_banner(varname="CLONING_FAILED_BANNER",text="failed to clone repository, program terminated",char="*")>>
-        <<set_shell_banner(varname="CLONING_ALREADY_DONE_BANNER",text="fwcd/kotlin-debug-adapter already cloned",char="#")>>
-        <<set_shell_banner(varname="RUNNING_GRADLE_BUILD_BANNER",text="running gradle build process",char="#")>>
-        <<set_shell_banner(varname="GRADLE_BUILD_FAILED_BANNER",text="failed to build kotlin debug adapter",char="*")>>
-        <<set_shell_banner(varname="INISHED_BANNER",text="finished installing the kotlin debug adapter",char="*")>>
-
-        DEST_PATH="<<server-install-path()>>/kotlin/debugger"
-      #+END_SRC
-
-      #+BEGIN_SRC bash
-        if [ -f "${DEST_PATH}/bin/kotlin-debug-adapter" ]; then
-            echo "${INSTALLATION_ALREADY_DONE_BANNER}"
-        else
-            mkdir -p "${DEST_PATH}"
-            pushd "${DEST_PATH}"
-
-            CLONE_PATH="./.debugger"
-            if [ ! -d "${CLONE_PATH}/.git" ]; then
-                echo "${CLONING_DEBUG_ADAPTER_BANNER}"
-
-                if ! git clone "https://github.com/fwcd/kotlin-debug-adapter" "${CLONE_PATH}"; then
-                    echo "${CLONING_FAILED_BANNER}"
-                    exit 1
-                fi
-            else
-                echo "${CLONING_ALREADY_DONE_BANNER}"
-            fi
-
-            echo "${RUNNING_GRADLE_BUILD_BANNER}"
-
-            pushd "${CLONE_PATH}"
-            if ! ./gradlew :adapter:installDist; then
-                echo "${GRADLE_BUILD_FAILED_BANNER}"
-                exit 2
-            fi
-            popd
-
-            mv ${CLONE_PATH}/adapter/build/install/adapter/* ./
-            rm -rf "${CLONE_PATH}"
-            echo "${FINISHED_BANNER}"
-        fi
-      #+END_SRC
-
-***** haskell-ide-engine
-      :PROPERTIES:
-      :header-args+: :tangle ~/.emacs.d/bin/install/haskell-ide-engine.sh
-      :END:
-
-      if your install fails with exit code 251, you're computer ran out of memory during the install process. Simply close all running programs and try again. Warning: install can take upto an hour and over 3 GB of RAM.
-
-      #+BEGIN_SRC bash :shebang #!/usr/bin/bash
-        <<set_shell_banner(varname="INSTALLATION_ALREADY_DONE_BANNER",text="haskell IDE engine already installed",char="#")>>
-        <<set_shell_banner(varname="CLONING_LANGUAGE_SERVER_BANNER",text="cloning haskell/haskell-ide-engine",char="#")>>
-        <<set_shell_banner(varname="CLONING_FAILED_BANNER",text="failed to clone repository, program terminated",char="*")>>
-        <<set_shell_banner(varname="CLONING_ALREADY_DONE_BANNER",text="haskell/haskell-ide-engine already cloned",char="#")>>
-        <<set_shell_banner(varname="RUNNING_CABAL_INSTALL_BANNER",text="running cabal installer, you may wish to free some RAM",char="#")>>
-        <<set_shell_banner(varname="CABAL_INSTALL_FAILED_BANNER",text="failed to build haskell IDE engine",char="*")>>
-        <<set_shell_banner(varname="FAILED_TO_MOVE_AFTER_INSTALL_BANNER",text="could not find stack install directory for server move",char="*")>>
-        <<set_shell_banner(varname="FINISHED_BANNER",text="finished installing the haskell IDE engine",char="*")>>
-
-        DEST_PATH="<<server-install-path()>>/haskell"
-      #+END_SRC
-
-      #+BEGIN_SRC bash
-        BUILD_TARGET="stack-hie-8.6.5"
-
-        if [ -f "${DEST_PATH}/hie.exe" -o -f "${DEST_PATH}/hie" ]; then
-            echo "${INSTALLATION_ALREADY_DONE_BANNER}"
-        else
-            mkdir -p "${DEST_PATH}"
-            pushd "${DEST_PATH}"
-
-            CLONE_PATH="./.hie"
-            if [ ! -d "${CLONE_PATH}/.git" ]; then
-                echo "${CLONING_LANGUAGE_SERVER_BANNER}"
-
-                if ! git clone "https://github.com/haskell/haskell-ide-engine" "${CLONE_PATH}" --recurse-submodules; then
-                    echo "${CLONING_FAILED_BANNER}"
-                    exit 1
-                fi
-            else
-                echo "${CLONING_ALREADY_DONE_BANNER}"
-            fi
-
-            echo "${RUNNING_CABAL_INSTALL_BANNER}"
-
-            pushd "${CLONE_PATH}"
-            if ! cabal v2-run ./install.hs --project-file install/shake.project -j1 --ghc-options="+RTS -M600M" "${BUILD_TARGET}"; then
-                echo "${CABAL_INSTALL_FAILED_BANNER}"
-                exit 2
-            fi
-            popd
-
-            INSTALL_PATH="$(stack path --local-bin)"
-            if [ $? -eq 0 ]; then
-                find "${INSTALL_PATH}/" -maxdepth 1 -iname 'hie*' -print0 | xargs -0 -i% mv % ./
-                rm -rf "${CLONE_PATH}"
-                echo "${FINISHED_BANNER}"
-            else
-                echo "${FAILED_TO_MOVE_AFTER_INSTALL_BANNER}"
-            fi
-        fi
-      #+END_SRC
 *** macro/kmacro/edmacro
     #+BEGIN_SRC emacs-lisp
       (leader/declare-prefix*
@@ -13378,6 +13181,207 @@
         (general-define-key
           :keymaps 'realgud-track-mode-map
           "<override-state>" nil))
+    #+END_SRC
+
+
+* Scripts
+
+** server-installation-scripts
+   #+NAME: server-install-path
+   #+BEGIN_SRC emacs-lisp :results value :tangle no
+     (expand-file-name "~/.emacs.d/var/lsp/servers")
+   #+END_SRC
+
+   #+NAME: set_shell_banner
+   #+BEGIN_SRC emacs-lisp :var varname="BANNER" text="" width=80 char="@" :results value :tangle no
+     (let* ((text-width (length text))
+            (width (max width
+                        (+ 4 text-width)))
+            (header-string (make-string width
+                                        (string-to-char char)))
+            (pad-width (/ (- width 4 text-width)
+                          2))
+            (pad-string (make-string pad-width ? ))
+
+            (banner (concat "\n"
+                            char
+                            " "
+                            (unless (zerop (% text-width 2))
+                              " ")
+                            pad-string
+                            text
+                            pad-string
+                            " "
+                            char
+                            "\n")))
+       (format "%s='\n%s\n'"
+               varname
+               (concat header-string
+                       banner
+                       header-string)))
+   #+END_SRC
+
+*** kotlin-language-server
+    :PROPERTIES:
+    :header-args+: :tangle ~/.emacs.d/bin/install/kotlin-language-server.sh
+    :END:
+
+    #+BEGIN_SRC bash :shebang #!/usr/bin/bash
+      <<set_shell_banner(varname="INSTALLATION_ALREADY_DONE_BANNER",text="kotlin language server already installed",char="#")>>
+      <<set_shell_banner(varname="CLONING_LANGUAGE_SERVER_BANNER",text="cloning fwcd/kotlin-language-server",char="#")>>
+      <<set_shell_banner(varname="CLONING_FAILED_BANNER",text="failed to clone repository, program terminated",char="*")>>
+      <<set_shell_banner(varname="CLONING_ALREADY_DONE_BANNER",text="fwcd/kotlin-language-server already cloned",char="#")>>
+      <<set_shell_banner(varname="RUNNING_GRADLE_BUILD_BANNER",text="running gradle build process",char="#")>>
+      <<set_shell_banner(varname="GRADLE_BUILD_FAILED_BANNER",text="failed to build kotlin language server",char="*")>>
+      <<set_shell_banner(varname="FINISHED_BANNER",text="finished installing the kotlin language server",char="*")>>
+
+      DEST_PATH="<<server-install-path()>>/kotlin"
+    #+END_SRC
+
+    #+BEGIN_SRC bash
+      if [ -f "${DEST_PATH}/bin/kotlin-language-server" ]; then
+          echo "${INSTALLATION_ALREADY_DONE_BANNER}"
+      else
+          mkdir -p "${DEST_PATH}"
+          pushd "${DEST_PATH}"
+
+          CLONE_PATH="./.server"
+          if [ ! -d "${CLONE_PATH}/.git" ]; then
+              echo "${CLONING_LANGUAGE_SERVER_BANNER}"
+
+              if ! git clone "https://github.com/fwcd/kotlin-language-server" "${CLONE_PATH}"; then
+                  echo "${CLONING_FAILED_BANNER}"
+                  exit 1
+              fi
+          else
+              echo "${CLONING_ALREADY_DONE_BANNER}"
+          fi
+
+          echo "${RUNNING_GRADLE_BUILD_BANNER}"
+
+          pushd "${CLONE_PATH}"
+          if ! ./gradlew :server:installDist; then
+              echo "${GRADLE_BUILD_FAILED_BANNER}"
+              exit 2
+          fi
+          popd
+
+          mv ${CLONE_PATH}/server/build/install/server/* ./
+          rm -rf "${CLONE_PATH}"
+          echo "${FINISHED_BANNER}"
+      fi
+    #+END_SRC
+
+*** kotlin-debug-adapter
+    :PROPERTIES:
+    :header-args+: :tangle ~/.emacs.d/bin/install/kotlin-debug-adapter.sh
+    :END:
+
+    #+BEGIN_SRC bash :shebang #!/usr/bin/bash
+      <<set_shell_banner(varname="INSTALLATION_ALREADY_DONE_BANNER",text="kotlin debug adapter already installed",char="#")>>
+      <<set_shell_banner(varname="CLONING_DEBUG_ADAPTER_BANNER",text="cloning fwcd/kotlin-debug-adapter",char="#")>>
+      <<set_shell_banner(varname="CLONING_FAILED_BANNER",text="failed to clone repository, program terminated",char="*")>>
+      <<set_shell_banner(varname="CLONING_ALREADY_DONE_BANNER",text="fwcd/kotlin-debug-adapter already cloned",char="#")>>
+      <<set_shell_banner(varname="RUNNING_GRADLE_BUILD_BANNER",text="running gradle build process",char="#")>>
+      <<set_shell_banner(varname="GRADLE_BUILD_FAILED_BANNER",text="failed to build kotlin debug adapter",char="*")>>
+      <<set_shell_banner(varname="INISHED_BANNER",text="finished installing the kotlin debug adapter",char="*")>>
+
+      DEST_PATH="<<server-install-path()>>/kotlin/debugger"
+    #+END_SRC
+
+    #+BEGIN_SRC bash
+      if [ -f "${DEST_PATH}/bin/kotlin-debug-adapter" ]; then
+          echo "${INSTALLATION_ALREADY_DONE_BANNER}"
+      else
+          mkdir -p "${DEST_PATH}"
+          pushd "${DEST_PATH}"
+
+          CLONE_PATH="./.debugger"
+          if [ ! -d "${CLONE_PATH}/.git" ]; then
+              echo "${CLONING_DEBUG_ADAPTER_BANNER}"
+
+              if ! git clone "https://github.com/fwcd/kotlin-debug-adapter" "${CLONE_PATH}"; then
+                  echo "${CLONING_FAILED_BANNER}"
+                  exit 1
+              fi
+          else
+              echo "${CLONING_ALREADY_DONE_BANNER}"
+          fi
+
+          echo "${RUNNING_GRADLE_BUILD_BANNER}"
+
+          pushd "${CLONE_PATH}"
+          if ! ./gradlew :adapter:installDist; then
+              echo "${GRADLE_BUILD_FAILED_BANNER}"
+              exit 2
+          fi
+          popd
+
+          mv ${CLONE_PATH}/adapter/build/install/adapter/* ./
+          rm -rf "${CLONE_PATH}"
+          echo "${FINISHED_BANNER}"
+      fi
+    #+END_SRC
+
+*** haskell-ide-engine
+    :PROPERTIES:
+    :header-args+: :tangle ~/.emacs.d/bin/install/haskell-ide-engine.sh
+    :END:
+
+    if your install fails with exit code 251, you're computer ran out of memory during the install process. Simply close all running programs and try again. Warning: install can take upto an hour and over 3 GB of RAM.
+
+    #+BEGIN_SRC bash :shebang #!/usr/bin/bash
+      <<set_shell_banner(varname="INSTALLATION_ALREADY_DONE_BANNER",text="haskell IDE engine already installed",char="#")>>
+      <<set_shell_banner(varname="CLONING_LANGUAGE_SERVER_BANNER",text="cloning haskell/haskell-ide-engine",char="#")>>
+      <<set_shell_banner(varname="CLONING_FAILED_BANNER",text="failed to clone repository, program terminated",char="*")>>
+      <<set_shell_banner(varname="CLONING_ALREADY_DONE_BANNER",text="haskell/haskell-ide-engine already cloned",char="#")>>
+      <<set_shell_banner(varname="RUNNING_CABAL_INSTALL_BANNER",text="running cabal installer, you may wish to free some RAM",char="#")>>
+      <<set_shell_banner(varname="CABAL_INSTALL_FAILED_BANNER",text="failed to build haskell IDE engine",char="*")>>
+      <<set_shell_banner(varname="FAILED_TO_MOVE_AFTER_INSTALL_BANNER",text="could not find stack install directory for server move",char="*")>>
+      <<set_shell_banner(varname="FINISHED_BANNER",text="finished installing the haskell IDE engine",char="*")>>
+
+      DEST_PATH="<<server-install-path()>>/haskell"
+    #+END_SRC
+
+    #+BEGIN_SRC bash
+      BUILD_TARGET="stack-hie-8.6.5"
+
+      if [ -f "${DEST_PATH}/hie.exe" -o -f "${DEST_PATH}/hie" ]; then
+          echo "${INSTALLATION_ALREADY_DONE_BANNER}"
+      else
+          mkdir -p "${DEST_PATH}"
+          pushd "${DEST_PATH}"
+
+          CLONE_PATH="./.hie"
+          if [ ! -d "${CLONE_PATH}/.git" ]; then
+              echo "${CLONING_LANGUAGE_SERVER_BANNER}"
+
+              if ! git clone "https://github.com/haskell/haskell-ide-engine" "${CLONE_PATH}" --recurse-submodules; then
+                  echo "${CLONING_FAILED_BANNER}"
+                  exit 1
+              fi
+          else
+              echo "${CLONING_ALREADY_DONE_BANNER}"
+          fi
+
+          echo "${RUNNING_CABAL_INSTALL_BANNER}"
+
+          pushd "${CLONE_PATH}"
+          if ! cabal v2-run ./install.hs --project-file install/shake.project -j1 --ghc-options="+RTS -M600M" "${BUILD_TARGET}"; then
+              echo "${CABAL_INSTALL_FAILED_BANNER}"
+              exit 2
+          fi
+          popd
+
+          INSTALL_PATH="$(stack path --local-bin)"
+          if [ $? -eq 0 ]; then
+              find "${INSTALL_PATH}/" -maxdepth 1 -iname 'hie*' -print0 | xargs -0 -i% mv % ./
+              rm -rf "${CLONE_PATH}"
+              echo "${FINISHED_BANNER}"
+          else
+              echo "${FAILED_TO_MOVE_AFTER_INSTALL_BANNER}"
+          fi
+      fi
     #+END_SRC
 
 * Themes
