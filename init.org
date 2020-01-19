@@ -1326,14 +1326,8 @@
 
       (add-hook 'find-file-hook 'no-junk-please-were-unixish)
 
-      (defun enable-line-numbers ()
-        "forces the display of line numbers in the current buffer"
-        (interactive)
-        (display-line-numbers-mode 1)
-        (setq display-line-numbers 'relative))
-
-      (add-hook 'prog-mode-hook        #'enable-line-numbers)
-      (add-hook 'fundamental-mode-hook #'enable-line-numbers)
+      (add-hook 'prog-mode-hook        'display-line-numbers-mode)
+      (add-hook 'fundamental-mode-hook 'display-line-numbers-mode)
 
       (setq command-error-function
             (defun mohkale--command-error-function (data context caller)
@@ -9758,6 +9752,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package tabulated-list
         :defer t
+        :hook (tabulated-list-mode . hl-line-mode)
         :commands (tabulated-list-mode
                    tabulated-list-next-column)
         :config
@@ -11673,7 +11668,8 @@
        (use-package org
          :straight (org :type built-in)
          :defer t
-         :hook ((org-mode . enable-line-numbers))
+         :hook ((org-mode . display-line-numbers-mode)
+                (org-mode . hl-todo-mode))
          :commands (org-capture
                     org-agenda
                     org-copy-subtree
@@ -12464,7 +12460,7 @@
        (use-package markdown-mode
          :ensure t
          :defer  t
-         :hook ((markdown-mode . enable-line-numbers)
+         :hook ((markdown-mode . display-line-numbers-mode)
                 ;; (markdown-mode . emojify-mode)
                 (markdown-mode . flycheck-mode))
          :config
