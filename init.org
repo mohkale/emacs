@@ -111,7 +111,15 @@
                 ;; include variables anywhere in the string, including sublists, but no functions.
                 ;;
                 ;; See the format guide here: https://www.emacswiki.org/emacs/FrameTitle
-            `(,(user-login-name) "@" ,(system-name) " [%*] %m" major-mode (buffer-file-name " : %f")))
+            `(,(user-login-name)
+              "@"
+              ,(system-name)
+              " [%*] %m"
+              (:eval (when (derived-mode-p 'pdf-view-mode)
+                       (format "(%d/%d)"
+                               (pdf-view-current-page)
+                               (pdf-cache-number-of-pages))))
+              (buffer-file-name " : %f")))
 
       (setq-default indent-tabs-mode nil
                     save-place t ; auto enable save-place mode
@@ -418,6 +426,11 @@
            org-projectile-projects-file                       (org "projects/global.org")
            mohkale-library-of-babel-file                      (etc "babel-lib.org")
            multi-compile-history-file                         (var "multi-compile-history.el")
+           pdf-info-epdfinfo-program                          (expand-file-name
+                                                               (var (concat "pdf-tools/epdfinfo"
+                                                                            (when (eq system-type 'windows-nt)
+                                                                              ".exe"))))
+           ;; pdf-info-epdfinfo-error-filename                   (var "pdf-tools/log.txt")
            pcache-directory                                   (var "pcache/")
            persp-save-dir                                     (var "perspectives/")
            prescient-save-file                                (var "prescient-save.el")
@@ -430,6 +443,7 @@
            smex-save-file                                     (var "smex-save.el")
            tldr-directory-path                                (var "tldr/")
            transient-history-file                             (var "transient/history.el")
+           org-pdftools-root-dir                              "~/multimedia/pdfs"
            transient-levels-file                              (etc "transient/levels.el")
            straight-base-dir                                  (bin "") ;; weird way to configure it, but okay
            straight-bootstrap-file                            (concat straight-base-dir
@@ -470,6 +484,7 @@
                                   (var "bmkp/")
                                   (var "emojify/")
                                   (var "lsp/")
+                                  (var "pdf-tools/")
                                   yasnippet-snippets-dir))
             (mkdir (if (stringp ensured-path)
                        ensured-path
@@ -8158,8 +8173,49 @@
           :commands imenu-anywhere
           :init
           (leader/set-keys
-            "jI" 'imenu-anywhere)))
+            "bI" 'imenu-anywhere)))
+    #+END_SRC
 
+*** flyspell
+    #+BEGIN_SRC emacs-lisp
+      (use-package flyspell
+        :config
+        (leader/with-prefix mohkale-minor-mode-leader-key
+          (leader/set-keys-for-mode 'flyspell-mode
+            "."  'hydra-flyspell/body
+            "cb" 'flyspell-buffer
+            "cr" 'flyspell-region
+            "cw" 'flyspell-word))
+
+        (use-package flyspell-correct-ivy
+          :ensure t
+          :defer  t
+          :commands (flyspell-correct-wrapper)
+          :init
+          ;; NOTE wrapper works backwards through the buffer by default.
+          ;;      pass a two prefix args to check forward.
+          (setq flyspell-correct-interface #'flyspell-correct-ivy)
+
+          (leader/with-prefix mohkale-minor-mode-leader-key
+            (leader/set-keys-for-mode 'flyspell-mode
+              mohkale-minor-mode-leader-key 'flyspell-correct-wrapper))))
+    #+END_SRC
+
+**** ispell
+    #+BEGIN_SRC emacs-lisp
+      (use-package ispell
+        :defer t
+        :config
+        (defun ispell--prevent-absolute-path (func &rest args)
+          (cl-letf (((symbol-function 'expand-file-name)
+                     (lambda (_) _)))
+            (apply func args)))
+
+        (advice-add 'ispell-internal-change-dictionary :around
+                    #'ispell--prevent-absolute-path)
+        (advice-add 'flyspell-large-region :around
+                    #'ispell--prevent-absolute-path)
+        )
     #+END_SRC
 
 *** ein - emacs-ipython-notebook
@@ -13931,6 +13987,13 @@
       ;; eshell-prompt-extras
       `(epe-remote-face ((,cls (:foreground ,turquoise))))
       `(epe-venv-face ((,cls (:foreground ,purple))))
+
+      ;; magit
+      `(magit-mode-line-process-error ((,cls (:foreground ,red :background ,very-light-grey :inherit bold))))
+
+      ;; flyspell
+      `(flyspell-duplicate ((,cls (:foreground ,orange-dim :underline t))))
+      `(flyspell-incorrect ((,cls (:foreground ,red-dim :underline t))))
 
       ;;; ivy
       ;; `(ivy-current-match ((,cls :backgrouns ,blue-dim :foreground ,black))) ;; hl-line
