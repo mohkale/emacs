@@ -859,7 +859,8 @@
         "ML" 'lisp-interaction-mode
         "Mc" 'c++-mode
         "MC" 'c-mode
-        "Mf" 'fundamental-mode
+        "Mf" 'flyspell-mode
+        "Mt" 'fundamental-mode
         "Mp" 'python-mode
         "Mr" 'enh-ruby-mode
         "Ms" 'shell-script-mode
@@ -868,6 +869,7 @@
         "Mh" 'hexl-mode
         "M M-d" 'decipher
         "M M-r" 'toggle-rot13-mode
+        "Mv" 'visual-line-mode
 
         "Mdd" 'toggle-editable-dired
         "Mde" 'invoke-editable-dired
@@ -923,6 +925,7 @@
         "te" 'toggle-indicate-empty-lines
         "ta" 'toggle-text-mode-auto-fille
         "tR" 'read-only-mode
+        "tr" 'toggle-relative-linum
         "tc" 'toggle-case-fold-search
         "ti" 'toggle-input-method
         "ts" 'toggle-save-place-globally)
@@ -1004,12 +1007,16 @@
        "M-DEL"   'delete-forward-char
        "<C-S-backspace>" 'kill-word)
 
-     (general-define-key "C-w" '(:prefix-command mohkale-window-map :which-key "windows"))
+     (general-define-key
+       "C-w" '(:prefix-command mohkale-window-map
+                               :which-key "windows"))
 
      (general-define-key
        :keymaps 'mohkale-window-map
        "m"   'window-zen
-       "C-m" 'window-zen)
+       "C-m" 'window-zen
+       "M"   'window-zen-restore
+       "M-m" 'window-zen-restore)
 
      (defmacro defun-save-excursion-insert-char (char-name char)
        (setq char (eval char))
@@ -1406,7 +1413,7 @@
 
       ;; indent configuration
       (defvar mohkale-indent-config '((t . 4))
-        "alist configuring my preferred indentation for buffers.
+        "alist configuring preferred indentation for buffers.
       the car of an entry is used to match which buffer it's applied to
       and cdr is used to determine the value of it.
 
@@ -1526,7 +1533,8 @@
     #+END_SRC
 
 *** Yank Indent Adjust
-    adjust indentation of yanked text in some modes... because doing so manually is a pain :tongue_out:
+    adjust indentation of yanked text in some modes... because doing so manually is
+    a pain :tongue_out:.
 
     #+BEGIN_SRC emacs-lisp
       ;; initially sourced from: https://github.com/magnars/.emacs.d/blob/master/defuns/editing-defuns.el#L99-L124
@@ -1552,7 +1560,7 @@
            ,@body))
       (put 'with-auto-indent-satisfied 'lisp-indent-function 'defun)
 
-      (defun yank--auto-indent (arg)
+      (defun yank--auto-indent (&optional arg)
         "if mode is in `yank-indent-modes' indent yanked text
       doesn't do anything if a prefix arg is given."
         (with-auto-indent-satisfied arg
@@ -1689,6 +1697,39 @@
       (defun show-prefix (&optional prefix)
         (interactive "P")
         (message "prefix is: %s" prefix))
+
+      (defun toggle-relative-linum (&optional prefix)
+        "toggle relative line numbers in the current buffer
+      by default, doesn't do anything if line numbers aren't visible.
+
+      pass the prefix argument to force display of line numbers first."
+        (interactive "P")
+        (when (or prefix display-line-numbers)
+          (setq display-line-numbers
+                (if (eq display-line-numbers 'relative)
+                    t
+                  'relative))))
+
+      (defun keymaps-at-point ()
+        "List entire keymaps present at point."
+        (interactive)
+        (let ((map-list
+               (list
+                (mapcar (lambda (overlay)
+                          (overlay-get overlay 'keymap))
+                        (overlays-at (point)))
+                (mapcar (lambda (overlay)
+                          (overlay-get overlay 'local-map))
+                        (overlays-at (point)))
+                (get-text-property (point) 'keymap)
+                (get-text-property (point) 'local-map))))
+          (apply #'message
+                 (concat 
+                  "Overlay keymap: %s\n"
+                  "Overlay local-map: %s\n"
+                  "Text-property keymap: %s\n"
+                  "Text-property local-map: %s")
+                 map-list)))
     #+END_SRC
 
 *** Text
@@ -1713,6 +1754,7 @@
                    remove-all-trailing-whitespace
                    toggle-comment-at-point
                    tab-to-tab-stop-with-prefix
+                   indent-back-to-normal
                    back-to-tab-stop
                    toggle-comment-at-point-alt
                    custom-insert-line
@@ -2002,9 +2044,11 @@
                    switch-to-messages-buffer
                    force-set-all-visible-windows-dedication
                    window-zen
+                   window-zen-restore
                    display-last-buffer
                    vertical-display-last-buffer
                    shell-command-on-buffer
+                   set-window-dedication
                    async-shell-command-on-buffer
                    safe-erase-buffer
                    create-new-empty-buffer
@@ -2017,6 +2061,8 @@
           "T" 'force-set-all-visible-windows-dedication
           "o"   'display-last-buffer
           "C-o" 'display-last-buffer
+          "D"   'set-window-dedication
+          "M-d" 'set-window-dedication
           "O"   'vertical-display-last-buffer
           "M-o" 'vertical-display-last-buffer))
     #+END_SRC
@@ -2125,19 +2171,29 @@
           (when (not (eq dedicate (window-dedicated-p window)))
             (set-window-dedicated-p window dedicate))))
 
-      (defun window-zen (&optional prefix)
-        "Maximize buffer or undo maximize buffer
+      (let ((window-zen-register ?_))
+        (defun window-zen (&optional prefix)
+          "Maximize buffer or undo maximize buffer
       pass prefix to also restore original point."
-        ;; from https://gist.github.com/3402786
-        (interactive "P")
-        (if (and (= 1 (length (window-list)))
-                 (assoc ?_ register-alist))
-            (if prefix
-                (jump-to-register ?_)
-              (save-excursion
-                (jump-to-register ?_)))
-          (window-configuration-to-register ?_)
-          (delete-other-windows)))
+          ;; from https://gist.github.com/3402786
+          (interactive "P")
+          (if (and (= 1 (length (window-list)))
+                   (assoc window-zen-register register-alist))
+              (window-zen-restore prefix)
+            (window-configuration-to-register window-zen-register)
+            (delete-other-windows)))
+
+        (defun window-zen-restore (&optional prefix)
+          "force restoration of window, instead of replacement of previous zen.
+      like `window-zen' pass prefix argument to save excursion"
+          (interactive)
+          (unless (assoc window-zen-register register-alist)
+            (user-error "no previous zen found."))
+
+          (if prefix
+              (jump-to-register window-zen-register)
+            (save-excursion
+              (jump-to-register window-zen-register)))))
 
       (defun shell-command-on-buffer (&optional prefix)
         "Asks for a command and executes it in inferior shell with current buffer
@@ -4235,9 +4291,9 @@
 
          (general-define-key
            :states 'insert
-           "TAB"             'indent-relative
-           "S-TAB"           'tab-to-tab-stop-with-prefix
-           "<S-iso-lefttab>" 'tab-to-tab-stop-with-prefix
+           "<tab>"           'indent-relative
+           "<S-tab>"         'indent-back-to-normal
+           "<S-iso-lefttab>" 'indent-back-to-normal
            ;; "<S-backspace>" 'back-to-tab-stop
            "<S-backspace>" 'evil-delete-char
            "C-y"   'yank
@@ -6449,8 +6505,7 @@
                    ebuku-search-on-reg
                    ebuku-search-on-tag
                    ebuku-mode
-                   ebuku)
-        )
+                   ebuku))
     #+END_SRC
 
 *** edbi
@@ -8086,7 +8141,7 @@
         :commands imenu
         :init
         (leader/set-keys
-          "ji" 'imenu)
+          "bi" 'imenu)
 
         :config
         (use-package imenu-list
@@ -8095,8 +8150,7 @@
           :commands imenu-list
           :init
           (leader/set-keys
-            "Mi" 'imenu-list
-            "MI" 'imenu))
+            "ai" 'imenu-list))
 
         (use-package imenu-anywhere
           :ensure t
@@ -8426,7 +8480,7 @@
       (general-define-key
         :keymaps 'minibuffer-local-must-match-map
         "TAB" 'minibuffer-complete
-        "C-<tab>" 'minibuffer-complete-and-exit
+        "<C-tab>" 'minibuffer-complete-and-exit
         "C-j" nil)
 
       (general-define-key
@@ -9129,7 +9183,7 @@
            "pso" 'projectile-multi-occur
            "psR" 'projectile-replace
            "p TAB" 'projectile-find-other-file
-           "P DEL" 'projectile-browse-dirty-projects
+           "p DEL" 'projectile-browse-dirty-projects
            "p RET" 'projectile-find-file-dwim
            "p M-RET" 'projectile-find-file-dwim-other-window)
 
@@ -9452,6 +9506,7 @@
                    universal-argument-batch-decrement)
         :init
         (push 'messages-buffer-mode mohkale--whitespace-exempt-modes)
+
         :config
         (defmacro defun-universal-argument-operation (name docstring &rest body)
           `(defun ,name ()
@@ -9493,6 +9548,7 @@
               (setq prefix-arg (- prefix-value universal-argument-increment-by)))))
 
         (dolist (mode `(messages-buffer-mode
+                        completion-list-mode
                         special-mode
                         message-mode))
           (evil-set-initial-state mode 'motion))
@@ -9514,8 +9570,6 @@
           (when buffer
             (with-current-buffer buffer
               (evil-motion-state))))
-
-        (evil-set-initial-state 'completion-list-mode 'motion)
 
         (general-define-key
           :keymaps 'completion-list-mode-map
@@ -10069,7 +10123,7 @@
           "C-M-." nil ; xref-find-apropos
           )
 
-        :init
+        :config
         (evil-set-initial-state 'xref--xref-buffer-mode 'motion)
 
         (general-define-key
@@ -10289,9 +10343,10 @@
         ;;; include vc leader key in defaults leader keys
         (leader/declare-prefix "V" "version control")
 
-        (leader/set-keys
-          ;; "=v" 'vc-ediff
-          "=v" 'vc-diff)
+        (leader/with-prefix leader-diff-mode-prefix
+          (leader/set-keys
+            ;; "=v" 'vc-ediff
+            "v" 'vc-diff))
 
         (push 'vc-annotate-mode mohkale--whitespace-exempt-modes)
         (push 'vc-git-log-view-mode mohkale--whitespace-exempt-modes)
@@ -13143,14 +13198,6 @@
           "gU"  'magit-unstage-file)
 
         :config
-        (use-package evil-magit
-          :ensure t
-          :init
-          (setq evil-magit-state 'motion
-                evil-magit-use-y-for-yank t))
-
-        (require 'evil-magit)
-
         (setq mohkale--whitespace-exempt-modes
               (append '(magit-status-mode
                         magit-log-mode
@@ -13160,7 +13207,8 @@
         ;; GIVE ME BACK MY LEADER!!!
         (general-define-key
           :keymaps '(magit-mode-map magit-diff-mode-map)
-          leader-key nil)
+          leader-key nil
+          "C-w" mohkale-window-map)
 
         (general-define-key
           :keymaps 'magit-mode-map
