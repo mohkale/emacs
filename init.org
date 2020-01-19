@@ -7760,9 +7760,13 @@
        (use-package ibuffer
          :defer t
          :commands (ibuffer)
+         :hook (ibuffer-mode . hl-line-mode)
          :init
          (leader/set-keys
            "bm" 'ibuffer)
+
+         (defvar ibuffer-show-buffer-icons nil
+           "whether to show icons alongside the buffer")
 
          :config
          (evil-set-initial-state 'ibuffer-mode 'motion)
@@ -7988,9 +7992,22 @@
                 (ibuffer--bytes-to-human-readable-file-sizes total))))
            (ibuffer--bytes-to-human-readable-file-sizes (buffer-size)))
 
+         ;; Source: https://github.com/seagle0128/.emacs.d/blob/master/lisp/init-ibuffer.el
+         (define-ibuffer-column icon (:name "  ")
+           (let ((icon (if (and (buffer-file-name)
+                                (all-the-icons-auto-mode-match?))
+                           (all-the-icons-icon-for-file (file-name-nondirectory (buffer-file-name)) :v-adjust -0.05)
+                         (all-the-icons-icon-for-mode major-mode :v-adjust -0.05))))
+             (when (symbolp icon)
+               (setq icon (all-the-icons-faicon "file-o" :face 'all-the-icons-dsilver :height 0.8 :v-adjust 0.0)))
+             icon))
+
          (setq ibuffer-formats
                `((mark modified read-only locked
                        " "
+                       ,@(when ibuffer-show-buffer-icons
+                           (list '(icon 2 2 :left :elide)
+                                  (propertize " " 'display `(space :align-to 8))))
                        (name 20 20 :left :elide)
                        " "
                        (size-human-readable 11 -1 :right)
@@ -7998,6 +8015,10 @@
                        (mode 16 16 :left :elide)
                        " " filename-and-process)
                  (mark " "
+                       ,@(when ibuffer-show-buffer-icons
+                           (list '(icon 2 2 :left :elide)
+                                 (propertize " " 'display `(space :align-to 8))))
+
                        (name 20 20)
                        " "
                        filename))))
