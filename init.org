@@ -51,6 +51,7 @@
 *** Emacs Sanitize
     make emacs less like... emacs. use saner defaults and make emacs look nicer in general
 
+    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
     #+BEGIN_SRC emacs-lisp
       (setq delete-old-versions t                                                  ; delete excess backup versions silently
             version-control t                                                      ; use version control
@@ -67,7 +68,10 @@
             display-line-numbers-type 'relative                                    ; prefer relative line numbers when available
             backup-by-copying t                                                    ; don't clobber symlinks
             which-key-enable-extended-define-key t                                 ; let's you pass a cons to define-key
-            kept-new-versions 10                                                   ; keep 10 latest versions of file
+            kept-new-versions 15                                                   ; keep this many latest versions of file
+            kept-old-versions 5                                                    ; keep this many early versions of file
+            ;; NOTE kept-new-versions and kept-old-versions are both used to determine the allowed number of backups.
+            ;;      there will be at most kept-new-versions + kept-old-versions backups made.
             recenter-positions '(top middle bottom)
 
             enable-recursive-minibuffers t
@@ -89,7 +93,6 @@
                               "\\.mkv$"
                               "\\.mp[34]$"
                               "\\.avi$"
-                              "\\.pdf$"
                               "\\.docx?$"
                               ;; subtitles
                               "\\.sub$"
@@ -183,21 +186,6 @@
 
       ;; changing at startup messes up the display of the dashboard :(
       (defun mohkale//update-display-buffer-options-handler ()
-        (defmacro display-buffer--defun-focus-method (func)
-          `(defun ,(intern (concat (symbol-name func) "-and-focus")) (buffer alist)
-             (let ((window (,func buffer alist)))
-               (when window
-                 (select-window window)))))
-
-        (display-buffer--defun-focus-method display-buffer--maybe-same-window)
-        (display-buffer--defun-focus-method display-buffer-reuse-window)
-        (display-buffer--defun-focus-method display-buffer--maybe-pop-up-frame-or-window)
-        (display-buffer--defun-focus-method display-buffer-in-previous-window)
-        (display-buffer--defun-focus-method display-buffer-in-side-window)
-        (display-buffer--defun-focus-method display-buffer-use-some-window)
-        (display-buffer--defun-focus-method display-buffer-pop-up-frame)
-        (display-buffer--defun-focus-method display-buffer-below-selected)
-
         (defvar display-buffer--default-fallback-action
           display-buffer-fallback-action
           "the value for fallback actions without my configuration")
@@ -781,6 +769,10 @@
         "fv" "variables")
 
       (leader/set-keys
+        "f\"" 'recover-this-file
+        "f'" 'recover-file
+        "f~" 'write-backup
+        "fa" 'write-autosave
         "fc" 'copy-file
         "fD" 'delete-buffer-file
         "fF" 'find-file-at-point
@@ -791,8 +783,7 @@
         ;; "fo" 'open-file-or-directory-in-external-app ;; TODO implement
         "fR" 'rename-buffer-file
         "fy" 'show-and-copy-buffer-file-name
-        "f M-r" 'revert-buffer
-        "f M-f" 'find-dired
+        "sF" 'find-dired
         "fq" 'find-file-literally
 
         "fCd" 'unix2dos
@@ -902,7 +893,7 @@
       (leader/set-keys
         "xa" 'describe-text-properties
         "xf" 'list-faces
-        "xc" 'capitalize-region
+        "xc" 'evil-capitalize
         "xp" 'pad-line-with-space-to-length
         "xP" 'pad-line-with-char-to-length
         "xt" 'remove-all-trailing-whitespace)
@@ -1142,6 +1133,28 @@
                   'animate-birthday-present))
     #+END_SRC
 
+*** syntax
+    Adjust the syntax entries for the given modes so that functions like evil word
+    skip over them.
+
+    #+NAME: underscore-supported-modes
+    - c++
+    - c
+    - markdown
+    - lisp
+    - shell
+    - enh-ruby
+
+    #+BEGIN_SRC emacs-lisp :var modes=underscore-supported-modes
+      (defun mohkale//adjust-syntax-entry ()
+        "includes underscores in the syntax entry"
+        (modify-syntax-entry ?_ "w"))
+
+      (dolist (mode modes)
+        (let ((hook-name (concat (car mode) "-mode-hook")))
+          (add-hook (intern hook-name) #'mohkale//adjust-syntax-entry)))
+    #+END_SRC
+
 ** Methods
 *** File
     #+BEGIN_SRC emacs-lisp
@@ -1152,6 +1165,8 @@
                    delete-buffer-file
                    show-and-copy-buffer-file-name
                    write-kill-buffer
+                   write-backup
+                   write-autosave
                    jump-to-directory
                    jump-to-directory-other-window)
         :init
@@ -1161,6 +1176,7 @@
           "jD" 'jump-to-directory-other-window))
     #+END_SRC
 
+    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-file.el"
       (defun rename-buffer-file (buffer &optional new-name)
         "renames the file associated with the buffer `buffer'
@@ -1232,6 +1248,35 @@
 
       (defalias 'jump-to-directory 'dired-jump)
       (defalias 'jump-to-directory-other-window 'dired-jump-other-window)
+
+      (cl-defun write-backup (&optional prefix (silent t))
+        "manually force emacs to backup the current buffer.
+      By default doesn't do anything when the current buffer hasn't been modified.
+      Pass a single-prefix `C-u` to force backing-up even if the buffer has not been
+      modified. Pass two prefixes `C-u C-u`to backup the buffer and then save; this
+      in affect backs up the last save and then saves the current buffer."
+        (interactive "P")
+        (let* ((modified (buffer-modified-p))
+               (save-after (and (listp prefix)
+                                (eq (car prefix) 8)))
+               (save-before (and (not save-after)
+                                 modified)))
+          (if (and (not prefix)
+                   (not modified))
+              (or silent
+                  (message "buffer not modified since last save"))
+            (or save-before (save-buffer))
+
+            ;; buffer-backed-up is permenently buffer-local so you have to account
+            ;; for when it's already been backed up and when you first back it up.
+            (if buffer-backed-up
+                (let (buffer-backed-up)
+                  (backup-buffer))
+              (backup-buffer))
+
+            (or save-after (save-buffer)))))
+
+      (defalias 'write-autosave 'do-auto-save)
 
       (defun write-kill-buffer (&optional buffer-or-name confirm)
         "write buffer to file and then kill it"
@@ -1518,7 +1563,7 @@
       (advice-add 'yank     :after #'yank--auto-indent)
       (advice-add 'yank-pop :after #'yank--auto-indent)
 
-      (defun evil-visual-paste--auto-indent (count register &optional yank-handler)
+      (defun evil-visual-paste--auto-indent (count &optional register yank-handler)
         ;; not sure what yank handler is for, leave it in, to avoid errors
         "same as `yank--auto-indent', but for evil visual yank replace."
         (with-auto-indent-satisfied register
@@ -1535,12 +1580,94 @@
         (yank 1))
     #+END_SRC
 
+*** Display Functions
+    #+BEGIN_SRC emacs-lisp
+      (use-package mohkale-buffer-display
+       :defer t
+       :commands (display-buffer--maybe-same-window-and-focus
+                  display-buffer--maybe-pop-up-frame-or-window-and-focus
+                  display-buffer-reuse-window-and-focus
+                  display-buffer-in-previous-window-and-focus
+                  display-buffer-in-side-window-and-focus
+                  display-buffer-use-some-window-and-focus
+                  display-buffer-pop-up-frame-and-focus
+                  display-buffer-below-selected-and-focus
+                  display-buffer-left
+                  display-buffer-right
+                  display-buffer-left-and-focus
+                  display-buffer-right-and-focus))
+    #+END_SRC
+
+    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-buffer-display.el"
+      (defmacro display-buffer--create-focus-method (func)
+        `(defun ,(intern (concat (symbol-name func) "-and-focus")) (buffer alist)
+           (let ((window (,func buffer alist)))
+             (when window
+               (select-window window)))))
+
+      (display-buffer--create-focus-method display-buffer--maybe-same-window)
+      (display-buffer--create-focus-method display-buffer-reuse-window)
+      (display-buffer--create-focus-method display-buffer--maybe-pop-up-frame-or-window)
+      (display-buffer--create-focus-method display-buffer-in-previous-window)
+      (display-buffer--create-focus-method display-buffer-in-side-window)
+      (display-buffer--create-focus-method display-buffer-use-some-window)
+      (display-buffer--create-focus-method display-buffer-pop-up-frame)
+      (display-buffer--create-focus-method display-buffer-below-selected)
+
+      ;; See also: https://stackoverflow.com/questions/21542914/make-buffer-list-always-appear-in-horizontal-split/21544307#21544307
+      (defun display-buffer-left (buffer alist)
+        "display a buffer to the left of the current buffer.
+      (1) If `buffer` is already displayed, then display it again in the same window.
+      (2) If `buffer` is not already displayed, and if there is a window to the left,
+          then display that `buffer` in said window.
+      (3) If `buffer` is not already displayed, and if there is a window to the right, then
+          use the selected window.
+      (4) If all else fails, then create a new window to the left and display `buffer` there.
+      (5) Select the target window which displays `buffer`."
+        (let ((window
+               (cond
+                ((get-buffer-window buffer (selected-frame)))
+                ;; ((window-in-direction 'above))
+                ((window-in-direction 'left))
+                ((window-in-direction 'right)
+                 (selected-window))
+                (t
+                 (split-window (selected-window) nil 'left)))))
+          (window--display-buffer buffer window 'window alist display-buffer-mark-dedicated)))
+
+      (defun display-buffer-right (buffer alist)
+        "display a buffer to the right of the current buffer.
+      (1) If `buffer` is already displayed, then display it again in the same window.
+      (2) If `buffer` is not already displayed, and if there is a window to the right,
+          then display that `buffer` in said window.
+      (3) If `buffer` is not already displayed, and if there is a window to the left, then
+          use the selected window.
+      (4) If all else fails, then create a new window to the right and display `buffer` there.
+      (5) Select the target window which displays `buffer`."
+        (let ((window
+               (cond
+                ((get-buffer-window buffer (selected-frame)))
+                ;; ((window-in-direction 'above))
+                ((window-in-direction 'right))
+                ((window-in-direction 'left)
+                 (selected-window))
+                (t
+                 (split-window (selected-window) nil 'right)))))
+          (window--display-buffer buffer window 'window alist display-buffer-mark-dedicated)))
+
+      (display-buffer--create-focus-method display-buffer-left)
+      (display-buffer--create-focus-method display-buffer-right)
+    #+END_SRC
+
 *** Misc
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-misc
         :defer t
         :commands (toggle-lexical-binding
-                   show-prefix))
+                   keymaps-at-point
+                   show-prefix
+                   toggle-relative-linum))
     #+END_SRC
 
     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
@@ -2098,12 +2225,201 @@
         (interactive)
         (display-buffer
          (other-buffer)
-         (cons '(display-buffer-in-side-window-and-focus
+         (cons '(display-buffer-right-and-focus
                  display-buffer-in-previous-window-and-focus
                  display-buffer-use-some-window-and-focus
                  display-buffer-pop-up-frame-and-focus)
                '((side . right)
                  (window-width . 0.5)))))
+
+      (cl-defmacro window-route (&rest paths)
+        "macro to see which window exists at the end of a route
+      from the current window.
+
+      Accepts up, down, left & right as direction markers & every
+      route begins from the top left hand side of the current window."
+        `(let ((paths ',paths))
+           (if (not paths)
+               (selected-window)
+             (condition-case err
+                 (save-excursion
+                   ;; goto start to ensure route begins from
+                   ;; top left hand side of current window.
+                   (goto-char (max (point-min) (window-start)))
+                   (goto-char (line-beginning-position))
+                   (save-selected-window
+                     (let (head)
+                       ;; TODO check whether to goto top left hand side here.
+                       (while (setq head (pop paths))
+                         (cond
+                          ((eq head 'up)    (windmove-up))
+                          ((eq head 'down)  (windmove-down))
+                          ((eq head 'left)  (windmove-left))
+                          ((eq head 'right) (windmove-right))))
+                       (selected-window))) )
+               (user-error (message "window-route: %s" err))))))
+
+      ;; (defun window-expand-up ()
+      ;;   "Expand current window into region of window above.
+
+      ;;                          Begun from 3           Begun from 2
+      ;; +---------------+      +---------------+      +---------------+
+      ;; | 1             |      | 1        | 3  |      | 2        | 1  |
+      ;; |               |  |-> |          |    |  |-> |          |    |
+      ;; |---------+-----|      |----------+    |      |          +----|
+      ;; | 2       | 3   |      | 2        |    |      |          | 3  |
+      ;; +---------------+      +---------------+      +---------------+
+
+      ;; "
+      ;;   )
+
+      ;; (defun window-expand-down ()
+      ;;   "Expand current window into region of window below.
+
+      ;;                          Begun from 2           Begun from 1
+      ;; +---------------+      +---------------+      +---------------+
+      ;; | 1       | 2   |      | 1        | 2  |      | 1        | 2  |
+      ;; |         |     |  |-> |          |    |  |-> |          |    |
+      ;; |---------+-----|      |----------+    |      |          +----|
+      ;; | 3             |      | 3        |    |      |          | 3  |
+      ;; +---------------+      +---------------+      +---------------+
+      ;; "
+      ;;   )
+
+      ;; (defun window-expand-right ()
+      ;;   "Expand current window into region of window to the right.
+
+      ;;                          Begun from 1           Begun from 3
+      ;; +---------------+      +---------------+      +---------------+
+      ;; | 1       | 2   |      | 1             |      | 1        | 2  |
+      ;; |         |     |  |-> |               |  |-> |          |    |
+      ;; |---------+     |      |----------+----|      |----------+----|
+      ;; | 3       |     |      | 3        | 2  |      | 3             |
+      ;; +---------------+      +---------------+      +---------------+
+      ;; "
+      ;;   )
+
+      ;; (defun window-expand-left ()
+      ;;   "Expand current window into region of window to the left.
+
+      ;;                          Begun from 2           Begun from 3
+      ;; +---------------+      +---------------+      +---------------+
+      ;; | 1       | 2   |      | 2             |      | 1        | 2  |
+      ;; |         |     |  |-> |               |  |-> |          |    |
+      ;; |         +-----|      |----------+----|      |----------+----|
+      ;; |         | 3   |      | 1        | 3  |      | 3             |
+      ;; +---------------+      +---------------+      +---------------+
+      ;; "
+      ;;   )
+
+      (defun set-window-dedication (&optional prefix window)
+        "Set the dedication value for the current window.
+      By default it toggles the dedication. Supply a prefix arg
+      to explicitly enable or disable.
+
+      When a window is dedicated, you can't change the buffer for it.
+      "
+        (interactive "P")
+        (when (and prefix
+                   (listp prefix))
+          (setq prefix (car prefix)))
+        (or window (setq window (selected-window)))
+
+        (set-window-dedicated-p
+         window
+         (if prefix
+             (> prefix 0)
+           (not (window-dedicated-p window)))))
+    #+END_SRC
+
+*** evil
+    #+BEGIN_SRC emacs-lisp
+      (use-package mohkale-evil
+        :defer t
+        :after evil
+        :commands (evil-capitalize
+                   evil-reverse
+                   evil-adjust-eval-print-last-sexp
+                   evil-adjust-eval-last-sexp
+                   evil-adjust-eval-replace-last-sexp
+                   evil-toggle-comment
+                   evil-narrow-yank
+                   evil-shift-normal-state))
+    #+END_SRC
+
+    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-evil.el"
+      (require 'evil)
+
+      (evil-define-operator evil-capitalise (beg end)
+        (capitalize-region beg end))
+
+      (defun evil-shift-normal-state (&optional arg)
+        "return to normal state while also removing
+      any trailing whitespace from the current line"
+        (interactive "P")
+        (remove-all-trailing-whitespace (line-beginning-position)
+                                        (line-end-position))
+        (evil-normal-state arg))
+
+      (evil-define-operator evil-narrow-yank (beg end type register yank-handler)
+        "`evil-yank' except block yanks are yanked as their own lines.
+      evil by default yanks them such that you can compose them onto other lines.
+      this isn't always desirable (especially when you want to filter a region onto
+      it's own lines, thus this method satifies that requirement.
+
+      eg:
+      `evil-yank' cfj then `evil-paste-after'.
+        ab|c|   >   abc|c
+        de|f|   >   deff
+        gh|j|   >   ghjj
+
+      `evil-narrow-yank' cfj then `evil-paste-after'.
+        ab|c|   >   abc
+        de|f|   >   |c
+        gh|i|   >   f
+                >   j
+                >   def
+                >   ghj
+      "
+        (evil-visual-restore)
+        (if (eq type 'block)
+            (progn
+              (copy-rectangle-as-kill beg end)
+
+              (with-temp-buffer
+                (yank-rectangle)
+                (evil-yank (point-min) (point-max) 'line register yank-handler)))
+          (evil-yank beg end type register yank-handler)))
+
+      (evil-define-operator evil-toggle-comment (beg end)
+        :type        line
+        :repeat      t
+        :move-point  nil
+        :keep-visual nil
+        "run `toggle-comment-at-point' using evil motion."
+        (toggle-comment-at-point beg end))
+
+      (defun-evil-adjust-to-eol evil-adjust-eval-print-last-sexp (&optional arg)
+        (interactive "P")
+        (eval-print-last-sexp arg)
+        (message nil))
+
+      (defun-evil-adjust-to-eol evil-adjust-eval-last-sexp (&optional arg)
+        (interactive "P")
+        (eval-last-sexp arg)
+        (message nil))
+
+      (defun-evil-adjust-to-eol evil-adjust-eval-replace-last-sexp (&optional prefix)
+        (interactive "P")
+        (eval-replace-last-sexp prefix)
+        (message nil))
+
+      (evil-define-operator evil-reverse (beg end)
+        :type line
+        :repeat t
+        "evil command to reverse lines over range."
+        (reverse-region beg end))
     #+END_SRC
 
 *** Hydras
@@ -2113,11 +2429,13 @@
                        hydra-ibuffer
                        hydra-indent
                        hydra-ein
+                       hydra-flyspell
                        hydra-ivy-custom
                        hydra-org-navigate
                        hydra-org-link
                        hydra-org-agenda
                        hydra-visual-move
+                       hydra-evil-multiedit
                        hydra-org-clock
                        hydra-persp
                        hydra-text-zoom
@@ -2189,8 +2507,8 @@
        _d_ delete             _j_ down    _J_ move-down    _0_  ^ ^ window-by-num  _<_ decrease-width          /------\\/
        _s_ split              _k_ up      _K_ move-up      ^ ^  ^ ^                _+_ increase-height        / |    ||
        _v_ vsplit             _l_ right   _L_ move-right   ^ ^  ^ ^                _-_ decrease-height       *  /\\---/\\
-       _S_ split-and-focus    ^ ^         ^ ^              ^ ^  ^ ^                ^ ^                          ~~   ~~
-       _V_ vsplit-and-focus
+       _S_ split-and-focus    _n_ next    ^ ^              ^ ^  ^ ^                ^ ^                          ~~   ~~
+       _V_ vsplit-and-focus   _p_ prev
 
        "
          ("d" evil-window-delete)
@@ -2204,6 +2522,8 @@
          ("k" evil-window-up)
          ("j" evil-window-down)
          ("l" evil-window-right)
+         ("n" evil-window-next)
+         ("p" evil-window-prev)
 
          ("H" buf-window-left)
          ("J" buf-window-up)
@@ -3282,10 +3602,60 @@
          ("Q" vdiff-quit :exit t))
      #+END_SRC
 
+**** iedit
+     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-evil-multiedit.el"
+       (defhydra hydra-evil-multiedit ()
+         ("k" evil-multiedit-next "next")
+         ("j" evil-multiedit-prev "prev")
+         ("l" evil-multiedit-match-and-next "mark-next")
+         ("h" evil-multiedit-match-and-prev "mark-prev")
+         ("*" evil-multiedit-match-all "mark-all")
+
+         ("q" nil nil)
+         ("<escape>" nil nil))
+     #+END_SRC
+
+**** flyspell
+     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-flyspell.el"
+       (defhydra hydra-flyspell (nil nil :hint nil :foreign-keys run)
+         "
+       | ^M^ove       | ^R^echeck   | ^C^orrect      |
+       |-^-^----------|-^-^---------|-^-^------------|
+       | _h_ fix-prev | _gr_ region | _TAB_ cycle    |
+       | _j_ next     | _gb_ buffer | _c_   correct  |
+       | _k_ prev     | _gw_ word   | _p_   at-point |
+       | _l_ fix-next | ^  ^        | ^ ^            |
+       "
+         ("h" flyspell-correct-previous "fix-prev")
+         ("j" evil-next-flyspell-error "next")
+         ("k" evil-prev-flyspell-error "prev")
+         ("l" flyspell-correct-next "fix-next")
+
+         ("TAB" flyspell-auto-correct-word "cycle-suggestion")
+
+         ("c" flyspell-correct-wrapper "correct")
+         ("p" flyspell-correct-at-point "fix-at-point")
+
+         ("gb" flyspell-buffer "check-buffer")
+         ("gr" flyspell-region "check-region")
+         ("gw" flyspell-word "check-word")
+
+         ("q" nil nil)
+         ("<escape>" nil nil))
+     #+END_SRC
+
+
 ** Core Packages
-   For packages that're need to properly setup other packages. This list won't be in any sort of order, beyond the messy order needed to ensure everything can be built from scratch.
+   For packages that're need to properly setup other packages. This list won't be in any
+   sort of order, beyond the messy order needed to ensure everything can be built from
+   scratch.
+
 *** spaceline
-    an amazing mode line... needs to be initialised before all others to make sure every buffer inherits the same mode line. otherwise, the message buffer will definitely not use spaceline, you'll have to restart it or re evaluate this in it's context.
+    an amazing mode line... needs to be initialised before all others to make sure every
+    buffer inherits the same mode line. otherwise, the message buffer will definitely not
+    use spaceline, you'll have to restart it or re evaluate this in it's context.
 
     #+BEGIN_SRC emacs-lisp :results silent
       (use-package spaceline
@@ -3319,7 +3689,15 @@
           "evil operator state face"
           :group 'spaceline)
 
+        (defface spaceline-evil-multiedit
+          `((t (:weight normal
+                        :inherit (highlight spaceline-evil-motion))))
+          "face for evil multiedit face")
+
         (push '(operator . spaceline-evil-operator)
+              spaceline-evil-state-faces)
+
+        (push '(multiedit . spaceline-evil-multiedit)
               spaceline-evil-state-faces)
 
         (defvar spaceline--highlight-evil-operator-face t
@@ -3595,6 +3973,7 @@
            :states leader-norm-states
            ;; "g%" 'evilmi-select-items
            "g%" 'evilmi--simple-jump)
+
          :config
          (defalias 'evil-jump-item 'evilmi-jump-items))
      #+END_SRC
@@ -3612,6 +3991,7 @@
                     evil-vimish-fold/delete-all
                     evil-vimish-fold/next-fold
                     evil-vimish-fold/previous-fold)
+
          :init
          (general-define-key
            :states 'normal
@@ -3628,7 +4008,6 @@
          :commands (global-evil-surround-mode
                     evil-surround-region)
          :config
-
          (setq-default evil-surround-pairs-alist
                        '((?\( . ("(" . ")"))
                          (?\[ . ("[" . "]"))
@@ -3651,6 +4030,7 @@
          (general-define-key
            :states 'visual
            "s" 'evil-surround-region)
+
          :bind (:map evil-surround-mode-map ("S" . nil)))
      #+END_SRC
 
@@ -3660,7 +4040,8 @@
          :ensure t
          :defer  t
          :init
-         (add-hook 'anzu-mode-hook (lambda () (require 'evil-anzu))))
+         (with-eval-after-load 'anzu
+           (require 'evil-anzu)))
      #+END_SRC
 
 **** evil-numbers
@@ -3675,6 +4056,95 @@
            :states 'normal
            "C-S-a" 'evil-numbers/inc-at-pt
            "C-S-x" 'evil-numbers/dec-at-pt))
+     #+END_SRC
+
+**** evil-snipe
+     Let's you start a motion to some string matching some series of input characters.
+     Think evil-search... but to a fixed number of characters, which can be raised at
+     invocation.
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package evil-snipe
+         :ensure t
+         :defer  t
+         :hook (evil-mode . evil-snipe-mode)
+         :init
+         (setq evil-snipe-scope 'buffer                                      ; how far can a snipe take place
+               evil-snipe-enable-highlight nil                               ; don't highlight after jump
+               evil-snipe-repeat-keys nil                                    ; sniping after a snipe, repeats the last snipe
+               evil-snipe-enable-incremental-highlight t                     ; do highlight matching snipe locations
+               evil-snipe-skip-leading-whitespace t                          ; whitespace at start of line is ignored
+               evil-snipe-smart-case t                                       ; case sensetive until it's not, like ivy
+               evil-snipe-tab-increment t                                    ; hit tab to raise amount of snipes left
+               evil-snipe-override-evil-repeat-keys nil                      ; don't replace ; and , with evil keys
+               evil-snipe-auto-disable-substitute nil                        ; keep my substitute key available
+               )
+
+         :config
+         (defmacro evil-snipe-with-normalised-settings (&rest body)
+           `(let ((evil-snipe-enable-highlight nil)
+                  (evil-snipe-enable-incremental-highlight nil)
+                  (evil-snipe-show-prompt nil)
+                  (evil-snipe-smart-case nil)
+                  (evil-snipe-tab-increment nil))
+              ,@body))
+
+         (defun evil-snipe--normalise-single-snipes+ (func &rest args)
+           "normalise snipes with count 1 to match `evil-find-char'.
+       don't want highlighting, or a prompt or other feature enhancements.
+       just simple, jump to char."
+           (if (eq evil-snipe--match-count 1)
+               (evil-snipe-with-normalised-settings
+                 (apply func args))
+             (apply func args)))
+
+         (advice-add 'evil-snipe--collect-keys :around 'evil-snipe--normalise-single-snipes+)
+
+         (general-define-key
+           :keymaps 'evil-snipe-mode-map
+           :states  leader-norm-states
+           ;; S is inclusive, X is exclusive.
+           "gT" 'evil-snipe-X
+           "gt" 'evil-snipe-x
+           "gF" 'evil-snipe-S
+           "gf" 'evil-snipe-s
+           "f"  'evil-snipe-f
+           "F"  'evil-snipe-F
+           "t"  'evil-snipe-t
+           "T"  'evil-snipe-T
+           ";"  'evil-snipe-repeat
+           "g;" 'evil-snipe-repeat-reverse)
+
+         (general-define-key
+           :keymaps 'evil-snipe-mode-map
+           :states  '(motion normal)
+           "S" nil
+           "s" nil
+           "X" nil
+           "x" nil))
+     #+END_SRC
+
+**** evil-exchange
+     #+BEGIN_SRC emacs-lisp
+       (use-package evil-exchange
+         :ensure t
+         :defer  t
+         :init
+         (general-define-key
+           :states leader-norm-states
+           "gx" 'evil-exchange
+           "gX" 'evil-exchange-cancel))
+     #+END_SRC
+
+**** evil-traces
+     #+BEGIN_SRC emacs-lisp
+       (use-package evil-traces
+         :ensure t
+         :defer  t
+         :hook (evil-mode . evil-traces-mode)
+         :diminish
+         :config
+         (evil-traces-use-diff-faces))
      #+END_SRC
 
 **** evil-mode
@@ -3693,8 +4163,17 @@
                        evil-want-C-u-scroll t
                        evil-want-visual-char-semi-exclusive t)
 
+         (defun evil-set-initial-state+ (mode state)
+           (with-eval-after-load 'evil
+             (evil-set-initial-state mode state)
+             (dolist (buffer (buffer-list))
+               (with-current-buffer buffer
+                 (when (eq major-mode mode)
+                   (evil-change-state state))))))
+
          :config
          (evil-mode 1)
+
          ;; evil-adjust: https://raw.githubusercontent.com/troyp/evil-adjust/master/evil-adjust.el
          (defmacro defun-evil-adjust-to-eol (function-name arglist &optional interactive &rest body)
            `(defun ,function-name ,arglist
@@ -3709,14 +4188,6 @@
                            ,@body
                            (evil-visual-restore)))
                 (otherwise ,@body))))
-
-         (defun evil-shift-normal-state (&optional arg)
-           "return to normal state while also removing
-       any trailing whitespace from the current line"
-           (interactive "P")
-           (remove-all-trailing-whitespace (line-beginning-position)
-                                           (line-end-position))
-           (evil-normal-state arg))
 
          (general-define-key
            :states '(insert replace)
@@ -3739,6 +4210,9 @@
 
          (general-define-key
            :states 'normal
+           "gU" nil
+           "gu" 'evil-upcase
+           "gd" 'evil-downcase
            "gj" 'evil-next-visual-line
            "gk" 'evil-previous-visual-line)
 
@@ -3780,20 +4254,23 @@
            "C-p"   'evil-previous-line
            "C-w"   'backward-kill-word
 
-           "TAB" nil ;; ANNOYING
            "C-d" nil ; erase
            "C-t" nil ; erase
            )
 
          (general-define-key
            :states 'visual
-           "C-y" 'evil-paste-after)
+           "C-y" 'evil-paste-after
+           "gy"  'evil-narrow-yank)
 
          (general-define-key
            :states leader-norm-states
            ;; keep hitting C-SPC by accident
            "C-SPC" (general-simulate-key "SPC")
+           "gc" 'evil-toggle-comment
+           "gC" 'evil-capitalize
            "g=" 'count-words
+           "g-" 'evil-indent
            "g;" 'evil-repeat-find-char-reverse)
 
 
@@ -3814,8 +4291,6 @@
            "=" 'balance-windows
            "-" 'evil-window-set-width
            "|" 'evil-window-set-height
-           "n" 'evil-window-next
-           "p" 'evil-window-previous
 
            "C-1" 'evil-window-top-left
            "C-0" 'evil-window-bottom-right
@@ -3831,6 +4306,10 @@
            "C-M-l" 'evil-window-move-far-right
 
            ;; NOTE bindings with control variants
+           "n"   'evil-window-next
+           "C-n" 'evil-window-next
+           "p"   'evil-window-previous
+           "C-p" 'evil-window-previous
            "s"   'evil-window-split
            "M-s" 'evil-window-split
            "v"   'evil-window-vsplit
@@ -3899,69 +4378,49 @@
          (add-hook 'emacs-lisp-mode-hook #'evil-args--adjust-for-elisp))
      #+END_SRC
 
-**** evil-syntax
-     #+NAME: underscore-supported-modes
-     - c++
-     - c
-     - markdown
-     - lisp
-     - shell
-     - enh-ruby
+**** evil-magit
+     #+BEGIN_SRC emacs-lisp
+       (with-eval-after-load 'magit
+         (use-package evil-magit
+           :ensure t
+           :init
+           (setq evil-magit-state 'motion
+                 evil-magit-use-y-for-yank t)
+           :config
+           (general-define-key
+             :states `(,evil-magit-state visual)
+             :keymaps 'magit-mode-map
+             ;; prevent evil-window-map overriding mohkale-window-map
+             "C-w" nil))
 
-     #+BEGIN_SRC emacs-lisp :var modes=underscore-supported-modes
-       (defun mohkale//adjust-syntax-entry ()
-         "includes underscores in the syntax entry"
-         (modify-syntax-entry ?_ "w"))
+         (require 'evil-magit))
 
-       (dolist (mode modes)
-         (let ((hook-name (concat (car mode) "-mode-hook")))
-           (add-hook (intern hook-name) #'mohkale//adjust-syntax-entry)))
      #+END_SRC
 
-**** commands
+**** ex-commands
      see [[https://bytebucket.org/lyro/evil/raw/default/doc/evil.pdf][here]] for a list of the different evil commands and how they work.
-
-***** ex
-      Partially capitalised variants... for when your fingers are faster than you are.
 
       #+BEGIN_SRC emacs-lisp
         (evil-ex-define-cmd "W[RITE]" 'evil-write)
-        (evil-ex-define-cmd "Wa[LL]"  'evil-write-all)
+
+        (evil-ex-define-cmd "Wa[ll]"  'evil-write-all)
         (evil-ex-define-cmd "WA[LL]"  'evil-write-all)
+
         (evil-ex-define-cmd "wk[ill]" 'write-kill-buffer)
         (evil-ex-define-cmd "Wk[ill]" 'write-kill-buffer)
         (evil-ex-define-cmd "WK[ILL]" 'write-kill-buffer)
+
+        (evil-ex-define-cmd "wb[ackup]" 'write-backup)
+        (evil-ex-define-cmd "Wb[ackup]" 'write-backup)
+        (evil-ex-define-cmd "WB[ACKUP]" 'write-backup)
+
+        (evil-ex-define-cmd "a[s]ave" 'write-autosave)
+        (evil-ex-define-cmd "A[s]ave" 'write-autosave)
+        (evil-ex-define-cmd "A[S]AVE" 'write-autosave)
+
+        (evil-ex-define-cmd "buffers" 'ibuffer)
+        (evil-ex-define-cmd "rev[erse]" 'evil-reverse)
       #+END_SRC
-
-***** operators
-      #+BEGIN_SRC emacs-lisp
-        (evil-define-operator evil-toggle-comment (beg end)
-          :type        line
-          :repeat      t
-          :move-point  nil
-          :keep-visual nil
-          "run `toggle-comment-at-point' using evil motion."
-          (toggle-comment-at-point beg end))
-
-        (general-define-key
-          :states leader-norm-states
-          "gc" 'evil-toggle-comment)
-      #+END_SRC
-
-
-*** hydra
-    #+BEGIN_SRC emacs-lisp
-      (use-package hydra
-        :ensure t
-        :defer  t
-        :commands defhydra
-        :config
-        (setq lv-use-separator t))
-
-      (use-package pretty-hydra
-        :ensure t
-        :defer  t)
-    #+END_SRC
 
 *** prettify-symbols
     lets you convert identifiers like lambda into unicode symbols like λ... isn't that epic :).
@@ -6584,11 +7043,89 @@
                                           (internal-border-width . 2))))
     #+END_SRC
 
+*** iedit
+    #+BEGIN_SRC emacs-lisp
+      (use-package iedit
+        :ensure t
+        :defer  t
+        :commands (evil-multiedit-ex-match
+                   evil-multiedit-restore
+                   evil-multiedit-next
+                   evil-multiedit-match-and-next
+                   evil-multiedit-match-and-prev
+                   evil-multiedit-prev
+                   evil-multiedit-toggle-marker-here
+                   evil-multiedit-toggle-or-restrict-region
+                   evil-multiedit-match-all
+                   evil-multiedit
+                   evil-multiedit-all)
+        :init
+        (with-eval-after-load 'evil
+          (evil-ex-define-cmd "ie[dit]" 'evil-multiedit-ex-match)
+
+          (general-define-key
+            :states 'multiedit
+            "g." 'hydra-evil-multiedit/body
+            "g*" 'evil-multiedit-match-all
+            "gk" 'evil-multiedit-prev
+            "gj" 'evil-multiedit-next
+            "gl" 'evil-multiedit-match-and-next
+            "gh" 'evil-multiedit-match-and-prev)
+
+          (general-define-key
+            :states leader-norm-states
+            "ge" 'evil-multiedit
+            "g*" 'evil-multiedit-all
+            "gE" 'evil-multiedit-restore)
+
+          ;; (general-define-key
+          ;;   :states 'visual
+          ;;   "RET" 'evil-multiedit-toggle-or-restrict-region)
+          )
+
+        :config
+        (use-package evil-multiedit
+          :ensure t
+          :defer  t
+          :config
+
+          (defun evil-multiedit--multiedit (beg end)
+            (evil-visual-select beg
+                                (max 0 (- end 1)))
+            (evil-multiedit-match-and-next))
+
+          (evil-define-operator evil-multiedit (beg end)
+            :repeat nil
+            (if (evil-get-command-property 'evil-multiedit :move-point)
+                (save-excursion
+                  (evil-multiedit--multiedit beg end))
+              (evil-multiedit--multiedit beg end)))
+
+          (defun evil-multiedit--multiedit-all (beg end)
+            (evil-visual-select beg
+                                (max 0 (- end 1)))
+            (evil-multiedit-match-all))
+
+          (evil-define-operator evil-multiedit-all (beg end)
+            :repeat nil
+            (if (evil-get-command-property 'evil-multiedit-all :move-point)
+                (save-excursion
+                  (evil-multiedit--multiedit-all beg end))
+              (evil-multiedit--multiedit-all beg end)))
+
+          (general-define-key
+            :keymaps 'evil-multiedit-state-map
+            ;; "C-g" nil
+            "G"  nil
+            "gg" nil)))
+    #+END_SRC
+
 *** ivy
 **** ivy
      #+BEGIN_SRC emacs-lisp
        (use-package ivy
-         :demand t
+         :straight t
+         :defer    nil
          :commands (ivy-toggle-mark)
          :init
          (setq ivy-height 15
@@ -9938,6 +10475,7 @@
         :defer  t
         :config
         (evil-set-initial-state 'ztree-mode 'motion)
+
         (general-define-key
           :states  'motion
           :keymaps 'ztree-mode-map
@@ -10089,20 +10627,11 @@
 
          :config
          ;; show lambda as an actual lambda symbol
-         (mohkale/define-pretty-symbols-for-mode 'emacs-lisp-mode
-           ("lambda" . ?λ))
          (mohkale/define-pretty-symbols-for-mode 'lisp-interaction-mode
            ("lambda" . ?λ))
 
-         (defun-evil-adjust-to-eol evil-adjust-eval-print-last-sexp (&optional arg)
-           (interactive "P")
-           (eval-print-last-sexp arg)
-           (message nil))
-
-         (defun-evil-adjust-to-eol evil-adjust-eval-last-sexp (&optional arg)
-           (interactive "P")
-           (eval-last-sexp arg)
-           (message nil))
+         (mohkale/define-pretty-symbols-for-mode 'emacs-lisp-mode
+           ("lambda" . ?λ))
 
          (defun eval-replace-last-sexp (&optional prefix)
            "evaluate then replace the preceding sexp"
@@ -10112,12 +10641,7 @@
              (kill-sexp -1)
              (insert (format (if prefix "%s" "%S") value))))
 
-         (defun-evil-adjust-to-eol evil-adjust-eval-replace-last-sexp (&optional prefix)
-           (interactive "P")
-           (eval-replace-last-sexp prefix)
-           (message nil))
-
-         (evil-set-initial-state 'inferior-emacs-lisp-mode 'emacs)
+         (evil-set-initial-state 'inferior-emacs-lisp-mode 'emacs) ;; ielm
 
          ;;   (defun elisp-transcript ()
          ;;     ;; source https://www.emacswiki.org/emacs/LispInteractionMode
@@ -10307,8 +10831,10 @@
          :init
          (defalias 'python-repl 'run-python)
          (evil-set-initial-state 'inferior-python-mode 'emacs)
+
          :config
          (setq python--prettify-symbols-alist nil)
+
          (mohkale/define-pretty-symbols-for-mode 'python-mode
            ("lambda" . ?λ))
 
@@ -11174,7 +11700,7 @@
 
          (general-define-key
            :keymaps 'org-mode-map
-           :states '(normal visual insert emacs)
+           :states '(normal visual emacs)
            "<tab>" 'org-cycle
            "TAB" 'org-cycle
            "<S-tab>" 'org-shifttab)
