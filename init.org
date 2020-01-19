@@ -7125,6 +7125,14 @@
           "th" 'hide/show-comments-toggle))
     #+END_SRC
 
+*** hide-modeline
+    #+BEGIN_SRC emacs-lisp
+      (use-package hide-mode-line
+        :ensure t
+        :defer  t
+        :after spaceline)
+    #+END_SRC
+
 *** hl-line
     #+BEGIN_SRC emacs-lisp
       (use-package hl-line
@@ -8859,6 +8867,210 @@
           "xrp/" 'rxt-explain-pcre
           "xrpe" 'rxt-pcre-to-elisp
           "xrpx" 'rxt-pcre-to-rx))
+    #+END_SRC
+
+*** pdf-tools
+    #+BEGIN_SRC emacs-lisp
+      (use-package pdf-tools
+        :ensure t
+        :defer  t
+        :mode ("\\.pdf$" . pdf-view-mode)
+        :commands (pdf-view-mode
+                   org-pdftools-open)
+        :hook (pdf-view-mode . hide-mode-line-mode)
+        :config
+        (evil-set-initial-state 'pdf-view-mode 'motion)
+
+        ;; (pdf-tools-install)
+        (with-eval-after-load 'org
+          (use-package org-pdftools
+            :straight (org-pdftools :type git :host github :repo "fuxialexander/org-pdftools")
+            :demand t))
+
+        (general-define-key
+          :keymaps 'pdf-view-mode-map
+          :states 'motion
+          "RET" 'image-next-line
+          "o" 'pdf-outline
+          ;; TODO make interactive ivy-based outline
+
+          "j" 'pdf-view-next-line-or-next-page-with-prefix
+          "k" 'pdf-view-prev-line-or-prev-page-with-prefix
+          "gj" 'image-next-line
+          "gk" 'image-previous-line
+
+          "h" 'pdf-view-previous-page-command
+          "l" 'pdf-view-next-page-command
+          "C-j" 'pdf-view-next-page-command
+          "C-k" 'pdf-view-previous-page-command
+          "]]" 'pdf-view-next-page-command
+          "[[" 'pdf-view-previous-page-command
+
+          "gg" 'pdf-view-goto-first-page-with-prefix
+          "G"  'pdf-view-goto-page-with-prefix
+          "gh" 'beginning-of-buffer
+          "gl" 'end-of-buffer
+          "H" 'beginning-of-buffer
+          "L" 'end-of-buffer
+
+          "=" 'pdf-view-scale-reset
+          "+" 'pdf-view-enlarge
+          "-" 'pdf-view-shrink
+
+          "C-d" 'pdf-view-scroll-up-or-next-page
+          "C-u" 'pdf-view-scroll-down-or-previous-page
+          "m" 'pdf-view-position-to-register
+          "'" 'pdf-view-jump-to-register
+          "`" 'pdf-view-jump-to-register
+
+          "q" 'quit-window
+          "Q" 'kill-this-buffer
+          "ZQ" 'kill-this-buffer
+          "ZZ" 'quit-window)
+
+        (general-define-key
+          :keymaps 'pdf-view-mode-map
+          :states 'visual
+          "y" 'pdf-view-kill-ring-save)
+
+        (leader/set-keys-for-mode! 'pdf-view-mode
+          ;; "-" 'pdf-view-fit-height-to-window
+          ;; "|" 'pdf-view-fit-width-to-window
+          ;; "|" 'pdf-view-fit-page-to-window
+          "g" 'pdf-view-goto-label
+          "o" 'pdf-occur
+          "RET" 'pdf-outline
+
+          "M TAB" 'doc-view-mode
+          "Md" 'pdf-view-dark-minor-mode
+          "Mm" 'pdf-view-midnight-minor-mode
+          "Mp" 'pdf-view-printer-minor-mode
+
+          "zm" 'pdf-view-set-slice-using-mouse
+          "zz" 'pdf-view-set-slice-from-bounding-box
+          "zr" 'pdf-view-reset-slice)
+
+        (evil-set-initial-state 'pdf-outline-buffer-mode 'motion)
+
+        (general-define-key
+          :states  'motion
+          :keymaps 'pdf-outline-buffer-mode-map
+          "o" 'pdf-outline-display-link
+          "sa" 'show-all
+          "ss" 'show-subtree
+          "sh" 'hide-subtree
+          "sn" 'hide-subtree
+          "gh" 'pdf-outline-up-heading
+          "gk" 'outline-backward-same-level
+          "gj" 'outline-forward-same-level
+          "gl" 'outline-next-heading
+          "gd" 'outline-hide-entry
+          "g SPC" 'pdf-outline-select-pdf-window
+
+          "<C-return>" 'pdf-outline-follow-link
+          "M-RET" 'pdf-outline-display-link
+          "RET" 'pdf-outline-follow-link-and-quit
+          ;; goto current page in the outline window
+          "gp" 'pdf-outline-move-to-current-page
+
+          "<C-tab>" 'hide-sublevels
+          "<C-up>" 'outline-move-subtree-up
+          "<C-down>" 'outline-move-subtree-down)
+
+        (leader/set-keys-for-mode! 'pdf-outline-buffer-mode
+          "f" 'pdf-outline-follow-mode
+          "m" 'outline-mark-subtree)
+
+        (evil-set-initial-state 'pdf-occur-buffer-mode 'motion)
+        (general-define-key
+          :states  'motion
+          :keymaps 'pdf-occur-buffer-mode-map
+          ;; unbound: tablist-export-csv
+          "RET" 'pdf-occur-goto-occurrence
+          "s" 'pdf-occur-view-occurrence
+          "o" 'pdf-occur-view-occurrence
+          "d" 'tablist-do-kill-lines
+          "x" 'pdf-occur-tablist-do-flagged-delete
+          "<backtab>" 'tablist-backward-column
+          "DEL" 'tablist-unmark-backward
+
+          [remap evil-first-non-blank] 'tablist-move-to-major-column
+          [remap evil-next-line] 'tablist-next-line
+          [remap evil-previous-line] 'tablist-previous-line
+
+          "gr" 'pdf-occur-revert-buffer-with-args
+
+          "A" 'pdf-occur-tablist-gather-documents
+          "D" 'pdf-occur-tablist-do-delete
+
+          "S" 'tabulated-list-sort
+          "gS" 'tablist-revert
+
+          "m" 'tablist-mark-forward
+          "~" 'tablist-toggle-marks
+          "u" 'tablist-unmark-forward
+          "U" 'tablist-unmark-all-marks
+          "*m" 'tablist-mark-forward
+          "*!" 'tablist-unmark-all-marks
+          "*c" 'tablist-change-marks
+          "*n" 'tablist-mark-items-numeric
+          "*r" 'tablist-mark-items-regexp
+          "*%" 'tablist-mark-items-regexp
+
+          "a" 'tablist-flag-forward
+
+          "q"  'tablist-quit
+          "ZQ" 'tablist-quit
+          "ZZ" 'tablist-quit)
+
+        (leader/set-keys-for-mode! 'pdf-occur-buffer-mode-map
+          "/!" 'tablist-negate-filter
+          "//" 'tablist-display-filter
+          "/=" 'tablist-push-equal-filter
+          "/C" 'tablist-clear-filter
+          "/D" 'tablist-delete-named-filter
+          "/a" 'tablist-push-named-filter
+          "/d" 'tablist-deconstruct-named-filter
+          "/e" 'tablist-edit-filter
+          "/n" 'tablist-push-numeric-filter
+          "/p" 'tablist-pop-filter
+          "/r" 'tablist-push-regexp-filter
+          "/s" 'tablist-name-current-filter
+          "/t" 'tablist-toggle-first-filter-logic
+          "/z" 'tablist-suspend-filter)
+
+        ;; functions ripped from evil-collection
+        (defun pdf-view-next-line-or-next-page-with-prefix (&optional count)
+          "'evil' wrapper include a count argument to `pdf-view-next-line-or-next-page'"
+          (interactive "p")
+          (if count
+              (dotimes (_ count nil)
+                      (pdf-view-next-line-or-next-page 1))
+            (pdf-view-next-line-or-next-page 1)))
+
+        (defun pdf-view-prev-line-or-prev-page-with-prefix (&optional count)
+          "'evil' wrapper include a count argument to `pdf-view-previous-line-or-previous-page'"
+          (interactive "p")
+          (if count
+              (dotimes (_ count nil)
+                      (pdf-view-previous-line-or-previous-page 1))
+            (pdf-view-previous-line-or-previous-page 1)))
+
+        (defun pdf-view-goto-page-with-prefix (&optional page)
+          "`evil' wrapper around `pdf-view-last-page'."
+          (interactive "P")
+          (if page
+              (pdf-view-goto-page page)
+            (pdf-view-last-page)
+            (image-eob)))
+
+        (defun pdf-view-goto-first-page-with-prefix (&optional page)
+          "`evil' wrapper around `pdf-view-first-page'."
+          (interactive "P")
+          (if page
+              (pdf-view-goto-page page)
+            (pdf-view-first-page)
+            (image-bob))))
     #+END_SRC
 
 *** persp-mode
