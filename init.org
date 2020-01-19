@@ -341,7 +341,7 @@
            package-user-dir                                   (bin "elpa/")
            external-packages-directory                        (bin "misc")
 
-           abbrev-file-name                                   (var "abbrev.el")
+           abbrev-file-name                                   (etc "abbrev.el")
            auto-insert-directory                              (etc "auto-insert")
            auto-save-list-file-prefix                         (var "auto-save" "sessions/")
            auto-save-file-name-transforms                     `((".*" ,(var "auto-save" "sessions/") t))
@@ -403,6 +403,10 @@
            elmo-split-log-file                                (var "elmo/split-log")
            emms-directory                                     (var "emms/")
            emojify-emojis-dir                                 (var "emojify/")
+           ;; relative to home directory and refuses to accept absolute directories... for some DUMB REASON!!!
+           ispell-personal-dictionary                         (file-relative-name (concat mohkale-dotemacs-etc-path
+                                                                                           "/ispell/dict.txt")
+                                                                                   "~")
            geben-temporary-file-directory                     (var "geben/")
            helm-adaptive-history-file                         (var "helm/adaptive-history.el")
            helm-backup-path                                   (var "helm/backup/")
@@ -455,6 +459,7 @@
            mohkale-snippets-dir                               (etc "snippets/")
            yas-snippet-dirs                                   '(yasnippet-snippets-dir)
            yasnippet-snippets-dir                             mohkale-snippets-dir
+           xkcd-cache-dir                                     (var "xkcd")
            )
 
           (let ((list (list (join-path lsp-server-root
@@ -890,6 +895,16 @@
         "Mde" 'invoke-editable-dired
         "Md <escape>" 'wdired-abort-changes
         "Mdq" 'wdired-abort-changes)
+    #+END_SRC
+
+*** minor
+    #+BEGIN_SRC emacs-lisp
+      (defvar mohkale-minor-mode-leader-key "q"
+        "leader key for minor mode bindings.
+      this leader prefix is expected to be muddled and unreliable...
+      due to tonnes of different minor modes collabratively binding to it.
+      That said... I need a place to put minor-mode keys and this was
+      unoccupied.")
     #+END_SRC
 
 *** narrowing & numbers
@@ -4021,8 +4036,8 @@
               (message "no custom perspectives defined")
             (unless name
               (setq name (ivy-read "perspective: "
-                              persp-keys
-                              :require-match t)))
+                                   persp-keys
+                                   :require-match t)))
             (funcall (gethash name
                               persps
                               (lambda () (message "unable to find perspective: %s" name)))))))
@@ -10484,12 +10499,10 @@
 
 *** yasnippet
     yet another snippets tool... but amazingly powerful. :-P
+    See the snippet [[https://joaotavora.github.io/yasnippet/snippet-development.html#org6796ab7][dev]] guide at.
 
 **** yasnippet
      #+BEGIN_SRC emacs-lisp
-       ;; snippet dev guide at:
-       ;;   https://joaotavora.github.io/yasnippet/snippet-development.html#org6796ab7
-
        (use-package yasnippet
          :ensure t
          :defer  t
@@ -10508,10 +10521,11 @@
          :init
          (leader/set-keys
            "iSn" 'yas-new-snippet
-           "iSv" 'yas-visit-snippet-file)
+           "fS" 'yas-visit-snippet-file)
          (general-define-key
            :states 'insert
            "C-i" 'yas-expand)
+
          :config
          (yas-global-mode 1)
          (general-define-key
@@ -10550,7 +10564,7 @@
            "M-i" 'aya-expand))
      #+END_SRC
 
-**** snippet sources
+**** snippet-sources
 ***** yasnippet-snippets
       #+BEGIN_SRC emacs-lisp
         (with-eval-after-load 'yasnippet
@@ -10913,6 +10927,20 @@
           "n"   'ztree-dir-widen-to-parent
           "w"   'ztree-dir-narrow-to-dir
           "h"   'ztree-dir-toggle-show-filtered-files))
+    #+END_SRC
+
+*** hydra
+    #+BEGIN_SRC emacs-lisp
+      (use-package hydra
+        :ensure t
+        :defer  t
+        :commands defhydra
+        :config
+        (setq lv-use-separator t))
+
+      (use-package pretty-hydra
+        :ensure t
+        :defer  t)
     #+END_SRC
 
 ** languages
