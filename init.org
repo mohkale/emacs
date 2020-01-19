@@ -3899,9 +3899,7 @@
         :when (and (all-the-icons-available-p)
                    (active-minibuffer-window)))
 
-      (defvar spaceline-major-mode-icon--skip-modes
-        '(dashboard-mode
-          ebuku-mode)
+      (defvar spaceline-major-mode-icon--skip-modes nil
         "don't show the icon for modes in this list")
 
       (spaceline-define-segment buffer-mode-icon
@@ -3910,9 +3908,14 @@
           (let ((icon (all-the-icons-icon-for-mode major-mode
                                                    :v-adjust -0.15)))
             (unless (symbolp icon)
-              (propertize icon
-                          'help-echo (concat "major-mode: " (symbol-name major-mode))
-                          'face `(:height 1.0 :family ,(all-the-icons-icon-family-for-buffer) :inherit)))))
+              (let ((family
+                     (or
+                      (all-the-icons-icon-family-for-mode major-mode)
+                      (plist-get (get-text-property 0 'face icon)
+                                 :family))))
+                (propertize icon
+                            'help-echo (concat "major-mode: " (symbol-name major-mode))
+                            'face `(:height 1.0 :family ,family :inherit))))))
         :enabled (all-the-icons-available-p))
 
       (spaceline-define-segment version-control-type-icon
