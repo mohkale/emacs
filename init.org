@@ -5811,16 +5811,22 @@
     #+END_SRC
 
 *** diff
+    #+BEGIN_SRC emacs-lisp
+      (defvar leader-diff-mode-prefix "d"
+        "leader prefix under which diff bindings are assigned.")
+    #+END_SRC
+
 **** diff
      #+BEGIN_SRC emacs-lisp
        (use-package diff-mode
          :defer t
          :commands (diff-mode diff-buffer-with-file)
          :init
-         (leader/declare-prefix "=" "diff" "interactive diff sessions")
+         (leader/with-prefix leader-diff-mode-prefix
+           (leader/declare-prefix "" "diff" "interactive diff sessions")
 
-         (leader/set-keys
-           "= SPC" 'diff-buffer-with-file)
+           (leader/set-keys
+             "SPC" 'diff-buffer-with-file))
 
          (push 'diff-mode mohkale--whitespace-exempt-modes)
 
@@ -5870,7 +5876,10 @@
      #+END_SRC
 
 **** ediff
-     ediff is a pain to customize. all the help messages are hard coded, some of the keymaps are =magically= bound somewhere I don't know. I can get a reasonably useful out of the box experience with *evil-ediff* but it isn't much help in ediff-meta mode such as for the registry or multiple sessions.
+     ediff is a pain to customize. all the help messages are hard coded, some of the keymaps
+     are =magically= bound somewhere I don't know. I can get a reasonably useful out of the
+     box experience with *evil-ediff* but it isn't much help in ediff-meta mode such as for
+     the registry or multiple sessions.
 
      I'm moving to [[https://github.com/justbur/emacs-vdiff][vdiff]] & I suggest anyone else who can, does so as well.
 
@@ -5899,10 +5908,11 @@
                     ediff-revert-buffers-then-recompute-diffs
                     ediff-profile)
          :init
-         (leader/set-keys
-           "=f" 'ediff-current-file
-           "=b" 'ediff-buffers
-           "=w" 'ediff-windows)
+         (leader/with-prefix leader-diff-mode-prefix
+           (leader/set-keys
+             "f" 'ediff-current-file
+             "b" 'ediff-buffers
+             "w" 'ediff-windows))
 
          (push 'ediff-meta-mode mohkale--whitespace-exempt-modes)
 
@@ -6023,69 +6033,108 @@
                     vdiff-current-file
                     vdiff-merge-conflict)
          :init
-         (leader/declare-prefix
-           "d" "diff")
+         (leader/with-prefix leader-diff-mode-prefix
+           (leader/declare-prefix
+             "" "diff")
 
-         (leader/set-keys
-           "d RET" 'vdiff-merge-conflict
-           "dd" 'vdiff-current-file
-           "df" 'vdiff-files
-           "dF" 'vdiff-files3
-           "db" 'vdiff-buffers
-           "dB" 'vdiff-buffers3)
+           (leader/set-keys
+             "RET" 'vdiff-merge-conflict
+             "d" 'vdiff-current-file
+             "f" 'vdiff-files
+             "F" 'vdiff-files3
+             "b" 'vdiff-buffers
+             "B" 'vdiff-buffers3))
 
          (defvar vdiff-use-relative-line-numbers nil
            "when true, line numbers in vdiff sessions are relative")
 
          :config
-         (add-hook 'vdiff-mode-hook
-                   (defun mohkale--setup-vdiff (&rest args)
-                     (let ((inhibit-message t))
-                       (toggle-truncate-lines +1))
+         (defun vdiff-setup (&rest args)
+           (let ((inhibit-message t))
+             (toggle-truncate-lines +1)
+             (evil-normalize-keymaps))
 
-                     (when vdiff-use-relative-line-numbers
-                       (setq-local display-line-numbers
-                                   (if vdiff-mode t 'relative)))))
+           (when vdiff-use-relative-line-numbers
+             (setq-local display-line-numbers
+                         (if vdiff-mode t 'relative))))
 
-         (leader/declare-prefix-for-mode* 'vdiff-mode
-           "TAB" "refine"
-           "t"   "toggle"
-           "z"   "folds")
+         (defun vdiff-prepare ()
+           (cond
+            ((derived-mode-p 'org-mode)
+             (when vdiff-mode
+               (outline-show-all)))))
 
-         (leader/set-keys-for-mode 'vdiff-mode
-           "=-" 'vdiff-switch-buffer
-           "=j" 'vdiff-next-hunk
-           "=k" 'vdiff-previous-hunk
-           "=." 'vdiff-hydra/body
-           "=r" 'vdiff-refresh
-           "=m" 'vdiff-restore-windows
-           "=q" 'vdiff-quit
-           "=s" 'vdiff-save-buffers
-           "=<left>"  'vdiff-receive-changes
-           "=<right>" 'vdiff-send-changes
-           "=>" 'vdiff-send-changes-and-step
-           "=<" 'vdiff-send-changes
+         (dolist (handler '(vdiff-setup
+                            vdiff-prepare))
+           (add-hook 'vdiff-mode-hook      handler)
+           (add-hook 'vdiff-3way-mode-hook handler))
 
-           "= TAB TAB" 'vdiff-refine-this-hunk
-           "= TAB DEL" 'vdiff-remove-refinements-in-hunk
-           "= TAB RET" 'vdiff-refine-all-hunks
-           ;; 'vdiff-refine-this-hunk-symbol
-           ;; 'vdiff-refine-this-hunk-word
-           ;; 'vdiff-refine-all-hunks-symbol
-           ;; 'vdiff-refine-all-hunks-word
+         (general-define-key
+           :states leader-norm-states
+           :keymaps '(vdiff-mode-map vdiff-3way-mode-map)
+           "q"  'vdiff-quit
+           "gj" 'vdiff-next-hunk
+           "gk" 'vdiff-previous-hunk
+           "gh" 'vdiff-switch-buffer
+           "gl" 'vdiff-switch-buffer
+           "gr" 'vdiff-refresh
+           "zj" 'vdiff-next-fold
+           "zk" 'vdiff-previous-fold
+           "zo" 'vdiff-open-fold
+           "zO" 'vdiff-open-fold
+           "zr" 'vdiff-open-all-folds
+           "zf" 'vdiff-close-fold
+           "zc" 'vdiff-close-fold
+           "zF" 'vdiff-close-all-folds
+           "zC" 'vdiff-close-all-folds
+           "zC" 'vdiff-close-other-folds)
 
-           "=ti" 'vdiff-toggle-case
-           "=tw" 'vdiff-toggle-whitespace
+         (leader/with-prefix leader-diff-mode-prefix
+           (leader/declare-prefix-for-mode* '(vdiff-mode vdiff-3way-mode)
+             "TAB" "refine"
+             "t"   "toggle"
+             "z"   "folds")
 
-           "=zj" 'vdiff-next-fold
-           "=zk" 'vdiff-previous-fold
-           "=zo" 'vdiff-open-fold
-           "=zO" 'vdiff-open-all-folds
-           "=zf" 'vdiff-close-fold
-           "=zc" 'vdiff-close-fold
-           "=zC" 'vdiff-close-all-folds
-           "=z M-c" 'vdiff-close-other-folds))
+           (leader/set-keys-for-mode '(vdiff-mode vdiff-3way-mode)
+             "-" 'vdiff-switch-buffer
+             "." 'vdiff-hydra/body
+             "m" 'vdiff-restore-windows
+             "s" 'vdiff-save-buffers
+             "<left>"  'vdiff-receive-changes
+             "<right>" 'vdiff-send-changes
+             ">" 'vdiff-send-changes-and-step
+             "<" 'vdiff-send-changes
+
+             "TAB TAB" 'vdiff-refine-this-hunk
+             "TAB DEL" 'vdiff-remove-refinements-in-hunk
+             "TAB RET" 'vdiff-refine-all-hunks
+             ;; 'vdiff-refine-this-hunk-symbol
+             ;; 'vdiff-refine-this-hunk-word
+             ;; 'vdiff-refine-all-hunks-symbol
+             ;; 'vdiff-refine-all-hunks-word
+
+             "ti" 'vdiff-toggle-case
+             "tw" 'vdiff-toggle-whitespace)))
      #+END_SRC
+
+***** vdiff-magit
+      #+BEGIN_SRC emacs-lisp :tangle no
+        (use-package vdiff-magit
+          :ensure t
+          :defer  t
+          :after magit
+          :init
+          (general-define-key
+            :keymaps 'magit-mode-map
+            "e" 'vdiff-magit-dwim
+            "E" 'vdiff-magit)
+
+          :config
+          (transient-suffix-put 'magit-dispatch "e" :description "vdiff (dwim)")
+          (transient-suffix-put 'magit-dispatch "e" :command 'vdiff-magit-dwim)
+          (transient-suffix-put 'magit-dispatch "E" :description "vdiff")
+          (transient-suffix-put 'magit-dispatch "E" :command 'vdiff-magit))
+      #+END_SRC
 
 *** dired
 **** dired-x
