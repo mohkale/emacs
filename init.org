@@ -6150,6 +6150,41 @@
            :defer  t))
      #+END_SRC
 
+**** dired-all-the-icons
+     #+BEGIN_SRC emacs-lisp
+       (use-package all-the-icons-dired
+         :ensure t
+         :defer  t
+         :diminish "DiredIcons"
+         :after all-the-icons
+         :hook (dired-mode . all-the-icons-dired-mode)
+         :init
+         (defvar dired-subdir-after-insert-hook nil
+           "hook which is run after dired inserts a subtree.")
+         :config
+         ;; see https://github.com/jtbm37/all-the-icons-dired/issues/22
+         (defun all-the-icons-dired--subdir-icons+ ()
+           "insert icons for subdirectories in dired sessions."
+           (save-excursion
+             (unwind-protect
+                 (progn
+                   (narrow-to-region
+                    (line-beginning-position)
+                    (condition-case nil
+                        (dired-next-subdir 1)
+                      (error (point-max))))
+                   (all-the-icons-dired--reset)
+                   (all-the-icons-dired--display))
+               (widen))))
+
+         (advice-add 'dired-insert-subdir
+                     :after
+                     (defun dired-insert-subdir--run-hook+ (&rest _)
+                       (run-hook-with-args 'dired-subdir-after-insert-hook)))
+
+         (add-hook 'dired-subdir-after-insert-hook 'all-the-icons-dired--subdir-icons+))
+     #+END_SRC
+
 **** dired
      #+BEGIN_SRC emacs-lisp
        (use-package dired
@@ -6158,7 +6193,10 @@
          :config
          (setq ls-lisp-dirs-first t
                ls-lisp-use-insert-directory-program t
-               dired-listing-switches "-laXhv --group-directories-first")
+               dired-listing-switches "-laXhv --group-directories-first"
+               dired-auto-revert-buffer t
+               dired-hide-details-hide-symlink-targets nil
+               dired-recursive-copies t)
 
          (push 'dired-mode mohkale--whitespace-exempt-modes)
 
