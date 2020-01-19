@@ -9545,6 +9545,11 @@
 
         (defalias 'server-abort #'server-kill-clients-for-buffer)
 
+        (advice-add 'server-edit :before
+                    (defun server-edit--auto-save-on-exit (&rest args)
+                      "automatically save file before server exit"
+                      (save-buffer)))
+
         ;; add ,, and ,q like bindings in server edit sessions, like org-edit-src-code
         (define-minor-mode mohkale-server-mode
           "a dummy minor mode for files being edited by `server'.
@@ -9559,9 +9564,12 @@
                   (substitute-command-keys
                    "Editing an emacsclient sesssion.  Exit with '\\[server-edit]' or abort with '\\[server-abort]'"))))
 
-        (add-hook 'server-switch-hook (lambda () (when server-buffer-clients
-                                              (unless (derived-mode-p magit-mode)
-                                                (mohkale-server-mode)))))
+        (add-hook 'server-switch-hook
+                  (defun server-switch--enable-mohkale-server-mode ()
+                    (when server-buffer-clients
+                      (unless (or (bound-and-true-p magit-mode)
+                                  (bound-and-true-p git-commit-mode))
+                        (mohkale-server-mode)))))
 
         (add-hook 'server-done-hook (lambda () (mohkale-server-mode -1)))
 
