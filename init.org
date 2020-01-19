@@ -7438,102 +7438,119 @@
            "q" 'quit-window))
      #+END_SRC
 
-**** collapse directories
-     see [[https://github.com/abo-abo/swiper/issues/2211][this]] link for a description of the problem which this addresses.
-     I don't really need it for now so I'm not tangling.
+***** collapse-directories
+      see [[https://github.com/abo-abo/swiper/issues/2211][this]] link for a description of the problem which this addresses.
+      I don't really need it for now so I'm not tangling.
 
-     #+BEGIN_SRC emacs-lisp :tangle no
-       (defvar mohkale/ivy-collapse-paths t
-         "when true, empty directories are chained together.")
+      #+BEGIN_SRC emacs-lisp :tangle no
+        (defvar mohkale/ivy-collapse-paths t
+          "when true, empty directories are chained together.")
 
-       (defvar mohkale/ivy-collapse-paths--append-files nil
-         "when true, the only file in a directory is appended to
-       that directory when shown by ivy. otherwise the directory
-       is shown by itself.")
+        (defvar mohkale/ivy-collapse-paths--append-files nil
+          "when true, the only file in a directory is appended to
+        that directory when shown by ivy. otherwise the directory
+        is shown by itself.")
 
-       (defun collapse-directories (path files &optional read-directories-command)
-         "collapses any hollow directory files under PATH.
-       a hollow directory is any directory which is either empty
-       or has only one child which must be a file. depending on
-       `mohkale/ivy-collapse-paths--append-files' that files is also
-       appended to the path.
+        (defun collapse-directories (path files &optional read-directories-command)
+          "collapses any hollow directory files under PATH.
+        a hollow directory is any directory which is either empty
+        or has only one child which must be a file. depending on
+        `mohkale/ivy-collapse-paths--append-files' that files is also
+        appended to the path.
 
-       if you'd like to specify you're own command for listing directories
-       (or have aliased `directory-files' for your own purposes), you can
-       specify the read-command as the final optional arg to this function."
-         (or read-directories-command
-             (setq read-directories-command #'directory-files))
+        if you'd like to specify you're own command for listing directories
+        (or have aliased `directory-files' for your own purposes), you can
+        specify the read-command as the final optional arg to this function."
+          (or read-directories-command
+              (setq read-directories-command #'directory-files))
 
-         (mapcar
-          (lambda (file)
-            (when (and (ivy--dirname-p file)
-                       (not (or (string-equal file "./")
-                                (string-equal file "../"))))
-              (let (dir-files file-count (do-recurse t))
-                (ignore-errors ;; in case of permission errors
-                  (while do-recurse
-                    (setq dir-files  (funcall
-                                      read-directories-command
-                                      (concat path file)
-                                      ;; all but . and ..
-                                      nil "^[^\\.]\\{1,2\\}")
-                          file-count (length dir-files))
-                    (cond
-                     ;; nothing left to recurse, end recursion
-                     ((eq file-count 0) (setq do-recurse nil))
-                     ;; at least one found, cancel unless directory
-                     ((eq file-count 1)
-                      (let* ((only-child (concat file (car dir-files))))
-                        (if (file-directory-p (concat path only-child))
-                            ;; include trailing / for identity purposes
-                            (setq file (concat only-child "/"))
-                          ;; encountered final leaf only-child, show if desired
-                          (when mohkale/ivy-collapse-paths--append-files
-                            (setq file only-child))
-                          (setq do-recurse nil))))
-                     ;; encountered non-hollow directory
-                     (t (setq do-recurse nil)))))))
-            file)
-          files))
+          (mapcar
+           (lambda (file)
+             (when (and (ivy--dirname-p file)
+                        (not (or (string-equal file "./")
+                                 (string-equal file "../"))))
+               (let (dir-files file-count (do-recurse t))
+                 (ignore-errors ;; in case of permission errors
+                   (while do-recurse
+                     (setq dir-files  (funcall
+                                       read-directories-command
+                                       (concat path file)
+                                       ;; all but . and ..
+                                       nil "^[^\\.]\\{1,2\\}")
+                           file-count (length dir-files))
+                     (cond
+                      ;; nothing left to recurse, end recursion
+                      ((eq file-count 0) (setq do-recurse nil))
+                      ;; at least one found, cancel unless directory
+                      ((eq file-count 1)
+                       (let* ((only-child (concat file (car dir-files))))
+                         (if (file-directory-p (concat path only-child))
+                             ;; include trailing / for identity purposes
+                             (setq file (concat only-child "/"))
+                           ;; encountered final leaf only-child, show if desired
+                           (when mohkale/ivy-collapse-paths--append-files
+                             (setq file only-child))
+                           (setq do-recurse nil))))
+                      ;; encountered non-hollow directory
+                      (t (setq do-recurse nil)))))))
+             file)
+           files))
 
-       (defun counsel-find-file--collapse-directories-wrapper (func dir)
-         (if (not mohkale/ivy-collapse-paths)
-             (apply func dir nil) ;; no collapsing, leave as is
-           (cl-letf* (((symbol-function 'actual-directory-files)
-                       (symbol-function 'directory-files))
-                      ((symbol-function 'actual-read-file-name-internal)
-                       (symbol-function 'read-file-name-internal))
+        (defun counsel-find-file--collapse-directories-wrapper (func dir)
+          (if (not mohkale/ivy-collapse-paths)
+              (apply func dir nil) ;; no collapsing, leave as is
+            (cl-letf* (((symbol-function 'actual-directory-files)
+                        (symbol-function 'directory-files))
+                       ((symbol-function 'actual-read-file-name-internal)
+                        (symbol-function 'read-file-name-internal))
 
-                      ;; wrap `read-file-name-internal' and `directory-files'
-                      ;; into collapsing directories when possible.
-                      ((symbol-function 'read-file-name-internal)
-                       (lambda (&rest args)
-                         (collapse-directories default-directory
-                                               (apply #'actual-read-file-name-internal args)
-                                               #'actual-directory-files)))
-                      ((symbol-function 'directory-files)
-                       (lambda (dir)
-                         (collapse-directories dir
-                                               (mapcar
-                                                ;; directory-files doesn't append / to dirs
-                                                ;; so `ivy--dirname-p' won't work with them.
-                                                (lambda (file)
-                                                  (if (file-directory-p (concat dir file))
-                                                      (setq file (concat file "/")))
-                                                  file)
-                                                (actual-directory-files dir))
-                                               #'actual-directory-files))))
-             (apply func dir nil))))
+                       ;; wrap `read-file-name-internal' and `directory-files'
+                       ;; into collapsing directories when possible.
+                       ((symbol-function 'read-file-name-internal)
+                        (lambda (&rest args)
+                          (collapse-directories default-directory
+                                                (apply #'actual-read-file-name-internal args)
+                                                #'actual-directory-files)))
+                       ((symbol-function 'directory-files)
+                        (lambda (dir)
+                          (collapse-directories dir
+                                                (mapcar
+                                                 ;; directory-files doesn't append / to dirs
+                                                 ;; so `ivy--dirname-p' won't work with them.
+                                                 (lambda (file)
+                                                   (if (file-directory-p (concat dir file))
+                                                       (setq file (concat file "/")))
+                                                   file)
+                                                 (actual-directory-files dir))
+                                                #'actual-directory-files))))
+              (apply func dir nil))))
 
-       (advice-add 'ivy--sorted-files :around #'counsel-find-file--collapse-directories-wrapper)
-     #+END_SRC
+        (advice-add 'ivy--sorted-files :around #'counsel-find-file--collapse-directories-wrapper)
+      #+END_SRC
+
+***** ivy-hydra
+      #+BEGIN_SRC emacs-lisp
+        (use-package ivy-hydra
+          :ensure t
+          :defer  t
+          :after ivy
+          :commands hydra-ivy/body
+          :init
+          (general-define-key
+            :keymaps 'ivy-minibuffer-map
+            "C-." 'hydra-ivy/body)
+
+          :config
+          (when (autoloadp (symbol-function 'hydra-ivy-custom/body))
+            (autoload-do-load (symbol-function 'hydra-ivy-custom/body))))
+      #+END_SRC
 
 **** counsel
      #+BEGIN_SRC emacs-lisp
        (use-package counsel
          :ensure t
          :defer  t
-         :after  ivy
+         :after ivy
          :diminish
          :init
          (setq counsel-find-file-occur-use-find t
@@ -7549,8 +7566,8 @@
            "fs" "recursive-find")
 
          (leader/set-keys-for-mode! 'org-mode
-           "gg" 'counsel-org-goto
-           "gG" 'counsel-org-goto-all)
+           "g" 'counsel-org-goto
+           "G" 'counsel-org-goto-all)
 
          (general-define-key
            :keymaps 'mohkale-window-map
@@ -7642,47 +7659,12 @@
            "C-S-." 'counsel-find-symbol))
      #+END_SRC
 
-**** ivy-hydra
-     #+BEGIN_SRC emacs-lisp
-       (use-package ivy-hydra
-         :ensure t
-         :defer  t
-         :after ivy
-         :commands hydra-ivy/body
-         :init
-         (general-define-key
-           :keymaps 'ivy-minibuffer-map
-           "C-." 'hydra-ivy/body)
-
-         :config
-         (when (autoloadp (symbol-function 'hydra-ivy-custom/body))
-           (autoload-do-load (symbol-function 'hydra-ivy-custom/body))))
-     #+END_SRC
-
 **** swiper
      #+BEGIN_SRC emacs-lisp
        (use-package swiper
          :ensure t
          :defer  t
          :after ivy
-         :commands (swiper-query-replace
-                    swiper-all-query-replace
-                    swiper-avy
-                    ;; swiper-mc
-                    swiper-recenter-top-bottom
-                    swiper
-                    swiper-backward
-                    swiper-thing-at-point
-                    swiper-all-thing-at-point
-                    swiper-toggle-face-matching
-                    swiper-from-isearch
-                    swiper-multi
-                    swiper-all
-                    swiper-multibuffer
-                    swiper-isearch-thing-at-point
-                    swiper-isearch
-                    swiper-isearch-backward
-                    swiper-isearch-toggle)
          :init
          (leader/set-keys
            "ss" 'swiper
@@ -7765,15 +7747,6 @@
          :ensure t
          :defer  t
          :after counsel
-         :commands (counsel-gtags-find-definition
-                    counsel-gtags-find-reference
-                    counsel-gtags-find-symbol
-                    counsel-gtags-find-file
-                    counsel-gtags-go-backward
-                    counsel-gtags-go-forward
-                    counsel-gtags-create-tags
-                    counsel-gtags-update-tags
-                    counsel-gtags-dwim)
          :init
          (leader/set-keys
            "Tg" 'counsel-gtags-find-definition
@@ -7826,8 +7799,17 @@
            "se TAB"   'counsel-web-thing-at-point))
      #+END_SRC
 
+**** counsel-word-clock
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (use-package counsel-word-clock
+         :straight (counsel-word-clock :type git :host github :repo "kchenphy/counsel-world-clock")
+         :defer  t
+         :after  counsel)
+     #+END_SRC
+
 **** helm-make
-     contrary to what I initially thought, helm-make can also be used with ivy. Maybe should be named something else.
+     contrary to what I initially thought, helm-make can also be used with ivy. Maybe
+     should be named something else.
 
      #+BEGIN_SRC emacs-lisp
        (use-package helm-make
