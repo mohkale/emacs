@@ -11789,6 +11789,24 @@
 
                      (t (fallback-action (called-interactively-p)))))))
 
+         (defun org-openable-p ()
+           (org-element-lineage
+            (org-element-context)
+            '(footnote-definition
+              footnote-reference
+              headline
+              ;; inlinetask
+              link
+              timestamp)
+            t))
+
+         (defun org-normal-return ()
+           (interactive)
+           (call-interactively
+            (cond
+             ((org-openable-p) 'org-open-at-point)
+             (t 'evil-ret))))
+
          (general-define-key
            :keymaps 'org-mode-map
            :states 'insert
@@ -11799,6 +11817,7 @@
          (general-define-key
            :keymaps 'org-mode-map
            :states 'normal
+           "RET" 'org-normal-return
            "o" '(lambda () (interactive)
                   (let ((org-clever-return--insert-headings t))
                     (org-clever-return nil)))
@@ -11900,7 +11919,6 @@
            "c" "clock/calendar"
            "e" "export"
            "h" "headings"
-           "g" "jump"
            "i" "insert"
            "S" "subtrees"
            "t" "tables"
