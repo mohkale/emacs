@@ -4450,29 +4450,30 @@
        (use-package evil-args
          :ensure t
          :defer  t
-         :commands (evil-inner-arg
-                    evil-outer-arg
-                    evil-forward-arg
-                    evil-backward-arg
-                    evil-jump-out-args)
          :init
          (define-key evil-inner-text-objects-map "a" 'evil-inner-arg)
          (define-key evil-outer-text-objects-map "a" 'evil-outer-arg)
-         (define-key evil-normal-state-map "K" 'evil-jump-out-args)
+         (define-key evil-motion-state-map "g^" 'evil-jump-out-args)
 
          (general-define-key
-           :states '(motion normal)
-           "K" 'evil-jump-out-args)
+           :states 'motion
+           ;; replaces evil-first-non-blank-of-visual-line
+           "g^" 'evil-jump-out-args
+           "[^" 'evil-jump-out-args
+           "]^" 'evil-jump-out-args
+           "[a" 'evil-backward-arg
+           "]a" 'evil-forward-arg)
 
          (leader/set-keys
-           "g(" 'evil-backward-arg
-           "g)" 'evil-forward-arg
-           "gk" 'evil-jump-out-args)
+           "j(" 'evil-backward-arg
+           "j)" 'evil-forward-arg
+           "j^" 'evil-jump-out-args)
 
          (defun evil-args--adjust-for-elisp ()
            (setq evil-args-delimiters '(" ")))
 
-         (add-hook 'emacs-lisp-mode-hook #'evil-args--adjust-for-elisp))
+         (add-hook 'emacs-lisp-mode-hook #'evil-args--adjust-for-elisp)
+         (add-hook 'lisp-interaction-mode-hook #'evil-args--adjust-for-elisp))
      #+END_SRC
 
 **** evil-magit
