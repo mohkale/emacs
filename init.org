@@ -1329,6 +1329,8 @@
               (kill-buffer buffer)
               (when (and window (> (length (window-list)) 1))
                 (delete-window window))))))
+
+      (provide 'mohkale-file)
     #+END_SRC
 
 *** Hooks/Handlers
@@ -1690,6 +1692,8 @@
 
       (display-buffer--create-focus-method display-buffer-left)
       (display-buffer--create-focus-method display-buffer-right)
+
+      (provide 'mohkale-buffer-display)
     #+END_SRC
 
 *** Misc
@@ -1754,6 +1758,8 @@
                   "Text-property keymap: %s\n"
                   "Text-property local-map: %s")
                  map-list)))
+
+      (provide 'mohkale-misc)
     #+END_SRC
 
 *** Text
@@ -1833,6 +1839,8 @@
                               ,(plist-get (text-properties-at point) 'face)))))
            (and (called-interactively-p 'any) (message (format "%s" faces)))
            faces))
+
+       (provide 'mohkale-text-query)
      #+END_SRC
 
 **** Formatting
@@ -2053,6 +2061,8 @@
                   (evil-join-whitespace start end)
                 ;; otherwise trim to single space
                 (evil-join start end)))))
+
+        (provide 'mohkale-text)
       #+END_SRC
 
 *** Buffers, Windows & Frames
@@ -2410,6 +2420,8 @@
          (if prefix
              (> prefix 0)
            (not (window-dedicated-p window)))))
+
+      (provide 'mohkale-bufwin)
     #+END_SRC
 
 *** evil
@@ -2500,6 +2512,8 @@
         :repeat t
         "evil command to reverse lines over range."
         (reverse-region beg end))
+
+      (provide 'mohkale-evil)
     #+END_SRC
 
 *** Hydras
