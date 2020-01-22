@@ -4064,7 +4064,6 @@
          :ensure t
          :defer  t
          :hook (evil-mode . global-evil-matchit-mode)
-         :commands evilmi-jump-items
          :init
          (general-define-key
            :states leader-norm-states
@@ -4082,13 +4081,6 @@
          :defer  t
          :diminish
          :hook (evil-mode . evil-vimish-fold-mode)
-         :commands (evil-vimish-fold-mode
-                    evil-vimish-fold/create
-                    evil-vimish-fold/delete
-                    evil-vimish-fold/delete-all
-                    evil-vimish-fold/next-fold
-                    evil-vimish-fold/previous-fold)
-
          :init
          (general-define-key
            :states 'normal
@@ -4102,8 +4094,6 @@
          :ensure t
          :defer  5
          :hook (evil-mode . global-evil-surround-mode)
-         :commands (global-evil-surround-mode
-                    evil-surround-region)
          :config
          (setq-default evil-surround-pairs-alist
                        '((?\( . ("(" . ")"))
@@ -4146,8 +4136,6 @@
        (use-package evil-numbers
          :ensure t
          :defer  t
-         :commands (evil-numbers/inc-at-pt
-                    evil-numbers/dec-at-pt)
          :init
          (general-define-key
            :states 'normal
@@ -4277,9 +4265,6 @@
        (use-package evil
          :ensure t
          :demand t
-         :commands (evil-define-key
-                    defun-evil-adjust-to-eol
-                    evil-mode)
          :init
          (setq-default evil-cross-lines t
                        evil-want-C-i-jump nil
@@ -4518,7 +4503,6 @@
              "C-w" nil))
 
          (require 'evil-magit))
-
      #+END_SRC
 
 **** ex-commands
@@ -4595,53 +4579,35 @@
 
 ** Packages
 *** ace-link
-    #+BEGIN_SRC emacs-lisp
+    let's you use an avy like interface to jump to a link in the visible region of the buffer.
+    cool, but I doub't I'll ever really use it :P
+
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package ace-link
         :ensure t
-        :defer  t
-        :commands (ace-link-info
-                   ace-link-help
-                   ace-link-woman
-                   ace-link-eww
-                   ace-link-compilation
-                   ace-link-custom))
+        :defer  t)
     #+END_SRC
 
 *** adaptive-wrap
-    not really sure what this does. disable for now.
+    This package provides a mode such that when a paragraph you're inserting gets too
+    long, when it wraps round to the next line (assuming truncate-lines is disabled)
+    sequential lines are indented slightly to distinguish them from other lines.
 
-    #+BEGIN_SRC emacs-lisp
-      ;; (use-package adaptive-wrap
-      ;;   :ensure t
-      ;;   :defer  t
-      ;;   :commands adaptive-wrap-prefix-mode)
-    #+END_SRC
+    Seems cool... but I doubt I'll ever use it.
 
-*** asciidoc-mode
     #+BEGIN_SRC emacs-lisp :tangle no
-      (use-package adoc-mode
+      (use-package adaptive-wrap
         :ensure t
         :defer  t)
     #+END_SRC
 
 *** align
-    #+BEGIN_SRC emacs-lisp :tangle no
-      (use-package align
-        :straight (align :type built-in)
-        :defer t
-        :commands (align
-                   align-current
-                   align-entire
-                   align-newline-and-indent
-                   align-regexp))
-    #+END_SRC
-
 **** ialign
      #+BEGIN_SRC emacs-lisp
        (use-package ialign
          :ensure t
          :defer  t
-         :commands (ialign evil-ialign)
+         :commands evil-ialign
          :init
          (leader/set-keys
            "x TAB" 'evil-ialign)
@@ -4682,6 +4648,9 @@
      #+END_SRC
 
 *** all-the-icons
+    provides some fonts for rendering graphical icons within emacs; alongside a set
+    of functions to make retrieving appropriate functions for appropriate purposes.
+
     #+BEGIN_SRC emacs-lisp
       (use-package all-the-icons
         :ensure t
@@ -4708,31 +4677,37 @@
     #+END_SRC
 
 *** anzu
+    shows the number of search results in the mode-line. by default, this package
+    only works with the built in isearch module.
+
     #+BEGIN_SRC emacs-lisp
       (use-package anzu
         :ensure t
         :defer  5
         :diminish
-        :commands (global-anzu-mode
-                   anzu-mode)
         :config
         (global-anzu-mode +1)
         (setq anzu-cons-mode-line-p nil))
     #+END_SRC
 
 *** auto-highlight-symbol
-    #+BEGIN_SRC emacs-lisp
+    auto highlights the symbol under point, if you remain on it for a short while.
+    also lets you search to the next occurence of it. Seems cool, but it's slow and
+    kind of glitchy.
+
+    I can always just use * to search the word at point, or yt<SPC>/<C-y> to do the same.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package auto-highlight-symbol
         :ensure t
         :defer  t
-        :commands (ahs-forward
-                   ahs-backward)
         :init
         (general-define-key
           "M-n" 'ahs-forward
-          "M-N" 'ahs-backward)
+          "M-p" 'ahs-backward)
+
         :config
-        (auto-highlight-symbol-mode 1))
+        (global-auto-highlight-symbol-mode +1))
     #+END_SRC
 
 *** avy
@@ -4740,13 +4715,6 @@
       (use-package avy
         :ensure t
         :defer  t
-        :commands (avy-goto-char
-                   avy-goto-char-2
-                   avy-goto-char-timer
-                   avy-goto-line
-                   avy-goto-word-1
-                   avy-pop-mark
-                   avy-resume)
         :init
         (leader/set-keys
           "jB" 'avy-pop-mark
@@ -4756,11 +4724,12 @@
     #+END_SRC
 
 *** bookmarks
-    prioritise recently used bookmarks over just the default list.
+    Emacs builtin bookmarking fascilities. Let's you quickly navigate to bookmarked files.
 
     #+BEGIN_SRC emacs-lisp
       (use-package bookmark
         :config
+        ;; prioritise recently used bookmarks over just the default list.
         (defadvice bookmark-jump (after bookmark-jump activate)
           (let ((latest (bookmark-get-bookmark bookmark)))
             (setq bookmark-alist (delq latest bookmark-alist))
@@ -4768,6 +4737,8 @@
     #+END_SRC
 
 *** buffer-menu
+    The default buffer menu provided by emacs. Deprecated in favor of [[*ibuffer][ibuffer]].
+
     #+BEGIN_SRC emacs-lisp
       (use-package buff-menu
         :straight (buff-menu :type built-in)
@@ -4819,15 +4790,14 @@
     #+END_SRC
 
 *** buffer-move
+    Move buffer to windows in other directions. Like the vim C-w <Shift>+{h,j,k,l}
+    series of functions.
+
     #+BEGIN_SRC emacs-lisp
       (use-package buffer-move
         :ensure t
         :defer  t
-        :commands (buf-move-up
-                   buf-move-down
-                   buf-move-left
-                   buf-move-right
-                   rotate-windows)
+        :commands (rotate-windows)
         :init
         (general-define-key
           :keymaps 'mohkale-window-map
@@ -4941,9 +4911,9 @@
     #+BEGIN_SRC emacs-lisp
       (use-package add-log
         :defer t
-        :commands (change-log-mode)
         :init
         (push 'change-log-mode mohkale--whitespace-exempt-modes)
+
         :config
         (evil-set-initial-state 'change-log-mode 'motion)
 
@@ -5277,12 +5247,13 @@
     #+END_SRC
 
 *** command-log
+    outputs the commands you run, as you run them, to a dedicated buffer. useful
+    for demonstrating cool emacs stuff :).
+
     #+BEGIN_SRC emacs-lisp
       (use-package command-log-mode
         :ensure t
-        :defer  t
-        :commands (command-log-mode
-                   global-command-log-mode))
+        :defer  t)
     #+END_SRC
 
 *** company
@@ -5293,9 +5264,7 @@
         :delight
         company-mode
         global-company-mode
-        :commands (company-mode
-                   global-company-mode
-                   company/configure-mode)
+        :commands (company/configure-mode)
         :init
         (general-define-key
           :states 'insert
@@ -5469,19 +5438,18 @@
     #+END_SRC
 
 *** company-quickhelp
+    Shows a small floating window with the docstring/helpstring of the company candidate
+    at point.
+
     #+BEGIN_SRC emacs-lisp
       (use-package company-quickhelp
         :ensure t
         :defer  t
-        :commands (company-quickhelp-mode
-                   company-quickhelp-manual-begin)
         :hook (company-mode . company-quickhelp-mode)
         :init
         (setq company-quickhelp-delay nil)
 
         :config
-        (company-quickhelp-mode)
-
         (general-define-key
           :keymaps 'company-active-map
           "C-h" 'company-quickhelp-manual-begin))
@@ -5489,7 +5457,7 @@
 
 *** custom
     #+BEGIN_SRC emacs-lisp
-      (use-package custom
+      (use-package cus-edit
         :defer t
         :init
         (push 'Custom-mode mohkale--whitespace-exempt-modes)
@@ -5850,6 +5818,11 @@
     #+END_SRC
 
 *** delight/diminish
+    packages to change/hide modes from the mode-line. not sure if we're supposed to be using
+    both of them, pretty sure there's some feature overlap here.
+
+    TODO choose one, not both.
+
     #+BEGIN_SRC emacs-lisp
       (use-package delight
         :ensure t
@@ -5867,6 +5840,8 @@
     #+END_SRC
 
 **** diff
+     mode for showing diff/patch files.
+
      #+BEGIN_SRC emacs-lisp
        (use-package diff-mode
          :defer t
@@ -5926,6 +5901,8 @@
      #+END_SRC
 
 **** ediff
+     The builtin interactive diff tool.
+
      ediff is a pain to customize. all the help messages are hard coded, some of the keymaps
      are =magically= bound somewhere I don't know. I can get a reasonably useful out of the
      box experience with *evil-ediff* but it isn't much help in ediff-meta mode such as for
@@ -6069,19 +6046,13 @@
      #+END_SRC
 
 **** vdiff
+     inspired by vimdiff, vdiff is a better, less intrusive interactive diff tool for
+     emacs.
+
      #+BEGIN_SRC emacs-lisp
        (use-package vdiff
          :ensure t
          :defer  t
-         :commands (vdiff-mode
-                    vdiff-3way-mode
-
-                    vdiff-buffers
-                    vdiff-buffers3
-                    vdiff-files
-                    vdiff-files3
-                    vdiff-current-file
-                    vdiff-merge-conflict)
          :init
          (leader/with-prefix leader-diff-mode-prefix
            (leader/declare-prefix
@@ -6189,102 +6160,29 @@
 *** dired
 **** dired-x
      #+BEGIN_SRC emacs-lisp
-       (with-eval-after-load 'dired
-         (use-package dired-x
-           :straight (dired-x :type built-in)
-           :defer t
-           :hook (dired-mode . dired-omit-mode)
-           :commands (dired-jump
-                      dired-jump-other-window
-                      dired-omit-mode)
-           :config
-           (setq dired-omit-files (concat dired-omit-files
-                                          "\\|^__pycache__$"
-                                          "\\|^\\.pytest_cache$"
-                                          "\\|^\\.gradle$"
-                                          "\\|^\\.sass-cache$"
-                                          "\\|^\\.jekyll-cache$"
-                                          "\\|^\\.git$"
-                                          "\\|^Pipfile"))))
-     #+END_SRC
-
-**** epa-dired
-     #+BEGIN_SRC emacs-lisp
-       (with-eval-after-load 'dired
-        (use-package epa-dired
-          :straight (epa-dired :type built-in)
-          :defer t
-          :commands (epa-dired-do-decrypt
-                     epa-dired-do-encrypt
-                     epa-dired-do-sign
-                     epa-dired-do-verify)))
+       (use-package dired-x
+         :straight (dired-x :type built-in)
+         :hook (dired-mode . dired-omit-mode)
+         :config
+         (setq dired-omit-files (concat dired-omit-files
+                                        "\\|^__pycache__$"
+                                        "\\|^\\.pytest_cache$"
+                                        "\\|^\\.gradle$"
+                                        "\\|^\\.sass-cache$"
+                                        "\\|^\\.jekyll-cache$"
+                                        "\\|^\\.git$"
+                                        "\\|^Pipfile")))
      #+END_SRC
 
 **** diredfl
+     extra font lock rules for dired; basically adds some more color to dired sessions.
+     nice idea, but too much of a good thing can be bad.
+
      #+BEGIN_SRC emacs-lisp :tangle no
-       (with-eval-after-load 'dired
-         (use-package diredfl
-           :ensure t
-           :defer  t
-           :commands (diredfl-mode)
-           :hook (dired-mode . diredfl-mode)))
-     #+END_SRC
-
-**** dired-git-info
-     #+BEGIN_SRC emacs-lisp
-       (with-eval-after-load 'dired
-         (use-package dired-git-info
-           :ensure t
-           :defer  t
-           :commands (dired-git-info-mode)
-           :init
-           (general-define-key
-             :keymaps 'dired-mode-map
-             :states  'motion
-             ")" 'dired-git-info-mode)))
-     #+END_SRC
-
-**** dired-hacks
-     #+BEGIN_SRC emacs-lisp :tangle no
-       (with-eval-after-load 'dired
-         (use-package dired-hacks-utils
-           :ensure t
-           :defer  t))
-     #+END_SRC
-
-**** dired-all-the-icons
-     #+BEGIN_SRC emacs-lisp
-       (use-package all-the-icons-dired
+       (use-package diredfl
          :ensure t
          :defer  t
-         :diminish "DiredIcons"
-         :after all-the-icons
-         :hook (dired-mode . all-the-icons-dired-mode)
-         :init
-         (defvar dired-subdir-after-insert-hook nil
-           "hook which is run after dired inserts a subtree.")
-         :config
-         ;; see https://github.com/jtbm37/all-the-icons-dired/issues/22
-         (defun all-the-icons-dired--subdir-icons+ ()
-           "insert icons for subdirectories in dired sessions."
-           (save-excursion
-             (unwind-protect
-                 (progn
-                   (narrow-to-region
-                    (line-beginning-position)
-                    (condition-case nil
-                        (dired-next-subdir 1)
-                      (error (point-max))))
-                   (all-the-icons-dired--reset)
-                   (all-the-icons-dired--display))
-               (widen))))
-
-         (advice-add 'dired-insert-subdir
-                     :after
-                     (defun dired-insert-subdir--run-hook+ (&rest _)
-                       (run-hook-with-args 'dired-subdir-after-insert-hook)))
-
-         (add-hook 'dired-subdir-after-insert-hook 'all-the-icons-dired--subdir-icons+))
+         :hook (dired-mode . diredfl-mode))
      #+END_SRC
 
 **** dired
@@ -6450,195 +6348,254 @@
              (define-key dired-mode-map (kbd binding) nil))))
      #+END_SRC
 
-**** image-dired
+**** dired-all-the-icons
      #+BEGIN_SRC emacs-lisp
        (with-eval-after-load 'dired
-        (use-package image-dired
-          :straight (image-dired :type built-in)
-          :defer t
-          :commands (persp-custom-@dired-slideshow)
-          :init
-          (push 'image-dired-thumbnail-mode mohkale--whitespace-exempt-modes)
-          (puthash "@dired-slideshow" 'persp-custom-@dired-slideshow mohkale--custom-perspectives)
+         (use-package all-the-icons-dired
+           :ensure t
+           :defer  t
+           :diminish "DiredIcons"
+           :hook (dired-mode . all-the-icons-dired-mode)
+           :init
+           (defvar dired-subdir-after-insert-hook nil
+             "hook which is run after dired inserts a subtree.")
 
-          :config
-          ;;; fixed weird moves line, not thumbnail
-          (defun image-dired-slideshow-step ()
-            "Step to next file, if `image-dired-slideshow-times' has not been reached."
-            (if (< image-dired-slideshow-count image-dired-slideshow-times)
-                (progn
-                  (message "%s" (1+ image-dired-slideshow-count))
-                  (setq image-dired-slideshow-count (1+ image-dired-slideshow-count))
-                  (image-dired-display-next-thumbnail-original))
-              (image-dired-slideshow-stop)))
+           :config
+           ;; see https://github.com/jtbm37/all-the-icons-dired/issues/22
+           (defun all-the-icons-dired--subdir-icons+ ()
+             "insert icons for subdirectories in dired sessions."
+             (save-excursion
+               (unwind-protect
+                   (progn
+                     (narrow-to-region
+                      (line-beginning-position)
+                      (condition-case nil
+                          (dired-next-subdir 1)
+                        (error (point-max))))
+                     (all-the-icons-dired--reset)
+                     (all-the-icons-dired--display))
+                 (widen))))
 
-          (general-define-key
-            :keymaps 'image-dired-thumbnail-mode-map
-            :states '(normal visual)
-            "q" nil
+           (advice-add 'dired-insert-subdir
+                       :after
+                       (defun dired-insert-subdir--run-hook+ (&rest _)
+                         (run-hook-with-args 'dired-subdir-after-insert-hook)))
 
-            "h" 'image-dired-backward-image
-            "j" 'image-dired-next-line
-            "k" 'image-dired-previous-line
-            "l" 'image-dired-forward-image
-            "<left>"  'image-dired-forward-image
-            "<right>" 'image-dired-previous-image
-
-
-            "x" 'image-dired-delete-char
-            "m" 'image-dired-mark-thumb-original-file
-            "u" 'image-dired-unmark-thumb-original-file
-            "c" 'image-dired-comment-thumbnail
-            "d" 'image-dired-flag-thumb-original-file
-            "D" 'image-dired-thumbnail-set-image-description
-            "s" 'image-dired-slideshow-start
-            "t" 'image-dired-toggle-mark-thumb-original-file
-            "gr" 'image-dired-refresh-thumb
-            "gc" 'image-dired-create-thumbs
-            "gg" #'(lambda () (interactive) (evil-goto-first-line) (evil-beginning-of-line))
-            "G"  #'(lambda () (interactive) (end-of-buffer) (image-dired-backward-image))
-
-            "C-s" 'image-save           ; NOTE originally was bound to o
-
-            "<C-SPC>"    'image-dired-mark-thumb-original-file
-            "<M-SPC>"    'image-dired-unmark-thumb-original-file
-
-            "<C-return>" 'image-dired-display-current-image-full
-            "<RET>"      'image-dired-display-thumbnail-original-image
-            "C-l"        'image-dired-display-next-thumbnail-original
-            "C-h"        'image-dired-display-previous-thumbnail-original
-            ;;; column view aliases
-            "J" 'image-dired-display-next-thumbnail-original
-            "K" 'image-dired-display-previous-thumbnail-original
-            ;; "o" 'image-dired-display-thumbnail-original-image
-            "v" 'image-dired-display-thumbnail-original-image
-
-            "<mouse-1>" 'image-dired-mouse-select-thumbnail
-            "<mouse-2>" 'image-dired-mouse-display-image)
-
-          (leader/declare-prefix-for-mode* 'image-dired-thumbnail-mode
-            "mt" '("tagging" . "tag/describe images")
-            "me" '("edit"    . "edit images"))
-
-          (leader/set-keys-for-mode! 'image-dired-thumbnail-mode
-            "g" 'image-dired-jump-original-dired-buffer
-            "m" 'image-dired
-
-            "td" 'image-dired-thumbnail-set-image-description
-            "tt"  'image-dired-tag-thumbnail
-            "tT"  'image-dired-tag-thumbnail-remove
-
-            "el" 'image-dired-rotate-thumbnail-left
-            "eL" 'image-dired-rotate-original-left
-            "er" 'image-dired-rotate-thumbnail-right
-            "eR" 'image-dired-rotate-original-right
-
-            "." 'image-dired-track-original-file
-            "o" 'image-dired-thumbnail-display-external
-
-            ;; [re]set number of columns per row
-            "s" 'image-dired-line-up-interactive
-            "S" 'image-dired-line-up-dynamic)
-
-          ;;; image view
-          (general-define-key
-            :keymaps 'image-dired-display-image-mode-map
-            :states 'normal
-            "f" 'image-dired-display-current-image-full
-            "F" 'image-dired-display-current-image-sized
-            "s" 'image-dired-display-current-image-sized
-
-            "h" 'image-scroll-right
-            "l" 'image-scroll-left
-            "k" 'image-scroll-down
-            "j" 'image-scroll-up
-            ;; horizontal line by line movement
-            "C-d" 'image-scroll-up
-            "C-u" 'image-scroll-down
-            "C-e" 'image-next-line
-            "C-y" 'image-previous-line
-            ;; Arrow Keys Alias hjkl
-            "<left>"  'image-backward-hscroll
-            "<right>" 'image-forward-hscroll
-            "<up>"    'image-scroll-down
-            "<down>"  'image-scroll-up)
-
-          (leader/set-keys-for-mode! 'image-dired-display-image-mode
-            "h" 'image-bol ; far left   edge
-            "j" 'image-eob ; far bottom edge
-            "k" 'image-bob ; far top    edge
-            "l" 'image-eol ; far right  edge
-            "g" 'image-dired-jump-thumbnail-buffer)
-
-          (defvar dired-slideshow--thumbnail-column-count 2
-            "number of columns of thumbnails shown on each row")
-
-          (defvar dired-slideshow--dedicate-image-windows nil
-            "whether to dedicate thumbnail and display windows")
-
-          ;; NOTE keep setq because defvar doesn't work for repeated calls
-          ;; (setq dired-slideshow--thumbnail-column-count 3)
-          ;; (setq dired-slideshow--dedicate-image-windows t)
-
-          (mohkale//define-custom-perspective "@dired-slideshow"
-            (kill-all-windows-and-return-to-home) ; splitting issues with layout
-
-            (let* ((thumbnails-buffer-name "*image-dired*")
-                   (display-buffer-name "*image-dired-display-image*")
-
-                   ;; only load when buffer doesn't exist and user allows it
-                   (load-directory (and (not (get-buffer thumbnails-buffer-name))
-                                        (y-or-n-p "would you like to load an image directory")))
-
-                   (thumbnails-buffer (get-buffer-create thumbnails-buffer-name))
-                   (display-buffer (get-buffer-create display-buffer-name)))
-              (split-window-right) ; left window is for thumbnails, right for display
-
-              (let* ((thumbnails-window (selected-window))
-                     (display-window    (window-right thumbnails-window)))
-                (if load-directory (call-interactively 'image-dired))
-
-                (persp-add-buffer `(,thumbnails-buffer ,display-buffer))
-
-                ;; setup thumbnail window
-                (with-selected-window thumbnails-window
-                  (switch-to-buffer thumbnails-buffer)
-
-                  (unless (eq major-mode 'image-dired-thumbnail-mode)
-                    (image-dired-thumbnail-mode))
-
-                  ;; set number of columns in view
-                  (let ((image-dired-thumbs-per-row dired-slideshow--thumbnail-column-count))
-                    (image-dired-line-up))
-
-                  (let* ((thumbnail-window-width (* image-dired-thumb-width dired-slideshow--thumbnail-column-count))
-                         (delta-width (- thumbnail-window-width (window-pixel-width))))
-                    (unless (> (abs delta-width) (window-pixel-width))
-                      (window-resize thumbnails-window delta-width t nil t)))
-
-                  (window-preserve-size thumbnails-window t))
-
-                ;; setup display window
-                (with-selected-window display-window
-                  (switch-to-buffer display-buffer)
-
-                  (unless (eq major-mode 'image-dired-display-image-mode)
-                    (image-dired-display-image-mode)))
-
-                (and dired-slideshow--dedicate-image-windows (force-set-all-visible-windows-dedication t))
-                (select-window thumbnails-window)
-
-                (message "completed creation of slideshow layout"))))))
+           (add-hook 'dired-subdir-after-insert-hook 'all-the-icons-dired--subdir-icons+)))
      #+END_SRC
 
+**** dired-git-info
+     show the last commit log for files in the current dired buffer.
+
+     #+BEGIN_SRC emacs-lisp
+       (with-eval-after-load 'dired
+         (use-package dired-git-info
+           :ensure t
+           :defer  t
+           :init
+           (general-define-key
+             :keymaps 'dired-mode-map
+             :states  'motion
+             ")" 'dired-git-info-mode)))
+     #+END_SRC
+
+**** dired-hacks
+     A bunch of really cool extensions for dired. Look into [[https://github.com/Fuco1/dired-hacks][it]] later.
+
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (with-eval-after-load 'dired
+         (use-package dired-hacks-utils
+           :ensure t
+           :defer  t))
+     #+END_SRC
+
+**** image-dired
+     #+BEGIN_SRC emacs-lisp
+       (use-package image-dired
+         :straight (image-dired :type built-in)
+         :defer t
+         :commands (persp-custom-@dired-slideshow)
+         :init
+         (push 'image-dired-thumbnail-mode mohkale--whitespace-exempt-modes)
+         (puthash "@dired-slideshow" 'persp-custom-@dired-slideshow mohkale--custom-perspectives)
+
+         :config
+          ;;; fixed weird moves line, not thumbnail
+         (defun image-dired-slideshow-step ()
+           "Step to next file, if `image-dired-slideshow-times' has not been reached."
+           (if (< image-dired-slideshow-count image-dired-slideshow-times)
+               (progn
+                 (message "%s" (1+ image-dired-slideshow-count))
+                 (setq image-dired-slideshow-count (1+ image-dired-slideshow-count))
+                 (image-dired-display-next-thumbnail-original))
+             (image-dired-slideshow-stop)))
+
+         (general-define-key
+           :keymaps 'image-dired-thumbnail-mode-map
+           :states '(normal visual)
+           "q" nil
+
+           "h" 'image-dired-backward-image
+           "j" 'image-dired-next-line
+           "k" 'image-dired-previous-line
+           "l" 'image-dired-forward-image
+           "<left>"  'image-dired-forward-image
+           "<right>" 'image-dired-previous-image
+
+
+           "x" 'image-dired-delete-char
+           "m" 'image-dired-mark-thumb-original-file
+           "u" 'image-dired-unmark-thumb-original-file
+           "c" 'image-dired-comment-thumbnail
+           "d" 'image-dired-flag-thumb-original-file
+           "D" 'image-dired-thumbnail-set-image-description
+           "s" 'image-dired-slideshow-start
+           "t" 'image-dired-toggle-mark-thumb-original-file
+           "gr" 'image-dired-refresh-thumb
+           "gc" 'image-dired-create-thumbs
+           "gg" #'(lambda () (interactive) (evil-goto-first-line) (evil-beginning-of-line))
+           "G"  #'(lambda () (interactive) (end-of-buffer) (image-dired-backward-image))
+
+           "C-s" 'image-save           ; NOTE originally was bound to o
+
+           "<C-SPC>"    'image-dired-mark-thumb-original-file
+           "<M-SPC>"    'image-dired-unmark-thumb-original-file
+
+           "<C-return>" 'image-dired-display-current-image-full
+           "<RET>"      'image-dired-display-thumbnail-original-image
+           "C-l"        'image-dired-display-next-thumbnail-original
+           "C-h"        'image-dired-display-previous-thumbnail-original
+            ;;; column view aliases
+           "J" 'image-dired-display-next-thumbnail-original
+           "K" 'image-dired-display-previous-thumbnail-original
+           ;; "o" 'image-dired-display-thumbnail-original-image
+           "v" 'image-dired-display-thumbnail-original-image
+
+           "<mouse-1>" 'image-dired-mouse-select-thumbnail
+           "<mouse-2>" 'image-dired-mouse-display-image)
+
+         (leader/declare-prefix-for-mode* 'image-dired-thumbnail-mode
+           "mt" '("tagging" . "tag/describe images")
+           "me" '("edit"    . "edit images"))
+
+         (leader/set-keys-for-mode! 'image-dired-thumbnail-mode
+           "g" 'image-dired-jump-original-dired-buffer
+           "m" 'image-dired
+
+           "td" 'image-dired-thumbnail-set-image-description
+           "tt"  'image-dired-tag-thumbnail
+           "tT"  'image-dired-tag-thumbnail-remove
+
+           "el" 'image-dired-rotate-thumbnail-left
+           "eL" 'image-dired-rotate-original-left
+           "er" 'image-dired-rotate-thumbnail-right
+           "eR" 'image-dired-rotate-original-right
+
+           "." 'image-dired-track-original-file
+           "o" 'image-dired-thumbnail-display-external
+
+           ;; [re]set number of columns per row
+           "s" 'image-dired-line-up-interactive
+           "S" 'image-dired-line-up-dynamic)
+
+          ;;; image view
+         (general-define-key
+           :keymaps 'image-dired-display-image-mode-map
+           :states 'normal
+           "f" 'image-dired-display-current-image-full
+           "F" 'image-dired-display-current-image-sized
+           "s" 'image-dired-display-current-image-sized
+
+           "h" 'image-scroll-right
+           "l" 'image-scroll-left
+           "k" 'image-scroll-down
+           "j" 'image-scroll-up
+           ;; horizontal line by line movement
+           "C-d" 'image-scroll-up
+           "C-u" 'image-scroll-down
+           "C-e" 'image-next-line
+           "C-y" 'image-previous-line
+           ;; Arrow Keys Alias hjkl
+           "<left>"  'image-backward-hscroll
+           "<right>" 'image-forward-hscroll
+           "<up>"    'image-scroll-down
+           "<down>"  'image-scroll-up)
+
+         (leader/set-keys-for-mode! 'image-dired-display-image-mode
+           "h" 'image-bol ; far left   edge
+           "j" 'image-eob ; far bottom edge
+           "k" 'image-bob ; far top    edge
+           "l" 'image-eol ; far right  edge
+           "g" 'image-dired-jump-thumbnail-buffer)
+
+         (defvar dired-slideshow--thumbnail-column-count 2
+           "number of columns of thumbnails shown on each row")
+
+         (defvar dired-slideshow--dedicate-image-windows nil
+           "whether to dedicate thumbnail and display windows")
+
+         ;; NOTE keep setq because defvar doesn't work for repeated calls
+         ;; (setq dired-slideshow--thumbnail-column-count 3)
+         ;; (setq dired-slideshow--dedicate-image-windows t)
+
+         (mohkale//define-custom-perspective "@dired-slideshow"
+           (kill-all-windows-and-return-to-home) ; splitting issues with layout
+
+           (let* ((thumbnails-buffer-name "*image-dired*")
+                  (display-buffer-name "*image-dired-display-image*")
+
+                  ;; only load when buffer doesn't exist and user allows it
+                  (load-directory (and (not (get-buffer thumbnails-buffer-name))
+                                       (y-or-n-p "would you like to load an image directory")))
+
+                  (thumbnails-buffer (get-buffer-create thumbnails-buffer-name))
+                  (display-buffer (get-buffer-create display-buffer-name)))
+             (split-window-right) ; left window is for thumbnails, right for display
+
+             (let* ((thumbnails-window (selected-window))
+                    (display-window    (window-right thumbnails-window)))
+               (if load-directory (call-interactively 'image-dired))
+
+               (persp-add-buffer `(,thumbnails-buffer ,display-buffer))
+
+               ;; setup thumbnail window
+               (with-selected-window thumbnails-window
+                 (switch-to-buffer thumbnails-buffer)
+
+                 (unless (eq major-mode 'image-dired-thumbnail-mode)
+                   (image-dired-thumbnail-mode))
+
+                 ;; set number of columns in view
+                 (let ((image-dired-thumbs-per-row dired-slideshow--thumbnail-column-count))
+                   (image-dired-line-up))
+
+                 (let* ((thumbnail-window-width (* image-dired-thumb-width dired-slideshow--thumbnail-column-count))
+                        (delta-width (- thumbnail-window-width (window-pixel-width))))
+                   (unless (> (abs delta-width) (window-pixel-width))
+                     (window-resize thumbnails-window delta-width t nil t)))
+
+                 (window-preserve-size thumbnails-window t))
+
+               ;; setup display window
+               (with-selected-window display-window
+                 (switch-to-buffer display-buffer)
+
+                 (unless (eq major-mode 'image-dired-display-image-mode)
+                   (image-dired-display-image-mode)))
+
+               (and dired-slideshow--dedicate-image-windows (force-set-all-visible-windows-dedication t))
+               (select-window thumbnails-window)
+
+               (message "completed creation of slideshow layout")))))
+     #+END_SRC
 
 *** drag-stuff
+    VS Code like drag region or line upwards or downwards.
+
     #+BEGIN_SRC emacs-lisp
       (use-package drag-stuff
         :ensure t
         :defer  t
-        :commands (drag-stuff-up
-                   drag-stuff-down)
         :init
         (general-define-key
           "C-<up>" 'drag-stuff-up
@@ -6646,21 +6603,12 @@
     #+END_SRC
 
 *** ebuku
+    emacs interface to the [[https://github.com/jarun/buku][buku]] bookmark manager.
+
     #+BEGIN_SRC emacs-lisp
       (use-package ebuku
         :defer t
-        :straight (ebuku :type git :host github :repo "flexibeast/ebuku")
-        :commands (ebuku-add-bookmark
-                   ebuku-delete-bookmark
-                   ebuku-edit-bookmark
-                   ebuku-refresh
-                   ebuku-search
-                   ebuku-search-on-all
-                   ebuku-search-on-any
-                   ebuku-search-on-reg
-                   ebuku-search-on-tag
-                   ebuku-mode
-                   ebuku))
+        :straight (ebuku :type git :host github :repo "flexibeast/ebuku"))
     #+END_SRC
 
 *** edbi
@@ -6675,6 +6623,8 @@
     #+END_SRC
 
 *** edit-indirect
+    open regions of code in their own dedicated buffers, like org modes org-edit-special.
+
     #+BEGIN_SRC emacs-lisp
       (use-package edit-indirect
         :ensure t
@@ -6692,6 +6642,8 @@
     #+END_SRC
 
 *** eldoc
+    That package that displays help messages in the echo area.
+
     #+BEGIN_SRC emacs-lisp
       (use-package eldoc
         :delight "")
@@ -6699,11 +6651,11 @@
 
 *** electric
 **** electric-pair
-     electric pair is a built in module which lets auto insert matching pairs. For example, inserting a ( will lead to emacs auto inserting ).
+     electric pair is a built in module which lets auto insert matching pairs. For example,
+     inserting a ( will lead to emacs auto inserting ).
 
      #+BEGIN_SRC emacs-lisp
        (use-package elec-pair
-         :ensure t
          :hook ((text-mode prog-mode) . electric-pair-mode)
          :commands electric-pair-mode
          :config
@@ -6715,13 +6667,15 @@
 **** electric-indent
      #+BEGIN_SRC emacs-lisp
        (use-package electric
-         :ensure t
-         :defer  t
          :commands electric-indent-mode
          :hook ((text-mode prog-mode) . electric-indent-mode))
      #+END_SRC
 
 *** engine-mode
+    search engine interaction for emacs. lets you create enteractive functions to run
+    search queries on user specified engines. eg. engine/search-google will prompt you
+    for a string and then open your default browser on google (having run the query).
+
     #+NAME: engine-mode-search-engines
     | Search Engine | Key | Identifier               | URL                                                                      |
     |---------------+-----+--------------------------+--------------------------------------------------------------------------|
@@ -6792,6 +6746,7 @@
             (let* ((prefix (concat engine-prefix (car alias)))
                    (name   (nth 1 alias)))
               (leader/declare-prefix prefix name))))
+
         :config
         (dolist (engine engines)
           (let* ((identifier-string (nth 2 engine))
@@ -6806,6 +6761,8 @@
     #+END_SRC
 
 *** eshell
+    a nice minimalist shell for emacs.
+
 **** eshell-mode
      #+BEGIN_SRC emacs-lisp
        (use-package esh-mode
@@ -6920,6 +6877,8 @@
      #+END_SRC
 
 **** eshell-prompt-extras
+     Prettier prompt for eshell.
+
      #+BEGIN_SRC emacs-lisp
        (with-eval-after-load 'esh-mode
          (use-package eshell-prompt-extras
@@ -6929,8 +6888,8 @@
            :init
            (with-eval-after-load 'esh-mode
              (require 'eshell-prompt-extras))
-           :config
 
+           :config
            (setq epe-show-python-info t
                  epe-path-style 'full)
 
@@ -6954,24 +6913,6 @@
       (use-package eyebrowse
         :ensure t
         :defer  t
-        :commands (eyebrowse-create-window-config
-                   eyebrowse-close-window-config
-                   eyebrowse-last-window-config
-                   eyebrowse-rename-window-config
-                   eyebrowse-switch-to-window-config
-                   eyebrowse-switch-to-window-config-0
-                   eyebrowse-switch-to-window-config-1
-                   eyebrowse-switch-to-window-config-2
-                   eyebrowse-switch-to-window-config-3
-                   eyebrowse-switch-to-window-config-4
-                   eyebrowse-switch-to-window-config-5
-                   eyebrowse-switch-to-window-config-6
-                   eyebrowse-switch-to-window-config-7
-                   eyebrowse-switch-to-window-config-8
-                   eyebrowse-switch-to-window-config-9
-                   eyebrowse-prev-window-config
-                   eyebrowse-next-window-config
-                   eyebrowse-create-window-config)
         :config
         (eyebrowse-mode +1)
 
@@ -6993,21 +6934,22 @@
     #+END_SRC
 
 *** flycheck
+    on the fly syntax checker for emacs. finds where you've written bugs, adds an icon
+    to the fringe and underlines it.
+
     #+BEGIN_SRC emacs-lisp
       (use-package flycheck
         :ensure t
         :defer  t
         ;; :delight " ⓢ"
         :delight "FlyCheck"
-        :commands (flycheck-clear
-                   flycheck-explain-error-at-point
-                   flycheck-describe-checker
-                   goto-flycheck-error-list
-                   flycheck-list-errors
-                   flycheck-set-checker-executable
-                   flycheck-select-checker
-                   flycheck-verify-setup)
+        :commands (flycheck-last-error
+                   flycheck-error-list-goto-first-error
+                   flycheck-error-list-goto-last-error
+                   flycheck-list-errors--goto-first-error)
         :init
+        (setq flycheck-python-pycompile-executable "python3")
+
         (leader/set-keys
           "e." 'hydra-flycheck/body
           "ec" 'flycheck-clear
@@ -7020,7 +6962,6 @@
           "eS" 'flycheck-set-checker-executable
           "es" 'flycheck-select-checker
           "ev" 'flycheck-verify-setup)
-        (setq flycheck-python-pycompile-executable "python3")
 
         :config
         (use-package flycheck-pos-tip
@@ -7116,6 +7057,8 @@
     #+END_SRC
 
 *** font-lock-studio
+    debug issues with face declarations... I have no idea how to use this :P
+
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package font-lock-studio
         :ensure t
@@ -7124,7 +7067,10 @@
     #+END_SRC
 
 *** frog-jump-buffer
-    #+BEGIN_SRC emacs-lisp
+    display an avy like popup of your most recent buffers and then jump to it.
+    now that I have ibuffer and counsel-switch-buffer, I don't really need it.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package frog-jump-buffer
         :ensure t
         :defer  t
@@ -7135,6 +7081,8 @@
     #+END_SRC
 
 *** grep
+    emacs mode for interacting with output from the grep executeable.
+
     #+BEGIN_SRC emacs-lisp
       (use-package grep
         :defer t
@@ -7182,6 +7130,9 @@
     #+END_SRC
 
 *** hide-modeline
+    makes the mode-line blank in the current buffer. this doesn't let the buffer contents expand
+    into the mode-line region, it simply makes it appear as if nothings there.
+
     #+BEGIN_SRC emacs-lisp
       (use-package hide-mode-line
         :ensure t
@@ -7190,28 +7141,21 @@
     #+END_SRC
 
 *** hl-line
+    apply a different background face to the current line.
+
     #+BEGIN_SRC emacs-lisp
       (use-package hl-line
-        :ensure t
-        :defer  t
-        :commands (hl-line-mode
-                   global-hl-line-mode)
         :hook ((text-mode prog-mode) . hl-line-mode))
     #+END_SRC
 
 *** hl-todo
+    highlight certain keywords in the current buffer.
+
     #+BEGIN_SRC emacs-lisp
       (use-package hl-todo
         :ensure t
         :defer  t
         :hook ((text-mode prog-mode) . global-hl-todo-mode)
-        :commands (hl-todo-mode
-                   global-hl-todo-mode
-                   hl-todo-next
-                   hl-todo-previous
-                   hl-todo-occur
-                   hl-todo-insert
-                   hl-todo-insert-keyword)
         :init
         (leader/set-keys
           "jt" 'hl-todo-next
@@ -7228,12 +7172,13 @@
     #+BEGIN_SRC emacs-lisp
       (use-package htmlize
         :ensure t
-        :defer  t
-        :commands (htmlize-buffer))
+        :defer  t)
     #+END_SRC
 
 *** hydra-posframe
-    changes the display of the the hydra popups from some region above the message area into a posframe :) like frog-jump-buffer. That said, posframe seems to still be kind of buggy. The border parameter sometimes works, sometimes it doesn't.
+    changes the display of the the hydra popups from some region above the message area into a
+    posframe :) like frog-jump-buffer. That said, posframe seems to still be kind of buggy. The
+    border parameter sometimes works, sometimes it doesn't.
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package hydra-posframe
@@ -7247,6 +7192,7 @@
           ;; my terminals always too short for it to be
           ;; useful on there.
           (add-hook 'after-init-hook 'hydra-posframe-mode))
+
         :config
         ;; source for following section: https://github.com/jerrypnz/.emacs.d/blob/master/config/jp-base.el
         (defun mohkale--frame-bottom-poshandler (info)
@@ -7339,6 +7285,8 @@
     #+END_SRC
 
 *** ivy
+    a simple and elegent completion framework for emacs.
+
 **** ivy
      #+BEGIN_SRC emacs-lisp
        (use-package ivy
@@ -7656,6 +7604,8 @@
       #+END_SRC
 
 **** counsel
+     a bunch of really useful functions to go alongside ivy.
+
      #+BEGIN_SRC emacs-lisp
        (use-package counsel
          :ensure t
@@ -7770,6 +7720,8 @@
      #+END_SRC
 
 **** swiper
+     a minimalist search framework for the current buffer.
+
      #+BEGIN_SRC emacs-lisp
        (use-package swiper
          :ensure t
@@ -7825,15 +7777,17 @@
      #+END_SRC
 
 **** ivy-yasnippet
+     use ivy to select a snippet candidate.
+
      #+BEGIN_SRC emacs-lisp
        (use-package ivy-yasnippet
          :ensure t
          :defer  t
          :after ivy
-         :commands ivy-yasnippet
          :init
          (leader/set-keys
            "is" 'ivy-yasnippet)
+
          (general-define-key
            :states 'insert
            "C-M-i" 'ivy-yasnippet))
@@ -7871,12 +7825,13 @@
      #+END_SRC
 
 **** counsel-tramp
+     select a remote system to connect to, using ivy.
+
      #+BEGIN_SRC emacs-lisp
        (use-package counsel-tramp
          :ensure t
          :defer  t
          :after counsel
-         :commands (counsel-tramp)
          :init
          (leader/set-keys
            "f@" 'counsel-tramp))
@@ -7884,14 +7839,20 @@
 
 **** counsel-css
      #+BEGIN_SRC emacs-lisp
-       (use-package counsel-css
-         :ensure t
-         :defer  t
-         :after counsel
-         :commands (counsel-css))
+       (with-eval-after-load 'css-mode
+         (use-package counsel-css
+           :ensure t
+           :defer  t
+           :after counsel
+           :config
+           (leader/set-keys-for-mode! '(css-mode less-css-mode)
+             "g" 'counsel-css)))
      #+END_SRC
 
 **** counsel-web
+     like [[*engine-mode][engine-mode]] except runs queries asynchronously and displays results using an ivy
+     session.
+
      #+BEGIN_SRC emacs-lisp
        (use-package counsel-web
          :straight (counsel-web :type git :host github :repo "mnewt/counsel-web")
@@ -7910,6 +7871,8 @@
      #+END_SRC
 
 **** counsel-word-clock
+     see the time from anywhere in the world... I'll probably never use this.
+
      #+BEGIN_SRC emacs-lisp :tangle no
        (use-package counsel-word-clock
          :straight (counsel-word-clock :type git :host github :repo "kchenphy/counsel-world-clock")
@@ -7918,16 +7881,12 @@
      #+END_SRC
 
 **** helm-make
-     contrary to what I initially thought, helm-make can also be used with ivy. Maybe
-     should be named something else.
+     don't be fooled, helm make works with both helm and ivy.
 
      #+BEGIN_SRC emacs-lisp
        (use-package helm-make
          :ensure t
          :defer  t
-         :after ivy
-         :commands (helm-make
-                    helm-make-projectile)
          :init
          (setq helm-make-completion-method 'ivy)
 
@@ -8249,14 +8208,15 @@
            :ensure t
            :defer  t
            :after ibuffer
-           :commands (ibuffer-vc-set-filter-groups-by-vc-root)
+           :commands ibuffer-vc
            :init
-           (defalias 'ibuffer-vc #'ibuffer-vc-set-filter-groups-by-vc-root)
-
            (general-define-key
              :keymaps 'ibuffer-mode-map
              "sv" 'ibuffer-vc
-             ")" 'ibuffer-vc)))
+             ")" 'ibuffer-vc)
+
+           :config
+           (defalias 'ibuffer-vc #'ibuffer-vc-set-filter-groups-by-vc-root)))
      #+END_SRC
 
 **** ibuffer-tramp
@@ -8266,12 +8226,14 @@
            :ensure t
            :defer  t
            :after ibuffer
-           :commands (ibuffer-tramp-set-filter-groups-by-tramp-connection)
+           :commands (ibuffer-tramp)
            :init
-           (defalias 'ibuffer-tramp #'ibuffer-tramp-set-filter-groups-by-tramp-connection)
            (general-define-key
              :keymaps 'ibuffer-mode-map
-             "s@" 'ibuffer-tramp)))
+             "s@" 'ibuffer-tramp)
+
+           :config
+           (defalias 'ibuffer-tramp #'ibuffer-tramp-set-filter-groups-by-tramp-connection)))
      #+END_SRC
 
 **** ibuffer-persp
@@ -8280,13 +8242,9 @@
          (use-package ibuffer-persp
            :straight (ibuffer-persp :type built-in)
            :defer t
-           :commands (ibuffer-persp ;; only buffers from current perspective
-                      ibuffer-persp-set-filter-groups-by-persp-name-not-nil
-                      ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
+           :commands (ibuffer-persp-current
+                      ibuffer-persp-other)
            :init
-           (defalias 'ibuffer-persp-current #'ibuffer-persp-set-filter-groups-by-persp-name-not-nil)
-           (defalias 'ibuffer-persp-other #'ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
-
            (general-define-key
              :keymaps 'ibuffer-mode-map
              "sp" 'ibuffer-persp-current
@@ -8294,37 +8252,40 @@
 
            ;; (with-eval-after-load 'persp-mode
            ;;   (leader/set-keys "bm" 'ibuffer-persp))
-           ))
+           :config
+           (defalias 'ibuffer-persp-current #'ibuffer-persp-set-filter-groups-by-persp-name-not-nil)
+           (defalias 'ibuffer-persp-other #'ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)))
      #+END_SRC
 
 *** imenu
+    see (and jump to) key points of interest in the current buffer using your completion framework
+    of choice.
+
     #+BEGIN_SRC emacs-lisp
       (use-package imenu
         :defer t
-        :commands imenu
+        :commands (imenu-list
+                   imenu-anywhere)
         :init
         (leader/set-keys
-          "bi" 'imenu)
+          "bi" 'imenu
+          "ai" 'imenu-list
+          "bI" 'imenu-anywhere)
 
         :config
         (use-package imenu-list
           :ensure t
-          :defer  t
-          :commands imenu-list
-          :init
-          (leader/set-keys
-            "ai" 'imenu-list))
+          :defer  t)
 
         (use-package imenu-anywhere
           :ensure t
-          :defer  t
-          :commands imenu-anywhere
-          :init
-          (leader/set-keys
-            "bI" 'imenu-anywhere)))
+          :defer  t))
     #+END_SRC
 
 *** flyspell
+    on the fly spell checker. spawns an aspell subprocess and passes any words you write
+    to it; any mispellings or unknown words will be highlighted to indicate they're mispelled.
+
     #+BEGIN_SRC emacs-lisp
       (use-package flyspell
         :config
@@ -8338,7 +8299,6 @@
         (use-package flyspell-correct-ivy
           :ensure t
           :defer  t
-          :commands (flyspell-correct-wrapper)
           :init
           ;; NOTE wrapper works backwards through the buffer by default.
           ;;      pass a two prefix args to check forward.
@@ -8362,8 +8322,7 @@
         (advice-add 'ispell-internal-change-dictionary :around
                     #'ispell--prevent-absolute-path)
         (advice-add 'flyspell-large-region :around
-                    #'ispell--prevent-absolute-path)
-        )
+                    #'ispell--prevent-absolute-path))
     #+END_SRC
 
 *** ein - emacs-ipython-notebook
@@ -8460,20 +8419,22 @@
     #+END_SRC
 
 *** lorem-ipsum
-    #+BEGIN_SRC emacs-lisp
-      (use-package lorem-ipsum
-        :ensure nil
-        :defer  t
-        :commands (Lorem-ipsum-insert-list
-                   Lorem-ipsum-insert-paragraphs
-                   Lorem-ipsum-insert-sentences)
-        :init
-        (leader/declare-prefix "il" "lorem-ipsum")
+    insert placeholder text in the lorem-ipsum-dolor format.
 
-        (leader/set-keys
-          "ill" 'Lorem-ipsum-insert-list
-          "ilp" 'Lorem-ipsum-insert-paragraphs
-          "ils" 'Lorem-ipsum-insert-sentences))
+    #+BEGIN_SRC emacs-lisp
+            (use-package lorem-ipsum
+              :ensure nil
+              :defer  t
+              :commands (Lorem-ipsum-insert-list
+                         Lorem-ipsum-insert-paragraphs
+                         Lorem-ipsum-insert-sentences)
+              :init
+              (leader/declare-prefix "il" "lorem-ipsum")
+
+              (leader/set-keys
+                "ill" 'Lorem-ipsum-insert-list
+                "ilp" 'Lorem-ipsum-insert-paragraphs
+                "ils" 'Lorem-ipsum-insert-sentences))
     #+END_SRC
 
 *** language-server
@@ -8482,7 +8443,7 @@
        (use-package lsp-mode
          :ensure t
          :defer  t
-         :commands (lsp lsp-deferred lsp-mode) ;; never use lsp-mode, use lsp.
+         ;; never use lsp-mode, use lsp.
          :config
          (setq lsp-prefer-flymake             nil
                lsp-enable-snippet             nil
@@ -8523,6 +8484,8 @@
      #+END_SRC
 
 ***** lsp-ui
+      UI enhancements for lsp sessions... tries to make emacs more like VS Code. Boooooo!!!
+
       #+BEGIN_SRC emacs-lisp
         (with-eval-after-load 'lsp-mode
           (use-package lsp-ui
@@ -8534,6 +8497,7 @@
             ;; only really installed for flycheck support
             (setq lsp-ui-sideline-enable nil
                   lsp-ui-doc-enable nil)
+
             :config
             (leader/with-prefix mohkale--server-leader-key
               (leader/declare-prefix-for-mode 'lsp-mode
@@ -8545,6 +8509,8 @@
       #+END_SRC
 
 ***** company-lsp
+      use lsp as a completion backend for company.
+
       #+BEGIN_SRC emacs-lisp
         (with-eval-after-load 'lsp-mode
           (use-package company-lsp
@@ -8697,6 +8663,8 @@
     #+END_SRC
 
 *** miniedit
+    write the minibuffer contents to a buffer. edit, then paste new contents back to minibuffer.
+
     #+BEGIN_SRC emacs-lisp
       (use-package miniedit
         :defer t
@@ -8713,6 +8681,7 @@
                      minibuffer-local-completion-map
                      minibuffer-local-must-match-map)
           "C-M-<return>" 'miniedit)
+
         ;; ;; can't seem to change major mode without miniedit mode
         ;; ;; being removed :(
         ;; (add-hook 'miniedit-mode-hook initial-major-mode)
@@ -8725,6 +8694,9 @@
     #+END_SRC
 
 *** occur
+    see all occurences of a search query in the current buffer, with support to jumping
+    to the next or previous query and even editing them on the fly.
+
     #+BEGIN_SRC emacs-lisp
       (use-package replace
         :straight (replace :type built-in)
@@ -8783,6 +8755,8 @@
     #+END_SRC
 
 *** open-junk-file
+    create temporary files labelled with todays date and other information.
+
     #+BEGIN_SRC emacs-lisp
       (use-package open-junk-file
         :defer t
@@ -8879,45 +8853,32 @@
     #+END_SRC
 
 *** page-break-lines
-    #+BEGIN_SRC emacs-lisp
+    display ^L lines as horizontal-rules.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package page-break-lines
         :defer t
         :diminish)
     #+END_SRC
 
 *** paren
+    when your point is on a parenthesis, highlight the matching one.
+
     # TODO look into smart-parens-mode
 
     #+BEGIN_SRC emacs-lisp
       (use-package paren
-        :ensure t
-        :defer  t
-        :commands show-paren-mode
         :hook ((text-mode prog-mode) . show-paren-mode)
         :init (setq sp-highlight-pair-overlay nil))
     #+END_SRC
 
 *** pcre2el
+    convert from emacs regular expressions to perl like regexps and vice versa.
+
     #+BEGIN_SRC emacs-lisp
       (use-package pcre2el
         :ensure t
         :defer  t
-        :commands (rxt-convert-to-strings
-                   rxt-explain
-                   rxt-convert-syntax
-                   rxt-toggle-elisp-rx
-                   rxt-convert-to-rx
-
-                   rxt-elisp-to-strings
-                   rxt-explain-elisp
-                   rxt-elisp-to-pcre
-                   rxt-toggle-elisp-rx
-                   rxt-elisp-to-rx
-
-                   rxt-pcre-to-strings
-                   rxt-explain-pcre
-                   rxt-pcre-to-elisp
-                   rxt-pcre-to-rx)
         :init
         (leader/declare-prefix*
           "xr" "regular expressions"
@@ -8944,14 +8905,17 @@
     #+END_SRC
 
 *** pdf-tools
+    Use emacs as a quick and dirty pdf viewer.
+
     #+BEGIN_SRC emacs-lisp
       (use-package pdf-tools
         :ensure t
         :defer  t
         :mode ("\\.pdf$" . pdf-view-mode)
-        :commands (pdf-view-mode
-                   org-pdftools-open)
         :hook (pdf-view-mode . hide-mode-line-mode)
+        :init
+        (setq-default pdf-view-display-size 'fit-page)
+
         :config
         (evil-set-initial-state 'pdf-view-mode 'motion)
 
@@ -9148,6 +9112,8 @@
     #+END_SRC
 
 *** persp-mode
+    the core backend for spacemacs's layout functionality.
+
     #+BEGIN_SRC emacs-lisp
       (use-package persp-mode
         ;; unbound functions:
@@ -9157,41 +9123,17 @@
         :ensure t
         :defer  t
         :diminish persp-mode
-        ;; :after eyebrowse
-        :commands (switch-to-persp-by-num
-                   persp-add-new
-                   persp-kill
-                   persp-add-buffer
+        :commands (ivy-find-file-new-perspective
+                   switch-to-persp-by-num
+                   persp-kill-current
                    persp-add-current-buffer
-                   persp-remove-buffer
-                   persp-remove-current-buffer
-                   persp-kill-buffer
-                   persp-switch-to-buffer
-                   persp-copy
-                   persp-rename
-                   persp-next
-                   persp-prev
-                   persp-switch
-                   persp-temporarily-display-buffer
-                   persp-import-win-conf
-                   persp-import-buffers
-                   persp-window-switch
-                   ;; find-file-new-perspective
-                   ivy-find-file-new-perspective
-                   persp-frame-switch
-                   persp-save-state-to-file
-                   persp-load-state-from-file
-                   persp-save-to-file-by-names
-                   persp-load-from-file-by-names
-                   persp-save-and-kill)
+                   persp-remove-current-buffer)
         :init
         (leader/set-keys
           "ba" 'persp-add-current-buffer
           "bA" 'persp-add-buffer
           "br" 'persp-remove-buffer
-          "bR" 'persp-remove-current-buffer)
-
-        (leader/set-keys
+          "bR" 'persp-remove-current-buffer
           "fl" 'ivy-find-file-new-perspective)
 
         :config
@@ -9451,12 +9393,7 @@
       (use-package piper
         :defer t
         :straight (emacs-piper :type git :host gitlab :repo "howardabrams/emacs-piper")
-        :commands (piper
-                   piper-ui
-                   piper-other
-                   piper-remote
-                   eshell/piper
-                   piper-script)
+        :commands (piper-ui)
         :init
         (leader/declare-prefix "|" "piper" "interactive emacs pipeline")
 
@@ -9466,11 +9403,14 @@
             "|"   'piper
             "o"   'piper-other
             "@"   'piper-remote))
+
         :config
         (defalias 'piper-ui #'piper-user-interface))
     #+END_SRC
 
 *** proced
+    edit processes, like windows task-manager but within emacs :)
+
     #+BEGIN_SRC emacs-lisp
       (use-package proced
         :config
@@ -9553,13 +9493,15 @@
        (use-package projectile
          :ensure t
          :defer  10
-         ;; :diminish " Ⓟ"
          :delight ""
          :hook (prog-mode . projectile-mode)
+         :commands (projectile-ivy-persp-switch-project
+                    projectile-show-and-copy-project-dir)
          :init
          (leader/declare-prefix*
            "p" '("projectile" . "project management")
            "px" "execute")
+
          (leader/set-keys
            "p!" 'projectile-run-shell-command-in-root
            "p%" 'projectile-replace-regexp
@@ -9709,21 +9651,7 @@
        (use-package counsel-projectile
          :ensure t
          :defer  t
-         ;; :after (projectile counsel)
          ;; :hook (projectile-mode . counsel-projectile-mode)
-         :commands (counsel-projectile-switch-project
-                    counsel-projectile-find-file
-                    counsel-projectile-find-file-dwim
-                    counsel-projectile-find-dir
-                    counsel-projectile-switch-to-buffer
-                    counsel-projectile-grep
-                    counsel-projectile-ag
-                    counsel-projectile-rg
-                    counsel-projectile
-                    counsel-projectile-mode
-                    counsel-projectile-git-grep
-                    counsel-projectile-org-capture
-                    counsel-projectile-org-agenda)
          :init
          (leader/declare-prefix "ps" "search")
 
@@ -9737,10 +9665,7 @@
            "psv"   'counsel-projectile-git-grep
            "psa"   'counsel-projectile-ag
            "psr"   'counsel-projectile-rg
-           "p SPC" 'counsel-projectile)
-         ;; :config
-         ;; (counsel-projectile-mode +1)
-         )
+           "p SPC" 'counsel-projectile))
      #+END_SRC
 
 *** rake
@@ -9748,19 +9673,15 @@
       (use-package rake
         :ensure t
         :defer  t
-        :commands (rake
-                   rake-rerun
-                   rake-find-task ;; jump to task in rakefile
-                   rake-compilation-mode
-                   rake-regenerate-cache)
+        :commands (rake-refresh)
         :init
         (leader/set-keys
           "cr" 'rake
           "cR" 'rake-rerun)
 
-        (defalias 'rake-refresh #'rake-regenerate-cache)
         :config
-        (setq rake-completion-system 'ivy-read))
+        (setq rake-completion-system 'ivy-read)
+        (defalias 'rake-refresh #'rake-regenerate-cache))
     #+END_SRC
 
 *** restclient
@@ -9773,6 +9694,7 @@
          :init
          (leader/set-keys
            "ar" 'restclient)
+
          :config
          (let ((leader leader-major-mode-key))
            (leader/set-keys-for-mode! 'restclient-mode
@@ -9816,7 +9738,6 @@
              (with-current-buffer buffer
                (restclient-mode))
              (display-buffer buffer))))
-
      #+END_SRC
 
 **** company-restclient
@@ -9842,11 +9763,15 @@
              (org-babel-do-load-languages
               'org-babel-load-languages
               '((restclient . t))))))
-
      #+END_SRC
 
 *** save-place
-    remembers the cursor position in open files... so when I reopen them I'm taken to that point immeadiately. It's a cool feature, but not really essential. Generally, when I open a file, I'll look around a bit to see where I was and what I was doing. Jumping to where I was immediately only helps with one of those problems & it seems like a bad habit to depend on that to remind me... use org capture for that and mode dependent jump keys to get to where you need to. quick & easy.
+    remembers the cursor position in open files... so when I reopen them I'm taken to that point
+    immeadiately. It's a cool feature, but not really essential. Generally, when I open a file,
+    I'll look around a bit to see where I was and what I was doing. Jumping to where I was
+    immediately only helps with one of those problems & it seems like a bad habit to depend on
+    that to remind me... use org capture for that and mode dependent jump keys to get to where
+    you need to. quick & easy.
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package saveplace
@@ -9916,8 +9841,7 @@
       (use-package simple
         :straight (simple :type built-in)
         :defer t
-        :commands (completion-list-mode
-                   smart-universal-argument
+        :commands (smart-universal-argument
                    universal-argument-batch-increment
                    universal-argument-batch-decrement)
         :init
@@ -10017,6 +9941,8 @@
     #+END_SRC
 
 *** rainbow-delimeters
+    pretty colors for my lisp parens :)
+
     #+BEGIN_SRC emacs-lisp
       (use-package rainbow-delimiters
         :ensure t
@@ -10026,7 +9952,8 @@
     #+END_SRC
 
 *** rainbow-mode
-    highlights hex color strings in their appropriate color. keep it around... though I'll probably never use it.
+    highlights hex color strings in their appropriate color. keep it around... though I'll
+    probably never use it.
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package rainbow-mode
@@ -10039,8 +9966,7 @@
       (use-package tabulated-list
         :defer t
         :hook (tabulated-list-mode . hl-line-mode)
-        :commands (tabulated-list-mode
-                   tabulated-list-next-column)
+        :commands (tabulated-list-next-column)
         :config
         (evil-set-initial-state 'tabulated-list-mode 'motion)
 
@@ -10132,16 +10058,6 @@
       (use-package ggtags
         :ensure t
         :defer  t
-        :commands (ggtags-find-tag-dwim
-                   ggtags-find-tag-mouse
-                   ggtags-find-definition
-                   ggtags-find-reference
-                   ggtags-find-other-symbol
-                   ggtags-find-tag-regexp
-                   ggtags-idutils-query
-                   ggtags-grep
-                   ggtags-find-file
-                   ggtags-query-replace)
         :init
         (leader/declare-prefix "T" "tags")
 
@@ -10157,14 +10073,9 @@
           "f" 'next-error-follow-minor-mode))
     #+END_SRC
 
-*** tildify
-    #+BEGIN_SRC emacs-lisp
-      (use-package tildify
-        :defer t
-        :delight " ~")
-    #+END_SRC
-
 *** tramp
+    Transparent ReMote Access Protocol
+
     #+BEGIN_SRC emacs-lisp
       (use-package tramp
         :defer t
@@ -10242,6 +10153,7 @@
         :diminish
         :init
         (push 'undo-tree-visualizer-mode mohkale--whitespace-exempt-modes)
+
         :config
         (general-define-key
           :keymaps 'undo-tree-map
@@ -10267,6 +10179,9 @@
     #+END_SRC
 
 *** vi-tilde
+    display ~ on trailing lines in the fringe. doesn't work with emacs's new builtin line
+    numbers mode.
+
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package vi-tilde-fringe
         :ensure t
@@ -10299,6 +10214,8 @@
     #+END_SRC
 
 *** visible-mark
+    highlight region when mark is active.
+
     #+BEGIN_SRC emacs-lisp
       (use-package visible-mark
         :ensure t
@@ -10307,6 +10224,8 @@
     #+END_SRC
 
 *** visual-line
+    auto wrap long lines at the end of words.
+
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package visual-line
         :straight (visual-line :type built-in)
@@ -10347,12 +10266,13 @@
     #+END_SRC
 
 *** which-key
+    show completion candidates for the current key prefix, after a mild delay.
+
     #+BEGIN_SRC emacs-lisp
       (use-package which-key
         :ensure t
         :demand t
         :diminish
-        ;; :delight " Ⓚ"
         :commands (which-key-M-x+)
         :init
         (leader/set-keys
@@ -10437,12 +10357,11 @@
     #+END_SRC
 
 *** winner
+    undo changes to window configurations.
+
     #+BEGIN_SRC emacs-lisp
       (use-package winner
         :defer 10
-        :commands (winner-mode
-                   winner-undo
-                   winner-redo)
         :init
         (general-define-key
           :keymaps 'mohkale-window-map
@@ -10454,6 +10373,8 @@
     #+END_SRC
 
 *** winum
+    number windows, to make jumping to them easier.
+
     #+BEGIN_SRC emacs-lisp
       (use-package winum
         :ensure t
@@ -10503,24 +10424,11 @@
     #+END_SRC
 
 *** xref
+    cross reference keywords across a number of different backends.
+
     #+BEGIN_SRC emacs-lisp
       (use-package xref
         :defer t
-        :commands (xref-find-definitions
-                   xref-find-apropos
-                   xref-find-definitions-other-window
-                   xref-find-definitions-other-frame
-                   xref-pop-marker-stack
-                   xref-find-references
-
-                   ;; xref buffer commands
-                   xref-next-line
-                   xref-prev-line
-                   xref-goto-xref
-                   xref-show-location-at-point ;; open new window
-                   xref-query-replace-in-results ;; substitute
-                   xref-quit-and-goto-xref
-                   xref-quit)
         :init
         (leader/declare-prefix "ax" "xref")
 
@@ -10565,28 +10473,19 @@
        (use-package yasnippet
          :ensure t
          :defer  t
-         :commands (yas-expand
-                    yas-next-field
-                    yas-prev-field
-
-                    yas-new-snippet
-                    yas-visit-snippet-file
-
-                    ;; major mode commands
-                    yas-load-snippet-buffer
-                    yas-load-snippet-buffer-and-close
-                    yas-tryout-snippet)
          :delight (yas-minor-mode "YAS")
          :init
          (leader/set-keys
            "iSn" 'yas-new-snippet
            "fS" 'yas-visit-snippet-file)
+
          (general-define-key
            :states 'insert
            "C-i" 'yas-expand)
 
          :config
          (yas-global-mode 1)
+
          (general-define-key
            :keymaps 'yas-keymap
            "<C-return>" 'yas-next-field
@@ -10609,15 +10508,14 @@
        (use-package auto-yasnippet
          :ensure t
          :defer  t
-         :commands (aya-create
-                    aya-expand
-                    aya-persist-snippet)
          :init
          (leader/declare-prefix "iS" "auto-yasnippet")
+
          (leader/set-keys
            "iSc" 'aya-create
            "iSe" 'aya-expand
            "iSw" 'aya-persist-snippet)
+
          (general-define-key
            :states 'insert
            "M-i" 'aya-expand))
@@ -10633,23 +10531,6 @@
       #+END_SRC
 
 *** ycmd
-**** flycheck-ycmd
-     #+BEGIN_SRC emacs-lisp
-       (use-package flycheck-ycmd
-         :ensure t
-         :defer  t
-         :commands flycheck-ycmd-setup
-         :hook (ycmd-mode . flycheck-ycmd-setup))
-     #+END_SRC
-
-**** company-ycmd
-     #+BEGIN_SRC emacs-lisp
-       (use-package company-ycmd
-         :ensure t
-         :defer  t
-         :commands company-ycmd)
-     #+END_SRC
-
 **** ycmd-mode
      #+BEGIN_SRC emacs-lisp
        (use-package ycmd
@@ -10657,32 +10538,6 @@
          :defer  t
          :delight "YCMD"
          :hook (ycmd-mode . ycmd-eldoc-setup)
-         :commands (ycmd-mode
-                    global-ycmd-mode
-                    ycmd-eldoc-setup
-                    ycmd-open
-                    ycmd-close
-                    ycmd-version
-                    ycmd-parse-buffer
-                    ycmd-load-conf-file
-                    ycmd-clear-compilation-flag-cache
-                    ycmd-show-debug-info
-                    ycmd-show-documentation
-                    ycmd-toggle-log-enabled
-                    ycmd-restart-semantic-server
-                    ycmd-get-type
-                    ycmd-completer
-                    ycmd-toggle-force-semantic-completion
-                    ycmd-refactor-rename
-                    ycmd-display-completions
-                    ycmd-goto
-                    ycmd-goto-imprecise
-                    ycmd-goto-type
-                    ycmd-goto-definition
-                    ycmd-goto-declaration
-                    ycmd-goto-references
-                    ycmd-goto-include
-                    ycmd-goto-implementation)
          :init
          ;; NOTE to enable ycmd completion, hook ycmd-mode into any desired
          ;;      buffers and include company-ycmd in the company backends for
@@ -10727,6 +10582,23 @@
            (leader/declare-prefix-for-mode* 'ycmd-mode
              ""  "ycmd"
              "g" "jump")))
+     #+END_SRC
+
+**** company-ycmd
+     #+BEGIN_SRC emacs-lisp
+       (with-eval-after-load 'ycmd
+         (use-package company-ycmd
+           :ensure t
+           :defer  t))
+     #+END_SRC
+
+**** flycheck-ycmd
+     #+BEGIN_SRC emacs-lisp
+       (with-eval-after-load 'ycmd
+         (use-package flycheck-ycmd
+           :ensure t
+           :defer  t
+           :hook (ycmd-mode . flycheck-ycmd-setup)))
      #+END_SRC
 
 *** vc
@@ -11009,9 +10881,6 @@
        (use-package elisp-slime-nav
          :ensure t
          :defer  t
-         :commands (elisp-slime-nav-mode
-                    elisp-slime-nav-find-elisp-thing-at-point
-                    elisp-slime-nav-describe-elisp-thing-at-point)
          :hook (elisp-mode . elisp-slime-nav-mode)
          :config
          (leader/declare-prefix-for-mode! 'emacs-lisp-mode
@@ -11027,9 +10896,6 @@
        (use-package evil-lisp-state
          :ensure t
          :defer  t
-         :commands (evil-lisp-state-leader
-                    lisp-state-toggle-lisp-state
-                    lisp-state-eval-sexp-end-of-line)
          :init
          (leader/set-keys-for-mode! 'emacs-lisp-mode
            "el" 'lisp-state-eval-sexp-end-of-line
@@ -11040,10 +10906,6 @@
      #+BEGIN_SRC emacs-lisp
        (use-package pp
          :defer t
-         :commands (pp-eval-expression
-                    pp-macroexpand-expression
-                    pp-eval-last-sexp
-                    pp-macroexpand-last-sexp)
          :init
          (leader/set-keys-for-mode! 'emacs-lisp-mode
            "em" 'pp-macroexpand-expression
@@ -11235,7 +11097,7 @@
            :ensure t
            :defer  t
            :commands (company-anaconda)
-           :config
+           :init
            (company/configure-mode (python-mode :major t)
              company-anaconda)))
      #+END_SRC
@@ -11248,17 +11110,6 @@
            :defer  t
            :hook ((python-mode . anaconda-mode)
                   (python-mode . anaconda-eldoc-mode))
-           :commands (anaconda-mode-complete
-                      anaconda-mode-show-doc
-                      anaconda-mode-find-assignments
-                      anaconda-mode-find-references
-                      anaconda-mode-find-definitions
-                      anaconda-mode-find-assignments-other-window
-                      anaconda-mode-find-references-other-window
-                      anaconda-mode-find-definitions-other-window
-                      anaconda-mode-find-assignments-other-frame
-                      anaconda-mode-find-references-other-frame
-                      anaconda-mode-find-definitions-other-frame)
            :config
            (leader/set-keys-for-mode! 'python-mode
              "TAB" 'anaconda-mode-complete
@@ -11281,8 +11132,6 @@
          (use-package pyimport
            :ensure t
            :defer  t
-           :commands (pyimport-remove-unused
-                      pyimport-insert-missing)
            :init
            (leader/declare-prefix-for-mode! 'python-mode "i" "imports")
            (leader/set-keys-for-mode! 'python-mode
@@ -11296,8 +11145,6 @@
          (use-package py-isort
              :ensure t
              :defer  t
-             :commands (py-isort-buffer
-                        py-isort-region)
              :init
              (leader/declare-prefix-for-mode! 'python-mode "i" "imports")
              (leader/set-keys-for-mode! 'python-mode
@@ -11332,8 +11179,6 @@
          :straight (python :type built-in)
          :defer t
          :hook (python-mode . flycheck-mode)
-         :commands (python-mode
-                    run-python)
          :init
          (defalias 'python-repl 'run-python)
          (evil-set-initial-state 'inferior-python-mode 'emacs)
@@ -11354,6 +11199,7 @@
            "g" "jump"
 
            "d" "method-signature")
+
          (leader/set-keys-for-mode! 'python-mode
            "r" 'run-python ;; REPL
            "R" 'python-shell-switch-to-shell
@@ -11427,9 +11273,6 @@
          :defer t
          :mode ("\\.rb$" . ruby-mode)
          :interpreter "ruby"
-         :commands (ruby-mode
-                    ruby-toggle-string-quotes
-                    ruby-toggle-block)
          :config
          (leader/set-keys-for-mode! 'ruby-mode
            "'" 'ruby-toggle-string-quotes
@@ -11445,7 +11288,6 @@
          :mode ("\\.rb$" . enh-ruby-mode)
          :interpreter "ruby"
          :hook (enh-ruby-mode . flycheck-mode)
-         :commands enh-ruby-mode
          :config
          (setq enh-ruby-deep-indent-paren nil
                enh-ruby-hanging-paren-deep-indent-level 2)
@@ -11508,16 +11350,13 @@
          (use-package robe
            :ensure t
            :defer  t
-           :commands (robe-mode
-                      robe-start
-                      ruby-load-file
-                      company-robe)
            :init
            (add-hook mohkale-ruby-mode-hook
                      (defun ruby-robe-enable-in-projects (&rest args)
                        (unless (eq mohkale-ruby-use-lsp 'projectile)
                          (when-project-has-gemfile
                            (call-interactively 'robe-mode)))))
+
            :config
            (company/configure-mode (robe-mode)
              company-robe)
@@ -11539,21 +11378,13 @@
        (use-package inf-ruby
          :ensure t
          :defer  t
-         :commands (inf-ruby
-                    inf-ruby-console-gem
-                    inf-ruby-console-zeus
-                    inf-ruby-console-auto
-                    inf-ruby-console-rails
-                    inf-ruby-console-racksh
-                    inf-ruby-console-script
-                    inf-ruby-console-hanami
-                    inf-ruby-console-default)
          :init
          (defalias 'ruby-repl 'inf-ruby)
          (push 'inf-ruby-mode mohkale--whitespace-exempt-modes)
 
          (leader/declare-prefix-for-mode!
            mohkale-ruby-mode "r" "REPL")
+
          (leader/set-keys-for-mode! mohkale-ruby-mode
            "rr" 'inf-ruby
            "rg" 'inf-ruby-console-gem
@@ -11571,9 +11402,9 @@
          (use-package ruby-tools
            :ensure t
            :defer  t
-           :commands (ruby-tools-mode)
            :init
            (add-hook mohkale-ruby-mode-hook #'ruby-tools-mode)
+
            :config
            (leader/declare-prefix-for-mode!
              mohkale-ruby-mode "i" "insert")
@@ -11592,11 +11423,6 @@
          (use-package bundler
            :ensure t
            :defer  t
-           :commands (bundle-open
-                      bundle-console
-                      bundle-install
-                      bundle-update
-                      bundle-check)
            :init
            (leader/declare-prefix-for-mode!*
              mohkale-ruby-mode "b" "bundler")
@@ -11615,9 +11441,9 @@
          (use-package ruby-electric
            :ensure t
            :defer  t
-           :commands (ruby-electric-mode)
            :init
            (add-hook mohkale-ruby-mode-hook #'ruby-electric-mode)
+
            :config
            ;;; why poison the standard ruby map instead of using ruby-electric-mode-map?
            (defun ruby-electric-setup-keymap ()
@@ -11753,11 +11579,6 @@
            :ensure t
            :defer  t
            :hook (web-mode . emmet-mode)
-           :commands (emmet-mode
-                      emmet-expand-yas
-                      emmet-expand-line
-                      emmet-preview-mode
-                      emmet-preview)
            :config
            (general-define-key
              :keymaps 'emmet-mode-keymap
@@ -11793,8 +11614,6 @@
        (use-package simple-httpd
          :ensure t
          :defer  t
-         :commands (httpd-start
-                    httpd-stop)
          :config
          (setq httpd-port 35343))
      #+END_SRC
@@ -11805,11 +11624,9 @@
          (use-package web-beautify
            :ensure t
            :defer  t
-           :commands (web-beautify-js
-                      web-beautify-html
-                      web-beautify-css)
            :init
            (leader/declare-prefix-for-mode! 'web-mode "rb" "beautify")
+
            (leader/set-keys-for-mode! 'web-mode
              "rbh" 'web-beautify-htlm
              "rbj" 'web-beautify-js
@@ -11937,7 +11754,6 @@
        (use-package org-bullets
          :ensure t
          :defer  t
-         :commands org-bullets-mode
          :hook (org-mode . org-bullets-mode))
      #+END_SRC
 
@@ -11957,7 +11773,6 @@
        (use-package toc-org
          :ensure t
          :defer  t
-         :commands toc-org-mode
          ;; :hook (org-mode . toc-org-mode)
          )
      #+END_SRC
@@ -11969,11 +11784,6 @@
          :defer t
          :hook ((org-mode . display-line-numbers-mode)
                 (org-mode . hl-todo-mode))
-         :commands (org-capture
-                    org-agenda
-                    org-copy-subtree
-                    org-cut-subtree
-                    org-outline-smart-up-level)
          :init
          ;;; leader keys outside of org mode
          (leader/declare-prefix "o" "org")
@@ -12434,10 +12244,8 @@
        (use-package org-projectile
          :ensure t
          :defer  t
-         :commands (org-projectile-project-todo-completing-read
-                    org-projectile-project-todo-entry
-                    org-projectile-goto-location-for-project
-                    org-projectile-find-todo-file)
+         :commands (org-projectile-find-todo-file
+                    org-projectile-project-todo-entry)
          :init
          (with-eval-after-load 'org
            (add-to-list 'org-capture-templates (org-projectile-project-todo-entry) t)
@@ -12491,16 +12299,8 @@
         :ensure t
         :defer  t
         :mode "\\.json$"
-        :commands (json-decrement-number-at-point
-                   json-increment-number-at-point
-
-                   json-mode
-                   json-mode-beautify
-                   json-nullify-sexp
-                   json-mode-show-path
-                   json-toggle-boolean
-                   json-mode-kill-path)
         :hook (json-mode . flycheck-mode)
+
         :config
         (leader/set-keys-for-mode! 'json-mode
           "b" 'json-mode-beautify
@@ -12516,7 +12316,6 @@
         :defer  t
         :mode "\\.vim"
         :hook (vimrc-mode . flycheck-mode)
-        :commands vimrc-mode
         :delight (vimrc-mode "vim"))
     #+END_SRC
 
@@ -12527,11 +12326,6 @@
          :ensure t
          :defer  t
          :mode ("\\.sql" . sql-mode)
-         :commands (sql-mode
-                    sql-connect
-                    sql-save-connection
-                    sql-beginning-of-statement
-                    sql-end-of-statement)
          :hook (sql-mode . flycheck-mode)
          :init
          (setq sql-sqlite-options '("-interactive"))
@@ -12575,9 +12369,6 @@
            :defer  t
            :hook ((sql-mode . sqlup-mode)
                   (sql-interactive-mode . sqlup-mode))
-           :commands (sqlup-mode
-                      sqlup-capitalize-keywords-in-buffer
-                      sqlup-capitalize-keywords-in-region)
            :config
            (leader/declare-prefix-for-mode 'sql-mode
              "u" "upcase")
@@ -12603,7 +12394,6 @@
         :ensure t
         :defer  t
         :mode "\\.yaml"
-        :commands (yaml-mode)
         :hook (yaml-mode . flycheck-mode)
         :config
         (general-define-key
@@ -12658,9 +12448,6 @@
          (use-package company-shell
            :ensure t
            :defer  t
-           :commands (company-shell
-                      company-fish-shell
-                      company-shell-env)
            :config
            (company/configure-mode (sh-mode :major t)
              company-shell company-shell-env)))
@@ -12732,7 +12519,6 @@
        (use-package company-emoji
          :ensure t
          :defer  t
-         :commands (company-emoji)
          :config
          (setq company-emoji-insert-unicode nil))
      #+END_SRC
@@ -12741,17 +12527,14 @@
      #+BEGIN_SRC emacs-lisp
        (use-package emojify
          :ensure t
-         :defer  t
-         :commands (emojify-mode))
+         :defer  t)
      #+END_SRC
 
 **** gh-md
      #+BEGIN_SRC emacs-lisp
        (use-package gh-md
          :ensure t
-         :defer  t
-         :commands (gh-md-render-region
-                    gh-md-render-buffer))
+         :defer  t)
      #+END_SRC
 
 **** markdown-mode
@@ -12942,7 +12725,6 @@
          :ensure t
          :defer  t
          :mode "CMakeLists\\.txt\\|\\.cmake"
-         :commands (cmake-mode)
          :hook (cmake-mode . flycheck-mode)
          :config
          (company/configure-mode (cmake-mode :major t)
@@ -12953,9 +12735,8 @@
      #+BEGIN_SRC emacs-lisp
        (with-eval-after-load 'cmake-mode
          (use-package company-cmake
-           ;; :ensure t
            :defer  t
-           :commands (company-cmake)))
+           :commands company-cmake))
      #+END_SRC
 
 *** C-C++
@@ -12964,8 +12745,7 @@
        (with-eval-after-load 'cc-mode
          (use-package company-c-headers
            :ensure t
-           :defer  t
-           :commands (company-c-headers)))
+           :defer  t))
      #+END_SRC
 
 **** cc-mode
@@ -12974,7 +12754,7 @@
          :straight (cc-mode :type built-in)
          :defer t
          :mode ("\\.h$" . c-mode)
-         :commands (c-mode c++-mode mohkale//set-c-mode-bindings)
+         :commands (mohkale//set-c-mode-bindings)
          :hook (
                 ;; use global-ycmd-mode manually
                 ;; (c-mode   . ycmd-mode)
@@ -13023,7 +12803,6 @@
          (use-package disaster
            :ensure t
            :defer  t
-           :commands (disaster)
            :init
            (dolist (mode '(c-mode c++-mode))
              (leader/set-keys-for-mode! mode
@@ -13036,8 +12815,6 @@
        (use-package kotlin-mode
          :ensure t
          :defer  t
-         :commands (kotlin-mode
-                    kotlin-repl)
          :config
          (setq kotlin-tab-width 4)
 
@@ -13099,40 +12876,6 @@
           :defer  t
           :delight (meghanada "MEG")
           :hook ((java-mode . meghanada-mode))
-          :commands (meghanada-mode
-                     meghanada-install-server
-                     meghanada-update-server
-                     meghanada-server-start
-                     meghanada-restart
-                     meghanada-server-kill
-                     meghanada-client-direct-connect
-                     meghanada-client-connect
-                     meghanada-client-disconnect
-                     meghanada-client-ping
-                     meghanada-clear-cache
-
-                     meghanada-import-all
-                     meghanada-optimize-import
-                     meghanada-import-at-point
-                     meghanada-local-variable
-                     meghanada-compile-file
-                     meghanada-show-project
-                     meghanada-compile-project
-                     meghanada-switch-testcase
-                     meghanada-exec-main
-                     meghanada-debug-main
-                     meghanada-reference
-                     meghanada-search-everywhere
-                     meghanada-search-everywhere-ex
-                     meghanada-typeinfo
-                     meghanada-run-junit-class
-                     meghanada-run-junit-test-case
-                     meghanada-debug-junit-class
-                     meghanada-debug-junit-test-case
-                     meghanada-run-task
-                     meghanada-jump-declaration
-                     meghanada-back-jump
-                     meghanada-code-beautify)
           :config
           (require 'yasnippet)
 
@@ -13254,8 +12997,7 @@
          (use-package tern
            :ensure t
            :defer  t
-           :hook (js2-mode . tern-mode)
-           :commands tern-mode))
+           :hook (js2-mode . tern-mode)))
      #+END_SRC
 
 **** company-tern
@@ -13264,7 +13006,6 @@
          (use-package company-tern
            :ensure t
            :defer  t
-           :commands company-tern
            :hook (js2-mode . (lambda () (require 'company-tern)))
            :config
            (company/configure-mode (js2-mode :major t)
@@ -13277,11 +13018,6 @@
          (use-package js-doc
            :ensure t
            :defer  t
-           :commands (js-doc-insert-function-doc
-                      js-doc-insert-function-doc-snippet
-                      js-doc-insert-tag
-                      js-doc-insert-file-doc
-                      js-doc-describe-tag)
            :init
            ;; (general-define-key
            ;;   :keymaps 'js2-mode-map
@@ -13348,7 +13084,6 @@
          (use-package xref-js2
            :ensure t
            :defer  t
-           :commands (xref-js2-xref-backend)
            :hook (xref-backend-functions . xref-js2-xref-backend)
            :init
            (setq xref-js2-search-program 'rg)))
@@ -13371,11 +13106,9 @@
          :delight
          (skewer-css-mode "skewerC")
          (skewer-html-mode "skewerH")
-         :commands (skewer-mode
-                    skewer-css-mode
-                    skewer-html-mode)
          :init
          (setq skewer-leader-prefix (concat leader-major-mode-prefix "S"))
+
          :config
          ;; once required, enable skewer in all
          ;; compatible buffers
@@ -13439,7 +13172,6 @@
      #+BEGIN_SRC emacs-lisp
        (use-package less-css-mode
          :defer t
-         :commands (less-css-mode)
          :config
          (leader/set-keys-for-mode 'less-css-mode
            "c" 'less-css-compile))
@@ -13450,7 +13182,6 @@
        (use-package skewer-less
          :ensure t
          :defer  t
-         :commands (skewer-less-mode)
          :init
          (with-eval-after-load 'skewer-mode
            (add-hook 'less-css-mode-hook 'skewer-less-mode))
@@ -13468,12 +13199,7 @@
          (use-package hindent
            :ensure t
            :defer  t
-           :hook (haskell-mode . hindent-mode)
-           :commands (hindent-mode
-                      hindent-reformat-decl
-                      hindent-reformat-buffer
-                      hindent-reformat-decl-or-fill
-                      hindent-reformat-region)))
+           :hook (haskell-mode . hindent-mode)))
      #+END_SRC
 
 **** company-cabal
@@ -13481,8 +13207,7 @@
        (with-eval-after-load 'haskell-mode
          (use-package company-cabal
            :ensure t
-           :defer  t
-           :commands company-cabal))
+           :defer  t))
      #+END_SRC
 
 **** flycheck-haskell
@@ -13490,8 +13215,7 @@
        (with-eval-after-load 'haskell-mode
          (use-package flycheck-haskell
            :ensure t
-           :defer  t
-           :commands (flycheck-haskell-setup)))
+           :defer  t))
      #+END_SRC
 
 **** haskell-mode
@@ -13499,8 +13223,6 @@
        (use-package haskell-mode
          :ensure t
          :defer  t
-         :commands (haskell-mode
-                    run-haskell)
          :init
          (push 'haskell-interactive-mode mohkale--whitespace-exempt-modes)
          (push 'inferior-haskell-mode mohkale--whitespace-exempt-modes)
@@ -13521,7 +13243,7 @@
            :keymaps 'haskell-mode-map
            "C-M-i" nil)
 
-         (defun mohkale//enable-haskell-indent-control ()
+         (defun haskell-enable-indent-control+ ()
            (interactive)
            (haskell-indent-mode +1)
            (general-define-key
@@ -13565,7 +13287,7 @@
      #+BEGIN_SRC emacs-lisp
        (with-eval-after-load 'haskell-mode
          (use-package hs-lint
-           :defer  t
+           :defer t
            :commands (hs-lint hs-lint-mode)))
      #+END_SRC
 
@@ -13609,18 +13331,6 @@
       (use-package magit
         :ensure t
         :defer  t
-        :commands (magit-push
-                   magit-section-forward-sibling
-                   magit-section-backward-sibling
-                   magit-section-hide-children
-                   magit-section-show-children
-                   magit-log-buffer-file
-                   magit-dispatch-popup
-                   magit-status
-                   magit-stage-file
-                   magit-unstage-file
-                   magit-section-toggle
-                   magit-visit-thing)
         :init
         (setq magit-completing-read-function 'ivy-completing-read
               magit-revision-show-gravatars  '("^Author:     " . "^Commit:     ")
@@ -13704,24 +13414,21 @@
      #+BEGIN_SRC emacs-lisp
       (use-package gitignore-mode
         :ensure t
-        :defer  t
-        :commands (gitignore-mode))
+        :defer  t)
      #+END_SRC
 
 **** gitconfig-mode
      #+BEGIN_SRC emacs-lisp
       (use-package gitconfig-mode
         :ensure t
-        :defer  t
-        :commands (gitconfig-mode))
+        :defer  t)
      #+END_SRC
 
 **** gitignore-mode
      #+BEGIN_SRC emacs-lisp
       (use-package gitattributes-mode
         :ensure t
-        :defer  t
-        :commands (gitattributes-mode))
+        :defer  t)
      #+END_SRC
 
 **** gitlink
@@ -13729,9 +13436,6 @@
      (use-package git-link
         :ensure t
         :defer  t
-        :commands (git-link
-                   git-link-commit
-                   git-link-homepage)
         :init
         (leader/declare-prefix "gl" "links")
 
@@ -13760,8 +13464,6 @@
 **** magit-svn
      #+BEGIN_SRC emacs-lisp :tangle no
        (use-package magit-svn
-         :commands (turn-on-magit-svn
-                    magit-key-mode-popup-svn)
          :hook (magit-mode . turn-on-magit-svn)
          ;; TODO add some bindings
          )
@@ -13781,11 +13483,9 @@
          :ensure t
          :defer  t
          :hook (magit-mode . turn-on-magit-gitflow)
-         :commands (magit-gitflow-mode
-                    turn-on-magit-gitflow
-                    magit-gitflow-popup)
          :delight
          (magit-gitflow-mode "GitFlow")
+
          :init
          (with-eval-after-load 'magit--handle-bookmark
            (general-define-key
@@ -13806,8 +13506,6 @@
       (use-package realgud
         :ensure t
         :defer  t
-        :commands (realgud:gdb
-                   realgud:pdb)
         :config
         (mohkale--comint-set-bindings 'realgud:gdb-track-mode-map)
         (general-define-key
