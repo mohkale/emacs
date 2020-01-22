@@ -241,6 +241,15 @@
 
 *** Config Variables
     #+BEGIN_SRC emacs-lisp
+      (defvar load-me-now-duration 20
+        "ideal use-package defer duration.
+      after you've been inactive for this long, safe to say you
+      can load packages that you've deferred.
+
+      This is used for packages which aren't need at startup, but
+      more likely then not I'm going to end up requiring them quite
+      soon afterwards.")
+
       (defvar mohkale-should-compile-config nil
         "when truthy, building the configuration file also compiles the lisp file")
 
@@ -1067,7 +1076,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package mohkale
        :straight (mohkale :type built-in)
-       :defer t
+       :defer load-me-now-duration
        :commands (mohkale/eval-configuration-file
                   mohkale/build-configuration-file
                   mohkale/find-configuration-file
@@ -1197,7 +1206,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-file
         :straight (mohkale-file :type built-in)
-        :defer t
+        :defer load-me-now-duration
         :commands (rename-buffer-file
                    delete-buffer-file
                    show-and-copy-buffer-file-name
@@ -1617,7 +1626,7 @@
 *** Display Functions
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-buffer-display
-       :defer t
+       :defer load-me-now-duration
        :commands (display-buffer--maybe-same-window-and-focus
                   display-buffer--maybe-pop-up-frame-or-window-and-focus
                   display-buffer-reuse-window-and-focus
@@ -1699,7 +1708,7 @@
 *** Misc
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-misc
-        :defer t
+        :defer load-me-now-duration
         :commands (toggle-lexical-binding
                    keymaps-at-point
                    show-prefix
@@ -1766,7 +1775,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-text-query
         :straight (mohkale-text-query :type built-in)
-        :defer t
+        :defer load-me-now-duration
         :commands (line-width
                    column-number
                    point-to-coordinates
@@ -1775,7 +1784,7 @@
 
       (use-package mohkale-text
         :straight (mohkale-text :type built-in)
-        :defer t
+        :defer load-me-now-duration
         :commands (dos2unix
                    unix2dos
                    pad-line-with-char-to-length
@@ -2069,7 +2078,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-bufwin
         :straight (mohkale-bufwin :type built-in)
-        :defer t
+        :defer load-me-now-duration
         :commands (switch-to-scratch-buffer
                    kill-this-buffer-and-window-maybe
                    switch-to-last-buffer
@@ -2427,7 +2436,7 @@
 *** evil
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-evil
-        :defer t
+        :defer load-me-now-duration
         :after evil
         :commands (evil-capitalize
                    evil-reverse
@@ -4135,7 +4144,7 @@
      #+BEGIN_SRC emacs-lisp
        (use-package evil-numbers
          :ensure t
-         :defer  t
+         :defer  load-me-now-duration
          :init
          (general-define-key
            :states 'normal
@@ -4239,7 +4248,7 @@
      #+BEGIN_SRC emacs-lisp
        (use-package evil-exchange
          :ensure t
-         :defer  t
+         :defer  load-me-now-duration
          :init
          (general-define-key
            :states leader-norm-states
@@ -4796,7 +4805,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package buffer-move
         :ensure t
-        :defer  t
+        :defer  load-me-now-duration
         :commands (rotate-windows)
         :init
         (general-define-key
@@ -6595,7 +6604,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package drag-stuff
         :ensure t
-        :defer  t
+        :defer  load-me-now-duration
         :init
         (general-define-key
           "C-<up>" 'drag-stuff-up
@@ -6912,7 +6921,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package eyebrowse
         :ensure t
-        :defer  t
+        :defer  load-me-now-duration
         :config
         (eyebrowse-mode +1)
 
@@ -7917,7 +7926,7 @@
 **** ibuffer
      #+BEGIN_SRC emacs-lisp
        (use-package ibuffer
-         :defer t
+         :defer load-me-now-duration
          :commands (ibuffer)
          :hook (ibuffer-mode . hl-line-mode)
          :init
@@ -8759,7 +8768,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package open-junk-file
-        :defer t
+        :defer load-me-now-duration
         :commands (open-junk-file
                    goto-junk-file-directory
                    goto-todays-junk-file-directory)
@@ -9121,7 +9130,7 @@
         ;;    persp-save-and-kill
 
         :ensure t
-        :defer  t
+        :defer  load-me-now-duration
         :diminish persp-mode
         :commands (ivy-find-file-new-perspective
                    switch-to-persp-by-num
