@@ -7795,14 +7795,14 @@
 
 **** counsel-pydoc
      #+BEGIN_SRC emacs-lisp
-       (use-package counsel-pydoc
-         :ensure t
-         :defer  t
-         :after counsel
-         :commands counsel-pydoc
-         :init
-         (leader/set-keys-for-mode! 'python-mode
-           "hd" 'counsel-pydoc))
+       (with-eval-after-load 'python
+         (use-package counsel-pydoc
+           :ensure t
+           :defer  t
+           :after  counsel
+           :init
+           (leader/set-keys-for-mode! 'python-mode
+             "hd" 'counsel-pydoc)))
      #+END_SRC
 
 **** counsel-ggtags
