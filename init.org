@@ -5654,132 +5654,140 @@
          (leader/set-keys "bh" 'goto-home-buffer)
          (push 'dashboard-mode mohkale--whitespace-exempt-modes)
 
-         :config
-         (require 'all-the-icons)
-
-         (evil-set-initial-state 'dashboard-mode 'motion)
-
-         (defun mohkale/get-loaded-packages ()
+         (defun get-loaded-packages+ ()
            "return the number of packages loaded so far"
            (if (bound-and-true-p package-alist)
                package-activated-list
              (if (and (boundp 'straight--profile-cache) (hash-table-p straight--profile-cache))
                  (hash-table-size straight--profile-cache))))
 
-         (let ((dashboard-buffer "*dashboard*")
-               (preffered-icon-height 0.75))
-           (defun goto-home-buffer ()
-             (interactive)
-             (let* ((buffer (let ((buffer (get-buffer dashboard-buffer-name)))
-                              (if buffer
-                                  buffer
-                                (setq dashboard-startup-banner
-                                      (dashboard--choose-random-startup-banner))
-                                (dashboard-insert-startupify-lists)
-                                ;; switch to buffer with buffer-name
-                                dashboard-buffer-name))))
-               (switch-to-buffer buffer)))
+         :config
+         (require 'all-the-icons)
 
-           (setq inhibit-startup-screen t
-                 initial-buffer-choice (when (< (length command-line-args) 2)
-                                         (lambda () (get-buffer-create dashboard-buffer)))
-                 dashboard-banner-logo-title "Welcome to Emacs!"
-                 ;; recents, bookmarks, projects, agenda, registers
-                 dashboard-items '((recents  . 5)
-                                   (projects . 7)
-                                   (agenda   . nil))
-                 dashboard-center-content nil
-                 dashboard-set-file-icons t
-                 dashboard-set-navigator  t
-                 dashboard-set-init-info  t
-                 show-week-agenda-p       t
-                 dashboard-show-shortcuts t
-                 dashboard-set-heading-icons nil)
+         (evil-set-initial-state 'dashboard-mode 'motion)
 
+         (setq inhibit-startup-screen t
+               initial-buffer-choice (when (< (length command-line-args) 2)
+                                       (lambda () (switch-to-buffer dashboard-buffer-name)))
+               dashboard-banner-logo-title "Welcome to Emacs!"
+               ;; recents, bookmarks, projects, agenda, registers
+               dashboard-items '((recents  . 5)
+                                 (projects . 7)
+                                 (agenda   . nil))
+               dashboard-center-content nil
+               dashboard-set-file-icons t
+               dashboard-set-navigator  t
+               dashboard-set-init-info  t
+               show-week-agenda-p       t
+               dashboard-show-shortcuts t
+               dashboard-set-heading-icons nil)
+
+         ;; determine the appropriate banner to display on the dashboard
+         (defun dashboard-image-banner-p ()
+           "whether to use text graphics, or image graphics."
+           (display-graphic-p))
+
+         (defun dashboard-select-random-banner+ (&optional arg)
+           "toggle another banner to be used on the dashboard.
+       By default, if `dashboard-image-banner-p' is true, the default official banner
+       will be used. if otherwise a random text banner will be defaulted to."
+           (setq dashboard-startup-banner
+                 (if (and (not arg)
+                          (dashboard-image-banner-p))
+                     'official ;; prefer official cover.
+                   (seq-random-elt
+                    (or (file-expand-wildcards (concat
+                                                mohkale-dashboard-banners-directory "*"))
+                        '(1 2 3))))))
+
+         (advice-add 'dashboard-refresh-buffer :before
+                     (lambda (&rest args)
+                       (dashboard-select-random-banner+)))
+         (dashboard-select-random-banner+) ;; choose initial banner
+
+         ;; goto home buffer, or recreate the home buffer, when appropriate.
+         (defun goto-home-buffer ()
+           (interactive)
+           (let* ((buffer
+                   (or (get-buffer dashboard-buffer-name)
+                       (and
+                         ;; creates dashboard buffer as well
+                         (dashboard-insert-startupify-lists)
+                         dashboard-buffer-name))))
+             (switch-to-buffer buffer)))
+
+         ;; set the navigator button
+         (let ((prefered-icon-height 0.75))
            (setq dashboard-navigator-buttons
                  `((;; line 01
-                    (,(all-the-icons-octicon "mark-github" :height preffered-icon-height :v-adjust 0.0)
+                    (,(all-the-icons-octicon "mark-github" :height prefered-icon-height :v-adjust 0.0)
                      "Homepage"
                      "Browse Homepage"
-                     (lambda (&rest _) (browse-url "https://github.com/MoHKale")))
-                    (,(all-the-icons-faicon "google" :height preffered-icon-height :v-adjust 0.0)
+                     (lambda (&rest _)
+                       (browse-url "https://github.com/MoHKale")))
+                    (,(all-the-icons-faicon "google" :height prefered-icon-height :v-adjust 0.0)
                      "Google"
                      "Browse Google"
-                     (lambda (&rest _) (browse-url "https://www.google.co.uk")))
-                    (,(all-the-icons-fileicon "org" :height preffered-icon-height :v-adjust 0.0)
+                     (lambda (&rest _)
+                       (browse-url "https://www.google.co.uk")))
+                    (,(all-the-icons-fileicon "org" :height prefered-icon-height :v-adjust 0.0)
                      "Manual"
                      "Browse Emacs Manual"
-                     (lambda (&rest _) (message "%s" _) (browse-url "https://www.gnu.org/software/emacs/manual/html_node/emacs/index.html")))
-                    (,(all-the-icons-faicon "cogs" :height preffered-icon-height :v-adjust 0.0)
+                     (lambda (&rest _)
+                       (browse-url "https://www.gnu.org/software/emacs/manual/html_node/emacs/index.html")))
+                    (,(all-the-icons-faicon "cogs" :height prefered-icon-height :v-adjust 0.0)
                      "Update Packages"
                      "Update Packages"
                      #'update-installed-packages)
-                    ("?" "" "emacs FAQ" #'view-emacs-faq font-lock-builtin-face))))
+                    (,(propertize "?" 'face '(:inherit default)) ;; needs a face attribute
+                     "" "emacs FAQ" #'view-emacs-faq font-lock-builtin-face)))))
 
-           (defun dashboard--choose-random-startup-banner ()
-             "toggle another banner to be used on the dashboard"
-             (let ((custom-banners (or (file-expand-wildcards
-                                        (concat mohkale-dashboard-banners-directory "*"))
-                                       '(1 2 3))))
-               (seq-random-elt custom-banners)))
-
-           (setq dashboard-startup-banner (if (display-graphic-p)
-                                              'official ;; emacs logo is epic... always prefer it
-                                            ;; otherwise choose a text banner from my custom banners path or
-                                            ;; choose random text banner from the builtin dashboard banners.
-                                            (progn
-                                              ;; and also ensure a new banner is chosen everytime the buffer
-                                              ;; is refreshed... because why keep the same ascii banner 4ever
-                                              (advice-add 'dashboard-refresh-buffer :before
-                                                          #'(lambda (&rest args)
-                                                              (setq dashboard-startup-banner
-                                                                    (dashboard--choose-random-startup-banner))))
-                                              (dashboard--choose-random-startup-banner))))
-
-           (let* ((footer-count (length dashboard-footer-icon-associations))
-                  (footer-index (random footer-count))
-                  (footer-item (nth footer-index dashboard-footer-icon-associations))
+         ;; determine appropriate footer icon to display alongside quote.
+         (let* ((footer-count (length dashboard-footer-icon-associations))
+                (footer-index (random footer-count))
+                (footer-item (nth footer-index dashboard-footer-icon-associations))
 
                   ;;; extract items from table row
-                  (icon-source (nth 0 footer-item))
-                  (icon-name   (nth 1 footer-item)))
-             (setq dashboard-footer-icon (funcall (intern (concat "all-the-icons-" icon-source))
-                                                  icon-name
-                                                  :height 1.1
-                                                  :v-adjust -0.05
-                                                  :face 'font-lock-keyword-face)))
+                (icon-source (nth 0 footer-item))
+                (icon-name   (nth 1 footer-item)))
+           (setq dashboard-footer-icon (funcall (intern (concat "all-the-icons-" icon-source))
+                                                icon-name
+                                                :height 1.1
+                                                :v-adjust -0.05
+                                                :face 'font-lock-keyword-face)))
 
-           (setq dashboard-footer (car (nth (random (1- (1+ (length dashboard-quotes)))) dashboard-quotes))))
+         (setq dashboard-footer (car (nth (random (1- (1+ (length dashboard-quotes))))
+                                          dashboard-quotes)))
 
-         (defun dashboard--startup-handler ()
-           (let ((loaded-packages (mohkale/get-loaded-packages)))
-             (setq dashboard-init-info (if loaded-packages
-                                           (format "%d packages loaded in %s"
-                                                   (length loaded-packages)
-                                                   (emacs-init-time))
-                                         (format "emacs loaded in %s" (emacs-init-time))))
+         (add-hook 'dashboard-mode-hook (lambda () (message nil)))
 
-             ;; don't switch to dashboard on error buffer
-             (unless (eq 1 (length (window-list)))
-               (winum-select-window-1))))
+         (add-hook 'emacs-startup-hook
+                   (defun dashboard--startup-handler ()
+                     "update dashboard init info."
+                     (let ((loaded-packages (get-loaded-packages+)))
+                       (setq dashboard-init-info (if loaded-packages
+                                                     (format "%d packages loaded in %s"
+                                                             (length loaded-packages)
+                                                             (emacs-init-time))
+                                                   (format "emacs loaded in %s" (emacs-init-time))))
 
-         (add-hook 'emacs-startup-hook #'dashboard--startup-handler)
-         (add-hook 'dashboard-mode-hook (lambda () (message nil))) ;; clear echo area
+                       ;; don't switch to dashboard on error buffer
+                       (unless (eq 1 (length (window-list)))
+                         (winum-select-window-1)))))
 
-         (defun dashboard-choose-banner--allow-custom-banners ()
-           "the built in method only supports filepaths to graphical banners
-       so add a case supporting file paths to text based banners as well."
-           (let ((banner dashboard-startup-banner))
-             (when (and banner (stringp banner)
-                        (file-exists-p banner))
-               (let ((banner-ext (intern (file-name-extension banner))))
-                 (when (eq banner-ext 'txt) banner)))))
-
-         (advice-add 'dashboard-choose-banner :before-until #'dashboard-choose-banner--allow-custom-banners)
+         (advice-add 'dashboard-choose-banner :before-until
+                     (defun dashboard-choose-banner-allow-text-banners+ ()
+                       "the built in method only supports filepaths to graphical banners."
+                       (let ((banner dashboard-startup-banner))
+                         (when (and banner
+                                    (stringp banner)
+                                    (file-exists-p banner))
+                           (and (string-equal "txt"
+                                              (file-name-extension banner))
+                                banner)))))
 
          (defmacro dashboard-defun-shortcut-function (shortcut-char search-label &optional no-next-line)
-           "translation of `dashboard-insert-shortcut' but less bizarre.
-       see dashboard-widgets.el for details."
+           "translation of `dashboard-insert-shortcut' but less bizarre."
            (let* ((func-name (intern (concat "dashboard-" shortcut-char "-shortcut"))))
              `(defun ,func-name ()
                 (interactive)
