@@ -4164,9 +4164,13 @@
        (use-package evil-snipe
          :ensure t
          :defer  t
+         :diminish
+         evil-snipe-mode
+         evil-snipe-local-mode
          :hook (evil-mode . evil-snipe-mode)
          :init
          (setq evil-snipe-scope 'buffer                                      ; how far can a snipe take place
+               evil-snipe-repeat-scope 'buffer                               ; how far repeating previous snipe can take place.
                evil-snipe-enable-highlight nil                               ; don't highlight after jump
                evil-snipe-repeat-keys nil                                    ; sniping after a snipe, repeats the last snipe
                evil-snipe-enable-incremental-highlight t                     ; do highlight matching snipe locations
@@ -4177,25 +4181,47 @@
                evil-snipe-auto-disable-substitute nil                        ; keep my substitute key available
                )
 
+         (defvar mohkale-evil-find-scopes-to-line nil
+           "when true, evil-snipe-{f,F,t,T} (I.E. for single finds) only extends to EOL.")
+
          :config
          (defmacro evil-snipe-with-normalised-settings (&rest body)
-           `(let ((evil-snipe-enable-highlight nil)
-                  (evil-snipe-enable-incremental-highlight nil)
-                  (evil-snipe-show-prompt nil)
-                  (evil-snipe-smart-case nil)
-                  (evil-snipe-tab-increment nil))
+           `(let ((evil-snipe-enable-highlight nil)                           ; don't highlight jump matches after jump
+                  (evil-snipe-enable-incremental-highlight nil)               ; don't highlight jump matches while searching
+                  (evil-snipe-tab-increment nil)                              ; disable tab to raise snipe count
+                  (evil-snipe-show-prompt nil)                                ; don't show prompt, why bother? you can't increment it.
+                  (evil-snipe-smart-case nil)                                 ; fJ != fj
+                  (evil-snipe-scope (if mohkale-evil-find-scopes-to-line
+                                        'line
+                                      evil-snipe-scope)))
               ,@body))
 
          (defun evil-snipe--normalise-single-snipes+ (func &rest args)
            "normalise snipes with count 1 to match `evil-find-char'.
        don't want highlighting, or a prompt or other feature enhancements.
-       just simple, jump to char."
+       just simple, jump to char.
+
+       NOTE this function updates settings during the input reading phase
+            only; which is taken care of in the interactive section prior
+            to method body invocation.
+       "
            (if (eq evil-snipe--match-count 1)
                (evil-snipe-with-normalised-settings
                  (apply func args))
              (apply func args)))
 
+         (defun evil-snipe--normalise-single-snipes-wrapper+ (func &rest args)
+           "specify normalisation for the body of the given function."
+           (evil-snipe-with-normalised-settings (apply func args)))
+
          (advice-add 'evil-snipe--collect-keys :around 'evil-snipe--normalise-single-snipes+)
+         (advice-add 'evil-snipe-f :around #'evil-snipe--normalise-single-snipes-wrapper+)
+         (advice-add 'evil-snipe-F :around #'evil-snipe--normalise-single-snipes-wrapper+)
+         (advice-add 'evil-snipe-t :around #'evil-snipe--normalise-single-snipes-wrapper+)
+         (advice-add 'evil-snipe-T :around #'evil-snipe--normalise-single-snipes-wrapper+)
+
+         ;; I don't need it, I've got my own keys bound to do the same thing :)
+         (advice-add 'evil-snipe--transient-map :override 'ignore)
 
          (general-define-key
            :keymaps 'evil-snipe-mode-map
