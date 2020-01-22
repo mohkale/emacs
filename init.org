@@ -7950,40 +7950,42 @@
            :keymaps 'mohkale-ibuffer-filter-map
            "TAB"    'ibuffer-exchange-filters
            "RET"    'ibuffer-filter-by-mode
+           "DEL"    'ibuffer-delete-saved-filters
+           "M-DEL"  'ibuffer-delete-saved-filter-groups
            "!"      'ibuffer-negate-filter
            "&"      'ibuffer-and-filter
+           "|"      'ibuffer-or-filter
            "*"      'ibuffer-filter-by-starred-name
            "."      'ibuffer-filter-by-file-extension
            ","      'ibuffer-filter-by-used-mode
            "/"      'ibuffer-filter-disable
+           "\\"     'ibuffer-clear-filter-groups
            "<"      'ibuffer-filter-by-size-lt
            ">"      'ibuffer-filter-by-size-gt
-           "D"      'ibuffer-decompose-filter-group
-           "M"      'ibuffer-filter-by-derived-mode
-           "P"      'ibuffer-pop-filter-group
-           "R"      'ibuffer-switch-to-saved-filter-groups
-           "S"      'ibuffer-save-filter-groups
-           "X"      'ibuffer-delete-saved-filter-groups
-           "\\"     'ibuffer-clear-filter-groups
            "a"      'ibuffer-add-saved-filters
            "b"      'ibuffer-filter-by-basename
            "c"      'ibuffer-filter-by-content
-           "d"      'ibuffer-decompose-filter
            "e"      'ibuffer-filter-by-predicate
-           "f"      'ibuffer-filter-by-filename
+           "f"      'ibuffer-filter-by-filename  ; regexp
+           "d"      'ibuffer-filter-by-directory ; regexp
+           "D"      'ibuffer-filter-by-directory-path
            "g"      'ibuffer-filters-to-filter-group
            "("      'ibuffer-filters-to-filter-group
            "i"      'ibuffer-filter-by-modified
            "m"      'ibuffer-filter-by-used-mode
+           "M"      'ibuffer-filter-by-derived-mode
            "n"      'ibuffer-filter-by-name
            "o"      'ibuffer-or-filter
            "p"      'ibuffer-pop-filter
+           "P"      'ibuffer-pop-filter-group
+           "u"      'ibuffer-decompose-filter
+           "U"      'ibuffer-decompose-filter-group
            "r"      'ibuffer-switch-to-saved-filters
-           "s"      'ibuffer-save-filters
-           "t"      'ibuffer-exchange-filters
+           "R"      'ibuffer-switch-to-saved-filter-groups
            "v"      'ibuffer-filter-by-visiting-file
-           "x"      'ibuffer-delete-saved-filters
-           "|"      'ibuffer-or-filter
+           "w"      'ibuffer-save-filters
+           "W"      'ibuffer-save-filter-groups
+           "x"      'ibuffer-exchange-filters
            "<down>" 'ibuffer-pop-filter-group
            "<up>"   'ibuffer-pop-filter)
 
@@ -8195,6 +8197,22 @@
                        (name 20 20)
                        " "
                        filename))))
+     #+END_SRC
+
+**** ibuffer-filters
+     #+BEGIN_SRC emacs-lisp
+       (use-package ibuf-ext
+         :commands (ibuffer-filter-by-directory-path)
+         :config
+         (define-ibuffer-filter directory-path
+             "Toggle current view to buffers with file or directory name matching QUALIFIER."
+           (:description "filename"
+            :reader (file-truename
+                     (read-directory-name "List files from file/directory name: ")))
+           (ibuffer-awhen (or (buffer-local-value 'buffer-file-name buf)
+                              (buffer-local-value 'dired-directory buf))
+             ;; (message "qual: %s, it: %s" qualifier (file-truename it))
+             (string-prefix-p qualifier (file-truename it)))))
      #+END_SRC
 
 **** ibuffer-vc
