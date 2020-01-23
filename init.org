@@ -2147,10 +2147,10 @@
               (if buffer
                   (switch-to-buffer buffer)
                 (call-interactively 'create-new-empty-buffer)))
-          (let* ((buffer-list (seq-filter #'(lambda (x)
-                                              (string-match
-                                               (regexp-quote scratch-buffer-name)
-                                               (buffer-name x) 0))
+          (let* ((buffer-list (seq-filter (lambda (x)
+                                            (string-match
+                                             (regexp-quote scratch-buffer-name)
+                                             (buffer-name x) 0))
                                           (sort (buffer-list) (lambda (x y) (string<
                                                                         (buffer-name x)
                                                                         (buffer-name y))))))
@@ -6470,8 +6470,8 @@
            "t" 'image-dired-toggle-mark-thumb-original-file
            "gr" 'image-dired-refresh-thumb
            "gc" 'image-dired-create-thumbs
-           "gg" #'(lambda () (interactive) (evil-goto-first-line) (evil-beginning-of-line))
-           "G"  #'(lambda () (interactive) (end-of-buffer) (image-dired-backward-image))
+           "gg" (lambda () (interactive) (evil-goto-first-line) (evil-beginning-of-line))
+           "G"  (lambda () (interactive) (end-of-buffer) (image-dired-backward-image))
 
            "C-s" 'image-save           ; NOTE originally was bound to o
 
@@ -7370,12 +7370,12 @@
          (with-eval-after-load "persp-mode"
            ;; thanks https://gist.github.com/Bad-ptr/1aca1ec54c3bdb2ee80996eb2b68ad2d#file-persp-ivy-el
            (add-hook 'ivy-ignore-buffers
-                     #'(lambda (b)
-                         (when persp-mode
-                           (let ((persp (get-current-persp)))
-                             (if persp
-                                 (not (persp-contain-buffer-p b persp))
-                               nil)))))
+                     (lambda (b)
+                       (when persp-mode
+                         (let ((persp (get-current-persp)))
+                           (if persp
+                               (not (persp-contain-buffer-p b persp))
+                             nil)))))
 
            (setq ivy-sort-functions-alist
                  (append ivy-sort-functions-alist
@@ -9228,9 +9228,9 @@
               (persp-switch (safe-persp-name start-persp)))))
 
         (advice-add 'persp-add-new :after #'persp-add-new--after)
-        (advice-add 'persp-copy :around #'(lambda (func &rest args)
-                                            (let ((persp--copying-p t))
-                                              (apply func args))))
+        (advice-add 'persp-copy :around (lambda (func &rest args)
+                                          (let ((persp--copying-p t))
+                                            (apply func args))))
 
         (defun mohkale//persp-kill-wrapper (func &rest args)
           "function which wraps around persp-kill
@@ -9555,9 +9555,9 @@
            "p RET" 'projectile-find-file-dwim
            "p M-RET" 'projectile-find-file-dwim-other-window)
 
-         (advice-add 'delete-buffer-file :after #'(lambda (&rest r)
-                                                    (when (projectile-project-p)
-                                                      (call-interactively 'projectile-invalidate-cache))))
+         (advice-add 'delete-buffer-file :after (lambda (&rest r)
+                                                  (when (projectile-project-p)
+                                                    (call-interactively 'projectile-invalidate-cache))))
          :config
          (projectile-register-project-type 'rake '("rakefile")
                                            :compile "rake build"
@@ -10788,8 +10788,8 @@
               "<tab>"    'log-view-toggle-entry-display
 
               ;; move to next message, then reallign to top
-              ;; (kbd "C-j") #'(lambda () (interactive) (log-view-msg-next)
-              ;;                 (call-interactively 'evil-scroll-line-to-top))
+              ;; (kbd "C-j") (lambda () (interactive) (log-view-msg-next)
+              ;;               (call-interactively 'evil-scroll-line-to-top))
               "C-j" 'log-view-msg-next
               "C-k" 'log-view-msg-prev
 
@@ -10798,10 +10798,10 @@
 
               "C-M-j" 'diff-hunk-next
               ;; TODO reallign diff to propper location on move down without trapping on a single diff
-              ;; (kbd "M-j") #'(lambda () (interactive) (diff-hunk-next)
-              ;;                 (call-interactively 'evil-scroll-line-to-top)
-              ;;                 (evil-previous-line 3))
-              "C-M-k" #'(lambda () (interactive) (diff-hunk-prev) (evil-previous-line 3)))
+              ;; (kbd "M-j") (lambda () (interactive) (diff-hunk-next)
+              ;;               (call-interactively 'evil-scroll-line-to-top)
+              ;;               (evil-previous-line 3))
+              "C-M-k" (lambda () (interactive) (diff-hunk-prev) (evil-previous-line 3)))
 
             (leader/set-keys-for-mode! mode
               "p" 'log-view-diff-changeset
@@ -11103,7 +11103,7 @@
            "C-S-E" 'evil-adjust-eval-print-last-sexp
            "C-S-R" 'evil-adjust-eval-replace-last-sexp)
 
-         ;; (add-hook 'lisp-interaction-mode-hook #'(lambda () (paredit-mode -1)))
+         ;; (add-hook 'lisp-interaction-mode-hook (lambda () (paredit-mode -1)))
          )
      #+END_SRC
 
@@ -11859,9 +11859,9 @@
                    "* TODO%? %^g\n  DEADLINE: %^{Deadline}t\n  :LOGBOOK:\n  - Added %u\n  :END:"
                    :kill-buffer t)))
 
-         (advice-add 'org-edit-src-code :before #'(lambda (&rest args)
-                                                    (unless (eq evil-state 'normal)
-                                                      (evil-normal-state))))
+         (advice-add 'org-edit-src-code :before (lambda (&rest args)
+                                                  (unless (eq evil-state 'normal)
+                                                    (evil-normal-state))))
 
          (defun org-outline-smart-up-level ()
            "when at a heading, move to parent
@@ -11986,12 +11986,12 @@
            :keymaps 'org-mode-map
            :states 'normal
            "RET" 'org-normal-return
-           "o" '(lambda () (interactive)
-                  (let ((org-clever-return--insert-headings t))
-                    (org-clever-return nil)))
-           "O" '(lambda () (interactive)
-                  (let ((org-clever-return--insert-headings t))
-                    (org-clever-return t)))
+           "o" (lambda () (interactive)
+                 (let ((org-clever-return--insert-headings t))
+                   (org-clever-return nil)))
+           "O" (lambda () (interactive)
+                 (let ((org-clever-return--insert-headings t))
+                   (org-clever-return t)))
            "M-u" 'org-metaleft
            "M-i" 'org-metadown
            "M-o" 'org-metaup
@@ -13054,8 +13054,8 @@
              "h@" 'js-doc-describe-tag)
 
            :config
-           (advice-add 'js-doc-insert-function-doc-snippet :after #'(lambda (&rest r)
-                                                                      (evil-insert nil)))))
+           (advice-add 'js-doc-insert-function-doc-snippet :after (lambda (&rest r)
+                                                                    (evil-insert nil)))))
      #+END_SRC
 
 **** js2-refactor
