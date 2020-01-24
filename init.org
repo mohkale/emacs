@@ -241,7 +241,7 @@
 
 *** Config Variables
     #+BEGIN_SRC emacs-lisp
-      (defvar load-me-now-duration 20
+      (defvar load-me-now-duration 120
         "ideal use-package defer duration.
       after you've been inactive for this long, safe to say you
       can load packages that you've deferred.
@@ -571,6 +571,15 @@
       (setq straight-use-package-by-default nil
             use-package-always-ensure       nil
             straight-allow-recipe-inheritance t)
+    #+END_SRC
+
+    make use-package evaluate the :defer argument see [[https://github.com/jwiegley/use-package/issues/815][#815]].
+
+    #+BEGIN_SRC emacs-lisp
+      (with-eval-after-load 'use-package
+        (advice-add 'use-package-handler/:defer :around
+                    (defun use-package-:defer-eval-wait+ (func name keyword arg &rest args)
+                      (apply func name keyword (eval arg) args))))
     #+END_SRC
 
 *** External Packages
@@ -1626,7 +1635,7 @@
 *** Display Functions
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-buffer-display
-       :defer load-me-now-duration
+       :defer t
        :commands (display-buffer--maybe-same-window-and-focus
                   display-buffer--maybe-pop-up-frame-or-window-and-focus
                   display-buffer-reuse-window-and-focus
@@ -1708,7 +1717,7 @@
 *** Misc
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-misc
-        :defer load-me-now-duration
+        :defer t
         :commands (toggle-lexical-binding
                    keymaps-at-point
                    show-prefix
@@ -1774,8 +1783,8 @@
 *** Text
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-text-query
+        :defer t
         :straight (mohkale-text-query :type built-in)
-        :defer load-me-now-duration
         :commands (line-width
                    column-number
                    point-to-coordinates
@@ -1783,8 +1792,8 @@
                    list-faces))
 
       (use-package mohkale-text
+        :defer t
         :straight (mohkale-text :type built-in)
-        :defer load-me-now-duration
         :commands (dos2unix
                    unix2dos
                    pad-line-with-char-to-length
@@ -2436,7 +2445,7 @@
 *** evil
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-evil
-        :defer load-me-now-duration
+        :defer t
         :after evil
         :commands (evil-capitalize
                    evil-reverse
@@ -4143,8 +4152,8 @@
 **** evil-numbers
      #+BEGIN_SRC emacs-lisp
        (use-package evil-numbers
+         :defer  t
          :ensure t
-         :defer  load-me-now-duration
          :init
          (general-define-key
            :states 'normal
@@ -4248,7 +4257,7 @@
      #+BEGIN_SRC emacs-lisp
        (use-package evil-exchange
          :ensure t
-         :defer  load-me-now-duration
+         :defer  t
          :init
          (general-define-key
            :states leader-norm-states
@@ -4805,7 +4814,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package buffer-move
         :ensure t
-        :defer  load-me-now-duration
+        :defer  t
         :commands (rotate-windows)
         :init
         (general-define-key
@@ -6611,8 +6620,8 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package drag-stuff
+        :defer  t
         :ensure t
-        :defer  load-me-now-duration
         :init
         (general-define-key
           "C-<up>" 'drag-stuff-up
@@ -7934,8 +7943,7 @@
 **** ibuffer
      #+BEGIN_SRC emacs-lisp
        (use-package ibuffer
-         :defer load-me-now-duration
-         :commands (ibuffer)
+         :defer t
          :hook (ibuffer-mode . hl-line-mode)
          :init
          (leader/set-keys
@@ -8776,7 +8784,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package open-junk-file
-        :defer load-me-now-duration
+        :defer t
         :commands (open-junk-file
                    goto-junk-file-directory
                    goto-todays-junk-file-directory)
@@ -10490,7 +10498,7 @@
      #+BEGIN_SRC emacs-lisp
        (use-package yasnippet
          :ensure t
-         :defer  t
+         :defer  load-me-now-duration
          :delight (yas-minor-mode "YAS")
          :commands (yas-expand
                     yas-new-snippet
