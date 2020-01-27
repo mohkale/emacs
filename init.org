@@ -287,37 +287,60 @@
     #+END_SRC
 
 *** Paths Setup
-    #+BEGIN_SRC emacs-lisp :var --mohkale-config-file=(buffer-file-name) :results silent
-      (require 'bytecomp)
+    Set up some ease of use functions for defining paths within the dotemacs namespace.
 
-      (defun join-path (root path &rest args)
-        "like pythons os.path.join, join a series of path strings together.
-      does no validation check, every path is assumed to be relative."
-        (if (not args)
-            (concat root "/" path)
-          (apply 'join-path (concat root "/" path) args)))
+    #+BEGIN_SRC emacs-lisp
+      (if (version<= emacs-version "26.3")
+          (require 'cl)
+        (require 'cl-lib))
 
-      (defmacro mohkale//initialise-dotemacs-path (path-type path)
-        (let* ((path-type (symbol-name path-type))
-               (path-sym (intern (concat "mohkale-dotemacs-" path-type "-path"))))
+      (defun join-path (root path &rest rest)
+        "like python' os.path.join, join a series of paths together."
+        (setq path (if (file-name-absolute-p path)
+                       path
+                     (concat root
+                             (unless (string-suffix-p "/" root)
+                               "/")
+                             path)))
+        (if rest (apply 'join-path path rest) path))
+
+      (cl-defmacro dotemacs-initialise-path
+          (path-type path &optional &key
+                     (alias (intern (concat (symbol-name path-type) "!"))))
+        (let* ((path (eval path)) ;; path can be a variable or a string
+               (path-type (symbol-name path-type))
+               (path-sym (intern (concat "dotemacs-"      path-type "-path")))
+               (join-sym (intern (concat "dotemacs-join-" path-type "-path"))))
           `(progn
              (defconst ,path-sym (concat user-emacs-directory ,path))
 
-             (defun ,(intern (concat "mohkale/join-dotemacs-" path-type "-path")) (path &rest args)
-               (apply 'join-path ,path-sym path args)))))
-      (put 'mohkale//initialise-dotemacs-path 'lisp-indent-function 'defun)
+             (defun ,join-sym (path &rest args)
+               ,(concat "join args onto the directory: " path)
+               (apply 'join-path ,path-sym path args))
+
+             (when (quote ,alias)
+               (defalias (quote ,alias) (symbol-function (quote ,join-sym)))))))
+      (put 'dotemacs-initialise-path 'lisp-indent-function 'defun)
 
       ;; inspiration: https://github.com/emacscollective/no-littering/blob/master/no-littering.el
-      (mohkale//initialise-dotemacs-path etc "etc")
-      (mohkale//initialise-dotemacs-path bin "bin")
-      (mohkale//initialise-dotemacs-path var "var")
-      (mohkale//initialise-dotemacs-path org "org")
+      (dotemacs-initialise-path etc "etc")
+      (dotemacs-initialise-path bin "bin")
+      (dotemacs-initialise-path var "var")
+      (dotemacs-initialise-path org "org")
 
-      (defconst mohkale-config-root (mohkale/join-dotemacs-etc-path "mohkale")
+      (push (etc! "themes") custom-theme-load-path)
+    #+END_SRC
+
+    paths related to the current org file and it's tangled representations.
+
+    #+BEGIN_SRC emacs-lisp :var --mohkale-config-file=(buffer-file-name)
+      (require 'bytecomp)
+
+      (defconst mohkale-config-root (etc! "mohkale")
         "path to the configuration directory under which my general purpose
       configuration files will reside.")
 
-      (defconst mohkale-package-root (mohkale/join-dotemacs-bin-path "mohkale")
+      (defconst mohkale-package-root (bin! "mohkale")
         "path to where any tangled executeable elisp files should reside")
 
       (defconst mohkale-mohkale-config-file --mohkale-config-file
@@ -330,189 +353,217 @@
 
       (defconst mohkale-mohkale-elc-config-file (byte-compile-dest-file mohkale-mohkale-el-config-file)
         "path to my custom user config file after being tangled into emacs lisp and then compiled.")
+    #+END_SRC
 
-      ;; don't store customisations in here. They're really ugly :(
-      (let ((custom-file-path (mohkale/join-dotemacs-etc-path "custom.el")))
-        (setq custom-file custom-file-path)
+    stop emacs from littering over my dotemacs directory by specifying alternative values for most
+    paths in packages I've installed (at one point or another). This was inspired by [[https://github.com/emacscollective/no-littering/blob/master/no-littering.el][no-littering.el]].
 
-        (if (file-exists-p custom-file-path)
-            (load custom-file-path)))
+    #+BEGIN_SRC emacs-lisp :results silent
+      (with-no-warnings
+        (setq
+         ;;; Package Directories
+         package-user-dir                                   (bin! "elpa/")
+         external-packages-directory                        (bin! "misc")
 
-      ;;; cleanup the ~/.emacs.d directory ~~litterbox~~ by resetting most of the default emacs paths.
-      ;; most changes have been taken from: https://github.com/emacscollective/no-littering/blob/master/no-littering.el
+         ;;; Builtin Emacs Library Path Options
+         abbrev-file-name                                   (etc! "abbrev.el")
+         auto-insert-directory                              (etc! "auto-insert")
+         auto-save-list-file-prefix                         (var! "auto-save" "sessions/")
+         bookmark-default-file                              (etc! "bookmarks.el")
+         custom-file                                        (etc! "custom.el")
+         desktop-path                                       `(,(var! "desktop/"))
+         diary-file                                         (var! "diary")
+         eshell-directory-name                              (var! "eshell")
+         eshell-aliases-file                                (var! "eshell" "aliases")
+         eshell-login-script                                (etc! "eshell" "loginrc")
+         eshell-rc-script                                   (etc! "eshell" "eshrc")
+         eww-bookmarks-directory                            (var! "eww/")
+         gamegrid-user-score-file-directory                 (var! "gamegrid/")
+         ido-save-directory-list-file                       (var! "ido-save-directory-list.el")
+         image-dired-db-file                                (var! "image-dired" "db.el") ; tag associations
+         image-dired-dir                                    (var! "image-dired/")
+         image-dired-gallery-dir                            (var! "image-dired" "gallery/")
+         image-dired-temp-image-file                        (var! "image-dired" "temp-image")
+         image-dired-temp-rotate-image-file                 (var! "image-dired" "temp-rotate-image")
+         kkc-init-file-name                                 (var! "kkc-init.el")
+         message-auto-save-directory                        (var! "messages/")
+         meghanada-server-install-dir                       (var! "meghanada")
+         mohkale-dashboard-banners-directory                (etc! "banners/")
+         newsticker-cache-filename                          (var! "newsticker/cache.el")
+         newsticker-dir                                     (var! "newsticker/data/")
+         nsm-settings-file                                  (var! "nsm-settings.el")
+         omnisharp-cache-directory                          (var! "omnisharp/cache")
+         org-clock-persist-file                             (var! "org/clock-persist.el")
+         org-id-locations-file                              (var! "org/id-locations.el")
+         org-publish-timestamp-directory                    (var! "org/timestamps/")
+         org-registry-file                                  (var! "org/registry.el")
+         recentf-save-file                                  (var! "recentf.el")
+         save-place-file                                    (var! "save-place.el")
+         savehist-file                                      (var! "savehist.el")
+         server-auth-dir                                    (var! "server/")
+         shared-game-score-directory                        (var! "gamescore/")
+         tramp-auto-save-directory                          (var! "tramp/auto-save/")
+         tramp-persistency-file-name                        (etc! "private/tramp/history.el")
+         url-cache-directory                                (var! "url/cache/")
+         url-configuration-directory                        (var! "url/configuration/")
 
-      (cl-letf (((symbol-function #'etc) (symbol-function #'mohkale/join-dotemacs-etc-path))
-                ((symbol-function #'bin) (symbol-function #'mohkale/join-dotemacs-bin-path))
-                ((symbol-function #'var) (symbol-function #'mohkale/join-dotemacs-var-path))
-                ((symbol-function #'org) (symbol-function #'mohkale/join-dotemacs-org-path)))
-        (with-no-warnings
-          (setq
-           package-user-dir                                   (bin "elpa/")
-           external-packages-directory                        (bin "misc")
+         ;;; third party
+         ac-comphist-file                                   (var! "ac-comphist.el")
+         anaconda-mode-installation-directory               (var! "anaconda/")
+         bbdb-file                                          (var! "bbdb/bbdb.el")
+         bbdb-vcard-directory                               (var! "bbdb/vcard/")
+         bm-repository-file                                 (var! "bm-repository.el")
+         bmkp-current-bookmark-file                         (var! "bmkp/current-bookmark.el")
+         bmkp-last-bookmark-file                            (var! "bmkp/last-bookmark.el")
+         bookiez-file                                       (var! "bookiez")
+         company-statistics-file                            (var! "company/statistics.el")
+         company-tabnine-binaries-folder                    (var! "company/tabnine-binaries")
+         debbugs-gnu-persistency-file                       (var! "debbugs.el")
+         dired-recent-directories-file                      (var! "dired/recent.el")
+         elfeed-db-directory                                (var! "elfeed/db/")
+         elfeed-enclosure-default-dir                       (var! "elfeed/enclosures/")
+         elmo-msgdb-directory                               (var! "elmo/")
+         elmo-split-log-file                                (var! "elmo/split-log")
+         emms-directory                                     (var! "emms/")
+         emojify-emojis-dir                                 (var! "emojify/")
+         geben-temporary-file-directory                     (var! "geben/")
+         helm-adaptive-history-file                         (var! "helm/adaptive-history.el")
+         helm-backup-path                                   (var! "helm/backup/")
+         helm-github-stars-cache-file                       (var! "helm/github-stars-cache.el")
+         httpd-root                                         (var! "simple-httpd/")
+         indium-chrome-data-dir                             (var! "indium/chrome-profile")
+         indium-workspace-file                              (var! "indium/workspaces.el")
+         irfc-directory                                     (var! "irfc/")
+         junk-file-directory                                (var! "junk-files")
+         keyfreq-file                                       (var! "keyfreq.el")
+         keyfreq-file-lock                                  (var! "keyfreq.lock")
+         logview-cache-filename                             (var! "logview-cache")
+         logview-views-file                                 (etc! "logview-views")
+         lsp-server-root                                    (var! "lsp/servers")
+         lsp-session-file                                   (var! "lsp/session")
+         org-ditaa-jar-path                                 (var! "org/bin/ditaa.jar")
+         org-ditaa-eps-jar-path                             (var! "org/bin/ditaaEps.jar")
+         plantuml-jar-path                                  (var! "org/bin/plantuml.jar")
+         org-projectile-projects-directory                  (org! "projects/")
+         org-projectile-projects-file                       (org! "projects/global.org")
+         mohkale-library-of-babel-file                      (etc! "babel-lib.org")
+         multi-compile-history-file                         (var! "multi-compile-history.el")
+         pcache-directory                                   (var! "pcache/")
+         persp-save-dir                                     (var! "perspectives/")
+         prescient-save-file                                (var! "prescient-save.el")
+         projectile-cache-file                              (var! "projectile/cache.el")
+         projectile-known-projects-file                     (var! "projectile/known-projects.el")
+         purpose-default-layout-file                        (etc! "window-purpose/default-layout.el")
+         purpose-layout-dirs                                `(,(etc! "window-purpose/layouts/"))
+         rake-cache-file                                    (var! "rake.cache")
+         request-storage-directory                          (var! "requests")
+         smex-save-file                                     (var! "smex-save.el")
+         tldr-directory-path                                (var! "tldr/")
+         transient-history-file                             (var! "transient/history.el")
+         org-pdftools-root-dir                              "~/multimedia/pdfs"
+         transient-levels-file                              (etc! "transient/levels.el")
+         straight-base-dir                                  (bin! "") ;; weird way to configure it, but okay
+         transient-values-file                              (etc! "transient/values.el")
+         treemacs-persist-file                              (var! "treemacs/persist.org")
+         vimish-fold-dir                                    (var! "vimish-fold/")
+         mohkale-snippets-dir                               (etc! "snippets/")
+         yas-snippet-dirs                                   '(yasnippet-snippets-dir)
+         yasnippet-snippets-dir                             mohkale-snippets-dir
+         xkcd-cache-dir                                     (var! "xkcd")
+         ))
 
-           abbrev-file-name                                   (etc "abbrev.el")
-           auto-insert-directory                              (etc "auto-insert")
-           auto-save-list-file-prefix                         (var "auto-save" "sessions/")
-           auto-save-file-name-transforms                     `((".*" ,(var "auto-save" "sessions/") t))
-           backup-directory-alist                             (list (cons "." (var "backups/")))
-           bookmark-default-file                              (etc "bookmarks.el")
-           desktop-dirname                                    (var "desktop/")
-           desktop-path                                       (list desktop-dirname)
-           diary-file                                         (var "diary")
-           eshell-directory-name                              (var "eshell")
-           eshell-aliases-file                                (var "eshell" "aliases")
-           eshell-login-script                                (etc "eshell" "loginrc")
-           eshell-rc-script                                   (etc "eshell" "eshrc")
-           eww-bookmarks-directory                            (var "eww/")
-           gamegrid-user-score-file-directory                 (var "gamegrid/")
-           ido-save-directory-list-file                       (var "ido-save-directory-list.el")
-           image-dired-db-file                                (var "image-dired" "db.el") ; tag associations
-           image-dired-dir                                    (var "image-dired/")
-           image-dired-gallery-dir                            (var "image-dired" "gallery/")
-           image-dired-temp-image-file                        (var "image-dired" "temp-image")
-           image-dired-temp-rotate-image-file                 (var "image-dired" "temp-rotate-image")
-           kkc-init-file-name                                 (var "kkc-init.el")
-           message-auto-save-directory                        (var "messages/")
-           meghanada-server-install-dir                       (var "meghanada")
-           mohkale-dashboard-banners-directory                (etc "banners/")
-           newsticker-cache-filename                          (var "newsticker/cache.el")
-           newsticker-dir                                     (var "newsticker/data/")
-           nsm-settings-file                                  (var "nsm-settings.el")
-           omnisharp-cache-directory                          (var "omnisharp/cache")
-           org-clock-persist-file                             (var "org/clock-persist.el")
-           org-id-locations-file                              (var "org/id-locations.el")
-           org-publish-timestamp-directory                    (var "org/timestamps/")
-           org-registry-file                                  (var "org/registry.el")
-           recentf-save-file                                  (var "recentf.el")
-           save-place-file                                    (var "save-place.el")
-           savehist-file                                      (var "savehist.el")
-           server-auth-dir                                    (var "server/")
-           shared-game-score-directory                        (var "gamescore/")
-           tramp-auto-save-directory                          (var "tramp/auto-save/")
-           tramp-persistency-file-name                        (etc "private/tramp/history.el")
-           url-cache-directory                                (var "url/cache/")
-           url-configuration-directory                        (var "url/configuration/")
+    #+END_SRC
 
-           ;;; third party
-           ac-comphist-file                                   (var "ac-comphist.el")
-           anaconda-mode-installation-directory               (var "anaconda/")
-           bbdb-file                                          (var "bbdb/bbdb.el")
-           bbdb-vcard-directory                               (var "bbdb/vcard/")
-           bm-repository-file                                 (var "bm-repository.el")
-           bmkp-current-bookmark-file                         (var "bmkp/current-bookmark.el")
-           bmkp-last-bookmark-file                            (var "bmkp/last-bookmark.el")
-           bookiez-file                                       (var "bookiez")
-           company-statistics-file                            (var "company/statistics.el")
-           company-tabnine-binaries-folder                    (var "company/tabnine-binaries")
-           debbugs-gnu-persistency-file                       (var "debbugs.el")
-           dired-recent-directories-file                      (var "dired/recent.el")
-           elfeed-db-directory                                (var "elfeed/db/")
-           elfeed-enclosure-default-dir                       (var "elfeed/enclosures/")
-           elmo-msgdb-directory                               (var "elmo/")
-           elmo-split-log-file                                (var "elmo/split-log")
-           emms-directory                                     (var "emms/")
-           emojify-emojis-dir                                 (var "emojify/")
-           ;; relative to home directory and refuses to accept absolute directories... for some DUMB REASON!!!
-           ispell-personal-dictionary                         (file-relative-name (concat mohkale-dotemacs-etc-path
-                                                                                           "/ispell/dict.txt")
-                                                                                   "~")
-           geben-temporary-file-directory                     (var "geben/")
-           helm-adaptive-history-file                         (var "helm/adaptive-history.el")
-           helm-backup-path                                   (var "helm/backup/")
-           helm-github-stars-cache-file                       (var "helm/github-stars-cache.el")
-           httpd-root                                         (var "simple-httpd/")
-           indium-chrome-data-dir                             (var "indium/chrome-profile")
-           indium-workspace-file                              (var "indium/workspaces.el")
-           irfc-directory                                     (var "irfc/")
-           junk-file-directory                                (var "junk-files")
-           keyfreq-file                                       (var "keyfreq.el")
-           keyfreq-file-lock                                  (var "keyfreq.lock")
-           logview-cache-filename                             (var "logview-cache")
-           logview-views-file                                 (etc "logview-views")
-           lsp-server-root                                    (var "lsp/servers")
-           lsp-session-file                                   (var "lsp/session")
-           org-ditaa-jar-path                                 (var "org/bin/ditaa.jar")
-           org-ditaa-eps-jar-path                             (var "org/bin/ditaaEps.jar")
-           plantuml-jar-path                                  (var "org/bin/plantuml.jar")
-           org-plantuml-jar-path                              plantuml-jar-path
-           org-projectile-projects-directory                  (org "projects/")
-           org-projectile-projects-file                       (org "projects/global.org")
-           mohkale-library-of-babel-file                      (etc "babel-lib.org")
-           multi-compile-history-file                         (var "multi-compile-history.el")
-           pdf-info-epdfinfo-program                          (expand-file-name
-                                                               (var (concat "pdf-tools/epdfinfo"
-                                                                            (when (eq system-type 'windows-nt)
-                                                                              ".exe"))))
-           ;; pdf-info-epdfinfo-error-filename                   (var "pdf-tools/log.txt")
-           pcache-directory                                   (var "pcache/")
-           persp-save-dir                                     (var "perspectives/")
-           prescient-save-file                                (var "prescient-save.el")
-           projectile-cache-file                              (var "projectile/cache.el")
-           projectile-known-projects-file                     (var "projectile/known-projects.el")
-           purpose-default-layout-file                        (etc "window-purpose/default-layout.el")
-           purpose-layout-dirs                                (list (etc "window-purpose/layouts/"))
-           rake-cache-file                                    (var "rake.cache")
-           request-storage-directory                          (var "requests")
-           smex-save-file                                     (var "smex-save.el")
-           tldr-directory-path                                (var "tldr/")
-           transient-history-file                             (var "transient/history.el")
-           org-pdftools-root-dir                              "~/multimedia/pdfs"
-           transient-levels-file                              (etc "transient/levels.el")
-           straight-base-dir                                  (bin "") ;; weird way to configure it, but okay
-           straight-bootstrap-file                            (concat straight-base-dir
-                                                                      "straight/repos/straight.el/bootstrap.el")
-           transient-values-file                              (etc "transient/values.el")
-           treemacs-persist-file                              (var "treemacs/persist.org")
-           vimish-fold-dir                                    (var "vimish-fold/")
+    For more complicated path based variables. The previous block let you specify them all on one
+    line each... sometimes you may have to define it over multiple lines or give more detail. Thats
+    what this is for.
 
-           mohkale-snippets-dir                               (etc "snippets/")
-           yas-snippet-dirs                                   '(yasnippet-snippets-dir)
-           yasnippet-snippets-dir                             mohkale-snippets-dir
-           xkcd-cache-dir                                     (var "xkcd")
-           )
+    #+BEGIN_SRC emacs-lisp
+      (with-no-warnings
+        ;;; where do autosave files get stored
+        (setq auto-save-file-name-transforms
+              `((".*" ,(var! "auto-save" "sessions/") t)))
 
-          (let ((list (list (join-path lsp-server-root
-                                       "kotlin"
-                                       "bin")
-                            (join-path lsp-server-root
-                                       "kotlin"
-                                       "debugger"
-                                       "bin"
-                                       "org")
-                            (join-path lsp-server-root
-                                       "haskell"))))
-            (setq exec-path (append exec-path list)))
+        ;;; where do backup files get stored
+        (setq backup-directory-alist
+              `(("." . ,(var! "backups/"))))
 
-          ;; ensure some configured paths exist at startup
-          ;; TODO refactor this to only mkdir when needed
-          (dolist (ensured-path '(desktop-dirname
-                                  eww-bookmarks-directory
-                                  newsticker-dir
-                                  external-packages-directory
-                                  (var "org/bin")
-                                  (var "bbdb/")
-                                  (var "company/")
-                                  (var "elfeed/")
-                                  (var "helm/")
-                                  (var "projectile/")
-                                  (var "bmkp/")
-                                  (var "emojify/")
-                                  (var "lsp/")
-                                  (var "pdf-tools/")
-                                  yasnippet-snippets-dir))
-            (mkdir (if (stringp ensured-path)
-                       ensured-path
-                     (eval ensured-path))
-                   t))))
+        ;; depends on platuml-jar-path being defined
+        (setq org-plantuml-jar-path plantuml-jar-path)
 
+        ;; installation file for the straight package manager.
+        (setq straight-bootstrap-file (concat straight-base-dir
+                                              "straight/repos/straight.el/bootstrap.el"))
+
+        ;; I've only tested this on window/cygwin but aspell appears to be quite broken :P
+        ;;   * I can't specify a path to any directory not within my home directory.
+        ;;   * I can't specify any absolute path, even when that path is within my home directory.
+        ;;   * If I want to reference a file in a subdirectory of my home directory, the path must begin with a
+        ;;     slash.
+        ;; THIS IS WAY TOO UNINTUITIVE.
+        (setq ispell-personal-dictionary
+              (file-relative-name (etc! "/ispell/dict.txt") "~"))
+
+        ;; only accepts absolute paths and doesn't automatically append ".exe" when on windows.
+        (setq pdf-info-epdfinfo-program (expand-file-name
+                                         (var! (concat "pdf-tools/epdfinfo"
+                                                       (when (eq system-type 'windows-nt)
+                                                         ".exe"))))))
+
+    #+END_SRC
+
+    Post path setup. Do some stuff with your newly cleaned emacs :smile:.
+
+    #+BEGIN_SRC emacs-lisp
+      (push mohkale-package-root load-path)
+
+      (when (file-exists-p custom-file)
+        (load custom-file))
 
       (setenv "EDITOR"
               (concat "emacsclient --no-wait --suppress-output --server-file '"
                       (expand-file-name server-auth-dir) "server'"))
 
-      (push mohkale-package-root load-path)
-      (push (mohkale/join-dotemacs-etc-path "themes") custom-theme-load-path)
     #+END_SRC
+
+
+    Add more paths to PATH for emacs to find when looking for executables. This is mostly where
+    programs used only (or installed) by emacs will go.
+
+    #+BEGIN_SRC emacs-lisp
+      (setq exec-path
+            (append exec-path
+                    `(,(join-path lsp-server-root "kotlin/bin")
+                      ,(join-path lsp-server-root "kotlin/debugger/bin")
+                      ,(join-path lsp-server-root "haskell"))))
+
+    #+END_SRC
+
+    Make sure some subset of useful directories exist at startup. This is mostly for crazy
+    packages that don't check whether paths exist, before writing to them. **Shame! Shame!
+    Shame!**.
+
+    #+BEGIN_SRC emacs-lisp
+      (dolist (ensured-path `(,@desktop-path
+                              ,eww-bookmarks-directory
+                              ,newsticker-dir
+                              ,external-packages-directory
+                              ,dotemacs-org-path
+                              ,yasnippet-snippets-dir
+                              ,(var! "org/bin")
+                              ,(var! "bbdb/")
+                              ,(var! "company/")
+                              ,(var! "elfeed/")
+                              ,(var! "helm/")
+                              ,(var! "projectile/")
+                              ,(var! "bmkp/")
+                              ,(var! "emojify/")
+                              ,(var! "lsp/")
+                              ,(var! "pdf-tools/")))
+        (mkdir ensured-path t))
+
+    #+END_SRC
+
 
 *** package-initialise
     initialise installed packages and ensure packages needed to setup configuration
@@ -520,7 +571,6 @@
 
     #+NAME: setup-packages-list
     - which-key
-    - cl
     - bind-map
     - use-package
     - general
@@ -1143,8 +1193,8 @@
      (mohkale/defun-mohkale-find-package-file configuration  mohkale-mohkale-config-file)
      (mohkale/defun-mohkale-find-package-file tangled-config mohkale-mohkale-el-config-file)
 
-     (mohkale/defun-mohkale-find-package-file capture-notes  (mohkale/join-dotemacs-org-path "notes.org"))
-     (mohkale/defun-mohkale-find-package-file org-university (mohkale/join-dotemacs-org-path "university.org"))
+     (mohkale/defun-mohkale-find-package-file capture-notes  (org! "notes.org"))
+     (mohkale/defun-mohkale-find-package-file org-university (org! "university.org"))
 
      (defun mohkale/eval-configuration-file ()
        (interactive)
@@ -1161,7 +1211,7 @@
        (require 'bytecomp)
        (byte-compile-file mohkale-mohkale-el-config-file)
 
-       (let ((tangled-files (directory-files-recursively mohkale-dotemacs-bin-path
+       (let ((tangled-files (directory-files-recursively dotemacs-bin-path
                                                          ".*\\.el$"))
              (packages-dir (expand-file-name package-user-dir)))
          (dolist (file tangled-files)
@@ -11930,8 +11980,8 @@
                 ;; break org-cycle-seperator-lines from working automatically
                 ;; org-src-tab-acts-natively t ;; tab is native to block language
                 ;; native tabs are slow and unreliable... :sad:
-                org-default-notes-file (mohkale/join-dotemacs-org-path "notes.org")
-                org-agenda-files (file-expand-wildcards (mohkale/join-dotemacs-org-path "*.org")))
+                org-default-notes-file (org! "notes.org")
+                org-agenda-files (file-expand-wildcards (org! "*.org")))
 
           (setq org-capture-templates
                 `(("f" "File Task" entry (file ,org-default-notes-file)
@@ -11941,7 +11991,7 @@
                    "* TODO %?\n%U")
                   ("T" "Todo with Clipboard" entry (file ,org-default-notes-file)
                    "* TODO %?\n%U\n   %c")
-                  ("h" "Homework" entry (file+headline ,(mohkale/join-dotemacs-org-path "university.org") "Homework")
+                  ("h" "Homework" entry (file+headline ,(org! "university.org") "Homework")
                    "* TODO%? %^g\n  DEADLINE: %^{Deadline}t\n  :LOGBOOK:\n  - Added %u\n  :END:"
                    :kill-buffer t)))
 
