@@ -9862,6 +9862,81 @@
             "q" 'server-abort)))
     #+END_SRC
 
+**** edit-server
+     invoke emacs-client from a browser... EPIC!!!
+
+     #+BEGIN_SRC emacs-lisp
+       (defvar mohkale-browser-edit-package 'edit-with-emacs
+         "The extension with which I connect emacs to my browser.
+       Set to atomic to use atomic-chrome and edit-with-emacs to use
+       edit-with-emacs.
+
+       Personally I prefer edit-with-emacs because it lets you a cancel
+       an edit session and revert to the original (or last saved) text.
+       It also has the option of binding M-<enter> in chrome to edit with
+       emacs.
+
+       Atomic chrome reflects changes live, which is pretty cool if you
+       expect emacs to crash whilst writing... but otherwise isn't too
+       useful.")
+
+       (defvar mohkale-browser-edit-mode initial-major-mode
+         "default major mode for a browser edit session.")
+
+       (defvar mohkale-browser-edit-mode-alist
+         `(("^github.com/" . ,#'markdown-mode)
+           ("^gitlab.com/" . ,#'markdown-mode))
+         "association list of url regexps against mode-functions.")
+
+       (cond
+        ((eq mohkale-browser-edit-package 'edit-with-emacs)
+         (use-package edit-server
+           :ensure t
+           :demand t
+           :delight
+           (edit-server-edit-mode "ESE") ;; emacs server edit
+           :init
+           (setq edit-server-new-frame nil  ;; prefer current frame
+                 edit-server-default-major-mode mohkale-browser-edit-mode
+                 edit-server-url-major-mode-alist mohkale-browser-edit-mode-alist)
+
+           (edit-server-start)
+           :config
+           (leader/with-major-mode-prefix
+             (leader/set-keys-for-mode 'edit-server-edit-mode
+               "s" 'edit-server-save
+               "," 'edit-server-done
+               "q" 'edit-server-abort)))
+
+         ;; fixes issues with non conventional input components likes gmails compose box
+         (use-package edit-server-htmlize
+           :ensure t
+           :defer  t
+           :hook ((edit-server-start . edit-server-maybe-dehtmlize-buffer)
+                  (edit-server-done  . edit-server-maybe-htmlize-buffer))))
+
+        ((eq mohkale-browser-edit-package 'atomic)
+         (use-package atomic-chrome
+           :ensure t
+           :demand t
+           :delight
+           (atomic-chrome-edit-mode "Atomic")
+           :init
+           (setq atomic-chrome-default-major-mode   mohkale-browser-edit-mode
+                 atomic-chrome-url-major-mode-alist mohkale-browser-edit-mode-alist)
+
+           (atomic-chrome-start-server)
+           :config
+           (leader/with-major-mode-prefix
+             (leader/set-keys-for-mode 'atomic-chrome-edit-mode
+               "s" 'atomic-chrome-send-buffer-text
+               "," 'atomic-chrome-close-current-buffer))))
+
+        (mohkale-browser-edit-package
+         (message "unknown browser extension package: %s"
+                  mohkale-browser-edit-package)))
+     #+END_SRC
+
 *** simple
     #+BEGIN_SRC emacs-lisp
       (use-package simple
