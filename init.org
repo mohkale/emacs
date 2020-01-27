@@ -632,6 +632,44 @@
                       (apply func name keyword (eval arg) args))))
     #+END_SRC
 
+*** Core
+    basic syntax sugar functions, inspired by [[https://github.com/hlissner/doom-emacs/blob/develop/core/core-lib.el][doom]].
+
+    #+BEGIN_SRC emacs-lisp
+      (defmacro lambda! (&rest body)
+        "Expands to (lambda () (interactive) ,@body).
+      A factory for quickly producing interaction commands, particularly for keybinds
+      or aliases."
+        (declare (doc-string 1) (pure t) (side-effect-free t))
+        `(lambda () (interactive) ,@body))
+    #+END_SRC
+
+**** Misc
+     #+BEGIN_SRC emacs-lisp
+       (use-package mohkale-core
+         :defer t
+         :commands (with-no-write-messages))
+     #+END_SRC
+
+     Still core functions... just not so essential that they should be loaded at startup.
+
+    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
+    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-core.el"
+      (defmacro with-no-write-messages (&rest body)
+        "execute BODY while supressing \"Wrote: file\" messages"
+        `(let ((save-silently t))
+           ;; replace the VISIT argument of write-region with something
+           ;; that'll supress the write message
+           (cl-letf* (((symbol-function 'actual-write-region)
+                       (symbol-function 'write-region))
+                      ((symbol-function 'write-region)
+                       (lambda (a b c &optional d &rest args)
+                         (apply #'actual-write-region a b c d 'nomsg (cdr args)))))
+             ,@body)))
+      (put 'with-no-write-messages 'lisp-indent-function 'defun)
+
+    #+END_SRC
+
 *** External Packages
     Install the following the packages directly, compare against the hash value when given
     and then begin package initialisation.
