@@ -488,12 +488,38 @@
         (setq backup-directory-alist
               `(("." . ,(var! "backups/"))))
 
+        ;;; where do undo-tree auto-saves go.
+        (setq undo-tree-history-directory-alist
+              `(("." . ,(var! "undo"))))
+
         ;; depends on platuml-jar-path being defined
         (setq org-plantuml-jar-path plantuml-jar-path)
 
         ;; installation file for the straight package manager.
         (setq straight-bootstrap-file (concat straight-base-dir
                                               "straight/repos/straight.el/bootstrap.el"))
+
+        (setq undo-tree-skip-autosave-regex+
+              (rx
+               (or
+                ;; match extensions in filename
+                (and (or ".pdf" ".log") eol)
+                ;; match exact file paths
+                (and
+                 (or
+                  ;; wildcard regexp match. any match is a valid match.
+                  (and "[*Org Src")
+                  ;; match from the beginning of the line
+                  (and
+                   bol
+                   (or
+                    (eval dotemacs-var-path)
+                    (eval (concat straight-base-dir "straight/"))
+                    (eval package-user-dir)
+                    (eval external-packages-directory)
+                    (eval bookmark-default-file)
+                    (eval mohkale-library-of-babel-file)
+                    (eval mohkale-dashboard-banners-directory))))))))
 
         ;; I've only tested this on window/cygwin but aspell appears to be quite broken :P
         ;;   * I can't specify a path to any directory not within my home directory.
@@ -563,7 +589,6 @@
         (mkdir ensured-path t))
 
     #+END_SRC
-
 
 *** package-initialise
     initialise installed packages and ensure packages needed to setup configuration
@@ -10343,7 +10368,29 @@
         :init
         (push 'undo-tree-visualizer-mode mohkale--whitespace-exempt-modes)
 
+        (defvar undo-tree-skip-autosave-regex+ nil
+          "don't create an undo-tree auto-save for file if `buffer-file-name' \
+      matches this regexp.")
+
+        (setq undo-tree-auto-save-history t
+              ;; TODO look into undoing within region
+              ;; undo-tree-enable-undo-in-region t
+              )
+
         :config
+        (advice-add 'undo-tree-save-history :around
+                    (defun undo-tree-save-history--respect-ignore+ (func &rest args)
+                      "respect `undo-tree-skip-autosave-regex+'.
+      also suppresses undo-tree messages relating to saving files."
+                      (when (and undo-tree-skip-autosave-regex+
+                                 (not (string-match-p undo-tree-skip-autosave-regex+
+                                                      buffer-file-name)))
+                        (apply func args))))
+
+        (advice-add 'undo-tree-save-history :around
+                    (defun undo-tree-save-history--suppress-message+ (func &rest args)
+                      (with-no-write-messages (apply func args))))
+
         (general-define-key
           :keymaps 'undo-tree-map
           "C-/" nil
