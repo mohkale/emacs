@@ -3,12 +3,13 @@
 #+TITLE: mohkale.org
 #+STARTUP: content
 
-#+PROPERTY: header-args :tangle yes :comments link :mkdirp yes :noweb yes :hlines no
-
-# NOTE: <escape> is for gui
-#       ESC      if for cli
+#+PROPERTY: header-args :tangle init.el :comments link :mkdirp yes :noweb yes :hlines no
 
 * Configuration
+  :PROPERTIES:
+  :header-args+: :shebang ";; lexical-binding: t"
+  :END:
+
 ** init.el
 *** Startup Optimisations
     optimise emacs startup times as much as possible.
@@ -51,7 +52,6 @@
 *** Emacs Sanitize
     make emacs less like... emacs. use saner defaults and make emacs look nicer in general
 
-    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
     #+BEGIN_SRC emacs-lisp
       (setq delete-old-versions t                                                  ; delete excess backup versions silently
             version-control t                                                      ; use version control
@@ -657,44 +657,6 @@
                       (apply func name keyword (eval arg) args))))
     #+END_SRC
 
-*** Core
-    basic syntax sugar functions, inspired by [[https://github.com/hlissner/doom-emacs/blob/develop/core/core-lib.el][doom]].
-
-    #+BEGIN_SRC emacs-lisp
-      (defmacro lambda! (&rest body)
-        "Expands to (lambda () (interactive) ,@body).
-      A factory for quickly producing interaction commands, particularly for keybinds
-      or aliases."
-        (declare (doc-string 1) (pure t) (side-effect-free t))
-        `(lambda () (interactive) ,@body))
-    #+END_SRC
-
-**** Misc
-     #+BEGIN_SRC emacs-lisp
-       (use-package mohkale-core
-         :defer t
-         :commands (with-no-write-messages))
-     #+END_SRC
-
-     Still core functions... just not so essential that they should be loaded at startup.
-
-    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-core.el"
-      (defmacro with-no-write-messages (&rest body)
-        "execute BODY while supressing \"Wrote: file\" messages"
-        `(let ((save-silently t))
-           ;; replace the VISIT argument of write-region with something
-           ;; that'll supress the write message
-           (cl-letf* (((symbol-function 'actual-write-region)
-                       (symbol-function 'write-region))
-                      ((symbol-function 'write-region)
-                       (lambda (a b c &optional d &rest args)
-                         (apply #'actual-write-region a b c d 'nomsg (cdr args)))))
-             ,@body)))
-      (put 'with-no-write-messages 'lisp-indent-function 'defun)
-
-    #+END_SRC
-
 *** External Packages
     Install the following the packages directly, compare against the hash value when given
     and then begin package initialisation.
@@ -1195,6 +1157,83 @@
    #+END_SRC
 
 ** Mohkale
+*** Happy Birthday
+    animate-birthday-present on your birthday... yippeee :)
+
+    #+BEGIN_SRC emacs-lisp
+      ;; (time-since '(0 0 0 8 12 1999 3 nil nil))
+
+      (when (string-equal (format-time-string "%d.%m" (current-time))
+                          "08.12")
+        (add-hook 'emacs-startup-hook
+                  'animate-birthday-present))
+    #+END_SRC
+
+*** Syntax
+    Adjust the syntax entries for the given modes so that functions like evil word
+    skip over them.
+
+    #+NAME: underscore-supported-modes
+    - c++
+    - c
+    - markdown
+    - lisp
+    - shell
+    - enh-ruby
+
+    #+BEGIN_SRC emacs-lisp :var modes=underscore-supported-modes
+      (defun mohkale//adjust-syntax-entry ()
+        "includes underscores in the syntax entry"
+        (modify-syntax-entry ?_ "w"))
+
+      (dolist (mode modes)
+        (let ((hook-name (concat (car mode) "-mode-hook")))
+          (add-hook (intern hook-name) #'mohkale//adjust-syntax-entry)))
+    #+END_SRC
+
+** Methods
+   Define methods for a bunch of purposes within the configuration here. This includes
+
+*** Core
+    basic syntax sugar functions, inspired by [[https://github.com/hlissner/doom-emacs/blob/develop/core/core-lib.el][doom]].
+
+    #+BEGIN_SRC emacs-lisp
+      (defmacro lambda! (&rest body)
+        "Expands to (lambda () (interactive) ,@body).
+      A factory for quickly producing interaction commands, particularly for keybinds
+      or aliases."
+        (declare (doc-string 1) (pure t) (side-effect-free t))
+        `(lambda () (interactive) ,@body))
+    #+END_SRC
+
+**** Misc
+     #+BEGIN_SRC emacs-lisp
+       (use-package mohkale-core
+         :defer t
+         :commands (with-no-write-messages))
+     #+END_SRC
+
+     Still core functions... just not so essential that they should be loaded at startup.
+
+    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-core.el
+      (defmacro with-no-write-messages (&rest body)
+        "execute BODY while supressing \"Wrote: file\" messages"
+        `(let ((save-silently t))
+           ;; replace the VISIT argument of write-region with something
+           ;; that'll supress the write message
+           (cl-letf* (((symbol-function 'actual-write-region)
+                       (symbol-function 'write-region))
+                      ((symbol-function 'write-region)
+                       (lambda (a b c &optional d &rest args)
+                         (apply #'actual-write-region a b c d 'nomsg (cdr args)))))
+             ,@body)))
+      (put 'with-no-write-messages 'lisp-indent-function 'defun)
+
+    #+END_SRC
+
+*** Mohkale
+    User related functions. Find users dot file or some specific org files.
+
    #+BEGIN_SRC emacs-lisp
      (use-package mohkale
        :straight (mohkale :type built-in)
@@ -1232,9 +1271,7 @@
          "fet" 'mohkale/find-tangled-config-file))
    #+END_SRC
 
-*** Mohkale Functions
-   #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-   #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale.el"
+   #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale.el
      (defmacro mohkale/defun-mohkale-find-package-file (file-type file-path &optional root)
        (setq file-path (eval file-path))
 
@@ -1287,43 +1324,10 @@
 
        (when mohkale-should-compile-config
          (mohkale//compile-configuration-files)))
+
+     (provide 'mohkale)
    #+END_SRC
 
-*** Happy Birthday
-    animate-birthday-present on your birthday... yippeee :)
-
-    #+BEGIN_SRC emacs-lisp
-      ;; (time-since '(0 0 0 8 12 1999 3 nil nil))
-
-      (when (string-equal (format-time-string "%d.%m" (current-time))
-                          "08.12")
-        (add-hook 'emacs-startup-hook
-                  'animate-birthday-present))
-    #+END_SRC
-
-*** syntax
-    Adjust the syntax entries for the given modes so that functions like evil word
-    skip over them.
-
-    #+NAME: underscore-supported-modes
-    - c++
-    - c
-    - markdown
-    - lisp
-    - shell
-    - enh-ruby
-
-    #+BEGIN_SRC emacs-lisp :var modes=underscore-supported-modes
-      (defun mohkale//adjust-syntax-entry ()
-        "includes underscores in the syntax entry"
-        (modify-syntax-entry ?_ "w"))
-
-      (dolist (mode modes)
-        (let ((hook-name (concat (car mode) "-mode-hook")))
-          (add-hook (intern hook-name) #'mohkale//adjust-syntax-entry)))
-    #+END_SRC
-
-** Methods
 *** File
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-file
@@ -1344,8 +1348,7 @@
           "jD" 'jump-to-directory-other-window))
     #+END_SRC
 
-    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-file.el"
+    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-file.el
       (defun rename-buffer-file (buffer &optional new-name)
         "renames the file associated with the buffer `buffer'
       if the buffer isn't visiting a file, this function is
@@ -1763,8 +1766,7 @@
                   display-buffer-right-and-focus))
     #+END_SRC
 
-    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-buffer-display.el"
+    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-buffer-display.el
       (defmacro display-buffer--create-focus-method (func)
         `(defun ,(intern (concat (symbol-name func) "-and-focus")) (buffer alist)
            (let ((window (,func buffer alist)))
@@ -1837,8 +1839,7 @@
                    toggle-relative-linum))
     #+END_SRC
 
-    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-misc.el"
+    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-misc.el
       (defun toggle-lexical-binding (&optional prefix)
         (interactive "P")
         (if (not prefix)
@@ -1927,8 +1928,7 @@
 **** Querying
      functions for querying information about the text at point or retrieve other relevent information.
 
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-text-query.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-text-query.el
        (defun line-width (char-pos)
          "returns the number of columns on the line at char-pos"
          (interactive (if current-prefix-arg
@@ -1978,8 +1978,7 @@
 ***** Chunks
       manipulate chunks of text, such as leading indentation or sequential padding.
 
-      #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-      #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-text.el"
+      #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-text.el
         (defun dos2unix ()
           "Not exactly but it's easier to remember"
           (interactive)
@@ -2064,7 +2063,7 @@
 ***** Commenting
       comment regions of text or by default, the current line.
 
-      #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-text.el"
+      #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-text.el
         (defun toggle-comment-at-point (start end)
           "toggle comment on line or region
         pass a prefix argument to bulk toggle across multiple lines.
@@ -2133,7 +2132,7 @@
 ***** Line Insertion
       line insertion and joining functions.
 
-      #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-text.el"
+      #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-text.el
         (defun custom-insert-line (&optional prefix)
           "inserts a line above or below point
 
@@ -2232,8 +2231,7 @@
           "M-o" 'vertical-display-last-buffer))
     #+END_SRC
 
-    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-bufwin.el"
+    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-bufwin.el
       (defvar scratch-buffer-name "*scratch*"
         "name of users scratch buffer")
 
@@ -2570,8 +2568,7 @@
                    evil-shift-normal-state))
     #+END_SRC
 
-    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-evil.el"
+    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-evil.el
       (require 'evil)
 
       (evil-define-operator evil-capitalise (beg end)
@@ -2691,8 +2688,7 @@
     #+END_SRC
 
 **** text-zoom
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-text-zoom.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-text-zoom.el
 
        ;;  _            _
        ;; | |_ _____  _| |_     _______   ___  _ __ ___
@@ -2714,8 +2710,7 @@
      #+END_SRC
 
 **** window-management
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-winman.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-winman.el
 
        ;;           _           _
        ;; __      _(_)_ __   __| | _____      __     _ __ ___   __ _ _ __   __ _  __ _  ___ _ __
@@ -2796,8 +2791,7 @@
      #+END_SRC
 
 **** eyebrowse
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-eyebrowse.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-eyebrowse.el
 
        (require 'eyebrowse)
 
@@ -2932,8 +2926,7 @@
 **** emacs-ipython-notebook
      sourced from [[https://github.com/syl20bnr/spacemacs/blob/master/layers/%252Blang/ipython-notebook/packages.el][here]].
 
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-ein.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-ein.el
        (defhydra hydra-ein (:hint nil)
                "
         Operations on Cells^^^^^^            On Worksheets^^^^              Other
@@ -2990,8 +2983,7 @@
      #+END_SRC
 
 **** persp-mode
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-persp.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-persp.el
        (require 'persp-mode)
 
        (defhydra hydra-persp (:hint nil)
@@ -3118,8 +3110,7 @@
      #+END_SRC
 
 **** flycheck
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-flycheck.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-flycheck.el
        ;; source https://github.com/abo-abo/hydra/wiki/Flycheck
 
        (defhydra hydra-flycheck
@@ -3138,8 +3129,7 @@
      #+END_SRC
 
 **** ibuffer
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-ibuffer.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-ibuffer.el
        ;; source: https://github.com/abo-abo/hydra/wiki/Ibuffer
 
        (defhydra hydra-ibuffer-main (:color pink :hint nil)
@@ -3244,8 +3234,7 @@
 **** ivy
      the actual ivy hydra has trailing whitespace and is inseperably tied to C-o for both entry and exit, despite me not liking the former and changing the latter. This is my variant, much of the same functionality, just different display.
 
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-ivy-custom.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-ivy-custom.el
        (require 'ivy-hydra)
 
        (defhydra hydra-ivy (:foreign-keys run :hint nil)
@@ -3342,8 +3331,7 @@
 ***** agenda
       sourced from [[https://github.com/abo-abo/hydra/wiki/Org-agenda][here]]
 
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-org-agenda.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-org-agenda.el
        (defhydra hydra-org-agenda (:pre  (setq which-key-inhibit t)
                                    :post (setq which-key-inhibit nil)
                                    :hint none
@@ -3428,8 +3416,7 @@
 ***** clock & timers
       sourced from [[https://github.com/abo-abo/hydra/wiki/Org-clock-and-timers][here]].
 
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-org-clock.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-org-clock.el
        (defhydra hydra-org-clock (:color blue :hint nil)
          "
        ^Clock:^ ^In/out^     ^Edit^   ^Summary^    | ^Timers:^ ^Run^           ^Insert
@@ -3464,8 +3451,7 @@
 ***** links
       sourced from [[https://github.com/abo-abo/hydra/wiki/Org-mode-links][here]].
 
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-org-link.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-org-link.el
         (require 'org-link-edit)
 
         (defun org-link-unlinkify ()
@@ -3497,8 +3483,7 @@
       #+END_SRC
 
 ***** navigation
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-org-navigate.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-org-navigate.el
        (defun hydra-org-navigate--end-of-current-branch ()
          (interactive)
          (let ((last-point (point))
@@ -3591,8 +3576,7 @@
       #+END_SRC
 
 **** vlc-rc
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-vlc-rc.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-vlc-rc.el
        (require 'vlc-rc)
 
        ;; NOTE comments with @ means add current value indicator
@@ -3654,8 +3638,7 @@
 
 
 **** visual-move
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-visual-move.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-visual-move.el
        (defhydra hydra-visual-move (:foreign-keys run)
          ("gj" evil-next-line "next-line")
          ("gk" evil-previous-line "prev-line")
@@ -3665,8 +3648,7 @@
      #+END_SRC
 
 **** indentation
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-indent.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-indent.el
        (defmacro hydra-indent--keep-visual-state-active (&rest body)
          "when body is invoked with evil-visual, restore the state after body"
          `(let ((visual-active (evil-visual-state-p)))
@@ -3780,8 +3762,7 @@
      #+END_SRC
 
 **** vdiff
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-vdiff.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-vdiff.el
        (defhydra vdiff-toggle-hydra (nil nil :hint nil)
          "
        Toggles
@@ -3828,8 +3809,7 @@
      #+END_SRC
 
 **** iedit
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-evil-multiedit.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-evil-multiedit.el
        (defhydra hydra-evil-multiedit ()
          ("k" evil-multiedit-next "next")
          ("j" evil-multiedit-prev "prev")
@@ -3842,8 +3822,7 @@
      #+END_SRC
 
 **** flyspell
-     #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-     #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/hydras/hydra-flyspell.el"
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/hydras/hydra-flyspell.el
        (defhydra hydra-flyspell (nil nil :hint nil :foreign-keys run)
          "
        | ^M^ove       | ^R^echeck   | ^C^orrect      |
@@ -3870,7 +3849,6 @@
          ("q" nil nil)
          ("<escape>" nil nil))
      #+END_SRC
-
 
 ** Core Packages
    For packages that're need to properly setup other packages. This list won't be in any
@@ -4008,8 +3986,7 @@
     #+END_SRC
 
 **** segments
-    #+HEADER: :shebang ";; -*- lexical-binding: t -*-"
-    #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/bin/mohkale/mohkale-spaceline-segments.el" :results silent
+    #+BEGIN_SRC emacs-lisp :results silent :tangle bin/mohkale/mohkale-spaceline-segments.el
       (require 'spaceline-config)
 
       (defun spaceline--active-macro-to-string ()
@@ -13812,7 +13789,7 @@
 
 *** kotlin-language-server
     :PROPERTIES:
-    :header-args+: :tangle ~/.emacs.d/bin/install/kotlin-language-server.sh
+    :header-args+: :tangle bin/install/kotlin-language-server.sh
     :END:
 
     #+BEGIN_SRC bash :shebang #!/usr/bin/bash
@@ -13863,7 +13840,7 @@
 
 *** kotlin-debug-adapter
     :PROPERTIES:
-    :header-args+: :tangle ~/.emacs.d/bin/install/kotlin-debug-adapter.sh
+    :header-args+: :tangle bin/install/kotlin-debug-adapter.sh
     :END:
 
     #+BEGIN_SRC bash :shebang #!/usr/bin/bash
@@ -13914,7 +13891,7 @@
 
 *** haskell-ide-engine
     :PROPERTIES:
-    :header-args+: :tangle ~/.emacs.d/bin/install/haskell-ide-engine.sh
+    :header-args+: :tangle bin/install/haskell-ide-engine.sh
     :END:
 
     if your install fails with exit code 251, you're computer ran out of memory during the install process. Simply close all running programs and try again. Warning: install can take upto an hour and over 3 GB of RAM.
@@ -14076,7 +14053,7 @@
 
 *** Header
    #+HEADER: :shebang ";; an-old-hope-theme.el -- a syntax theme from a galaxy far away... -*- lexical-binding: t -*-"
-   #+BEGIN_SRC emacs-lisp :comments no :tangle "~/.emacs.d/etc/themes/an-old-hope-theme.el"
+   #+BEGIN_SRC emacs-lisp :comments no :tangle etc/themes/an-old-hope-theme.el
      ;; Author: MoHKale
      ;; URL: https://github.com/MoHKale/an-old-hope-theme
      ;; Version: 0.1.0
@@ -14104,7 +14081,7 @@
 
 *** Faces
    #+HEADER: :var desc=an-old-hope-theme-description colors=color-assoc-to-rgb-strings() cls=(eval t) rainbow-delims=rainbow-delimeter-shades
-   #+BEGIN_SRC emacs-lisp :tangle "~/.emacs.d/etc/themes/an-old-hope-theme.el" :results silent
+   #+BEGIN_SRC emacs-lisp :results silent :tangle etc/themes/an-old-hope-theme.el
      (require 'dash)
 
      (deftheme an-old-hope
@@ -14366,3 +14343,4 @@
   :PROPERTIES:
   :header-args+: :tangle no
   :END:
+
