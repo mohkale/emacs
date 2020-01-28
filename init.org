@@ -7763,7 +7763,6 @@
            "ic" 'counsel-unicode-char
            "ie" 'counsel-org-entity
            "Mm" 'counsel-major
-           "MM" 'counsel-major
 
            "?"  'counsel-apropos
            "ry" 'counsel-yank-pop
@@ -8925,6 +8924,34 @@
             (apply func args)))
 
         (advice-add 'open-junk-file :around #'open-junk-file--fix-read-file-name-with-directory-wrapper))
+    #+END_SRC
+
+*** olivetti
+    A nice writing environment for emacs :)
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package olivetti
+        :ensure t
+        :defer  t
+        :hook (olivetti-mode . (lambda (&rest _)
+                                 ;; hide line numbers and fringe
+                                 (display-line-numbers-mode
+                                  (if olivetti-mode -1 +1))
+
+                                 (eval
+                                  `(set-window-fringes
+                                    (selected-window)
+                                    ,@(if olivetti-mode '(0 0) '(8 8))))))
+        :init
+        (leader/set-keys
+          "M'" 'olivetti-mode)
+
+        :config
+        (leader/with-prefix mohkale-minor-mode-leader-key
+          (leader/set-keys
+            ">" 'olivetti-expand
+            "<" 'olivetti-shrink
+            "-" 'olivetti-set-width)))
     #+END_SRC
 
 *** package
