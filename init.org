@@ -3860,9 +3860,13 @@
     use spaceline, you'll have to restart it or re evaluate this in it's context.
 
     #+BEGIN_SRC emacs-lisp :results silent
+      (use-package powerline
+        :straight (powerline :type git :host github :repo "jonathanchu/emacs-powerline"
+                             :fork (:host github :repo "milkypostman/powerline")))
+
       (use-package spaceline
-        :ensure t
-        :demand t
+        :straight t
+        :demand   t
         ;; :hook (helm-mode . spaceline-helm-mode)
         :init
         (setq spaceline-buffer-id-max-length 25
