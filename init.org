@@ -1203,6 +1203,55 @@
       or aliases."
         (declare (doc-string 1) (pure t) (side-effect-free t))
         `(lambda () (interactive) ,@body))
+
+      (defmacro plist-pop! (list prop &optional default)
+        "delete PROP from plist LIST, returning value of PROP.
+      if PROP isn't in LIST, DEFAULT will be returned."
+        `(prog1
+             (or (plist-get ,list ,prop) ,default)
+           (cl-remf ,list ,prop)))
+
+      (defun keyword-sym-normalise! (sym)
+        "convert a keyword symbol, SYM, to a non-keyword symbol.
+      eg. (keyword-sym-normalise! :hello) ;; => 'hello"
+        (let ((sym-string (symbol-name sym)))
+          (if (string-prefix-p ":" sym-string)
+              (intern (substring sym-string 1))
+            sym)))
+
+      (cl-defmacro plist-bind! ((list &rest props) &rest body)
+        "declare local bindings in BODY using a property list LIST.
+      This functions exists as an alternative to `cl-defmacro's very limited support
+      for variable argument lists alongside keyword argument lists. A use case I've
+      encountered so often, it merited creating this.
+
+      This function accepts a LIST argument and then a bunch of property specifications.
+      For every property in PROPS, that property is popped from LIST and then included
+      in the local scope of BODY. A property can be specified as an ALIST, in which case
+      the `car' of the list is the property name and the `cdr' is the default value for
+      the property.
+
+      WARN LIST should be an identifier for a list variable... not a LIST by itself.
+
+      The remaining value of LIST is all the properties which were not provided in the
+      spec.
+      "
+        ;; TODO replace mapcar implementation with cl-loop
+        `(let ((,list (cl-copy-list ,list)))
+           (let ,(mapcar
+                  (lambda (car)
+                    (let (default property)
+                      (if (listp car)
+                          (progn
+                            (setq default  (cdr car)
+                                  property (car car)))
+                        (setq property car))
+                      (list
+                       (keyword-sym-normalise! property)
+                       `(plist-pop! ,list ,property ,default))))
+                  props)
+             ,@body)))
+      (put 'plist-bind! 'lisp-indent-function 'defun)
     #+END_SRC
 
 **** Misc
@@ -3884,6 +3933,9 @@
 
         (setq-default mode-line-format (spaceline-spacemacs-theme))
 
+        (defvar spaceline-preferred-icon-height 0.98
+          "height of icons in the spaceline modeline")
+
         (defface spaceline-minibuffer
           `((t (:inherit (spaceline-evil-emacs))))
           "highlight face for spaceline when minibuffer is active"
@@ -3928,7 +3980,79 @@
 
         ;; by default, colors seem to glitch out on change
         (add-hook 'after-load-theme-hook #'powerline-reset)
+
         :config
+        (defun spaceline--face-icon-height (face)
+          (let ((height (face-attribute face :height)))
+            (unless (eq height 'unspecified)
+              (/ height 100.0))))
+
+        (defun spaceline-icon-height (&optional height)
+          (or height
+              spaceline-preferred-icon-height
+              (spaceline--face-icon-height 'mode-line)
+              (spaceline--face-icon-height 'default)))
+
+        (cl-defmacro spaceline-prepared-icon (func icon-arg &rest args)
+          "retrieve an `all-the-icons' icon for display in the spaceline.
+      FUNC is a function such as `all-the-icon-faicon' which accepts an argument
+      ICON-ARG and a bunch of face properties and returns either a symbol or an
+      icon string.
+
+      The remaining arguments should form a PLIST with the following being used
+      by this function and the remaining being passed directly to FUNC.
+
+      Keywords
+      --------
+      face - Can be given to specify a face for the icon. This face will be applied
+             over the regular background of the current spaceline section.
+
+      face-when-active - When specified means the face argument from before will only
+                         only be applied on the windows spaceline sees as active.
+
+      family - Can be specified as a function to force usage of a certain font family
+               for the icon. If ommited the family property is extracted from the icon
+               directly. eg. `all-the-icons-icon-family-for-mode'.
+      "
+          (plist-bind! (args :face :family :height :propertize (:v-adjust . -0.1) (:face-when-active . t))
+            (setq family (eval family))
+
+            `(let* ((use-face (and ,face
+                                   ,@(when face-when-active
+                                       (list (quote (bound-and-true-p active))))))
+                    (icon (funcall ,func ,icon-arg
+                                   :face (when use-face ,face)
+                                   :v-adjust ,v-adjust
+                                   :height (spaceline-icon-height ,height)
+                                   ,@args)))
+               (unless (symbolp icon)
+                 (if use-face
+                     (prog1 icon
+                       ;; see https://github.com/domtronn/all-the-icons.el/issues/131
+                       (add-face-text-property 0 (length icon) :inherit t icon))
+                   (propertize icon
+                               ;; 'display '(raise 0.1)
+                               'mouse-face 'mode-line-highlight
+                               'face (list :family (or
+                                                ,@(when (and family (functionp family))
+                                                    (funcall family))
+                                                (plist-get (get-text-property 0 'face icon)
+                                                           :family))
+                                       :inherit)))))))
+        (put 'spaceline-prepared-icon 'lisp-indent-function 'defun)
+
+        (cl-defmacro spaceline-icon (family icon &rest args)
+          "alias for `spaceline-prepared-icon' which uses a font-family as a function.
+      FONT-FAMILY should be a symbol (such as faicon) relating to some font family.
+      ICON should be a string relating to an icon in that family.
+
+      See `spaceline-prepared-icon' for a description of the remaining arguments.
+      "
+          (let* ((icon-func (intern (concat "all-the-icons-" (symbol-name family))))
+                 (family-func (intern (concat (symbol-name icon-func) "-family"))))
+            `(spaceline-prepared-icon #',icon-func ,icon :family #',family-func ,@args)))
+        (put 'spaceline-icon 'lisp-indent-function 'defun)
+
         (require 'mohkale-spaceline-segments)
 
         (spaceline-compile
@@ -4022,14 +4146,12 @@
         :enabled t)
 
       ;; see for eg segments: [[https://github.com/domtronn/all-the-icons.el/wiki/Spaceline]]
-
       (defalias 'all-the-icons-available-p #'display-graphic-p
         "whether your current frame has access to emacs icons.")
 
       (spaceline-define-segment minibuffer-active
         "show a stop symbol if minibuffer is active"
-        (propertize (all-the-icons-faicon "minus-circle" :v-adjust 0.00)
-                    'face `(:height 1.0 :family ,(all-the-icons-faicon-family) :inherit))
+        (spaceline-icon faicon "minus-circle" :v-adjust 0.00)
         :when (and (all-the-icons-available-p)
                    (active-minibuffer-window)))
 
@@ -4039,52 +4161,36 @@
       (spaceline-define-segment buffer-mode-icon
         "an `all-the-icons' segment to show the mode of the current buffer"
         (unless (member major-mode spaceline-major-mode-icon--skip-modes)
-          (let ((icon (all-the-icons-icon-for-mode major-mode
-                                                   :v-adjust -0.15)))
-            (unless (symbolp icon)
-              (let ((family
-                     (or
-                      (all-the-icons-icon-family-for-mode major-mode)
-                      (plist-get (get-text-property 0 'face icon)
-                                 :family))))
-                (propertize icon
-                            'help-echo (concat "major-mode: " (symbol-name major-mode))
-                            'face `(:height 1.0 :family ,family :inherit))))))
+          (spaceline-prepared-icon #'all-the-icons-icon-for-mode major-mode
+            :v-adjust -0.15))
         :enabled (all-the-icons-available-p))
 
       (spaceline-define-segment version-control-type-icon
-        (let ((icon
-               (cond ((string-match "Git[:-]" vc-mode)
-                      (all-the-icons-alltheicon "git"))
-                     ((string-match "SVN-" vc-mode)
-                      (all-the-icons-material "cloud_download")))))
-          (when icon
-            (propertize (all-the-icons-alltheicon "git")
-                        'display '(raise 0.1)
-                        'face `(:height 1.0
-                                :family ,(all-the-icons-octicon-family)
-                                :inherit))))
+        (let (func icon)
+          (cond ((string-match "Git[:-]" vc-mode)
+                 (setq func #'all-the-icons-alltheicon
+                       icon "git"))
+                ((string-match "SVN-" vc-mode)
+                 (setq func #'all-the-icons-material
+                       icon "cloud_download")))
+          (when (and func icon)
+            (spaceline-prepared-icon func icon)))
         :when (and vc-mode (all-the-icons-available-p)))
 
       (defun spaceline-vc--git-status ()
         "Get the formatted GIT Version Control Icon based on variable `vc-mode'."
         (let* ((branch (cadr (split-string vc-mode "Git[:-]")))
-               (git-branch (all-the-icons-octicon
-                            (if (string= branch "master")
-                                "git-merge"
-                              "git-branch")))
+               (git-branch (spaceline-icon octicon
+                                            (if (string= branch "master")
+                                                "git-merge"
+                                              "git-branch")))
                (local-map (get-text-property 1 'local-map branch)))
           (propertize
            (concat
-            (propertize git-branch
-                        'display '(raise 0.1)
-                        'face `(:height 1.0
-                                :family ,(all-the-icons-octicon-family)
-                                :inherit))
+            (when git-branch
+              (propertize git-branch 'display '(raise 0.1)))
             " "
-            (propertize branch
-                        'display '(raise 0.1)
-                        'face `(:inherit)))
+            (propertize branch 'display '(raise 0.1) 'face `(:inherit)))
            'mouse-face 'mode-line-highlight
            'local-map local-map)))
 
@@ -4093,7 +4199,7 @@
         (let ((revision (cadr (split-string vc-mode "-" ))))
           (propertize revision
                       'display '(raise 0.1)
-                      'face `(:height 1.0
+                      'face `(:height ,spaceline-preferred-icon-height
                               :family ,(all-the-icons-octicon-family)
                               :inherit))))
 
@@ -4105,14 +4211,6 @@
                (spaceline-vc--svn-status)))
         :when (and active vc-mode (all-the-icons-available-p)))
 
-      (spaceline-define-segment blarg
-        (propertize (format "%s" (all-the-icons-octicon "git" :v-adjust 0.1))
-                    'face `(:height 0.8
-                                    :family ,(all-the-icons-octicon-family)
-                                    :foreground "green"
-                                    )
-                    'help-echo "blarg")
-        :when active)
 
       (provide 'mohkale-spaceline-segments)
      #+END_SRC
