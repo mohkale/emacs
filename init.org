@@ -2667,15 +2667,14 @@
         (eval-print-last-sexp arg)
         (message nil))
 
-      (defun-evil-adjust-to-eol evil-adjust-eval-last-sexp (&optional arg)
-        (interactive "P")
-        (eval-last-sexp arg)
-        (message nil))
-
       (defun-evil-adjust-to-eol evil-adjust-eval-replace-last-sexp (&optional prefix)
         (interactive "P")
         (eval-replace-last-sexp prefix)
         (message nil))
+
+      (defun-evil-adjust-to-eol evil-adjust-eval-last-sexp (&optional arg)
+        (interactive "P")
+        (eval-last-sexp arg))
 
       (evil-define-operator evil-reverse (beg end)
         :type line
@@ -4582,7 +4581,10 @@
            "gC" 'evil-capitalize
            "g=" 'count-words
            "g-" 'evil-indent
-           "g;" 'evil-repeat-find-char-reverse)
+           "g;" 'evil-repeat-find-char-reverse
+           [remap eval-last-sexp] 'evil-adjust-eval-last-sexp
+           [remap eval-print-last-sexp] 'evil-adjust-eval-print-last-sexp
+           [remap eval-replace-last-sexp] 'evil-adjust-eval-replace-last-sexp)
 
 
          (leader/declare-prefix "sc" "search-noh")
@@ -8796,40 +8798,43 @@
 *** macro/kmacro/edmacro
     #+BEGIN_SRC emacs-lisp
       (leader/declare-prefix*
-        "k"  "macros/lisp"
-        "kc" "counter")
+        "k"  "macros/lisp")
 
-      (leader/set-keys
-        "kk" 'eval-last-sexp
-        "k(" 'eval-replace-last-sexp
-        "k)" 'eval-print-last-sexp
-        "ke" 'kmacro-edit-macro ;; last defined
-        "kE" 'edit-kbd-macro ;; any named macro
-        "ka" 'apply-macro-to-region-lines
-        "kn" 'name-last-kbd-macro
-        "ki" 'insert-kbd-macro
-        "kp" 'kbd-macro-query ;; prompt at macro point
-        "kq" 'kbd-macro-query ;; prompt at macro point
-        "kb" 'kmacro-bind-to-key
-        "kl" 'kmacro-edit-lossage ;; edit last 300 strokes as macro
-        "kd" 'kmacro-step-edit-macro ;; debug last macro
-        "kM" 'pp-macroexpand-last-sexp
+      (use-package kmacro
+        :init
+        (leader/with-prefix "k"
+          (leader/declare-prefix "c" "counter" "macro-counter")
 
-        "kcs" 'kmacro-set-counter
-        "kc=" 'kmacro-set-counter
-        "kcc" 'kmacro-insert-counter
-        "kci" 'kmacro-insert-counter
-        "kca" 'kmacro-add-counter
-        "kc+" 'kmacro-add-counter
-        "kcf" 'kmacro-set-format)
+          (leader/set-keys
+            ;; 'edit-kbd-macro ;; any named macro
+            ;; 'apply-macro-to-region-lines
+            "s" 'name-last-kbd-macro
+            "i" 'insert-kbd-macro
+            "q" 'kbd-macro-query ;; prompt at macro point
+
+            "cs" 'kmacro-set-counter
+            "c=" 'kmacro-set-counter
+            "cc" 'kmacro-insert-counter
+            "ci" 'kmacro-insert-counter
+            "ca" 'kmacro-add-counter
+            "c+" 'kmacro-add-counter
+            "cf" 'kmacro-set-format)))
 
       (use-package edmacro
         :defer t
         :commands (edmacro-mode)
         :config
+        (leader/with-prefix "k"
+          (leader/set-keys
+            ;; 'kmacro-edit-lossage ;; edit last 300 strokes as macro
+            ;; 'kmacro-step-edit-macro ;; debug last macro
+            "SPC" 'kmacro-edit-macro ;; last defined
+            "k"   'kmacro-bind-to-key))
+
+        :config
         (leader/set-keys-for-mode! 'edmacro-mode
-          "k," 'edmacro-finish-edit
-          "ki" 'edmacro-insert-key))
+          "," 'edmacro-finish-edit
+          "i" 'edmacro-insert-key))
     #+END_SRC
 
 *** minibuffer
@@ -11245,11 +11250,19 @@
        (use-package pp
          :defer t
          :init
-         (leader/set-keys-for-mode! 'emacs-lisp-mode
-           "em" 'pp-macroexpand-expression
-           "eM" 'pp-macroexpand-last-sexp
-           "ex" 'pp-eval-expression
-           "eX" 'pp-eval-last-sexp))
+         (leader/with-prefix "k"
+           (leader/set-keys
+             "m" 'pp-macroexpand-last-sexp
+             "M" 'pp-macroexpand-expression
+             "x" 'pp-eval-last-sexp
+             "X" 'pp-eval-expression))
+
+         (with-eval-after-load 'elisp-mode
+           (leader/set-keys-for-mode! '(emacs-lisp-mode lisp-interaction-mode)
+             "eM" 'pp-macroexpand-expression
+             "em" 'pp-macroexpand-last-sexp
+             "ex" 'pp-eval-last-sexp
+             "eX" 'pp-eval-expression)))
      #+END_SRC
 
 **** paredit
@@ -11331,6 +11344,12 @@
          :init
          (add-hook 'emacs-lisp-mode-hook #'electric-pair-mode)
 
+         (leader/with-prefix "k"
+           (leader/set-keys
+             "e" 'eval-last-sexp
+             "(" 'eval-print-last-sexp
+             ")" 'eval-replace-last-sexp))
+
          :config
          ;; show lambda as an actual lambda symbol
          (mohkale/define-pretty-symbols-for-mode 'lisp-interaction-mode
@@ -11379,21 +11398,18 @@
          ;;           (forward-sexp 1)))
          ;;       (display-buffer dest-buffer)))
 
-         (dolist (mode '(emacs-lisp-mode lisp-interaction-mode))
-           (push `(,mode . 2) mohkale-indent-config)
+         (push '(emacs-lisp-mode . 2) mohkale-indent-config)
+         (push '(lisp-interaction-mode . 2) mohkale-indent-config)
 
-           (leader/declare-prefix-for-mode!* mode
-             "g" '("jump" . "jump to various places in source code")
+         (let ((lisp-modes '(emacs-lisp-mode lisp-interaction-mode)))
+           (leader/declare-prefix-for-mode!* lisp-modes
              "e" "eval"
-             "t" "test"
 
              ;; method aliases
-             "gg" "jump-to-definition"
-             "gG" "jump-to-definition-other-window"
-             "eE" "eval-replace-last-sexp")
+             "g" "jump-to-definition"
+             "G" "jump-to-definition-other-window")
 
-           (leader/set-keys-for-mode! mode
-             ;; NOTE cl was bound to auto-compile-display-log
+           (leader/set-keys-for-mode! lisp-modes
              "'" 'ielm
              "c" 'emacs-lisp-byte-compile
              "i" 'indent-sexp
@@ -11401,30 +11417,24 @@
              ;; eval
              "eb" 'eval-buffer
              "ee" 'eval-last-sexp
-             "eE" 'evil-adjust-eval-replace-last-sexp
+             "eE" 'eval-replace-last-sexp
              "ef" 'eval-defun
              "er" 'eval-region
              ;; "et" 'elisp-transcript
 
              ;; jump
-             "gg" 'xref-find-definitions
-             "gG" 'xref-find-definitions-other-window
+             "g" 'xref-find-definitions
+             "G" 'xref-find-definitions-other-window
 
              ;; tests
-             "tq" 'ert
-             "ti" 'ert-run-tests-interactively))
+             "t" 'ert
+             "T" 'ert-run-tests-interactively))
 
          (general-define-key
-           ;; :states '(normal insert motion replace)
            :keymaps 'lisp-interaction-mode-map
            "C-j" nil
-           "C-)" 'evil-adjust-eval-print-last-sexp
-           "C-(" 'evil-adjust-eval-replace-last-sexp
-           "C-S-E" 'evil-adjust-eval-print-last-sexp
-           "C-S-R" 'evil-adjust-eval-replace-last-sexp)
-
-         ;; (add-hook 'lisp-interaction-mode-hook (lambda () (paredit-mode -1)))
-         )
+           "C-(" 'eval-print-last-sexp
+           "C-)" 'eval-replace-last-sexp))
      #+END_SRC
 
 *** python
