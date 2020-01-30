@@ -1236,21 +1236,15 @@
       The remaining value of LIST is all the properties which were not provided in the
       spec.
       "
-        ;; TODO replace mapcar implementation with cl-loop
-        `(let ((,list (cl-copy-list ,list)))
-           (let ,(mapcar
-                  (lambda (car)
-                    (let (default property)
-                      (if (listp car)
-                          (progn
-                            (setq default  (cdr car)
-                                  property (car car)))
-                        (setq property car))
-                      (list
-                       (keyword-sym-normalise! property)
-                       `(plist-pop! ,list ,property ,default))))
-                  props)
-             ,@body)))
+        `(let* ((,list (cl-copy-list ,list))
+                ,@(cl-loop for prop in props
+                           with default = nil
+                             when (listp prop)
+                               do (setq default (cdr prop) prop (car prop))
+                             end
+                             collect (list (keyword-sym-normalise! prop)
+                                           `(plist-pop! ,list ,prop ,default))))
+           ,@body))
       (put 'plist-bind! 'lisp-indent-function 'defun)
     #+END_SRC
 
