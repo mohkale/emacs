@@ -4116,7 +4116,7 @@
     #+BEGIN_SRC emacs-lisp :results silent :tangle bin/mohkale/mohkale-spaceline-segments.el
       (require 'spaceline-config)
 
-      (defun spaceline--active-macro-to-string ()
+      (defun spaceline-active-macro-to-string+ ()
         (when defining-kbd-macro
           (let ((macro-symbol "@"))
             (if (and (bound-and-true-p evil-mode)
@@ -4125,18 +4125,18 @@
                         (string evil-this-macro))
               macro-symbol))))
 
-      (defvar spaceline-evil-register--always-display-p nil
+      (defvar spaceline-evil-register-always-display-p+ nil
         "whether to always show something in the modeline,
       even when no register is currently active.")
 
       (defmacro evil-register-to-string (register-var)
         `(if ,register-var
              (concat "\"" (char-to-string ,register-var))
-           (when spaceline-evil-register--always-display-p
+           (when spaceline-evil-register-always-display-p+
              (make-string 2 ?_))))
 
       (spaceline-define-segment evil-macro-and-register
-        (let ((macro (spaceline--active-macro-to-string))
+        (let ((macro (spaceline-active-macro-to-string+))
               (register (evil-register-to-string evil-this-register)))
           (cond
            ((and macro register)
@@ -4177,7 +4177,7 @@
             (spaceline-prepared-icon func icon)))
         :when (and vc-mode (all-the-icons-available-p)))
 
-      (defun spaceline-vc--git-status ()
+      (defun spaceline-vc-git-status+ ()
         "Get the formatted GIT Version Control Icon based on variable `vc-mode'."
         (let* ((branch (cadr (split-string vc-mode "Git[:-]")))
                (git-branch (spaceline-icon octicon
@@ -4194,7 +4194,7 @@
            'mouse-face 'mode-line-highlight
            'local-map local-map)))
 
-      (defun spaceline-vc--svn-status ()
+      (defun spaceline-vc-svn-status+ ()
         "Get the formatted SVN Version Control Icon based on variable `vc-mode'."
         (let ((revision (cadr (split-string vc-mode "-" ))))
           (propertize revision
@@ -4206,9 +4206,9 @@
       (spaceline-define-segment version-control-status
         "An `all-the-icons' segment to depict the current VC system with an icon"
         (cond ((string-match "Git[:-]" vc-mode)
-               (spaceline-vc--git-status))
+               (spaceline-vc-git-status+))
               ((string-match "SVN-" vc-mode)
-               (spaceline-vc--svn-status)))
+               (spaceline-vc-svn-status+)))
         :when (and active vc-mode (all-the-icons-available-p)))
 
 
