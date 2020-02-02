@@ -1247,6 +1247,18 @@
                                            `(plist-pop! ,list ,prop ,default))))
            ,@body))
       (put 'plist-bind! 'lisp-indent-function 'defun)
+
+      ;; source https://www.emacswiki.org/emacs/DestructiveOperations#toc4
+      (defun nconc-safe (ls1 ls2)
+        "`nconc', but avoids creating circular lists."
+        (let ((tail ls1))
+          (while (and (cdr tail) (not (eq tail ls2)))
+            (setq tail (cdr tail)))
+          (unless (eq tail ls2)
+            (if (null tail)
+                (setq ls1 ls2)
+              (setcdr tail ls2)))
+          ls1))
     #+END_SRC
 
 **** Misc
@@ -4747,45 +4759,96 @@
     #+BEGIN_SRC emacs-lisp
       (use-package prog-mode
         :straight (prog-mode :type built-in)
+        :delight  (prettify-symbols-mode "λ")
         :defer t
-        :commands (prettify-symbols-mode)
-        :delight
         :init
-        (defmacro mohkale/define-pretty-symbols-for-mode (mode &rest symbols)
-          "defines a hook and an alist for MODE which pushes SYMBOLS onto
-      `prettify-symbols-alist' and enables prettify-symbols-mode in that MODE.
+        (setq lisp-prettify-symbols-alist nil
+              ;; don't need to keep symbolifying it whilst I'm on it
+              prettify-symbols-unprettify-at-point t)
 
-      if you want to add more mappings for symbols after this function has been
-      invoked, then push them onto MODE-prettify-symbols-alist."
-          (setq mode (eval mode))
+        (defvar prettify-symbols-pretty-symbols-alist+ nil
+          "alist of mode to pretty symbols ")
 
-          (let* ((mode-name (symbol-name mode))
-                 (symbols-alist (intern (concat mode-name "-prettify-symbols-alist")))
-                 (mode-hook (intern (concat mode-name "-hook")))
-                 (func-name (intern (concat mode-name "--setup-prettify-symbols"))))
-            `(progn
-               (setq ,symbols-alist (quote ,symbols))
+        ;; inspired by: [[https://emacs.stackexchange.com/questions/34808/using-prettify-symbols-with-strings-instead-of-characters][this post]].
+        (defun prettify-symbols-string+ (to)
+          "get a prettify symbols entry to map a string to a string."
+          (let ((length (length to)))
+            (cl-loop for i from 0 to length
+                     for char in (string-to-list to)
+                     unless (eq i (- length 1))
+                       do (setq char (list char '(Br . Bl)))
+                     else
+                       do (setq char (list char))
+                     end
+                     append char)))
 
-               (defun ,func-name ()
-                 ,(concat "sets up the pretty symbol maps for " mode-name)
-                 (if (not prettify-symbols-alist)
-                     (setq prettify-symbols-alist (copy-sequence ,symbols-alist))
-                   (nconc prettify-symbols-alist ,symbols-alist))
+        (defun configure-presym--prepare-args (args)
+          "convert ARGS to partitioned 2 length cons cells.
+      ARGS should simply be a flat sequence of string to pretty-symbol.
 
-                 ;; invocation must come after symbol list assignment.
-                 ;; or else assigned symbols won't be replaced :(
-                 (prettify-symbols-mode +1))
+      The pretty-symbol part can be a given as a string, to automatically
+      pass through `prettify-symbols-string+'.
+      "
+          (cl-loop for it in (-partition 2 args)
+                   do (setq it
+                            (cons (car it)
+                                  (let ((to (car (cdr it))))
+                                    (if (stringp to)
+                                        (prettify-symbols-string+ to)
+                                      to))))
+                   collect it))
 
-               (add-hook (quote ,mode-hook) (quote ,func-name)))))
-        (put 'mohkale/define-pretty-symbols-for-mode 'lisp-indent-function 'defun)
+        ;; TODO add duplicate remove check.
+        (defmacro configure-presym! (modes &rest args)
+          "Configure prettify-symbols for modes MODES.
+      This function adds/modifies an entry for mode in the
+      `prettify-symbols-pretty-symbols-alist+' alist and binds a hook in MODES
+      mode-hook to enable `prettify-symbols-mode'.
 
-        :config
-        ;; I'll bind it myself, thank you.
-        (setq lisp-prettify-symbols-alist nil)
-        ;; no mode line indicator by default... so here's my own
-        (push '(prettify-symbols-mode "λ") minor-mode-alist)
-        ;; don't need to keep symbolifying it whilst I'm on it
-        (setq-default prettify-symbols-unprettify-at-point t))
+      MODES can be given as a quoted list, or a single quoted mode name or a
+      variable pointing to either of these types (and discoverable at macro
+      expansion time).
+
+      ARGS should be a form acceptable by `configure-presym--prepare-args'.
+
+      eg.
+
+      > (configure-presym! 'org-mode \"lambda\" ?λ)
+      "
+          (plist-bind! (args :remove-duplicates)
+            (setq modes (eval modes))
+
+            (when modes
+              (unless (listp modes)
+                (setq modes `(,modes))))
+
+            (let (res ; aggregate forms into here
+                  (tuples (configure-presym--prepare-args args)))
+              (dolist (mode modes)
+                (let ((mode-name (symbol-name mode)))
+                  (push
+                   `(let ((config (assoc (quote ,mode) prettify-symbols-pretty-symbols-alist+)))
+                      (if config
+                          ; add to existing config, while prevent cyclic loops
+                          (nconc-safe (car (cdr config)) tuples)
+                        (push (cons (quote ,mode) (list tuples))
+                              prettify-symbols-pretty-symbols-alist+)
+
+                        (add-hook (quote ,(intern (concat mode-name "-hook")))
+                                  (defun ,(intern (concat "configure-presym-" mode-name)) (&rest _)
+                                    ,(concat "sets up pretty symbols for " mode-name)
+                                    (let ((config (assoc (quote ,mode)
+                                                         prettify-symbols-pretty-symbols-alist+)))
+                                      (when (and config
+                                                 (setq config (car (cdr config))))
+                                        (setq prettify-symbols-alist
+                                              (append prettify-symbols-alist
+                                                      (copy-sequence config)))
+
+                                        (prettify-symbols-mode +1)))))))
+                   res)))
+              `(let ((tuples (quote ,tuples))) ,@res))))
+        (put 'configure-presym! 'lisp-indent-function 'defun))
     #+END_SRC
 
 ** Packages
@@ -11359,12 +11422,11 @@
              ")" 'eval-replace-last-sexp))
 
          :config
-         ;; show lambda as an actual lambda symbol
-         (mohkale/define-pretty-symbols-for-mode 'lisp-interaction-mode
-           ("lambda" . ?λ))
-
-         (mohkale/define-pretty-symbols-for-mode 'emacs-lisp-mode
-           ("lambda" . ?λ))
+         ;; show lambda as an actual lambda symbol... pretty cool, if I do say
+         ;; so myself.
+         (configure-presym! '(lisp-interaction-mode emacs-lisp-mode org-mode)
+           "lambda"  ?λ
+           "lambda!" "λ!")
 
          (defun eval-replace-last-sexp (&optional prefix)
            "evaluate then replace the preceding sexp"
@@ -11542,8 +11604,8 @@
          :config
          (setq python--prettify-symbols-alist nil)
 
-         (mohkale/define-pretty-symbols-for-mode 'python-mode
-           ("lambda" . ?λ))
+         (configure-presym! 'python-mode
+           "lambda" ?λ)
 
          (defun python-shell-calculate-command ()
            "python3 -i")
@@ -12153,8 +12215,6 @@
            "oY" 'org-cut-subtree)
 
          :config
-         (mohkale/define-pretty-symbols-for-mode 'org-mode
-           ("lambda" . ?λ))
 
          ;; switch to insert state when capturing org templates
          (add-hook 'org-capture-mode-hook (lambda () (evil-append nil)) t)
