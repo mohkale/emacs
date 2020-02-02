@@ -1304,14 +1304,11 @@
                   mohkale/build-configuration-file
                   mohkale//tangle-configuration-file
                   mohkale//compile-configuration-files
-                  mohkale/find-dotfile-file
-                  mohkale/find-capture-notes-file
-                  mohkale/find-org-university-file)
+                  mohkale/find-dotfile-file)
        :init
        (setq mohkale--server-leader-key "y")
 
        (leader/declare-prefix*
-         "on" "find-notes-file"
          "ou" "find-uni-file"
          "feb" "build-config"
          "fec" "find-config"
@@ -1320,8 +1317,6 @@
          "fed" "find-dotfile")
 
        (leader/set-keys
-         "on" 'mohkale/find-capture-notes-file
-         "ou" 'mohkale/find-org-university-file
          "feb" 'mohkale/build-configuration-file
          "fec" 'mohkale/find-configuration-file
          "fer" 'mohkale/eval-configuration-file
@@ -1350,9 +1345,6 @@
      (mohkale/defun-mohkale-find-package-file dotfile        "init.el" user-emacs-directory)
      (mohkale/defun-mohkale-find-package-file configuration  mohkale-mohkale-config-file)
      (mohkale/defun-mohkale-find-package-file tangled-config mohkale-mohkale-el-config-file)
-
-     (mohkale/defun-mohkale-find-package-file capture-notes  (org! "notes.org"))
-     (mohkale/defun-mohkale-find-package-file org-university (org! "university.org"))
 
      (defun mohkale/eval-configuration-file ()
        (interactive)
@@ -12293,8 +12285,11 @@
        (use-package mohkale-org
          :commands (org-outline-smart-up-level
                     org-openable-p
+                    org-find-file
                     org-normal-return
-                    org-clever-return))
+                    org-clever-return)
+         :init
+         (leader/set-keys "oo" 'org-find-file))
      #+END_SRC
 
      #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-org.el
@@ -12374,6 +12369,13 @@
                     (evil-append nil))
 
                    (t (fallback-action (called-interactively-p)))))))
+
+       (defun org-find-file (&optional arg)
+         (interactive "P")
+         (if (not arg)
+             (find-file org-default-notes-file)
+           ;; TODO prompt open buffers and projects etc.
+           (counsel-file-jump nil dotemacs-org-path)))
      #+END_SRC
 
 **** org-mode
