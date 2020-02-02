@@ -4559,7 +4559,7 @@
            "<S-backspace>" 'evil-delete-char
            "C-y"   'yank
            "M-y"   'yank-unindented
-           "C-$"   (lambda () (interactive)
+           "C-$"   (lambda!
                      (evil-end-of-line)
                      (unless (line-empty-p)
                        (forward-char)))
@@ -6672,8 +6672,8 @@
            "t" 'image-dired-toggle-mark-thumb-original-file
            "gr" 'image-dired-refresh-thumb
            "gc" 'image-dired-create-thumbs
-           "gg" (lambda () (interactive) (evil-goto-first-line) (evil-beginning-of-line))
-           "G"  (lambda () (interactive) (end-of-buffer) (image-dired-backward-image))
+           "gg" (lambda! (evil-goto-first-line) (evil-beginning-of-line))
+           "G"  (lambda! (goto-char (point-max)) (image-dired-backward-image))
 
            "C-s" 'image-save           ; NOTE originally was bound to o
 
@@ -11121,7 +11121,7 @@
               "<tab>"    'log-view-toggle-entry-display
 
               ;; move to next message, then reallign to top
-              ;; (kbd "C-j") (lambda () (interactive) (log-view-msg-next)
+              ;; (kbd "C-j") (lambda! (log-view-msg-next)
               ;;               (call-interactively 'evil-scroll-line-to-top))
               "C-j" 'log-view-msg-next
               "C-k" 'log-view-msg-prev
@@ -11131,10 +11131,10 @@
 
               "C-M-j" 'diff-hunk-next
               ;; TODO reallign diff to propper location on move down without trapping on a single diff
-              ;; (kbd "M-j") (lambda () (interactive) (diff-hunk-next)
+              ;; (kbd "M-j") (lambda! (diff-hunk-next)
               ;;               (call-interactively 'evil-scroll-line-to-top)
               ;;               (evil-previous-line 3))
-              "C-M-k" (lambda () (interactive) (diff-hunk-prev) (evil-previous-line 3)))
+              "C-M-k" (lambda! (diff-hunk-prev) (evil-previous-line 3)))
 
             (leader/set-keys-for-mode! mode
               "p" 'log-view-diff-changeset
@@ -12242,7 +12242,6 @@
 
          (defmacro evil-org-eol-call-anon (&rest body)
            "define an anonymous function running body at the end of the line"
-           `(lambda () (interactive) (end-of-visual-line) ,@body (evil-append nil)))
 
          (defvar org-clever-return--insert-headings nil
            "when true, returning from the end of a heading
@@ -12312,6 +12311,7 @@
             (cond
              ((org-openable-p) 'org-open-at-point)
              (t 'evil-ret))))
+           `(lambda! (end-of-visual-line) ,@body (evil-append nil)))
 
          (general-define-key
            :keymaps 'org-mode-map
@@ -12324,10 +12324,10 @@
            :keymaps 'org-mode-map
            :states 'normal
            "RET" 'org-normal-return
-           "o" (lambda () (interactive)
+           "o" (lambda!
                  (let ((org-clever-return--insert-headings t))
                    (org-clever-return nil)))
-           "O" (lambda () (interactive)
+           "O" (lambda!
                  (let ((org-clever-return--insert-headings t))
                    (org-clever-return t)))
            "M-u" 'org-metaleft
