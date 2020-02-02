@@ -8911,10 +8911,17 @@
     #+BEGIN_SRC emacs-lisp
       (general-define-key
         :keymaps 'minibuffer-local-map
-        "C-h" 'previous-matching-history-element
         "C-j" 'next-history-element
         "C-k" 'previous-history-element
-        "C-l" 'next-matching-history-element
+        "M-j" 'previous-matching-history-element
+        "M-k" 'next-matching-history-element
+        "C-h" 'backward-char
+        "C-l" (defun minibuffer-forward-char-or-exit ()
+                (interactive)
+                (call-interactively (if (eolp)
+                                        'exit-minibuffer
+                                      'forward-char)))
+
         "C-a" 'move-beginning-of-line
         "C-e" 'move-end-of-line
         "C-q" 'quoted-insert
