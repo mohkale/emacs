@@ -12236,17 +12236,54 @@
 
 ***** templates
       #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-org-capture.el
-        (setq org-capture-templates
-              `(("f" "File Task" entry (file ,org-default-notes-file)
-                 "* TODO %?\n  %a"
-                 :kill-buffer t)
-                ("t" "Todo" entry (file ,org-default-notes-file)
-                 "* TODO %?\n%U")
-                ("T" "Todo with Clipboard" entry (file ,org-default-notes-file)
-                 "* TODO %?\n%U\n   %c")
-                ("h" "Homework" entry (file+headline ,(org! "university.org") "Homework")
-                 "* TODO%? %^g\n  DEADLINE: %^{Deadline}t\n  :LOGBOOK:\n  - Added %u\n  :END:"
-                 :kill-buffer t)))
+        ;; -*- lisp-indent-function: 'common-lisp-indent-function -*-
+
+        ;; let's you create declarative org capture templates
+        (use-package doct
+          :straight (doct :host github :repo "progfolio/doct" :branch "master")
+          :init
+          (setq doct-default-entry-type 'entry))
+
+        ;; see also: https://www.gnu.org/software/emacs/manual/html_node/org/Template-expansion.html#Template-expansion
+        (setq
+         org-capture-templates
+         (doct `((:group "TODOs"
+                  :type entry
+                  :file ,org-default-notes-file
+                  :prepend     t
+                  :empty-lines 1
+                  :headline "TODOs [/]"
+                  ;; WARN %doct() doesn't work with ivy completions.
+                  :template (; "* %doct(todo-state) %?"
+                             "* TODO %?"
+                             "  %U")
+                  ;; :todo-state "TODO"
+                  :children (("Todo" :keys "t")
+                             ("Todo with Clipboard"
+                              :keys "T"
+                              :template (;"* %doct(todo-state) %?"
+                                         "* TODO %?"
+                                         "  %U"
+                                         "  %c"))))
+                 (:group "professional"
+                  :type entry
+                  :file ,(org! "university.org")
+                  :empty-lines 1
+                  :children (("Homework"
+                              :keys "h"
+                              :template ("* TODO %? %^g"
+                                         "  DEADLINE: %^{Deadline}t"
+                                         "  :LOGBOOK:"
+                                         "  Added %u"
+                                         "  :END:")))))))
+
+        (setq
+         counsel-projectile-org-capture-templates
+         (doct `(("[${name}] Task"
+                  :keys "p"
+                  :template ("* TODO %?"
+                             "  %U")
+                  :file ,(join-path org-projectile-projects-directory "${name}.org")))))
 
         (provide 'mohkale-org-capture)
       #+END_SRC
