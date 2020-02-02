@@ -24,7 +24,7 @@
             file-name-handler-alist nil)
 
       (add-hook 'emacs-startup-hook
-                (defun mohkale//post-init-handler (&rest args)
+                (defun mohkale//post-init-handler (&rest _)
                   ;; reset optimisation changes
                   (setq gc-cons-threshold 800000
                         gc-cons-percentage 0.1
@@ -968,6 +968,7 @@
 
       (leader/set-keys
         "Mz" 'zone
+        "M|" 'auto-fill-mode
         "Ml" 'emacs-lisp-mode
         "ML" 'lisp-interaction-mode
         "Mc" 'c++-mode
@@ -4223,7 +4224,6 @@
               ((string-match "SVN-" vc-mode)
                (spaceline-vc-svn-status+)))
         :when (and active vc-mode (all-the-icons-available-p)))
-
 
       (provide 'mohkale-spaceline-segments)
      #+END_SRC
@@ -8055,6 +8055,7 @@
          (general-define-key
            :keymaps 'swiper-map
            "C-q" nil
+           "M-l" 'swiper-recenter-top-bottom
            "C-l" 'ivy-forward-char-or-partial-or-done
            "C-q" 'swiper-avy
            "C-s" 'swiper-query-replace))
@@ -12725,6 +12726,7 @@
            "po" 'org-projectile-goto-location-for-project
            ;; "pO" 'org-projectile-helm-template-or-project
            )
+
          :config
          (setq org-projectile-per-project-filepath
                (defun mohkale--org-projectile-path (project-path)
@@ -13809,6 +13811,7 @@
 
         (leader/set-keys
           "gm" 'magit-dispatch
+          "g$" 'magit-process-buffer
           "g!" 'magit-run
           "gfh" 'magit-log-buffer-file
           "gm"  'magit-dispatch-popup
