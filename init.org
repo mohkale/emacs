@@ -9968,9 +9968,13 @@
          :defer  t
          ;; :hook (projectile-mode . counsel-projectile-mode)
          :init
+         (general-define-key
+           [remap counsel-org-capture] 'counsel-projectile-org-capture)
+
          (leader/declare-prefix "ps" "search")
 
          (leader/set-keys
+           ;; 'counsel-projectile-org-agenda
            "fp"    'counsel-projectile-switch-project
            "pP"    'counsel-projectile-switch-project
            "pf"    'counsel-projectile-find-file
@@ -12762,7 +12766,9 @@
      #+END_SRC
 
 **** org-projectile
-     #+BEGIN_SRC emacs-lisp
+     deprecated in favour of [[*counsel-projectile][counsel-projectile]].
+
+     #+BEGIN_SRC emacs-lisp :tangle no
        (use-package org-projectile
          :ensure t
          :defer  t
