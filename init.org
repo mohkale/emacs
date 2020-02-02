@@ -5134,19 +5134,22 @@
     #+BEGIN_SRC emacs-lisp
       (use-package calendar
         :defer t
+        :init
+        (push 'calendar-mode mohkale--whitespace-exempt-modes)
+
         :config
-        (evil-set-initial-state 'calendar-mode 'normal)
+        (evil-set-initial-state 'calendar-mode 'motion)
 
         (general-define-key
-          :states  'normal
+          :states  'motion
           :keymaps 'calendar-mode-map
-          ;;; see also https://github.com/emacs-evil/evil-collection/blob/master/evil-collection-calendar.el
+          ;; see also https://github.com/emacs-evil/evil-collection/blob/master/evil-collection-calendar.el
           ;; globally useful
           "q"  'calendar-exit
           "p"  'calendar-print-day-of-year
           "c"  'calendar-count-days-region
           "?"  'calendar-goto-info-node
-          "C-r" 'calendar-redraw
+          "gr" 'calendar-redraw
 
           ;; jumpt to date
           "."  'calendar-goto-today
