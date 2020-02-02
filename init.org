@@ -397,6 +397,7 @@
          org-id-locations-file                              (var! "org/id-locations.el")
          org-publish-timestamp-directory                    (var! "org/timestamps/")
          org-registry-file                                  (var! "org/registry.el")
+         org-default-notes-file                             (org! "notes.org")
          recentf-save-file                                  (var! "recentf.el")
          save-place-file                                    (var! "save-place.el")
          savehist-file                                      (var! "savehist.el")
@@ -12206,6 +12207,49 @@
          )
      #+END_SRC
 
+**** org-capture
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-capture
+         :straight (org-capture :type built-in)
+         :defer t
+         :config
+         (require 'mohkale-org-capture)
+
+         ;; for some reason, the header for org-capture specifically uses
+         ;; the org-capture-mode-map, meaning my leader key shortcuts won't
+         ;; show up in it :(. Fix that here.
+         (add-hook 'org-capture-mode-hook
+                   (defun org-capture--fix-header (&rest args)
+                     (setq-local
+                      header-line-format
+                      (substitute-command-keys
+                       "Capture buffer. Finish `\\[org-capture-finalize]', \
+       refile `\\[org-capture-refile]', abort `\\[org-capture-kill]'."))))
+
+         (leader/with-major-mode-prefix
+           (leader/set-keys-for-mode 'org-capture-mode
+             "," 'org-capture-finalize
+             "q" 'org-capture-kill
+             "r" 'org-capture-refile)))
+     #+END_SRC
+
+***** templates
+      #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-org-capture.el
+        (setq org-capture-templates
+              `(("f" "File Task" entry (file ,org-default-notes-file)
+                 "* TODO %?\n  %a"
+                 :kill-buffer t)
+                ("t" "Todo" entry (file ,org-default-notes-file)
+                 "* TODO %?\n%U")
+                ("T" "Todo with Clipboard" entry (file ,org-default-notes-file)
+                 "* TODO %?\n%U\n   %c")
+                ("h" "Homework" entry (file+headline ,(org! "university.org") "Homework")
+                 "* TODO%? %^g\n  DEADLINE: %^{Deadline}t\n  :LOGBOOK:\n  - Added %u\n  :END:"
+                 :kill-buffer t)))
+
+        (provide 'mohkale-org-capture)
+      #+END_SRC
+
 **** mohkale-org
      #+BEGIN_SRC emacs-lisp
        (use-package mohkale-org
@@ -12304,6 +12348,7 @@
          :init
          ;;; leader keys outside of org mode
          (leader/declare-prefix "o" "org")
+
          (leader/set-keys
            "oc" 'org-capture
            "oa" 'org-agenda
@@ -12313,48 +12358,38 @@
          (setq-default org-src-window-setup 'current-window
                        org-babel-python-command "python3")
 
+         (setq org-todo-keywords '((sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED"))
+               org-refile-targets '((nil :maxlevel . 9)
+                                    (org-agenda-files :maxlevel . 9))
+               org-log-done 'time ; record when a TODO item is done.
+               org-outline-path-complete-in-steps nil ; refile in a single go
+               org-refile-use-outline-path t  ; show full paths for refiling
+               org-cycle-separator-lines 0 ; prevents weird coloring of collapsed trees
+
+               ;; break org-cycle-seperator-lines from working automatically
+               ;; org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
+
+               ;; native tabs are slow and unreliable... :sad:
+               ;; org-src-tab-acts-natively t ;; tab is native to block language
+               org-agenda-files (file-expand-wildcards (org! "*.org")))
+
+         ;; Initialised here to prevent org from defining a bunch of keys I won't
+         ;; end up using :P
+         (setq org-read-date-minibuffer-local-map (make-sparse-keymap))
+         (set-keymap-parent org-read-date-minibuffer-local-map minibuffer-local-map)
 
          :config
          ;; switch to insert state when capturing org templates
          (add-hook 'org-capture-mode-hook (lambda () (evil-append nil)) t)
 
-         (defun org-src--prevent-window-config-being-saved-wrapper (&rest args)
-           "prevents org mode from saving and restoring the window config
+         (advice-add 'org-edit-src-code :after
+                     (defun org-src--prevent-window-config-being-saved-wrapper (&rest args)
+                       "prevents org mode from saving and restoring the window config
        sorrunding a source code edit. it's annoyingly frustrating, so turn it off"
-           (setq org-src--saved-temp-window-config nil))
-
-         (advice-add 'org-edit-src-code :after #'org-src--prevent-window-config-being-saved-wrapper)
+                       (setq org-src--saved-temp-window-config nil)))
 
          (when (file-exists-p mohkale-library-of-babel-file)
-            (org-babel-lob-ingest mohkale-library-of-babel-file))
-
-          (setq-default org-src-window-setup 'current-window
-                        org-babel-python-command "python3")
-
-          (setq org-todo-keywords '((sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED"))
-                org-refile-targets '((nil :maxlevel . 9)
-                                     (org-agenda-files :maxlevel . 9))
-                org-outline-path-complete-in-steps nil ; refile in a single go
-                org-refile-use-outline-path t  ; show full paths for refiling
-                org-cycle-separator-lines 0 ; prevents weird coloring of collapsed trees
-                ;; org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
-                ;; break org-cycle-seperator-lines from working automatically
-                ;; org-src-tab-acts-natively t ;; tab is native to block language
-                ;; native tabs are slow and unreliable... :sad:
-                org-default-notes-file (org! "notes.org")
-                org-agenda-files (file-expand-wildcards (org! "*.org")))
-
-          (setq org-capture-templates
-                `(("f" "File Task" entry (file ,org-default-notes-file)
-                   "* TODO %?\n  %a"
-                   :kill-buffer t)
-                  ("t" "Todo" entry (file ,org-default-notes-file)
-                   "* TODO %?\n%U")
-                  ("T" "Todo with Clipboard" entry (file ,org-default-notes-file)
-                   "* TODO %?\n%U\n   %c")
-                  ("h" "Homework" entry (file+headline ,(org! "university.org") "Homework")
-                   "* TODO%? %^g\n  DEADLINE: %^{Deadline}t\n  :LOGBOOK:\n  - Added %u\n  :END:"
-                   :kill-buffer t)))
+           (org-babel-lob-ingest mohkale-library-of-babel-file))
 
          (advice-add 'org-edit-src-code :before (lambda (&rest args)
                                                   (unless (eq evil-state 'normal)
@@ -12367,22 +12402,21 @@
          ;; |_|\__,_|_| |_|\__, |\__,_|\__,_|\__, |\___||___/
          ;;                |___/             |___/
 
-         (org-babel-do-load-languages
-          'org-babel-load-languages
+         (org-babel-do-load-languages 'org-babel-load-languages
           '((emacs-lisp . t)
-            (awk . t)
-            (C . t)
-            (awk . t)
-            (haskell . t)
-            (java . t)
-            (js . t)
-            (ditaa . t)
-            (plantuml . t)
-            (python . t)
-            (ruby . t)
-            (sed . t)
-            (shell . t)
-            (R . t)))
+            (awk        . t)
+            (C          . t)
+            (awk        . t)
+            (haskell    . t)
+            (java       . t)
+            (js         . t)
+            (ditaa      . t)
+            (plantuml   . t)
+            (python     . t)
+            (ruby       . t)
+            (sed        . t)
+            (shell      . t)
+            (R          . t)))
 
          ;;             _ _       _     _           _ _
          ;;   _____   _(_) |     | |__ (_)_ __   __| (_)_ __   __ _ ___
@@ -12672,30 +12706,6 @@
            ;; "xu" 'org-underline
            ;; "xv" 'org-verbose
            ))
-     #+END_SRC
-
-**** org-capture
-     #+BEGIN_SRC emacs-lisp
-       (use-package org-capture
-         :straight (org-capture :type built-in)
-         :defer t
-         :config
-         ;; for some reason, the header for org-capture specifically uses
-         ;; the org-capture-mode-map, meaning my leader key shortcuts won't
-         ;; show up in it :(. Fix that here.
-         (add-hook 'org-capture-mode-hook
-                   (defun org-capture--fix-header (&rest args)
-                     (setq-local
-                      header-line-format
-                      (substitute-command-keys
-                       "Capture buffer. Finish `\\[org-capture-finalize]', \
-       refile `\\[org-capture-refile]', abort `\\[org-capture-kill]'."))))
-
-         (leader/with-major-mode-prefix
-           (leader/set-keys-for-mode 'org-capture-mode
-             "," 'org-capture-finalize
-             "q" 'org-capture-kill
-             "r" 'org-capture-refile)))
      #+END_SRC
 
 **** org-src
