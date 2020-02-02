@@ -1882,7 +1882,7 @@
                    toggle-relative-linum))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-misc.el
+    #+BEGIN_SRC emacs-lisp
       (defun toggle-lexical-binding (&optional prefix)
         (interactive "P")
         (if (not prefix)
@@ -1969,6 +1969,10 @@
     #+END_SRC
 
 **** Querying
+     :PROPERTIES:
+     :header-args+: :tangle bin/mohkale/mohkale-text-query.el
+     :END:
+
      functions for querying information about the text at point or retrieve other relevent information.
 
      #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-text-query.el
@@ -2018,10 +2022,14 @@
      #+END_SRC
 
 **** Formatting
+     :PROPERTIES:
+     :header-args+: :tangle bin/mohkale/mohkale-text-query.el
+     :END:
+
 ***** Chunks
       manipulate chunks of text, such as leading indentation or sequential padding.
 
-      #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-text.el
+      #+BEGIN_SRC emacs-lisp
         (defun dos2unix ()
           "Not exactly but it's easier to remember"
           (interactive)
@@ -2106,7 +2114,7 @@
 ***** Commenting
       comment regions of text or by default, the current line.
 
-      #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-text.el
+      #+BEGIN_SRC emacs-lisp
         (defun toggle-comment-at-point (start end)
           "toggle comment on line or region
         pass a prefix argument to bulk toggle across multiple lines.
@@ -2175,7 +2183,7 @@
 ***** Line Insertion
       line insertion and joining functions.
 
-      #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-text.el
+      #+BEGIN_SRC emacs-lisp
         (defun custom-insert-line (&optional prefix)
           "inserts a line above or below point
 
