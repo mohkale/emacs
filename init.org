@@ -8571,6 +8571,9 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package flyspell
+        :init
+        (evil-ex-define-cmd "spell" #'flyspell-buffer)
+
         :config
         (leader/with-prefix mohkale-minor-mode-leader-key
           (leader/set-keys-for-mode 'flyspell-mode
