@@ -12403,8 +12403,11 @@
          (leader/set-keys
            "oc" 'org-capture
            "oa" 'org-agenda
+           "ol" 'org-store-link
            "oy" 'org-copy-subtree
-           "oY" 'org-cut-subtree)
+           "oY" 'org-cut-subtree
+           "on" 'org-next-link
+           "op" 'org-previous-link)
 
          (setq-default org-src-window-setup 'current-window
                        org-babel-python-command "python3")
@@ -12512,18 +12515,24 @@
            ;; NOTE meta keys insert headings with changed priority, shift keys insert todo headings
            ;; FIXME prefix arg doesn't work
            ;; FIXME doesn't work when on a heading
-           "C-<return>"   (evil-org-eol-call-anon (org-insert-heading nil))
+           "C-<return>"   (evil-org-eol-call-anon
+                           (org-insert-heading nil))
+
            "C-M-<return>" (evil-org-eol-call-anon
                            (org-insert-heading nil)
                            (if current-prefix-arg
                                (org-metaleft)
                              (org-metaright)))
-           "C-S-<return>"   (evil-org-eol-call-anon (org-insert-todo-heading nil))
+
+           "C-S-<return>"   (evil-org-eol-call-anon
+                             (org-insert-todo-heading nil))
+
            "C-S-M-<return>" (evil-org-eol-call-anon
                              (org-insert-todo-heading nil)
                              (if current-prefix-arg
                                  (org-metaleft)
                                (org-metaright)))
+
            "C-." 'org-toggle-heading)
 
          (general-define-key
@@ -12546,10 +12555,14 @@
            "gk" 'org-backward-heading-same-level
            "gl" 'outline-next-visible-heading
            "g." 'hydra-org-navigate/body
-           ;; "t" 'org-todo ; I use this too often
-           ;; "T" 'org-insert-todo-heading ; rebound to C-S-<return>
            "$" 'org-end-of-line
            "^" 'org-beginning-of-line)
+
+         (general-define-key
+           :keymaps 'org-mode-map
+           :states  'visual
+           "gb" 'org-babel-mark-block
+           "gB" 'org-mark-element)
 
          (general-define-key
            :keymaps 'org-mode-map
@@ -12623,7 +12636,7 @@
            "c" "clock/calendar"
            "e" "export"
            "h" "headings"
-           "i" "insert"
+           "I" "insert"
            "S" "subtrees"
            "t" "tables"
            "m" "mark/move"
@@ -12636,6 +12649,7 @@
 
          (leader/set-keys-for-mode! 'org-mode
            "RET" 'org-ctrl-c-ret
+           "TAB" 'org-todo
            "SPC" 'org-display-outline-path
            "!" 'org-time-stamp-inactive
            "'" 'org-edit-special
@@ -12645,6 +12659,7 @@
            "." 'org-time-stamp
            "/" 'org-sparse-tree
            ":" 'org-set-tags-command
+           "#" 'org-priority
            "^" 'org-sort
            "A" 'org-archive-subtree
            "a" 'org-agenda
@@ -12653,26 +12668,27 @@
            "D" 'org-insert-drawer
            "d" 'org-deadline
            "f" 'org-set-effort
-           "I" 'org-clock-in
+           "i" 'org-clock-in
            "H" 'org-shiftleft
            "J" 'org-shiftdown
            "K" 'org-shitup
            "L" 'org-shiftright
-           "l" 'org-open-at-point
+           "l" 'org-insert-link
            "n" 'org-add-note
-           "O" 'org-clock-out
+           "o" 'org-clock-out
            "P" 'org-set-property
            "p" 'org-pomodoro
+           "q" 'org-set-tags-command
            "r" 'org-refile
            "R" 'org-refile-goto-last-stored
            "s" 'org-schedule
            "T" 'org-show-todo-tree
            "U" 'org-update-all-dblocks
            "u" 'org-dblock-update
-           "C-h" 'org-shiftcontrolleft
-           "C-j" 'org-shiftcontroldown
-           "C-k" 'org-shiftcontrolup
-           "C-l" 'org-shiftcontrolright
+           ;; "C-h" 'org-shiftcontrolleft
+           ;; "C-j" 'org-shiftcontroldown
+           ;; "C-k" 'org-shiftcontrolup
+           ;; "C-l" 'org-shiftcontrolright
            "M-a" 'org-attach
            "M-c" 'org-columns
            "M-p" 'org-delete-property
@@ -12697,13 +12713,12 @@
            "hi" 'org-insert-heading-after-current
            "hs" 'org-insert-subheading
 
-           "ia" 'org-attach
-           "if" 'org-footnote-new
-           ;; "ik" 'insert-keybinding-org
-           "il" 'org-insert-link
-           "it" 'org-table-create
-           ;; "is" 'org-download-screenshot
-           ;; "iy" 'org-download-yank
+           "Ia" 'org-attach
+           "If" 'org-footnote-new
+           ;; "Ik" 'insert-keybinding-org
+           "It" 'org-table-create
+           ;; "Is" 'org-download-screenshot
+           ;; "Iy" 'org-download-yank
 
            "ms" 'org-mark-subtree
            "me" 'org-mark-element
