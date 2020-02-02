@@ -13842,11 +13842,23 @@
           "gU"  'magit-unstage-file)
 
         :config
+        (advice-add 'magit-section-up :around
+                    (defun magit-section-up--adjust-destination (func &rest args)
+                      (cond
+                       ((magit-diff-inside-hunk-body-p)
+                        (magit-section-goto (magit-current-section)))
+                       (t (apply func args)))))
+
         (setq mohkale--whitespace-exempt-modes
               (append '(magit-status-mode
                         magit-log-mode
                         magit-diff-mode)
                       mohkale--whitespace-exempt-modes))
+
+        (general-define-key
+          :states evil-magit-state
+          :keymaps 'magit-mode-map
+          "gl" 'magit-section-forward)
 
         ;; GIVE ME BACK MY LEADER!!!
         (general-define-key
