@@ -12206,6 +12206,94 @@
          )
      #+END_SRC
 
+**** mohkale-org
+     #+BEGIN_SRC emacs-lisp
+       (use-package mohkale-org
+         :commands (org-outline-smart-up-level
+                    org-openable-p
+                    org-normal-return
+                    org-clever-return))
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-org.el
+       (defun org-outline-smart-up-level ()
+         "when at a heading, move to parent
+       otherwise move to current heading."
+         (interactive)
+         (call-interactively (if (org-at-heading-p)
+                                 'outline-up-heading
+                               'outline-previous-heading)))
+
+       (defun org-openable-p ()
+         (org-element-lineage
+          (org-element-context)
+          '(footnote-definition
+            footnote-reference
+            headline
+            ;; inlinetask
+            link
+            timestamp)
+          t))
+
+       (defun org-normal-return ()
+         (interactive)
+         (call-interactively
+          (cond
+           ((org-openable-p) 'org-open-at-point)
+           (t 'evil-ret))))
+
+       (defvar org-clever-return--insert-headings nil
+         "when true, returning from the end of a heading
+       inserts a heading.")
+
+       (defun org-clever-return (&optional above)
+         "depending on the local state, inserts a heading, a table row an item or newline.
+       this function is functionally similair to the result of evil-org-eol-call-anon, but
+       instead of checking the line after moving to the end of it (which doesn't work for
+       folded lines, such as headings), it checks before moving and then inserts the right
+       items depending on how things looked where you were."
+         (interactive)
+         (cl-letf (((symbol-function 'evil-open)
+                    (lambda () (call-interactively
+                           (if above
+                               'evil-open-above
+                             'evil-open-below))))
+                   ((symbol-function 'fallback-action)
+                    (lambda (&optional interactive)
+                      (when (and (line-empty-p)
+                                 (not (zerop (column-number (point)))))
+                        ;; don't leave a trailing indent on current line unecessarily
+                        (remove-all-trailing-whitespace (line-beginning-position)
+                                                        (line-end-position)))
+                      (if (and interactive (not above))
+                          (funcall-interactively
+                           'newline-and-indent)
+                        (evil-open)))))
+           (if (and current-prefix-arg (listp current-prefix-arg))
+               ;; when called with simple prefix, goto
+               ;; fallaback action.
+               (let ((current-prefix-arg nil))
+                 (fallback-action))
+             (cond ((org-table-p)
+                    (org-table-insert-row (not above))
+                    (evil-insert nil))
+
+                   ((and org-clever-return--insert-headings
+                         (org-at-heading-p))
+                    (evil-open)
+                    (org-insert-heading))
+
+                   ((org-at-item-p)
+                    ;; position of cursor dictates where new point goes
+                    (if above
+                        (goto-char (line-beginning-position))
+                      (goto-char (line-end-position)))
+                    (org-insert-item)
+                    (evil-append nil))
+
+                   (t (fallback-action (called-interactively-p)))))))
+     #+END_SRC
+
 **** org-mode
      #+BEGIN_SRC emacs-lisp
        (use-package org
@@ -12272,14 +12360,6 @@
                                                   (unless (eq evil-state 'normal)
                                                     (evil-normal-state))))
 
-         (defun org-outline-smart-up-level ()
-           "when at a heading, move to parent
-       otherwise move to current heading."
-           (interactive)
-           (call-interactively (if (org-at-heading-p)
-                                   'outline-up-heading
-                                 'outline-previous-heading)))
-
          ;;  _
          ;; | | __ _ _ __   __ _ _   _  __ _  __ _  ___  ___
          ;; | |/ _` | '_ \ / _` | | | |/ _` |/ _` |/ _ \/ __|
@@ -12313,75 +12393,6 @@
 
          (defmacro evil-org-eol-call-anon (&rest body)
            "define an anonymous function running body at the end of the line"
-
-         (defvar org-clever-return--insert-headings nil
-           "when true, returning from the end of a heading
-       inserts a heading.")
-
-         (defun org-clever-return (&optional above)
-           "depending on the local state, inserts a heading, a table row an item or newline.
-       this function is functionally similair to the result of evil-org-eol-call-anon, but
-       instead of checking the line after moving to the end of it (which doesn't work for
-       folded lines, such as headings), it checks before moving and then inserts the right
-       items depending on how things looked where you were."
-           (interactive)
-           (cl-letf (((symbol-function 'evil-open)
-                      (lambda () (call-interactively
-                             (if above
-                                 'evil-open-above
-                               'evil-open-below))))
-                     ((symbol-function 'fallback-action)
-                      (lambda (&optional interactive)
-                        (when (and (line-empty-p)
-                                   (not (zerop (column-number (point)))))
-                          ;; don't leave a trailing indent on current line unecessarily
-                          (remove-all-trailing-whitespace (line-beginning-position)
-                                                          (line-end-position)))
-                        (if (and interactive (not above))
-                            (funcall-interactively
-                             'newline-and-indent)
-                          (evil-open)))))
-             (if (and current-prefix-arg (listp current-prefix-arg))
-                 ;; when called with simple prefix, goto
-                 ;; fallaback action.
-                 (let ((current-prefix-arg nil))
-                   (fallback-action))
-               (cond ((org-table-p)
-                      (org-table-insert-row (not above))
-                      (evil-insert nil))
-
-                     ((and org-clever-return--insert-headings
-                           (org-at-heading-p))
-                      (evil-open)
-                      (org-insert-heading))
-
-                     ((org-at-item-p)
-                      ;; position of cursor dictates where new point goes
-                      (if above
-                          (goto-char (line-beginning-position))
-                        (goto-char (line-end-position)))
-                      (org-insert-item)
-                      (evil-append nil))
-
-                     (t (fallback-action (called-interactively-p)))))))
-
-         (defun org-openable-p ()
-           (org-element-lineage
-            (org-element-context)
-            '(footnote-definition
-              footnote-reference
-              headline
-              ;; inlinetask
-              link
-              timestamp)
-            t))
-
-         (defun org-normal-return ()
-           (interactive)
-           (call-interactively
-            (cond
-             ((org-openable-p) 'org-open-at-point)
-             (t 'evil-ret))))
            `(lambda! (end-of-visual-line) ,@body (evil-append nil)))
 
          (general-define-key
