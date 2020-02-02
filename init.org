@@ -2663,19 +2663,18 @@
         "run `toggle-comment-at-point' using evil motion."
         (toggle-comment-at-point beg end))
 
-      (defun-evil-adjust-to-eol evil-adjust-eval-print-last-sexp (&optional arg)
-        (interactive "P")
-        (eval-print-last-sexp arg)
-        (message nil))
+      (defun evil-adjust-eval-print-last-sexp ()
+        (interactive)
+        (save-excursion
+          (with-evil-adjust-to-eol
+            (funcall-interactively 'eval-print-last-sexp)
+            (message nil))))
 
-      (defun-evil-adjust-to-eol evil-adjust-eval-replace-last-sexp (&optional prefix)
-        (interactive "P")
-        (eval-replace-last-sexp prefix)
-        (message nil))
-
-      (defun-evil-adjust-to-eol evil-adjust-eval-last-sexp (&optional arg)
-        (interactive "P")
-        (eval-last-sexp arg))
+      (defun evil-adjust-eval-replace-last-sexp ()
+        (interactive)
+        (with-evil-adjust-to-eol
+          (eval-replace-last-sexp prefix)
+          (message nil)))
 
       (evil-define-operator evil-reverse (beg end)
         :type line
@@ -4486,19 +4485,18 @@
          (evil-mode 1)
 
          ;; evil-adjust: https://raw.githubusercontent.com/troyp/evil-adjust/master/evil-adjust.el
-         (defmacro defun-evil-adjust-to-eol (function-name arglist &optional interactive &rest body)
-           `(defun ,function-name ,arglist
-              ,interactive
-              (cl-case evil-state
-                ('normal (progn
-                           (evil-append 1)
-                           ,@body
-                           (evil-normal-state)))
-                ('visual (progn
-                           (evil-append 1)
-                           ,@body
-                           (evil-visual-restore)))
-                (otherwise ,@body))))
+         (defmacro with-evil-adjust-to-eol (&rest body)
+           `(let ((-last-evil-state evil-state)
+                  (evil-echo-state nil))
+              (when (member evil-state '(normal visual))
+                (evil-append 1)) ; switch to insert state
+              (condition-case err
+                  (progn ,@body)
+                (error
+                 (evil-change-state -last-evil-state)
+                 (signal (car err) (cdr err))))
+              (evil-change-state -last-evil-state)))
+         (put 'with-evil-adjust-to-eol 'lisp-indent-function 'defun)
 
          (general-define-key
            :states '(insert replace)
@@ -4583,7 +4581,6 @@
            "g=" 'count-words
            "g-" 'evil-indent
            "g;" 'evil-repeat-find-char-reverse
-           [remap eval-last-sexp] 'evil-adjust-eval-last-sexp
            [remap eval-print-last-sexp] 'evil-adjust-eval-print-last-sexp
            [remap eval-replace-last-sexp] 'evil-adjust-eval-replace-last-sexp)
 
@@ -8931,13 +8928,15 @@
         (leader/set-keys-for-mode! 'occur-edit-mode
           "," 'occur-cease-edit)
 
-        (defun-evil-adjust-to-eol evil-adjust-occur-next (&optional prefix)
-          (interactive "P")
-          (occur-next prefix))
+        (defun evil-adjust-occur-next ()
+          (interactive)
+          (with-evil-adjust-to-eol
+            (funcall-interactively 'occur-next)))
 
-        (defun-evil-adjust-to-eol evil-adjust-occur-prev (&optional prefix)
-          (interactive "P")
-          (occur-prev prefix))
+        (defun evil-adjust-occur-prev ()
+          (interactive)
+          (with-evil-adjust-to-eol
+            (funcall-interactively 'occur-prev)))
 
         (evil-set-initial-state 'occur-mode 'motion)
         (general-define-key
