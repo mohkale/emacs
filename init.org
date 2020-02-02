@@ -431,6 +431,7 @@
          helm-adaptive-history-file                         (var! "helm/adaptive-history.el")
          helm-backup-path                                   (var! "helm/backup/")
          helm-github-stars-cache-file                       (var! "helm/github-stars-cache.el")
+         hl-highlight-save-file                             (var! "hl-save.el")
          httpd-root                                         (var! "simple-httpd/")
          indium-chrome-data-dir                             (var! "indium/chrome-profile")
          indium-workspace-file                              (var! "indium/workspaces.el")
@@ -13985,8 +13986,12 @@
     #+END_SRC
 
 ** Unimplemented
+   :PROPERTIES:
+   :header-args+: :tangle no
+   :END:
+
 *** realgud
-    #+BEGIN_SRC emacs-lisp :tangle no
+    #+BEGIN_SRC emacs-lisp
       (use-package realgud
         :ensure t
         :defer  t
@@ -14014,9 +14019,84 @@
           "<override-state>" nil))
     #+END_SRC
 
+*** hl-anything
+    See [[https://github.com/hl-anything/hl-anything-emacs][here]].
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package hl-anything
+        :ensure t
+        :defer  t
+        :commands (hl-toggle-local
+                   hl-toggle-global)
+        :init
+        (general-define-key
+          :states leader-norm-states
+          "zh" 'hl-toggle-local
+          "zH" 'hl-toggle-global)
+
+        :config
+        (evil-define-operator hl-toggle-local (beg end)
+          (if (bound-and-true-p hl-highlight-mode)
+              (let ((regexp (regexp-quote (buffer-substring-no-properties beg end))))
+                (when regexp
+                  (if (member regexp hl-highlights-local)
+                      (hl-unhighlight-internal regexp hl-highlights-local hl-colors-index-local)
+                    (hl-highlight-internal regexp hl-highlights-local hl-colors-index-local))))
+            (user-error "`hl-highlight-mode' is not active at the moment.")))
+
+        (evil-define-operator hl-toggle-global (beg end)
+          (if (bound-and-true-p hl-highlight-mode)
+              (let ((regexp (regexp-quote (buffer-substring-no-properties beg end))))
+                (when regexp
+                  (if (member regexp hl-highlights)
+                      (hl-unhighlight-internal regexp hl-highlights hl-colors-index)
+                    (hl-highlight-internal regexp hl-highlights hl-colors-index))))
+            (user-error "`hl-highlight-mode' is not active at the moment."))))
+    #+END_SRC
+
+*** keycast
+    Doesn't work with evil, see [[https://github.com/emacs-evil/evil/issues/1261][here]].
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package keycast
+        :ensure t
+        :defer  t
+        :init
+        (with-eval-after-load 'spaceline
+          (spaceline-define-segment keycast
+            "show active pressed keys in the modeline."
+            (eval (nth 1 mode-line-keycast))
+            :when (and active
+                       (bound-and-true-p keycast-mode))))
+
+        :config
+        (advice-add #'keycast-mode :around
+                    (cl-defun keycast--supress-user-error+ (func &rest args)
+                      "make keycast happy :)"
+                      (let ((mode-line-format `(,keycast-insert-after
+                                                ,(when (bound-and-true-p keycast-mode)
+                                                   'mode-line-keycast))))
+                        (apply func args))))
+
+        (advice-add #'keycast-mode-line-update :around
+                    (defun keycast--prevent-mode-line-update+ (func &rest args)
+                      "stope keycast-mode-line-update... from updating the mode-line."
+                      (cl-letf (((symbol-function #'force-mode-line-update)
+                                 (symbol-function #'ignore)))
+                        (apply func args)))))
+
+    #+END_SRC
+
+*** gif-screencast
+    Doesn't work, see [[*keycast][keycast]].
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package gif-screencast
+        :straight (gif-screencast :type git :host gitlab :repo "ambrevar/emacs-gif-screencast")
+        :defer t)
+    #+END_SRC
 
 * Scripts
-
 ** server-installation-scripts
    #+NAME: server-install-path
    #+BEGIN_SRC emacs-lisp :results value :tangle no
