@@ -12236,36 +12236,38 @@
        (use-package org-capture
          :straight (org-capture :type built-in)
          :defer t
+         :commands doct
          :config
+         (use-package doct
+           :straight (doct :host github :repo "progfolio/doct" :branch "master")
+           :init
+           (setq doct-default-entry-type 'entry))
+
          (require 'mohkale-org-capture)
+
+         (leader/with-major-mode-prefix
+           (leader/set-keys-for-mode 'org-capture-mode
+             "," 'org-capture-finalize
+             "q" 'org-capture-kill
+             "r" 'org-capture-refile))
 
          ;; for some reason, the header for org-capture specifically uses
          ;; the org-capture-mode-map, meaning my leader key shortcuts won't
          ;; show up in it :(. Fix that here.
          (add-hook 'org-capture-mode-hook
                    (defun org-capture--fix-header (&rest args)
+                     (message "setting header")
                      (setq-local
                       header-line-format
                       (substitute-command-keys
                        "Capture buffer. Finish `\\[org-capture-finalize]', \
-       refile `\\[org-capture-refile]', abort `\\[org-capture-kill]'."))))
-
-         (leader/with-major-mode-prefix
-           (leader/set-keys-for-mode 'org-capture-mode
-             "," 'org-capture-finalize
-             "q" 'org-capture-kill
-             "r" 'org-capture-refile)))
+       refile `\\[org-capture-refile]', abort `\\[org-capture-kill]'.")))))
      #+END_SRC
 
 ***** templates
       #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-org-capture.el
         ;; -*- lisp-indent-function: 'common-lisp-indent-function -*-
-
-        ;; let's you create declarative org capture templates
-        (use-package doct
-          :straight (doct :host github :repo "progfolio/doct" :branch "master")
-          :init
-          (setq doct-default-entry-type 'entry))
+        (require 'doct)
 
         ;; see also: https://www.gnu.org/software/emacs/manual/html_node/org/Template-expansion.html#Template-expansion
         (setq
@@ -12274,18 +12276,30 @@
                   :type entry
                   :file ,org-default-notes-file
                   :prepend     t
-                  :empty-lines 1
-                  :headline "TODOs [/]"
-                  ;; WARN %doct() doesn't work with ivy completions.
-                  :template (; "* %doct(todo-state) %?"
-                             "* TODO %?"
+                  :empty-lines 0
+                  :function (lambda ()
+                              "goto TODO headline with numeric statistics value."
+                              (let* ((heading "* TODOs [/]")
+                                     (heading-regexp "* TODOs \\[[[:digit:]]*/[[:digit:]]*\\]")
+                                     (heading-point
+                                      (ignore-errors
+                                        (save-excursion
+                                          (goto-char (point-min))
+                                          (search-forward-regexp heading-regexp)
+                                          (line-beginning-position)))))
+                                (if heading-point
+                                    (goto-char heading-point)
+                                  (goto-char (point-min))
+                                  (save-excursion
+                                    (insert heading "\n")))))
+                  :before-finalize (lambda () (org-update-parent-todo-statistics))
+                  :template ("* %doct(todo-state) %?"
                              "  %U")
-                  ;; :todo-state "TODO"
+                  :todo-state "TODO"
                   :children (("Todo" :keys "t")
                              ("Todo with Clipboard"
                               :keys "T"
-                              :template (;"* %doct(todo-state) %?"
-                                         "* TODO %?"
+                              :template ("* %doct(todo-state) %?"
                                          "  %U"
                                          "  %c"))))
                  (:group "professional"
@@ -12298,9 +12312,9 @@
                                          "  DEADLINE: %^{Deadline}t"
                                          "  :LOGBOOK:"
                                          "  Added %u"
-                                         "  :END:")))))))
+                                         "  :END:"))))))
 
-        (setq
+         ;; templates for projectile-projects.
          counsel-projectile-org-capture-templates
          (doct `(("[${name}] Task"
                   :keys "p"
