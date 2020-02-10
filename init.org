@@ -9278,10 +9278,6 @@
         (evil-set-initial-state 'pdf-view-mode 'motion)
 
         ;; (pdf-tools-install)
-        (with-eval-after-load 'org
-          (use-package org-pdftools
-            :straight (org-pdftools :type git :host github :repo "fuxialexander/org-pdftools")
-            :demand t))
 
         (general-define-key
           :keymaps 'pdf-view-mode-map
@@ -9378,6 +9374,7 @@
           "m" 'outline-mark-subtree)
 
         (evil-set-initial-state 'pdf-occur-buffer-mode 'motion)
+        (defvar pdf-occur-buffer-mode-map (make-sparse-keymap))
         (general-define-key
           :states  'motion
           :keymaps 'pdf-occur-buffer-mode-map
@@ -9468,6 +9465,14 @@
             (pdf-view-first-page)
             (image-bob))))
     #+END_SRC
+
+**** org-pdftools
+     #+BEGIN_SRC emacs-lisp
+       (with-eval-after-load 'org
+         (use-package org-pdftools
+           :defer t
+           :straight (org-pdftools :type git :host github :repo "fuxialexander/org-pdftools")))
+     #+END_SRC
 
 *** persp-mode
     the core backend for spacemacs's layout functionality.
