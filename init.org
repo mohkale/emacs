@@ -9820,7 +9820,9 @@
          :defer  10
          :delight ""
          :hook (prog-mode . projectile-mode)
-         :commands (projectile-ivy-persp-switch-project
+         :commands (project-has-file-p
+                    when-project-has-file-p
+                    projectile-ivy-persp-switch-project
                     projectile-show-and-copy-project-dir)
          :init
          (leader/declare-prefix*
@@ -9966,7 +9968,19 @@
                    (save-excursion
                      (insert path))))
                (message (abbreviate-file-name path))
-               (kill-new path)))))
+               (kill-new path))))
+
+         (defun project-has-file-p (&rest files)
+           (let ((project-dir (projectile-project-p)))
+             (and project-dir
+                  (cl-loop
+                   for file in files
+                   when (file-exists-p (concat project-dir file))
+                   return t))))
+
+         (defmacro when-project-has-file-p (file &rest body)
+           `(when (project-has-file-p ,file)
+              ,@body)))
      #+END_SRC
 
 **** counsel-projectile
@@ -11692,12 +11706,6 @@
       (push (cons mohkale-ruby-mode 2) mohkale-indent-config)
 
       (leader/set-keys "Mr" mohkale-ruby-mode)
-
-      (defmacro when-project-has-gemfile (&rest body)
-        `(let ((project-dir (projectile-project-p)))
-           (when (and project-dir
-                      (file-exists-p (concat project-dir "Gemfile")))
-             ,@body)))
     #+END_SRC
 
 **** ruby
@@ -11772,7 +11780,7 @@
        (add-hook mohkale-ruby-mode-hook
                  (defun ruby-enable-lsp-in-projects (&rest args)
                    (when (eq mohkale-ruby-use-lsp 'projectile)
-                     (when-project-has-gemfile
+                     (when-project-has-file-p "Gemfile"
                        (call-interactively 'lsp)))))
      #+END_SRC
 
@@ -11789,7 +11797,7 @@
            (add-hook mohkale-ruby-mode-hook
                      (defun ruby-robe-enable-in-projects (&rest args)
                        (unless (eq mohkale-ruby-use-lsp 'projectile)
-                         (when-project-has-gemfile
+                         (when-project-has-file-p "Gemfile"
                            (call-interactively 'robe-mode)))))
 
            :config
