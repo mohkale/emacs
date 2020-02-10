@@ -1954,6 +1954,9 @@
         :straight (mohkale-text-query :type built-in)
         :commands (line-width
                    column-number
+                   in-comment-p
+                   in-font-lock-comment-p
+                   line-beginning-column
                    point-to-coordinates
                    line-empty-p
                    list-faces))
@@ -2027,6 +2030,31 @@
                               ,(plist-get (text-properties-at point) 'face)))))
            (and (called-interactively-p 'any) (message (format "%s" faces)))
            faces))
+
+       (defun in-comment-p (&optional pos)
+         (save-excursion
+           (goto-char (or pos (point)))
+           (nth 4 (syntax-ppss))))
+
+       (defun in-font-lock-comment-p (&optional pos)
+         "Test if character at POS is comment.
+       If POS is nil, character at `(point)' is tested"
+         (unless pos (setq pos (point)))
+         (let* ((fontfaces (get-text-property pos 'face)))
+           (when (not (listp fontfaces))
+             (setf fontfaces (list fontfaces)))
+           (delq nil
+                 (mapcar #'(lambda (f)
+                             ;; learn this trick from flyspell
+                             (or (eq f 'font-lock-comment-face)
+                                 (eq f 'font-lock-comment-delimiter-face)))
+                         fontfaces))))
+
+       (defun line-beginning-column (&optional point)
+         (save-excursion
+           (goto-char (or point (point)))
+           (evil-first-non-blank)
+           (current-column)))
 
        (provide 'mohkale-text-query)
      #+END_SRC
@@ -13549,6 +13577,7 @@
          :mode "\\.js$"
          :hook ((js2-mode . flycheck-mode)
                 (js2-mode . javascript-enable-lsp-in-projects))
+         :commands (js-jsdoc-return+)
          :init
          (defun javascript-enable-lsp-in-projects (&rest _)
            (when (project-has-file-p "package.json"
@@ -13559,6 +13588,10 @@
          (setq js2-mode-show-parse-errors      nil
                js2-mode-show-strict-warnings   nil
                js2-strict-missing-semi-warning nil)
+
+         (general-define-key
+           :keymaps 'js2-mode-map
+           [remap indent-new-comment-line] 'js-jsdoc-return+)
 
          (general-define-key
            :keymaps 'js2-mode-map
@@ -13593,7 +13626,36 @@
            "Hsw" 'js2-mode-display-warnings-and-errors
            "Hse" 'js2-mode-show-element
            "Hsc" 'js2-mode-hide-comments
-           "Hsf" 'js2-mode-show-functions))
+           "Hsf" 'js2-mode-show-functions)
+
+         (defun js-jsdoc-return+ (&optional arg)
+           (interactive "p")
+           (barf-if-buffer-read-only) ;; can't continue adding to readonly buffer.
+           (setq arg (or arg 1)) ;; insert one line when arg hasn't been given.
+
+           (let (inserted)
+             (when (in-comment-p)
+               (let* ((current-line (buffer-substring-no-properties
+                                     (line-beginning-position)
+                                     (line-end-position)))
+                      (start-regexp (rx bol (zero-or-more blank) "/**"))
+                      (continue-regexp (rx bol (one-or-more blank) "*"))
+                      start-p continue-p)
+                 (when (or (setq continue-p (string-match-p continue-regexp current-line))
+                           (setq start-p    (string-match-p start-regexp    current-line)))
+                   (setq inserted t)
+                   (let ((start-column (line-beginning-column)))
+                     (when start-p (incf start-column)) ;; one char past start column
+                     (dotimes (_ arg)
+                       ;; (goto-char (line-end-position))
+                       (newline)
+                       (insert (make-string start-column ? ) "* ")
+                       (save-excursion
+                         (previous-line)
+                         (whitespace-cleanup-region (line-beginning-position) (line-end-position))))))))
+             (unless inserted
+               (dotimes (_ arg)
+                 (indent-new-comment-line))))))
      #+END_SRC
 
 **** tern
