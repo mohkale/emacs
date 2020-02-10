@@ -12934,6 +12934,155 @@
                    (find-file file)))))))
      #+END_SRC
 
+**** org-live-latex-mode
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-live-latex-mode
+         :defer t
+         :commands org-live-latex-mode)
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp :tangle ~/.emacs.d/bin/misc/org-live-latex-mode.el
+       ;;; org-live-latex-mode.el --- render latex as you write -*- lexical-binding: t -*-
+
+       ;; Copyright (C) 2015-2019  Free Software Foundation, Inc.
+
+       ;; Author: Mohsin Kaleem <mohkalsin@gmail.com>
+       ;; Version: 0.0.1
+       ;; Package-Requires: ((emacs "26.3"))
+       ;; Keywords: org
+
+       (defvar org-live-latex-last nil
+         "Holds last fragment/environment you were on.")
+
+       (defvar org-live-latex-toggle-delay 0.5
+         "delay after which the fragment at point will be derendered.")
+
+       (defun org-live-latex--get-current-latex-fragment ()
+         "Return the overlay associated with the image under point."
+         (car (--select (eq (overlay-get it 'org-overlay-type) 'org-latex-overlay)
+                        (overlays-at (point)))))
+
+       (defun org-live-latex-in-fragment-p ()
+         "Return the point where the latex fragment begins, if inside
+       a latex fragment. Else return false"
+         (let* ((el (org-element-context))
+                (el-type (car el)))
+           (and (or (eq 'latex-fragment el-type)
+                    (eq 'latex-environment el-type))
+                (org-element-property :begin el))))
+
+       (defun org-live-latex-toggle-auto ()
+         (interactive)
+         (while-no-input
+           (run-with-idle-timer org-live-latex-toggle-delay
+                                nil 'org-live-latex-toggle-helper)))
+
+       (defun org-live-latex--new-fragment-p (new-fragment-point)
+         "true when we were on a fragmet, but have moved to a new fragment.
+       NEW-FRAGMENT-POINT is expected to be the return value of
+       `org-live-latex-in-fragment-p'."
+         (and
+          ;; fragment we were on
+          org-live-latex-last
+          ;; and are on a fragment now
+          new-fragment-point
+          ;; but not on the last one this is a little tricky. as you edit the
+          ;; fragment, it is not equal to the last one. We use the begin
+          ;; property which is less likely to change for the comparison.
+          (not (= new-fragment-point
+                  org-live-latex-last))))
+
+       (defun org-live-latex--exit-fragment-p (new-fragment-point)
+         "true when we've exited the body of a fragment we were on.
+       See also: `org-live-latex--new-fragment-p'."
+         (and
+          ;; not on a fragment now
+          (not new-fragment-point)
+          ;; but we were on one
+          org-live-latex-last))
+
+       (defun org-live-latex--enter-fragment-p (new-fragment-point)
+         "true when we've entered a fragment, but were not in one before.
+       See also: `org-live-latex--new-fragment-p'."
+         (and
+          ;; we were not one one
+          (not org-live-latex-last)
+          ;; but now we are
+          new-fragment-point))
+
+       (defun org-live-latex-toggle-helper ()
+         "Toggle a latex fragment image."
+         (ignore-errors
+           (when (eq major-mode 'org-mode)
+             (let* ((begin (org-live-latex-in-fragment-p)))
+               (cond
+                ;; were on a fragment and now on a new fragment
+                ((org-live-latex--new-fragment-p begin)
+                 ;; go back to last one and put image back on
+                 (save-excursion
+                   (goto-char org-live-latex-last)
+                   (when (org-live-latex-in-fragment-p) (org-toggle-latex-fragment))
+                   ;; now remove current imagea
+                   (goto-char begin)
+                   (let ((ov (org-live-latex--get-current-latex-fragment)))
+                     (when ov
+                       (delete-overlay ov)))
+                   ;; and save new fragment
+                   (setq org-live-latex-last begin)))
+
+                ;; were on a fragment and now are not on a fragment
+                ((org-live-latex--exit-fragment-p begin)
+                 ;; put image back on
+                 (save-excursion
+                   (goto-char org-live-latex-last)
+                   (when (org-live-latex-in-fragment-p)
+                     (org-toggle-latex-fragment)))
+
+                 ;; unset last fragment
+                 (setq org-live-latex-last nil))
+
+                ;; were not on a fragment, and now are
+                ((org-live-latex--enter-fragment-p begin)
+                 (save-excursion
+                   (goto-char begin)
+                   ;; remove image
+                   (let ((ov (org-live-latex--get-current-latex-fragment)))
+                     (when ov
+                       (delete-overlay ov)))
+                   (setq org-live-latex-last begin)))
+                ;; else not on a fragment
+                ((not begin)
+                 (setq org-live-latex-last nil)))))))
+
+       ;; (setq org-live-latex-toggle-helper (byte-compile 'org-live-latex-toggle-helper))
+       ;; (setq org-live-latex-toggle-auto   (byte-compile 'org-live-latex-toggle-auto))
+
+       (define-minor-mode org-live-latex-mode
+         "Toggle org-live-latex-mode
+       When this minor-mode is active alongside `org-mode', latex fragments are automatically
+       rendered as their written. Returning `point' to a fragment will delete the overlay
+       providing an affect similair to `prettify-symbols-mode'.
+
+       This mode was basically copied and pasted from:
+       https://ivanaf.com/automatic_latex_fragment_toggling_in_org-mode.html
+       "
+         :lighter " OLL"
+         (if org-live-latex-mode
+             (progn
+               (if (eq major-mode 'org-mode)
+                   (progn
+                     (make-variable-buffer-local 'post-command-hook)
+                     (add-hook 'post-command-hook 'org-live-latex-toggle-auto))
+                 (setq org-live-latex-mode nil)
+                 (user-error "org-live-latex-mode can only be active in org-mode buffers.")))
+
+           (remove-hook 'post-command-hook 'org-live-latex-toggle-auto)
+           (when (eq post-command-hook
+                     (default-value 'post-command-hook))
+             (kill-local-variable 'post-command-hook))))
+
+     #+END_SRC
+
 *** JSON
     #+BEGIN_SRC emacs-lisp
       (use-package json-mode
