@@ -14594,28 +14594,34 @@
    #+HEADER: :var associations=an-old-hope-theme-color-associations
    #+BEGIN_SRC emacs-lisp :results value table :tangle no :exports none
      (require 'color)
+     (require 'cl-lib)
      (require 'subr-x)
 
      (let (result)
-       (dolist (row (cdr associations))
-         (message "%s" row)
-         (let* ((color-name (nth 0 row))
-                (dest-name  (progn
-                              (let ((dest-name (nth 1 row)))
-                                (if (string-empty-p dest-name)
-                                    color-name
-                                  dest-name))))
-                (hue   (/ (nth 2 row) 360.0))
-                (sat   (/ (nth 3 row) 100.0))
-                (light (/ (nth 4 row) 100.0))
+       (cl-letf (((symbol-function 'smart-num)
+                  (lambda (arg)
+                    (if (numberp arg)
+                        arg
+                      (string-to-number arg)))))
+         (dolist (row (cdr associations))
+           (message "%s" row)
+           (let* ((color-name (nth 0 row))
+                  (dest-name  (progn
+                                (let ((dest-name (nth 1 row)))
+                                  (if (string-empty-p dest-name)
+                                      color-name
+                                    dest-name))))
+                  (hue   (/ (smart-num (nth 2 row)) 360.0))
+                  (sat   (/ (smart-num (nth 3 row)) 100.0))
+                  (light (/ (smart-num (nth 4 row)) 100.0))
 
-                (rgb (color-hsl-to-rgb hue sat light))
-                (red   (nth 0 rgb))
-                (green (nth 1 rgb))
-                (blue  (nth 2 rgb)))
-           (push (list (intern dest-name)
-                       (color-rgb-to-hex red green blue 2))
-                 result)))
+                  (rgb (color-hsl-to-rgb hue sat light))
+                  (red   (nth 0 rgb))
+                  (green (nth 1 rgb))
+                  (blue  (nth 2 rgb)))
+             (push (list (intern dest-name)
+                         (color-rgb-to-hex red green blue 2))
+                   result))))
        (reverse result))
    #+END_SRC
 
