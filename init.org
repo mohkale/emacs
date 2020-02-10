@@ -13826,6 +13826,20 @@
              "P" 'skewer-phantomjs-kill)))
      #+END_SRC
 
+**** typescript
+     TODO implement [[https://github.com/ananthakumaran/tide][tide]].
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package typescript-mode
+         :ensure t
+         :defer  t
+         :hook (typescript-mode . javascript-enable-lsp-in-projects)
+         :config
+         (general-define-key
+           :keymaps 'typescript-mode-map
+           [remap indent-new-comment-line] 'js-jsdoc-return+))
+     #+END_SRC
+
 *** css/less
 **** css-mode
      #+BEGIN_SRC emacs-lisp
@@ -14849,6 +14863,9 @@
       ;; flyspell
       `(flyspell-duplicate ((,cls (:foreground ,orange-dim :underline t))))
       `(flyspell-incorrect ((,cls (:foreground ,red-dim :underline t))))
+
+      ;; typescript
+      `(typescript-primitive-face ((,cls (:inherit font-lock-type-face))))
 
       ;;; ivy
       ;; `(ivy-current-match ((,cls :backgrouns ,blue-dim :foreground ,black))) ;; hl-line
