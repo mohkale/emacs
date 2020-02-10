@@ -13547,7 +13547,14 @@
          :ensure t
          :defer  t
          :mode "\\.js$"
-         :hook (js2-mode . flycheck-mode)
+         :hook ((js2-mode . flycheck-mode)
+                (js2-mode . javascript-enable-lsp-in-projects))
+         :init
+         (defun javascript-enable-lsp-in-projects (&rest _)
+           (when (project-has-file-p "package.json"
+                                     "yarn.lock")
+             (call-interactively 'lsp)))
+
          :config
          (setq js2-mode-show-parse-errors      nil
                js2-mode-show-strict-warnings   nil
