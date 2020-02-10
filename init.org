@@ -14057,10 +14057,19 @@
                         magit-diff-mode)
                       mohkale--whitespace-exempt-modes))
 
+        (leader/set-keys-for-mode 'magit-log-select-mode
+          "," 'magit-log-select-pick
+          "q" 'magit-log-select-quit)
+
         (general-define-key
           :states evil-magit-state
           :keymaps 'magit-mode-map
           "gl" 'magit-section-forward)
+
+        (general-define-key
+          :states evil-magit-state
+          :keymaps 'magit-diff-mode-map
+          "gh" 'magit-section-up)
 
         ;; GIVE ME BACK MY LEADER!!!
         (general-define-key
