@@ -1676,6 +1676,9 @@
             (when (= 0 (% indent 2))
               (setq-local tab-stop-list (number-sequence indent 40 indent)))
 
+            (when (bound-and-true-p emmet-mode)
+              (setq emmet-indentation indent))
+
             ;; major mode dependent configurations
             (cond
              ((eq major-mode 'python-mode)
@@ -10907,7 +10910,8 @@
 
          (general-define-key
            :states 'insert
-           "C-i" 'yas-expand)
+           "C-i" 'yas-expand
+           "M-I" 'yas-expand)
 
          :config
          (yas-global-mode 1)
@@ -12017,6 +12021,14 @@
            (general-define-key
              :keymaps 'emmet-mode-keymap
              "C-j" nil)
+
+           (general-define-key
+             :states 'insert
+             :keymaps 'emmet-mode-keymap
+             "C-i" 'emmet-expand-line
+             ;; "TAB" 'emmet-expand-line
+             "<tab>"   'emmet-next-edit-point
+             "<S-tab>" 'emmet-prev-edit-point)
 
            (leader/with-major-mode-prefix
              (leader/declare-prefix-for-mode 'emmet-mode
