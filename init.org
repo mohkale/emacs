@@ -251,6 +251,22 @@
       more likely then not I'm going to end up requiring them quite
       soon afterwards.")
 
+      (defvar mohkale-hosts-alist
+        '((desktop . "MK-DT")
+          (macbook . "MK-Macbook"))
+        "list of devices I own.")
+
+      (defun host! (id)
+        "check if current host matches ID
+      if ID is a string it's matched against the currents hosts
+      hostname. otherwise id is looked for in `mohkale-hosts-alist'
+      and then compared against. "
+        (unless (stringp id)
+          (setq id (cdr (assoc id mohkale-hosts-alist))))
+
+        (when id
+          (string-equal id (system-name))))
+
       (defvar mohkale-should-compile-config nil
         "when truthy, building the configuration file also compiles the lisp file")
 
