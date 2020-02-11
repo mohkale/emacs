@@ -14393,7 +14393,11 @@
                (latex-mode . flycheck-mode))
         :init
         (setq TeX-auto-save  t
-              TeX-parse-self t)
+              TeX-parse-self t
+              TeX-source-correlate-start-server t)
+
+        (defvar mohkale-latex-modes '(latex-mode tex-mode)
+          "list of tex related modes. used for leader and pretty symbols.")
 
         :config
         (push 'TeX-output-mode mohkale--whitespace-exempt-modes)
@@ -14408,7 +14412,7 @@
         ;; (add-hook 'LaTeX-mode-hook 'tex-setup-electric-math)
 
         (eval
-         `(configure-presym! 'latex-mode
+         `(configure-presym! ',mohkale-latex-modes
             ,@(cl-loop
                for tuple in tex--prettify-symbols-alist
                append (list (car tuple) (cdr tuple)))))
@@ -14417,38 +14421,121 @@
           :keymaps 'latex-mode-map
           "C-M-i" nil)
 
-        (leader/set-keys-for-mode 'latex-mode
+        (leader/set-keys-for-mode! mohkale-latex-modes
           "b" 'latex-environment ;; block but more interactive.
           "{" 'latex-insert-block
-          "}" 'latex-close-block))
+          "}" 'latex-close-block)
 
-      (use-package auctex
-        :ensure t
+        ;; (defun latex/font-bold         () (interactive) (TeX-font nil ?\C-b))
+        ;; (defun latex/font-medium       () (interactive) (TeX-font nil ?\C-m))
+        ;; (defun latex/font-code         () (interactive) (TeX-font nil ?\C-t))
+        ;; (defun latex/font-emphasis     () (interactive) (TeX-font nil ?\C-e))
+        ;; (defun latex/font-italic       () (interactive) (TeX-font nil ?\C-i))
+        ;; (defun latex/font-clear        () (interactive) (TeX-font nil ?\C-d))
+        ;; (defun latex/font-calligraphic () (interactive) (TeX-font nil ?\C-a))
+        ;; (defun latex/font-small-caps   () (interactive) (TeX-font nil ?\C-c))
+        ;; (defun latex/font-sans-serif   () (interactive) (TeX-font nil ?\C-f))
+        ;; (defun latex/font-normal       () (interactive) (TeX-font nil ?\C-n))
+        ;; (defun latex/font-serif        () (interactive) (TeX-font nil ?\C-r))
+        ;; (defun latex/font-oblique      () (interactive) (TeX-font nil ?\C-s))
+        ;; (defun latex/font-upright      () (interactive) (TeX-font nil ?\C-u))
+        )
+
+      (use-package tex-site
+        :ensure auctex
         :defer  t
-        :hook (latex-mode . TeX-fold-mode)
-        :config
+        :hook ((latex-mode . TeX-fold-mode)
+               (latex-mode . TeX-PDF-mode))
+        :init
+        (defvaralias 'LaTeX-mode-hook 'latex-mode-hook)
 
-        (leader/set-keys-for-mode 'latex-mode
-          "," 'TeX-command-master
+        (defvar TeX-view-in-emacs+ nil
+          "when true, view latex documents in emacs PDFTools.
+      This variable should be set before requiring Auctex.")
+
+        :config
+        (defvar-local TeX-command-last nil
+          "the last command invoked by TeX in this buffer.")
+
+        (defun TeX-command-smart (&optional prompt override-confirm)
+          "`TeX-command-master' but with memory.
+      This function works like the master command, however by default it reruns
+      the last run command instead of prompting to run the command. You can pass
+      a prefix arg to force the prompt to take place.
+      "
+          (interactive "P")
+          (unless TeX-command-last
+            (setq prompt t))
+
+          (let ((cmd (or (and prompt
+                              (TeX-command-query (TeX-master-file nil nil t)))
+                         TeX-command-last)))
+            (setq TeX-command-last cmd) ;; update command memory
+            (TeX-command cmd 'TeX-master-file override-confirm)))
+
+        (when TeX-view-in-emacs+
+          (add-hook 'TeX-after-compilation-finished-functions
+                    #'TeX-revert-document-buffer))
+
+        (setq TeX-view-program-selection
+              (delq nil
+                    `(((output-dvi style-pstricks)
+                       "dvips and start")
+                      ,(when TeX-view-in-emacs+
+                         '(output-pdf "PDF Tools"))
+                      ,(when (executable-find "zathura")
+                         '(output-pdf "zathura"))
+                      (output-dvi "Yap")
+                      ,(when (executable-find "xdvi")
+                         '(output-pdf "xdvi"))
+                      (output-pdf "start")
+                      (output-html "start"))))
+
+        (leader/declare-prefix-for-mode!* mohkale-latex-modes
+          "z" "fold"
+          "TAB" "indent"
+          "M" "mode"
+          "T" "toggle"
+          "p" "preview")
+
+        (leader/set-keys-for-mode! mohkale-latex-modes
+          "SPC" 'TeX-command-master
+          "," 'TeX-command-smart
+          "." 'TeX-command-run-all
+          "-" 'TeX-recenter-output-buffer
+          "k" 'TeX-kill-job
+          "v" 'TeX-view
+          "h" 'TeX-doc
           "RET" 'TeX-command-run-all
           "t" 'TeX-font
           "\\" 'TeX-insert-macro
           "s" 'LaTeX-section
           "m" 'LaTeX-mark-environment ;; or LaTeX-mark-section
 
+          ;; preview
+          "pb"  'preview-buffer
+          "pc"  'preview-clearout
+          "pd"  'preview-document
+          "pe"  'preview-environment
+          "pf"  'preview-cache-preamble
+          "pp"  'preview-at-point
+          "pr"  'preview-region
+          "ps"  'preview-section
+
           ;; fold
+          "z=" 'TeX-fold-math
           "zz" 'TeX-fold-dwim
-          "ze" 'TeX-fold-env
           "zb" 'TeX-fold-buffer
+          "zB" 'TeX-fold-clearout-buffer
+          "ze" 'TeX-fold-env
           "zr" 'TeX-fold-region
-          "zp" 'TeX-fold-paragraph
-          "zm" 'TeX-fold-math
-          "z%" 'TeX-fold-comment
-          "z\\" 'TeX-fold-macro
-          "zC" 'TeX-fold-clearout-buffer
-          "zc" 'TeX-fold-clearout-item
           "zR" 'TeX-fold-clearout-region
+          "zm" 'TeX-fold-macro
+          "z\\" 'TeX-fold-macro
+          "zp" 'TeX-fold-paragraph
           "zP" 'TeX-fold-clearout-paragraph
+          "z%" 'TeX-fold-comment
+          "zc" 'TeX-fold-clearout-item
 
           ;; indentation
           "TAB b" 'LaTeX-fill-environ
