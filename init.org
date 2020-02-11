@@ -14383,6 +14383,89 @@
         :defer  t)
     #+END_SRC
 
+*** latex
+    #+BEGIN_SRC emacs-lisp
+      (use-package tex-mode
+        :defer t
+        :hook ((latex-mode . display-line-numbers-mode)
+               (latex-mode . flycheck-mode))
+        :init
+        (setq TeX-auto-save  t
+              TeX-parse-self t)
+
+        :config
+        (push 'TeX-output-mode mohkale--whitespace-exempt-modes)
+        (push 'TeX-special-mode mohkale--whitespace-exempt-modes)
+
+        ;; (defun tex-setup-electric-math (&rest _)
+        ;;   (setq-local TeX-electric-math
+        ;;               (cond
+        ;;                (TeX-mode   '("$"   . "$"))
+        ;;                (LaTeX-mode '("\\(" . "\\)")))))
+        ;; (add-hook 'tex-mode-hook   'tex-setup-electric-math)
+        ;; (add-hook 'LaTeX-mode-hook 'tex-setup-electric-math)
+
+        (eval
+         `(configure-presym! 'latex-mode
+            ,@(cl-loop
+               for tuple in tex--prettify-symbols-alist
+               append (list (car tuple) (cdr tuple)))))
+
+        (general-define-key
+          :keymaps 'latex-mode-map
+          "C-M-i" nil)
+
+        (leader/set-keys-for-mode 'latex-mode
+          "b" 'latex-environment ;; block but more interactive.
+          "{" 'latex-insert-block
+          "}" 'latex-close-block))
+
+      (use-package auctex
+        :ensure t
+        :defer  t
+        :hook (latex-mode . TeX-fold-mode)
+        :config
+
+        (leader/set-keys-for-mode 'latex-mode
+          "," 'TeX-command-master
+          "RET" 'TeX-command-run-all
+          "t" 'TeX-font
+          "\\" 'TeX-insert-macro
+          "s" 'LaTeX-section
+          "m" 'LaTeX-mark-environment ;; or LaTeX-mark-section
+
+          ;; fold
+          "zz" 'TeX-fold-dwim
+          "ze" 'TeX-fold-env
+          "zb" 'TeX-fold-buffer
+          "zr" 'TeX-fold-region
+          "zp" 'TeX-fold-paragraph
+          "zm" 'TeX-fold-math
+          "z%" 'TeX-fold-comment
+          "z\\" 'TeX-fold-macro
+          "zC" 'TeX-fold-clearout-buffer
+          "zc" 'TeX-fold-clearout-item
+          "zR" 'TeX-fold-clearout-region
+          "zP" 'TeX-fold-clearout-paragraph
+
+          ;; indentation
+          "TAB b" 'LaTeX-fill-environ
+          "TAB p" 'LaTeX-fill-paragra
+          "TAB r" 'LaTeX-fill-region
+          "TAB s" 'LaTeX-fill-section
+
+          ;; modes
+          "Mp" 'TeX-PDF-mode ;; toggle between PDF and DVI output.
+          "Ms" 'TeX-source-correlate-mode
+          "Mi" 'TeX-interactive-mode
+          "Mm" 'LaTeX-math-mode
+
+          ;; toggle
+          "Tb" 'TeX-toggle-debug-bad-boxes
+          "Td" 'TeX-toggle-debug-warnings
+          "Ts" 'TeX-toggle-suppress-ignored-warnings))
+    #+END_SRC
+
 ** Unimplemented
    :PROPERTIES:
    :header-args+: :tangle no
