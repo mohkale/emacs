@@ -393,6 +393,7 @@
          eshell-aliases-file                                (var! "eshell" "aliases")
          eshell-login-script                                (etc! "eshell" "loginrc")
          eshell-rc-script                                   (etc! "eshell" "eshrc")
+         emacs-session-directory                            (var! "x-sessions/")
          eww-bookmarks-directory                            (var! "eww/")
          gamegrid-user-score-file-directory                 (var! "gamegrid/")
          ido-save-directory-list-file                       (var! "ido-save-directory-list.el")
@@ -553,8 +554,12 @@
         (setq pdf-info-epdfinfo-program (expand-file-name
                                          (var! (concat "pdf-tools/epdfinfo"
                                                        (when (eq system-type 'windows-nt)
-                                                         ".exe"))))))
+                                                         ".exe")))))
 
+        (with-eval-after-load 'x-win
+          (advice-add 'emacs-session-filename :override
+                      (defun emacs-session-custom-filename (session-id)
+                        (join-path emacs-session-directory (concat "session." session-id))))))
     #+END_SRC
 
     Post path setup. Do some stuff with your newly cleaned emacs :smile:.
@@ -595,6 +600,7 @@
                               ,external-packages-directory
                               ,dotemacs-org-path
                               ,yasnippet-snippets-dir
+                              ,emacs-session-directory
                               ,(var! "org/bin")
                               ,(var! "bbdb/")
                               ,(var! "company/")
