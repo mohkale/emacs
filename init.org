@@ -1696,20 +1696,22 @@
               (setq emmet-indentation indent))
 
             ;; major mode dependent configurations
-            (cond
-             ((eq major-mode 'python-mode)
+            (cl-case major-mode
+             ('python-mode
               (setq-local python-indent-offset indent))
-             ((eq major-mode 'ruby-mode)
+             ('ruby-mode
               (setq-local ruby-indent-level indent))
-             ((eq major-mode 'enh-ruby-mode)
+             ('enh-ruby-mode
               (setq-local enh-ruby-indent-level indent))
-             ((eq major-mode 'c-mode)
+             ('c-mode
               (setq-local c-basic-offset indent))
-             ((eq major-mode 'plantum-mode)
+             ('plantum-mode
               (setq-local plantuml-indent-level indent))
-             ((eq major-mode 'yaml-mode)
+             ('yaml-mode
               (setq-local yaml-indent-offset indent))
-             ((eq major-mode 'web-mode)
+             ('latex-mode
+              (setq-local LaTeX-indent-level indent))
+             ('web-mode
               (setq-local css-indent-offset indent)
               (setq-local web-mode-markup-indent-offset indent)
               (setq-local web-mode-css-indent-offset indent)
