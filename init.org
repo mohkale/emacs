@@ -9170,25 +9170,37 @@
       (use-package olivetti
         :ensure t
         :defer  t
-        :hook (olivetti-mode . (lambda (&rest _)
-                                 ;; hide line numbers and fringe
-                                 (display-line-numbers-mode
-                                  (if olivetti-mode -1 +1))
-
-                                 (eval
-                                  `(set-window-fringes
-                                    (selected-window)
-                                    ,@(if olivetti-mode '(0 0) '(8 8))))))
+        :commands olivetti-setup-buffer
+        :hook (olivetti-mode . olivetti-setup-buffer)
         :init
         (leader/set-keys
           "M'" 'olivetti-mode)
 
+        (defvar olivetti-hide-fringe+ nil
+          "when true, olivetti mode will hide the window fringe.")
+
+        (general-define-key
+          :keymaps 'olivetti-mode-map
+          "C-c >" #'olivetti-expand
+          "C-c <" #'olivetti-shrink)
+
         :config
-        (leader/with-prefix mohkale-minor-mode-leader-key
-          (leader/set-keys
-            ">" 'olivetti-expand
-            "<" 'olivetti-shrink
-            "-" 'olivetti-set-width)))
+        (add-hook 'olivetti-mode-hook
+                  (defun olivetti-setup-buffer ()
+                    "hide line numbers and the fringe."
+                    (display-line-numbers-mode
+                     (if olivetti-mode -1 +1))
+
+                    (eval
+                     `(set-window-fringes
+                       (selected-window)
+                       ,@(if (and olivetti-mode
+                                  olivetti-hide-fringe+)
+                             '(0 0)
+                           '(8 8))))))
+
+        (leader/set-keys
+          (concat mohkale-minor-mode-leader-key "-") 'olivetti-set-width))
     #+END_SRC
 
 *** package
