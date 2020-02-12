@@ -393,6 +393,7 @@
          eshell-aliases-file                                (var! "eshell" "aliases")
          eshell-login-script                                (etc! "eshell" "loginrc")
          eshell-rc-script                                   (etc! "eshell" "eshrc")
+         emacs-session-directory                            (var! "x-sessions/")
          eww-bookmarks-directory                            (var! "eww/")
          gamegrid-user-score-file-directory                 (var! "gamegrid/")
          ido-save-directory-list-file                       (var! "ido-save-directory-list.el")
@@ -414,6 +415,7 @@
          org-publish-timestamp-directory                    (var! "org/timestamps/")
          org-registry-file                                  (var! "org/registry.el")
          org-default-notes-file                             (org! "notes.org")
+         org-preview-latex-image-directory                  (var! "org/latex")
          recentf-save-file                                  (var! "recentf.el")
          save-place-file                                    (var! "save-place.el")
          savehist-file                                      (var! "savehist.el")
@@ -552,8 +554,12 @@
         (setq pdf-info-epdfinfo-program (expand-file-name
                                          (var! (concat "pdf-tools/epdfinfo"
                                                        (when (eq system-type 'windows-nt)
-                                                         ".exe"))))))
+                                                         ".exe")))))
 
+        (with-eval-after-load 'x-win
+          (advice-add 'emacs-session-filename :override
+                      (defun emacs-session-custom-filename (session-id)
+                        (join-path emacs-session-directory (concat "session." session-id))))))
     #+END_SRC
 
     Post path setup. Do some stuff with your newly cleaned emacs :smile:.
@@ -594,6 +600,7 @@
                               ,external-packages-directory
                               ,dotemacs-org-path
                               ,yasnippet-snippets-dir
+                              ,emacs-session-directory
                               ,(var! "org/bin")
                               ,(var! "bbdb/")
                               ,(var! "company/")
@@ -2005,7 +2012,7 @@
 
      functions for querying information about the text at point or retrieve other relevent information.
 
-     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-text-query.el
+     #+BEGIN_SRC emacs-lisp
        (defun line-width (char-pos)
          "returns the number of columns on the line at char-pos"
          (interactive (if current-prefix-arg
@@ -11799,7 +11806,7 @@
 
 *** ruby
     #+BEGIN_SRC emacs-lisp
-      (defvar mohkale-ruby-package (if (eq system-type 'gnu/linux) 'enh-ruby 'ruby)
+      (defvar mohkale-ruby-package 'ruby ;; (if (eq system-type 'gnu/linux) 'enh-ruby 'ruby)
         "determine which mode to use for ruby... enh-ruby is really slowing everything down on windows
       also, for some reason, creating a symlink to ruby on cygwin makes the process unrunnable from emacs,
       it just spits out exec error... my loathing towards windows grows :P
@@ -14538,7 +14545,7 @@
                       ,(when TeX-view-in-emacs+
                          '(output-pdf "PDF Tools"))
                       ,(when (executable-find "zathura")
-                         '(output-pdf "zathura"))
+                         '(output-pdf "Zathura"))
                       (output-dvi "Yap")
                       ,(when (executable-find "xdvi")
                          '(output-pdf "xdvi"))
