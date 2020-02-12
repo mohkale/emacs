@@ -986,7 +986,6 @@
 
       (leader/set-keys
         "Mz" 'zone
-        "M|" 'auto-fill-mode
         "Ml" 'emacs-lisp-mode
         "ML" 'lisp-interaction-mode
         "Mc" 'c++-mode
@@ -5025,6 +5024,49 @@
 
         :config
         (global-auto-highlight-symbol-mode +1))
+    #+END_SRC
+
+*** auto-fill-mode
+    #+BEGIN_SRC emacs-lisp
+      (use-package simple
+        :commands set-word-wrap-column
+        :init
+        (leader/set-keys
+          "t^" 'set-word-wrap-column)
+
+        :config
+        (defun set-word-wrap-column (&optional arg)
+          "set the maximum wanted length for a line in this buffer.
+      This function enables `auto-fill-mode' in this buffer and sets
+      the fill column value.
+
+      If `auto-fill-mode' is already active and this function is called
+      with no ARG, then a new `fill-column' value is interactively read.
+      This also happens if a non numeric ARG is passed.
+
+      If ARG is a number, `fill-column' is set to the value of that number.
+
+      However, if the final value of ARG resolves to be non-positive,
+      `auto-fill-mode' will be disabled.
+      "
+          (interactive "P")
+          (let ((active (bound-and-true-p auto-fill-function)))
+            (setq arg
+                  (cond
+                   ((numberp arg)
+                    arg)
+                   ((or (consp arg)
+                        active)
+                    ;; why would you pass a prefix to make this ask you for a number
+                    ;; instead of just passing the number, dummy?
+                    (read-number "fill-column: " fill-column))
+                   (t fill-column)))
+
+            (if (<= arg 0)
+                (auto-fill-mode -1)
+              (or active
+                  (auto-fill-mode +1))
+              (setq fill-column arg)))))
     #+END_SRC
 
 *** avy
