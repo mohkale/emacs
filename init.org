@@ -12428,15 +12428,13 @@
                                          "  %c"))))
                  (:group "professional"
                   :type entry
-                  :file ,(org! "university.org")
+                  :file "university/university.org"
                   :empty-lines 1
-                  :children (("Homework"
-                              :keys "h"
-                              :template ("* TODO %? %^g"
-                                         "  DEADLINE: %^{Deadline}t"
-                                         "  :LOGBOOK:"
-                                         "  Added %u"
-                                         "  :END:"))))))
+                  :children (("Lecture"
+                              :keys "l"
+                              :clock-in t
+                              :template ("* [/] %^{title} %^g"
+                                         "  %?"))))))
 
          ;; templates for projectile-projects.
          counsel-projectile-org-capture-templates
