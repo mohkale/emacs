@@ -13016,7 +13016,14 @@
      #+BEGIN_SRC emacs-lisp
        (use-package org-live-latex-mode
          :defer t
-         :commands org-live-latex-mode)
+         :commands org-live-latex-mode
+         :init
+         (with-eval-after-load 'org-mode
+           (when (host! 'desktop)
+             (setq org-format-latex-options
+                   (plist-put
+                    org-format-latex-options
+                    :scale 1.5)))))
      #+END_SRC
 
      #+BEGIN_SRC emacs-lisp :tangle ~/.emacs.d/bin/misc/org-live-latex-mode.el
