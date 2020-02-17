@@ -12723,11 +12723,22 @@
          (general-define-key
            :keymaps 'org-mode-map
            :states '(normal visual)
-           :predicate '(or (org-table-p)
+           :predicate '(or (org-table-p t)
                            (org-at-heading-p)
                            (org-at-item-p))
            "C-j" 'org-metadown
            "C-k" 'org-metaup)
+
+         ;; navigate throught tables or lists with tab in insert state.
+         (general-define-key
+           :keymaps 'org-mode-map
+           :states 'insert
+           :predicate '(or (org-table-p t)
+                           (org-at-heading-p)
+                           (org-at-item-p))
+           "<tab>" 'org-cycle
+           "TAB" 'org-cycle
+           "<S-tab>" 'org-shifttab)
 
          (general-define-key
            :keymaps 'org-mode-map
