@@ -846,7 +846,23 @@
    #+BEGIN_SRC emacs-lisp
      (use-package spaceleader
        :demand   t
-       :straight (spaceleader :type git :host github :repo "mohkale/spaceleader"))
+       :straight (spaceleader :type git :host github :repo "mohkale/spaceleader")
+       :config
+       ;; WARN hard coded leader-key and prefix
+
+       (general-define-key
+         :keymaps 'override
+         :states leader-norm-states
+         "C-," (general-simulate-key "SPC m"))
+
+       (general-define-key
+         :keymaps 'override
+         :states leader-nnorm-states
+         "C-," (general-simulate-key "C-SPC m"))
+
+       (general-define-key
+         :states leader-norm-states
+         "C-SPC" (general-simulate-key "SPC")))
    #+END_SRC
 
 *** emacs-root
