@@ -479,6 +479,7 @@
          org-registry-file                                  (var! "org/registry.el")
          org-default-notes-file                             (org! "notes.org")
          org-preview-latex-image-directory                  (var! "org/latex")
+         package-quickstart-file                            (var! "package-qs.el")
          recentf-save-file                                  (var! "recentf.el")
          save-place-file                                    (var! "save-place.el")
          savehist-file                                      (var! "savehist.el")
@@ -693,7 +694,8 @@
       ;; disable both package.el autloads
       ;; and selected packages in custom.
       (setq package-enable-at-startup  nil
-            package--init-file-ensured nil)
+            package--init-file-ensured nil
+            package-quickstart         t)
 
       (package-initialize) ;; TODO find a way to remove this... without breaking everything
       (defalias 'package--save-selected-packages #'ignore) ;; stop messing with custom.el :P
