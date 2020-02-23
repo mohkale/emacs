@@ -701,11 +701,13 @@
       (defalias 'package--save-selected-packages #'ignore) ;; stop messing with custom.el :P
 
       (defvar package-archives)
-      (setq package-archives
-            (append '(("melpa" . "https://melpa.org/packages/")
-                      ;; ("org"       . "http://orgmode.org/elpa/")
-                      ;; ("marmalade" . "http://marmalade-repo.org/packages/")
-                      ("gnu"       . "http://elpa.gnu.org/packages/"))))
+      (setq
+       package-check-signature nil ; 'allow-unsigned
+       package-archives
+       (append '(("melpa" . "https://melpa.org/packages/")
+                 ;; ("org"       . "http://orgmode.org/elpa/")
+                 ;; ("marmalade" . "http://marmalade-repo.org/packages/")
+                 ("gnu"       . "http://elpa.gnu.org/packages/"))))
 
       (let ((plist-refreshed nil))
         (dolist (package startup-requires)
