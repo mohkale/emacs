@@ -9357,11 +9357,15 @@
     #+END_SRC
 
 *** page-break-lines
-    display ^L lines as horizontal-rules.
+    display ^L lines as horizontal-rules. Like so:
+
+
 
     #+BEGIN_SRC emacs-lisp
       (use-package page-break-lines
         :defer t
+        :hook ((org-mode . page-break-lines-mode)
+               (help-mode . page-break-lines-mode))
         :diminish
         page-break-lines-mode)
     #+END_SRC
