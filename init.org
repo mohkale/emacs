@@ -254,7 +254,7 @@
       ;;   3. the remaining list items should be an alists providing options.
 
       ;; changing at startup messes up the display of the dashboard :(
-      (defun mohkale//update-display-buffer-options-handler ()
+      (defun display-buffer-alist--update-handlers ()
         (defvar display-buffer--default-fallback-action
           display-buffer-fallback-action
           "the value for fallback actions without my configuration")
@@ -299,7 +299,7 @@
           (push `(,buffer-name ,@display-buffer--default-fallback-action)
                 display-buffer-alist)))
 
-      (add-hook #'emacs-startup-hook #'mohkale//update-display-buffer-options-handler)
+      (add-hook 'emacs-startup-hook #'display-buffer-alist--update-handlers)
     #+END_SRC
 
 *** Config Variables
