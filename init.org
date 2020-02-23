@@ -695,12 +695,8 @@
       ;; and selected packages in custom.
       (setq package-enable-at-startup  nil
             package--init-file-ensured nil
-            package-quickstart         t)
+            package-quickstart         nil)
 
-      (package-initialize) ;; TODO find a way to remove this... without breaking everything
-      (defalias 'package--save-selected-packages #'ignore) ;; stop messing with custom.el :P
-
-      (defvar package-archives)
       (setq
        package-check-signature nil ; 'allow-unsigned
        package-archives
@@ -708,6 +704,9 @@
                  ;; ("org"       . "http://orgmode.org/elpa/")
                  ;; ("marmalade" . "http://marmalade-repo.org/packages/")
                  ("gnu"       . "http://elpa.gnu.org/packages/"))))
+
+      (package-initialize) ;; TODO find a way to remove this... without breaking everything
+      (defalias 'package--save-selected-packages #'ignore) ;; stop messing with custom.el :P
 
       (let ((plist-refreshed nil))
         (dolist (package startup-requires)
