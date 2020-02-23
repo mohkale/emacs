@@ -5169,10 +5169,9 @@
         :defer  t
         :init
         (leader/set-keys
-          "jB" 'avy-pop-mark
           "jj" 'avy-goto-char
           "jJ" 'avy-goto-char-2
-          "jt" 'avy-goto-char-timer))
+          "jf" 'avy-goto-char-timer))
     #+END_SRC
 
 *** bookmarks
@@ -6740,7 +6739,7 @@
            "o" 'browse-url-of-dired-file ;; open in external app
            "O" 'dired-omit-mode
            "v" 'dired-view-file          ;; TODO customize view mode
-           ":" 'dired-goto-file ;; prompt for file to visit in current buffer
+           "g" 'dired-goto-file ;; prompt for file to visit in current buffer
            "s" 'dired-sort-toggle-or-edit
 
            "ru" 'dired-upcase
@@ -11118,12 +11117,12 @@
         (leader/declare-prefix "ax" "xref")
 
         (leader/set-keys
-          "axx" 'xref-find-references
-          "axX" 'xref-find-definitions
-          "ax/" 'xref-find-apropos
-          "axw" 'xref-find-definitions-other-window
-          "axf" 'xref-find-definitions-other-frame
-          "ax SPC" 'xref-pop-marker-stack)
+          "jx" 'xref-find-references
+          "j/" 'xref-find-apropos
+          "jz" 'xref-find-definitions
+          ;; "axw" 'xref-find-definitions-other-window
+          ;; "axf" 'xref-find-definitions-other-frame
+          )
 
         ;; erase global xref bindings
         (general-define-key
@@ -11132,6 +11131,10 @@
           "M-?"   nil ; xref-find-references
           "C-M-." nil ; xref-find-apropos
           )
+
+        (general-define-key
+          :states 'motion
+          "[x" 'xref-pop-marker-stack)
 
         :config
         (evil-set-initial-state 'xref--xref-buffer-mode 'motion)
@@ -14632,7 +14635,6 @@
           "C-M-i" nil)
 
         (leader/set-keys-for-mode! mohkale-latex-modes
-          "b" 'latex-environment ;; block but more interactive.
           "{" 'latex-insert-block
           "}" 'latex-close-block)
 
@@ -14710,9 +14712,10 @@
 
         (leader/set-keys-for-mode! mohkale-latex-modes
           "SPC" 'TeX-command-master
+          "b" 'LaTeX-environment ;; block but more interactive.
           "," 'TeX-command-smart
           "." 'TeX-command-run-all
-          "-" 'TeX-recenter-output-buffer
+          "l" 'TeX-recenter-output-buffer
           "k" 'TeX-kill-job
           "v" 'TeX-view
           "h" 'TeX-doc
