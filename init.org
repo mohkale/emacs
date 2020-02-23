@@ -11,43 +11,99 @@
   :END:
 
 ** init.el
-*** Startup Optimisations
-    optimise emacs startup times as much as possible.
+*** Early Init
+    #+BEGIN_SRC emacs-lisp
+      (defvar default-gc-cons-threshold 16777216 ; 16mb
+        "my default desired value of `gc-cons-threshold'
+      during normal emacs operations.")
+    #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :shebang ";; -*- lexical-binding: t; coding: utf-8-unix -*-"
+
+    #+BEGIN_SRC emacs-lisp :tangle early-init.el
       ;; make garbage collector less invasive
-      (setq gc-cons-threshold 402653184
+      (setq gc-cons-threshold  most-positive-fixnum
             gc-cons-percentage 0.6)
 
       ;; not needed at startup
       (setq default-file-name-handler-alist file-name-handler-alist
             file-name-handler-alist nil)
 
+      ;; Prevent the glimpse of un-styled Emacs by disabling these UI elements early.
+      (push '(menu-bar-lines . 0) default-frame-alist)
+      (push '(tool-bar-lines . 0) default-frame-alist)
+      (push '(vertical-scroll-bars) default-frame-alist)
+
       (add-hook 'emacs-startup-hook
-                (defun mohkale//post-init-handler (&rest _)
-                  ;; reset optimisation changes
-                  (setq gc-cons-threshold 800000
+                (defun post-init-restore-defaults+ (&rest _)
+                  (setq gc-cons-threshold default-gc-cons-threshold
                         gc-cons-percentage 0.1
                         file-name-handler-alist default-file-name-handler-alist)
 
-                  ;; switch focus to any error or compilation windows
-                  (let* ((window-list  (window-list))
-                         (window-count (length window-list))
-                         (focus-list   '("*Warnings*"
-                                         "*Compile-Log*"))
-                         (kill-list    '()))
-                    (when (> window-count 1)
-                      (dolist (window (window-list))
-                        (let ((buffer-name (buffer-name (window-buffer window))))
-                          (cond
-                           ((member buffer-name focus-list)
-                            (select-window window))
-                           ((member buffer-name kill-list)
-                            (delete-window window)))))))
-
-                  ;; load my custom emacs theme
-                  (load-theme 'an-old-hope t)))
+                  ;; delete no longer necessary startup variable
+                  (makunbound 'default-file-name-handler-alist)))
     #+END_SRC
+
+**** Macros
+     Macros and functions I'm probably going to need at startup.
+
+     #+BEGIN_SRC emacs-lisp
+       (defmacro emacs= (version)
+         `(version= emacs-version ,version))
+
+       (defmacro emacs< (version)
+         `(version< emacs-version ,version))
+
+       (defmacro emacs<= (version)
+         `(version<= emacs-version ,version))
+
+       (defmacro emacs>= (version)
+         `(not (emacs< ,version)))
+
+       (defmacro emacs> (version)
+         `(not (emacs<= ,version)))
+
+       (defun windows-p ()
+         (member system-type '(cygwin ms-dos windows-nt)))
+
+       (defun macos-p ()
+         (eq system-type 'darwin))
+
+       (defun unix-p ()
+         (member system-type '(gnu gnu/linux gnu/kfreebsd)))
+     #+END_SRC
+
+**** Optimisations
+     Optimise emacs startup times as much as possible.
+
+     #+BEGIN_SRC emacs-lisp
+       ;; not needed at startup
+       (setq default-file-name-handler-alist file-name-handler-alist
+             file-name-handler-alist nil)
+
+       (unless (emacs>= "27")
+         (load "~/.emacs.d/early-init.el"))
+
+       (add-hook 'emacs-startup-hook
+                 (defun post-init-setup+ (&rest _)
+                   ;; switch focus to any error or compilation windows
+                   (let* ((window-list  (window-list))
+                          (window-count (length window-list))
+                          (focus-list   '("*Warnings*"
+                                          "*Compile-Log*"))
+                          (kill-list    '()))
+                     (when (> window-count 1)
+                       (dolist (window (window-list))
+                         (let ((buffer-name
+                                (buffer-name (window-buffer window))))
+                           (cond
+                            ((member buffer-name focus-list)
+                             (select-window window))
+                            ((member buffer-name kill-list)
+                             (delete-window window)))))))
+
+                   ;; load my custom emacs theme
+                   (load-theme 'an-old-hope t)))
+     #+END_SRC
 
 *** Emacs Sanitize
     make emacs less like... emacs. use saner defaults and make emacs look nicer in general
@@ -139,7 +195,7 @@
       (set-face-attribute 'default nil
                           :family "Source Code Pro"
                           ;; height value is 1/10pt. so 100 = 10pt
-                          :height (if (eq system-type 'gnu/linux) 110 100)
+                          :height (if (unix-p) 110 100)
                           :weight 'normal
                           :width 'normal)
 
@@ -151,9 +207,13 @@
     Disable annoying GUI enhancemants. minimal emacs is *best* emacs.
 
     #+BEGIN_SRC emacs-lisp
-      (menu-bar-mode -1)     ; dropdown menu list below frame title
-      (scroll-bar-mode -1)   ; scrolling bar shown on frames right side
-      (tool-bar-mode -1)     ; short mini menu showed below the menu bar
+      ;; this is now circumvented in early-init.el
+      (unless (emacs>= "27")
+        (menu-bar-mode -1)     ; dropdown menu list below frame title
+        (scroll-bar-mode -1)   ; scrolling bar shown on frames right side
+        (tool-bar-mode -1)     ; short mini menu shown below the menu bar
+        )
+
       (blink-cursor-mode -1) ; cursor flashes annoyingly
     #+END_SRC
 
@@ -554,7 +614,7 @@
         ;; only accepts absolute paths and doesn't automatically append ".exe" when on windows.
         (setq pdf-info-epdfinfo-program (expand-file-name
                                          (var! (concat "pdf-tools/epdfinfo"
-                                                       (when (eq system-type 'windows-nt)
+                                                       (when (windows-p)
                                                          ".exe")))))
 
         (with-eval-after-load 'x-win
@@ -10024,7 +10084,7 @@
            (unless (file-exists-p path)
              (mkdir path t)))
 
-         (unless (eq system-type 'gnu/linux)
+         (unless (unix-p)
            ;; fixes search glitches on windows when using cygwin... also strips out leading ./ because
            ;; ivy seems to recognise ./ paths as distinct from their non ./ counterparts... maybe that's
            ;; projectiles fault... who knows. also exclude special emacs backup files from search results.
