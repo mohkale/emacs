@@ -8059,9 +8059,11 @@
          :diminish
          :init
          (setq counsel-find-file-occur-use-find t
-               counsel-rg-base-command "rg --with-filename --no-heading --line-number --path-separator // --color never %s ."
                counsel-evil-registers-height ivy-height
                counsel-find-file-ignore-regexp "\\.#.+")
+
+         (when (windows-p)
+           (setq counsel-rg-base-command "rg --with-filename --no-heading --line-number --path-separator // --color never %s ."))
 
          (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
          (fset 'describe-bindings (symbol-function 'counsel-descbinds))
