@@ -1166,7 +1166,7 @@
 ** Global Bindings
    #+BEGIN_SRC emacs-lisp
      (general-define-key
-       ;; ("ESC"   . nil) ;; WARN never do this... it broke everything
+       ;; "ESC" nil ;; WARN never do this... it broke everything
 
        ;; Control     for comamnd,
        ;; Meta        for command on region
@@ -4722,8 +4722,10 @@
 
          (general-define-key
            :states leader-norm-states
-           ;; keep hitting C-SPC by accident
-           "C-SPC" (general-simulate-key "SPC")
+           "zn" 'evil-scroll-column-right
+           "zN" 'evil-scroll-right
+           "zp" 'evil-scroll-column-left
+           "zP" 'evil-scroll-left
            "gc" 'evil-toggle-comment
            "gC" 'evil-capitalize
            "g=" 'count-words
