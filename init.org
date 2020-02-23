@@ -14596,13 +14596,13 @@
         (push 'TeX-output-mode mohkale--whitespace-exempt-modes)
         (push 'TeX-special-mode mohkale--whitespace-exempt-modes)
 
-        ;; (defun tex-setup-electric-math (&rest _)
-        ;;   (setq-local TeX-electric-math
-        ;;               (cond
-        ;;                (TeX-mode   '("$"   . "$"))
-        ;;                (LaTeX-mode '("\\(" . "\\)")))))
-        ;; (add-hook 'tex-mode-hook   'tex-setup-electric-math)
-        ;; (add-hook 'LaTeX-mode-hook 'tex-setup-electric-math)
+        (add-hook 'plain-TeX-mode-hook
+                  (defun tex-update-electric-math+ (&rest _)
+                    (setq-local TeX-electric-math '("$" . "$"))))
+
+        (add-hook 'LaTeX-mode-hook
+                  (defun latex-update-electric-math+ (&rest _)
+                    (setq-local TeX-electric-math '("\\(" . "\\)"))))
 
         (eval
          `(configure-presym! ',mohkale-latex-modes
