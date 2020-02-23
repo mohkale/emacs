@@ -12687,13 +12687,19 @@
                org-outline-path-complete-in-steps nil ; refile in a single go
                org-refile-use-outline-path t  ; show full paths for refiling
                org-cycle-separator-lines 0 ; prevents weird coloring of collapsed trees
+               org-log-into-drawer "LOGBOOK" ; where org-add-note stores notes
 
                ;; break org-cycle-seperator-lines from working automatically
                ;; org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
 
                ;; native tabs are slow and unreliable... :sad:
                ;; org-src-tab-acts-natively t ;; tab is native to block language
-               org-agenda-files (file-expand-wildcards (org! "*.org")))
+               )
+
+         (setq org-agenda-files
+               (append
+                (file-expand-wildcards (org! "*.org"))
+                (file-expand-wildcards (org! "university/*.org"))))
 
          ;; Initialised here to prevent org from defining a bunch of keys I won't
          ;; end up using :P
