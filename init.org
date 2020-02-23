@@ -14685,6 +14685,14 @@
             (setq TeX-command-last cmd) ;; update command memory
             (TeX-command cmd 'TeX-master-file override-confirm)))
 
+        (advice-add 'TeX-command :before
+                    (defun TeX-command--prompt-to-save+ (&rest args)
+                      "ask to save modified tex buffers, before running commands on them."
+                      (when (and (buffer-modified-p)
+                                 buffer-file-name
+                                 (yes-or-no-p (format "Save file %s?" buffer-file-name)))
+                        (save-buffer))))
+
         (when TeX-view-in-emacs+
           (add-hook 'TeX-after-compilation-finished-functions
                     #'TeX-revert-document-buffer))
