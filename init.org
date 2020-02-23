@@ -982,6 +982,7 @@
         ;; "fo" 'open-file-or-directory-in-external-app ;; TODO implement
         "fR" 'rename-buffer-file
         "fy" 'show-and-copy-buffer-file-name
+        "f%" 'show-and-copy-buffer-file-basename
         "sF" 'find-dired
         "fq" 'find-file-literally
 
@@ -1469,6 +1470,7 @@
         :commands (rename-buffer-file
                    delete-buffer-file
                    show-and-copy-buffer-file-name
+                   show-and-copy-buffer-file-basename
                    write-kill-buffer
                    write-backup
                    write-autosave
@@ -1521,6 +1523,23 @@
 
               (kill-buffer buffer)))))
 
+      (defun smart-buffer-file-name ()
+        (or (buffer-file-name)
+            (cond
+             ((derived-mode-p 'dired-mode)
+              (string-trim-right (dired-current-directory) "/")))))
+
+      (defun show-and-copy-buffer-file-basename (&optional prefix)
+        (interactive "P")
+        (let ((bufname (file-name-nondirectory (or (smart-buffer-file-name) ""))))
+          (when (consp prefix)
+            (if (eq (car prefix) 4)
+                (insert bufname)
+              (save-excursion
+                (insert bufname))))
+          (message bufname)
+          (kill-new bufname)))
+
       (defun show-and-copy-buffer-file-name (&optional prefix)
         "Displays the current buffers name in the echo area & yanks it
       when a prefix arg is given, the buffer name is also inserted into
@@ -1529,10 +1548,7 @@
       prefix greater than 0, that many parent directories will be
       navigated to before yanking."
         (interactive "P")
-        (let ((bufname (or (buffer-file-name)
-                           (and (derived-mode-p 'dired-mode)
-                                (string-trim-right (dired-current-directory) "/"))
-                           "")))
+        (let ((bufname (or (smart-buffer-file-name) "")))
           (cond
            ((consp prefix)
             (if (eq (car prefix) 4)
