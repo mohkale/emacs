@@ -7840,7 +7840,8 @@
            "RET" 'ivy-resume)
 
          (general-define-key
-           :keymaps 'counsel-ag-map
+           :keymaps '(counsel-ag-map
+                      counsel-imenu-map)
            "C-l" 'ivy-forward-char-or-partial-or-done
            "M-l" 'ivy-call-and-recenter)
 
@@ -8734,14 +8735,22 @@
                    imenu-anywhere)
         :init
         (leader/set-keys
-          "bi" 'imenu
-          "ai" 'imenu-list
-          "bI" 'imenu-anywhere)
+          "ji" 'imenu
+          "jI" 'imenu-anywhere
+          "bi" 'imenu-list)
 
         :config
         (use-package imenu-list
           :ensure t
-          :defer  t)
+          :defer  t
+          :config
+          (evil-set-initial-state 'imenu-list-major-mode 'motion)
+
+          (general-define-key
+            :states 'motion
+            :keymaps 'imenu-list-major-mode-map
+            "gr" 'imenu-list-refresh
+            "o" 'imenu-list-display-entry))
 
         (use-package imenu-anywhere
           :ensure t
