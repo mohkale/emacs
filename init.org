@@ -12728,6 +12728,7 @@
             (C          . t)
             (awk        . t)
             (haskell    . t)
+            (latex      . t)
             (java       . t)
             (js         . t)
             (ditaa      . t)
@@ -13128,7 +13129,9 @@
          :defer t
          :commands org-live-latex-mode
          :init
-         (with-eval-after-load 'org-mode
+         (with-eval-after-load 'org
+           (add-to-list 'org-latex-packages-alist '("" "mathdots"))
+
            (when (host! 'desktop)
              (setq org-format-latex-options
                    (plist-put
