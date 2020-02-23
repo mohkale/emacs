@@ -9124,6 +9124,23 @@
          "<escape>" 'abort-recursive-edit)
     #+END_SRC
 
+    Some more sage advice from the demigods at [[https://github.com/hlissner/doom-emacs/blob/develop/docs/faq.org#how-does-doom-start-up-so-quickly][doom]].
+
+    #+BEGIN_SRC emacs-lisp
+      (defun defer-garbage-collection+ ()
+        (setq gc-cons-threshold most-positive-fixnum))
+
+      (defun restore-garbage-collection+ ()
+        ;; Deferred so that commands launched immediately after will enjoy the
+        ;; benefits.
+        (run-at-time
+         1 nil (lambda () (setq gc-cons-threshold default-gc-cons-threshold))))
+
+      (add-hook 'minibuffer-setup-hook #'defer-garbage-collection+)
+      (add-hook 'minibuffer-exit-hook #'restore-garbage-collection+)
+    #+END_SRC
+
+
 *** miniedit
     write the minibuffer contents to a buffer. edit, then paste new contents back to minibuffer.
 
