@@ -11009,6 +11009,16 @@
              (format "%-50s" desc) cmd))))
     #+END_SRC
 
+*** with-editor
+    #+BEGIN_SRC emacs-lisp
+      (use-package with-editor
+        :init
+        (leader/with-major-mode-prefix
+          (leader/set-keys-for-mode 'with-editor-mode
+            ","  'with-editor-finish
+            "q"  'with-editor-cancel)))
+    #+END_SRC
+
 *** whitespace
     #+BEGIN_SRC emacs-lisp
       (use-package whitespace
@@ -14459,8 +14469,6 @@
             "i" "insert")
 
           (leader/set-keys-for-mode 'git-commit-mode
-            ","  'with-editor-finish
-            "q"  'with-editor-cancel
             "s"  'git-commit-save-message
             "d"  'magit-diff-while-committing
             "j"  'git-commit-next-message
