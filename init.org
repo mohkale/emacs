@@ -1772,23 +1772,27 @@
       the current buffers indentation will be set to that."
         (interactive "Nindent: ")
         (let* ((buffer (current-buffer))
-               (buffer-name (buffer-name buffer))
-               (indent-config mohkale-indent-config)
-               _)
-          (while (and (not indent)
-                      (setq _ (pop indent-config)))
-            (let ((matcher (car _)))
-              (setq indent
-                    (when (cond
-                           ((eq matcher t) t)
-                           ((symbolp matcher)
-                            (eq matcher major-mode))
-                           ((stringp matcher)
-                            (string-match-p matcher buffer-name))
-                           ((functionp matcher)
-                            (funcall matcher))
-                           (t (eval matcher)))
-                      (cdr _)))))
+               (buffer-name (buffer-name buffer)))
+          (setq indent
+                (or indent
+                    (cl-loop
+                     with matcher = nil
+                     with indent  = nil
+                     for cfg in mohkale-indent-config
+                     do (setq matcher (car cfg))
+                     if (cond
+                         ((eq matcher t) t)
+                         ((symbolp matcher)
+                          (eq matcher major-mode))
+                         ((stringp matcher)
+                          (string-match-p matcher buffer-name))
+                         ((functionp matcher)
+                          (funcall matcher))
+                         (t (eval matcher)))
+                       do (setq indent (cdr cfg))
+                       and return (if (functionp indent)
+                                      (funcall indent)
+                                    indent))))
 
           (if (not indent)
               (message "set-indent-offset::warn() unable to determine indent for current buffer.")
