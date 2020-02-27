@@ -130,6 +130,8 @@
             ;;      there will be at most kept-new-versions + kept-old-versions backups made.
             recenter-positions '(top middle bottom)
 
+            find-file-suppress-same-file-warnings t
+
             enable-recursive-minibuffers t
             kill-whole-line              t ; kill-line includes eol
             help-window-select           t ; always
@@ -12681,11 +12683,34 @@
                    (t (fallback-action (called-interactively-p)))))))
 
        (defun org-find-file (&optional arg)
+         "find an org file.
+       By default this function simply finds the default notes file, as indicated
+       by `org-default-notes-file'. When ARG is non-nil, you are instead prompted
+       interactively with all org files known to emacs (through `dotemacs-org-path',
+       `dotemacs-agenda-files' etc.) and then allowed to select which one to visit.
+       "
          (interactive "P")
          (if (not arg)
              (find-file org-default-notes-file)
-           ;; TODO prompt open buffers and projects etc.
-           (counsel-file-jump nil dotemacs-org-path)))
+           (ivy-read "File file: "
+                     (cl-loop
+                      with relative-path = nil
+                      for file in (cl-remove-duplicates
+                                   (append (file-expand-wildcards (org! "*.org"))
+                                           (file-expand-wildcards (org! "**/*.org"))
+                                           org-agenda-files)
+                                   :test (lambda (x y) (or (null y) (equal x y)))
+                                   :from-end t)
+                      do (setq relative-path (file-relative-name file dotemacs-org-path))
+
+                      if (string-prefix-p ".." relative-path)
+                        collect (cons file file)
+                      else
+                        collect (cons relative-path file)
+                      end)
+                     :require-match t
+                     :action (lambda (file-cons) (find-file (org! (cdr file-cons))))
+                     :caller 'org-find-file)))
      #+END_SRC
 
 **** org-mode
