@@ -13405,6 +13405,105 @@
 
      #+END_SRC
 
+
+**** org-ql
+     lisp like query language for org mode.
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-ql
+         ;; :ensure t
+         :straight t
+         :defer  t
+         :commands (ivy-org-ql-query
+                    ivy-org-ql-query-picklink
+                    ivy-org-ql-query-goto
+                    ivy-org-ql-query-insert-link)
+         :init
+         (leader/set-keys
+           "oq" 'ivy-org-ql-query)
+
+         :config
+         ;; basically all of ivy-org-ql was just copied and pasted from
+         ;; here: https://github.com/alphapapa/org-ql/issues/63
+         (defvar ivy-org-ql-query-collect-timer nil)
+         (defun ivy-org-ql-query-collect (input)
+           (when ivy-org-ql-query-collect-timer
+             (cancel-timer ivy-org-ql-query-collect-timer))
+           (if (< (length input) 4)
+               (list "" (format "%d chars more" (- 4 (length input))))
+             (setq ivy-org-ql-query-collect-timer
+                   (run-with-timer
+                    0.25 nil
+                    `(lambda ()
+                       (let ((files (org-agenda-files))
+                             (query (org-ql--plain-query  ,input)))
+                         (when query
+                           (ignore-errors
+                             (setq ivy--all-candidates
+                                   (or
+                                    (org-ql-select files query
+                                      :action (lambda ()
+                                                (propertize (org-get-heading t)
+                                                            'marker (copy-marker (point)))))
+                                    '("" "Search no results!")))
+                             (setq ivy--old-cands ivy--all-candidates)
+                             (ivy--exhibit)))))))
+             nil))
+
+         (defun ivy-org-ql-query ()
+           (interactive)
+           (ivy-read "Org query: " #'ivy-org-ql-query-collect
+                     :dynamic-collection t
+                     :initial-input (ivy-org-ql-query-string)
+                     :action #'ivy-org-ql-query-goto))
+
+         (defun ivy-org-ql-query-picklink ()
+           (interactive)
+           (ivy-read "Org query: " #'ivy-org-ql-query-collect
+                     :dynamic-collection t
+                     :initial-input (ivy-org-ql-query-string)
+                     :action #'ivy-org-ql-query-insert-link))
+
+         (defun ivy-org-ql-query-string ()
+           (when mark-active
+             (buffer-substring-no-properties
+              (region-beginning) (region-end))))
+
+         (defun ivy-org-ql-query-goto (headline)
+           (interactive)
+           (let ((marker (get-text-property 0 'marker headline)))
+             (when (markerp marker)
+               (switch-to-buffer (marker-buffer marker))
+               (goto-char marker)
+               (org-show-entry))))
+
+         (defun ivy-org-ql-query-insert-link (headline &optional link-type breadcrumbs)
+           (interactive)
+           (let ((marker (get-text-property 0 'marker headline))
+                 store-link)
+             (when (markerp marker)
+               (org-with-point-at marker
+                 (let* ((id (org-id-get (point) t))
+                        (attach-dir (org-attach-dir t))
+                        (breadcrumbs
+                         (when breadcrumbs
+                           (let ((s (org-format-outline-path
+                                     (org-get-outline-path)
+                                     (1- (frame-width))
+                                     nil org-picklink-breadcrumbs-separator)))
+                             (if (eq "" s) "" (concat s org-picklink-breadcrumbs-separator)))))
+                        (item (concat (or breadcrumbs "") (org-entry-get (point) "ITEM")))
+                        (link
+                         (cl-case link-type
+                           (attach (list :link attach-dir :description (concat item "(ATTACH)") :type "file"))
+                           (t (list :link (concat "id:" id) :description item :type "id")))))
+                   (setq store-link link)))
+               (org-insert-link nil (plist-get store-link :link) (plist-get store-link :description))
+               (cond ((org-in-item-p)
+                      (call-interactively #'org-insert-item))
+                     (t (insert " ")))))))
+     #+END_SRC
+
 *** JSON
     #+BEGIN_SRC emacs-lisp
       (use-package json-mode
