@@ -2822,10 +2822,10 @@
         (evil-visual-restore)
         (if (eq type 'block)
             (progn
-              (copy-rectangle-as-kill beg end)
+              (evil-yank-rectangle beg end ?\" yank-handler)
 
               (with-temp-buffer
-                (yank-rectangle)
+                (evil-paste-before nil ?\")
                 (evil-yank (point-min) (point-max) 'line register yank-handler)))
           (evil-yank beg end type register yank-handler)))
 
