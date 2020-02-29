@@ -7811,6 +7811,19 @@
 
                ivy-initial-inputs-alist mohkale--ivy-initial-inputs-alist)
 
+         (defvar ivy-actions-done-hook+ nil
+           "hook run after ivy has completed a set of actions.
+       this could be when `ivy-done' is invoked, or when `ivy-call'
+       has been invoked.")
+
+         (defun ivy-run-actions-done-hook+ (func &rest args)
+           (unwind-protect
+               (apply func args)
+             (run-hooks 'ivy-actions-done-hook+)))
+
+         (advice-add 'ivy-done :around #'ivy-run-actions-done-hook+)
+         (advice-add 'ivy-call :around #'ivy-run-actions-done-hook+)
+
          (defun ivy-kill-line-backward ()
            (interactive)
            (delete-region (minibuffer-prompt-end) (point)))
@@ -8261,6 +8274,63 @@
                                     (unless (string-equal message "Mark saved where search started")
                                       (apply actual-message message-args)))))
                          (apply func args))))
+
+         (defvar swiper-norm-action--macro-history nil
+           "history variable for macros invoked through `swiper-norm-action'.")
+
+         (defvar swiper-norm-action--macro nil
+           "the macro string used for the current invocation
+       of `swiper-norm-action'.")
+         (add-hook 'ivy-actions-done-hook+
+                   (lambda (&rest _)
+                     "reset the macro recorded by `swiper-norm-action'."
+                     (setq swiper-norm-action--macro nil)))
+
+         (defun swiper-norm-action--execute (markers macro)
+           (unwind-protect
+               (dolist (marker markers)
+                 (goto-char marker)
+                 (evil-ex-normal
+                  (line-beginning-position)
+                  (line-end-position)
+                  macro))
+             ;; ensure that all markers are deleted afterwards,
+             ;; even in the event of failure
+             (dolist (marker markers)
+               (set-marker marker nil))))
+
+         (defun swiper-norm-action (_)
+           "use swiper like evils :global and :norm command.
+       this function prompts for a normal mode macro string, and then
+       runs the macro on every candidate in the current swiper session.
+
+       This function tries to be smart about how it's invoked, if it's called
+       with no marked candidates, it runs a macro on every candidate in the
+       current swiper session. Otherwise it runs only on the candidates that're
+       marked."
+           ;; when `swiper-norm-action--macro' has already been assigned, this function
+           ;; is being called through marked candidates, which've already been
+           ;; operated on, so just ignore them.
+           (unless swiper-norm-action--macro
+             (let ((history-add-new-input t))
+               (setq swiper-norm-action--macro
+                     (read-string "macro: " nil
+                                  'swiper-norm-action--macro-history)))
+
+             (unless (string-empty-p swiper-norm-action--macro)
+               (let* ((markers
+                       (save-excursion
+                         (goto-char (point-min)) ;; start from beginning of buffer, downwards
+
+                         (cl-loop
+                          for cand in (or ivy-marked-candidates ivy--old-cands) collect
+                          (move-marker (make-marker)
+                                       (line-beginning-position
+                                        (get-text-property 0 'swiper-line-number cand)))))))
+                 (evil-with-single-undo
+                   (swiper-norm-action--execute markers swiper-norm-action--macro))))))
+
+         (ivy-add-actions 'swiper '(("n" swiper-norm-action "norm")))
 
          (general-define-key
            :keymaps 'swiper-map
