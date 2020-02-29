@@ -8168,6 +8168,7 @@
            ;; "bb" 'counsel-buffer-or-recentf ;; WARN only file buffers
            "bb" 'counsel-switch-buffer
            "hdf" 'counsel-describe-function
+           "hdx" 'counsel-fonts
            "hdv" 'counsel-describe-variable
            "hdB" 'describe-bindings-buffer)
 
@@ -8196,6 +8197,9 @@
          (advice-add 'counsel-company :before
                      (defun counsel-company--hide-popup (&rest args)
                        (company-cancel)))
+
+         (ivy-set-actions 'counsel-fonts
+                          '(("o" describe-font "describe-font")))
 
          (ivy-configure 'counsel-evil-registers :height ivy-height)
 
