@@ -7779,6 +7779,10 @@
          :config
          (ivy-mode +1)
 
+         (when (emacs>= "27")
+           ;; see issue: https://github.com/abo-abo/swiper/issues/2397
+           (setq ivy-read-action-function #'ivy-hydra-read-action))
+
          (push 'ivy-occur mohkale--whitespace-exempt-modes)
 
          (setq ivy-preferred-re-builders
