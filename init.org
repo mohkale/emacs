@@ -1508,30 +1508,35 @@
 
     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-file.el
       (defun rename-buffer-file (buffer &optional new-name)
-        "renames the file associated with the buffer `buffer'
-      if the buffer isn't visiting a file, this function is
-      equivalent to `rename-buffer' followed by setting the
-      file visited by the buffer."
+        "renames the file associated with the buffer BUFFER.
+      if the buffer isn't visiting a file or the visited file
+      doesn't exist on disk, this function is equivalent to
+      simply changing the visited file name for BUFFER."
         (interactive (list (current-buffer)))
 
-        (with-current-buffer buffer
-          (or new-name (setq new-name (read-file-name "new-name: ")))
-          (let ((buffer-file (buffer-file-name buffer)))
-            (if (get-buffer new-name)
-                (message "a buffer with that name already exists: %s" new-name)
-              (when (or (not (file-exists-p new-name))
-                        (yes-or-no-p "file already exists, overwrite it:"))
-                ;; destination doesn't exist, so can write
-                ;; or
-                ;; user agrees to overwrite, so can write
-                (when (and buffer-file
-                           (file-exists-p buffer-file))
-                  ;; only rename buffer file if it exists
-                  (rename-file buffer-file new-name t)
-                  (message "moved file '%s' to '%s'" buffer-file new-name))
-                (rename-buffer new-name)
-                (set-visited-file-name new-name)
-                (set-buffer-modified-p nil))))))
+        (or new-name
+            (setq new-name (read-file-name "new-name: ")))
+
+        (let* ((buffer-file (buffer-file-name buffer))
+               (modified-p (buffer-modified-p buffer))
+               (directory (file-name-directory new-name))
+               (src-exists (file-exists-p buffer-file))
+               (dst-exists (file-exists-p new-name)))
+          (with-current-buffer buffer
+            ;; destination doesn't exist, so can write
+            ;; or
+            ;; user agrees to overwrite, so can write
+            (when (or (not dst-exists)
+                      (yes-or-no-p "file already exists, overwrite it:"))
+              ;; only rename buffer file if it exists
+              (when (and buffer-file src-exists)
+                (unless (file-directory-p directory)
+                  (mkdir directory t))
+                (rename-file buffer-file new-name t)
+                (message "moved file '%s' to '%s'" buffer-file new-name))
+
+              (set-visited-file-name new-name)
+              (set-buffer-modified-p modified-p)))))
 
       (defun delete-buffer-file ()
         (interactive)
@@ -4646,6 +4651,11 @@
          :config
          (evil-mode 1)
 
+         ;; https://github.com/hlissner/doom-emacs/blob/develop/modules/editor/evil/config.el#L137
+         (advice-add #'evil-global-marker-p :before-until
+                     (defun evil--make-numbered-markers-global+ (char)
+                       (and (>= char ?2) (<= char ?9))))
+
          ;; evil-adjust: https://raw.githubusercontent.com/troyp/evil-adjust/master/evil-adjust.el
          (defmacro with-evil-adjust-to-eol (&rest body)
            `(let ((-last-evil-state evil-state)
@@ -4841,7 +4851,10 @@
            "]h" 'evil-backward-arg
 
            "[l" 'evil-forward-arg
-           "]l" 'evil-forward-arg)
+           "]l" 'evil-forward-arg
+
+           "[a" 'evil-backward-arg
+           "]a" 'evil-forward-arg)
 
          (leader/set-keys
            "jh" 'evil-backward-arg
@@ -5943,7 +5956,7 @@
 
         (general-define-key
           :states  'normal
-          :keymaps 'Custom-mode-map
+          :keymaps 'custom-mode-map
 
           ;; motion
           "TAB"       'widget-forward
@@ -7771,6 +7784,10 @@
          :config
          (ivy-mode +1)
 
+         (when (emacs>= "27")
+           ;; see issue: https://github.com/abo-abo/swiper/issues/2397
+           (setq ivy-read-action-function #'ivy-hydra-read-action))
+
          (push 'ivy-occur mohkale--whitespace-exempt-modes)
 
          (setq ivy-preferred-re-builders
@@ -7798,6 +7815,19 @@
                  (woman . "^"))
 
                ivy-initial-inputs-alist mohkale--ivy-initial-inputs-alist)
+
+         (defvar ivy-actions-done-hook+ nil
+           "hook run after ivy has completed a set of actions.
+       this could be when `ivy-done' is invoked, or when `ivy-call'
+       has been invoked.")
+
+         (defun ivy-run-actions-done-hook+ (func &rest args)
+           (unwind-protect
+               (apply func args)
+             (run-hooks 'ivy-actions-done-hook+)))
+
+         (advice-add 'ivy-done :around #'ivy-run-actions-done-hook+)
+         (advice-add 'ivy-call :around #'ivy-run-actions-done-hook+)
 
          (defun ivy-kill-line-backward ()
            (interactive)
@@ -8156,6 +8186,7 @@
            ;; "bb" 'counsel-buffer-or-recentf ;; WARN only file buffers
            "bb" 'counsel-switch-buffer
            "hdf" 'counsel-describe-function
+           "hdx" 'counsel-fonts
            "hdv" 'counsel-describe-variable
            "hdB" 'describe-bindings-buffer)
 
@@ -8185,6 +8216,9 @@
                      (defun counsel-company--hide-popup (&rest args)
                        (company-cancel)))
 
+         (ivy-set-actions 'counsel-fonts
+                          '(("o" describe-font "describe-font")))
+
          (ivy-configure 'counsel-evil-registers :height ivy-height)
 
          (general-define-key
@@ -8210,6 +8244,11 @@
            "ss" 'swiper
            "s*" 'swiper-all
            "sS" 'swiper-multi)
+
+         (general-define-key
+           :keymaps 'ivy-mode-map
+           "M-s" 'swiper-isearch-thing-at-point
+           [remap isearch-forward] 'swiper-isearch)
 
          (defvar swiper-persistent-highlight nil
            "if swiper is using evil-search for searching, determine
@@ -8245,6 +8284,63 @@
                                     (unless (string-equal message "Mark saved where search started")
                                       (apply actual-message message-args)))))
                          (apply func args))))
+
+         (defvar swiper-norm-action--macro-history nil
+           "history variable for macros invoked through `swiper-norm-action'.")
+
+         (defvar swiper-norm-action--macro nil
+           "the macro string used for the current invocation
+       of `swiper-norm-action'.")
+         (add-hook 'ivy-actions-done-hook+
+                   (lambda (&rest _)
+                     "reset the macro recorded by `swiper-norm-action'."
+                     (setq swiper-norm-action--macro nil)))
+
+         (defun swiper-norm-action--execute (markers macro)
+           (unwind-protect
+               (dolist (marker markers)
+                 (goto-char marker)
+                 (evil-ex-normal
+                  (line-beginning-position)
+                  (line-end-position)
+                  macro))
+             ;; ensure that all markers are deleted afterwards,
+             ;; even in the event of failure
+             (dolist (marker markers)
+               (set-marker marker nil))))
+
+         (defun swiper-norm-action (_)
+           "use swiper like evils :global and :norm command.
+       this function prompts for a normal mode macro string, and then
+       runs the macro on every candidate in the current swiper session.
+
+       This function tries to be smart about how it's invoked, if it's called
+       with no marked candidates, it runs a macro on every candidate in the
+       current swiper session. Otherwise it runs only on the candidates that're
+       marked."
+           ;; when `swiper-norm-action--macro' has already been assigned, this function
+           ;; is being called through marked candidates, which've already been
+           ;; operated on, so just ignore them.
+           (unless swiper-norm-action--macro
+             (let ((history-add-new-input t))
+               (setq swiper-norm-action--macro
+                     (read-string "macro: " nil
+                                  'swiper-norm-action--macro-history)))
+
+             (unless (string-empty-p swiper-norm-action--macro)
+               (let* ((markers
+                       (save-excursion
+                         (goto-char (point-min)) ;; start from beginning of buffer, downwards
+
+                         (cl-loop
+                          for cand in (or ivy-marked-candidates ivy--old-cands) collect
+                          (move-marker (make-marker)
+                                       (line-beginning-position
+                                        (get-text-property 0 'swiper-line-number cand)))))))
+                 (evil-with-single-undo
+                   (swiper-norm-action--execute markers swiper-norm-action--macro))))))
+
+         (ivy-add-actions 'swiper '(("n" swiper-norm-action "norm")))
 
          (general-define-key
            :keymaps 'swiper-map
@@ -9119,10 +9215,10 @@
     #+BEGIN_SRC emacs-lisp
       (general-define-key
         :keymaps 'minibuffer-local-map
-        "C-j" 'next-history-element
-        "C-k" 'previous-history-element
-        "M-j" 'previous-matching-history-element
-        "M-k" 'next-matching-history-element
+        "M-j" 'next-history-element
+        "M-k" 'previous-history-element
+        "C-j" 'previous-matching-history-element
+        "C-k" 'next-matching-history-element
         "C-h" 'backward-char
         "C-l" (defun minibuffer-forward-char-or-exit ()
                 (interactive)
@@ -9142,7 +9238,6 @@
         "C-w" 'backward-kill-word
         "C-?" 'minibuffer-completion-help
         ;; for some reason.. I can't bind Meta keys
-        "M-k" 'kill-whole-line
         "M-h" 'backward-kill-sentence
         "M-l" 'kill-sentence)
 
@@ -11297,15 +11392,6 @@
            "M-i" 'aya-expand))
      #+END_SRC
 
-**** snippet-sources
-***** yasnippet-snippets
-      #+BEGIN_SRC emacs-lisp
-        (with-eval-after-load 'yasnippet
-          (use-package yasnippet-snippets
-            :ensure t
-            :defer  t))
-      #+END_SRC
-
 *** ycmd
 **** ycmd-mode
      #+BEGIN_SRC emacs-lisp
@@ -12932,7 +13018,6 @@
          (general-define-key
            :keymaps 'org-mode-map
            ;; "C-M-<return>" 'org-meta-return
-           "C-s"          'org-sort
            "<C-tab>"      nil
            "M-S-<return>" nil
            "C-e"          nil
@@ -13082,6 +13167,7 @@
            "l" 'org-insert-link
            "N" 'org-add-note
            "o" 'org-clock-out
+           "O" 'org-sort
            "P" 'org-set-property
            "p" 'org-pomodoro
            "q" 'org-set-tags-command
@@ -13406,6 +13492,105 @@
                      (default-value 'post-command-hook))
              (kill-local-variable 'post-command-hook))))
 
+     #+END_SRC
+
+
+**** org-ql
+     lisp like query language for org mode.
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-ql
+         ;; :ensure t
+         :straight t
+         :defer  t
+         :commands (ivy-org-ql-query
+                    ivy-org-ql-query-picklink
+                    ivy-org-ql-query-goto
+                    ivy-org-ql-query-insert-link)
+         :init
+         (leader/set-keys
+           "oq" 'ivy-org-ql-query)
+
+         :config
+         ;; basically all of ivy-org-ql was just copied and pasted from
+         ;; here: https://github.com/alphapapa/org-ql/issues/63
+         (defvar ivy-org-ql-query-collect-timer nil)
+         (defun ivy-org-ql-query-collect (input)
+           (when ivy-org-ql-query-collect-timer
+             (cancel-timer ivy-org-ql-query-collect-timer))
+           (if (< (length input) 4)
+               (list "" (format "%d chars more" (- 4 (length input))))
+             (setq ivy-org-ql-query-collect-timer
+                   (run-with-timer
+                    0.25 nil
+                    `(lambda ()
+                       (let ((files (org-agenda-files))
+                             (query (org-ql--plain-query  ,input)))
+                         (when query
+                           (ignore-errors
+                             (setq ivy--all-candidates
+                                   (or
+                                    (org-ql-select files query
+                                      :action (lambda ()
+                                                (propertize (org-get-heading t)
+                                                            'marker (copy-marker (point)))))
+                                    '("" "Search no results!")))
+                             (setq ivy--old-cands ivy--all-candidates)
+                             (ivy--exhibit)))))))
+             nil))
+
+         (defun ivy-org-ql-query ()
+           (interactive)
+           (ivy-read "Org query: " #'ivy-org-ql-query-collect
+                     :dynamic-collection t
+                     :initial-input (ivy-org-ql-query-string)
+                     :action #'ivy-org-ql-query-goto))
+
+         (defun ivy-org-ql-query-picklink ()
+           (interactive)
+           (ivy-read "Org query: " #'ivy-org-ql-query-collect
+                     :dynamic-collection t
+                     :initial-input (ivy-org-ql-query-string)
+                     :action #'ivy-org-ql-query-insert-link))
+
+         (defun ivy-org-ql-query-string ()
+           (when mark-active
+             (buffer-substring-no-properties
+              (region-beginning) (region-end))))
+
+         (defun ivy-org-ql-query-goto (headline)
+           (interactive)
+           (let ((marker (get-text-property 0 'marker headline)))
+             (when (markerp marker)
+               (switch-to-buffer (marker-buffer marker))
+               (goto-char marker)
+               (org-show-entry))))
+
+         (defun ivy-org-ql-query-insert-link (headline &optional link-type breadcrumbs)
+           (interactive)
+           (let ((marker (get-text-property 0 'marker headline))
+                 store-link)
+             (when (markerp marker)
+               (org-with-point-at marker
+                 (let* ((id (org-id-get (point) t))
+                        (attach-dir (org-attach-dir t))
+                        (breadcrumbs
+                         (when breadcrumbs
+                           (let ((s (org-format-outline-path
+                                     (org-get-outline-path)
+                                     (1- (frame-width))
+                                     nil org-picklink-breadcrumbs-separator)))
+                             (if (eq "" s) "" (concat s org-picklink-breadcrumbs-separator)))))
+                        (item (concat (or breadcrumbs "") (org-entry-get (point) "ITEM")))
+                        (link
+                         (cl-case link-type
+                           (attach (list :link attach-dir :description (concat item "(ATTACH)") :type "file"))
+                           (t (list :link (concat "id:" id) :description item :type "id")))))
+                   (setq store-link link)))
+               (org-insert-link nil (plist-get store-link :link) (plist-get store-link :description))
+               (cond ((org-in-item-p)
+                      (call-interactively #'org-insert-item))
+                     (t (insert " ")))))))
      #+END_SRC
 
 *** JSON
@@ -15339,6 +15524,11 @@
        `(quote (,face ((,cls ,(aoh-replace-color-syms spec))))))
      (put 'aoh-create-spec 'lisp-indent-function 'defun)
 
+     (with-eval-after-load 'ivy
+       (defface ivy-actual-highlight-face '((t (:inherit highlight)))
+         "face actually used by ivy to highlight some candidates.
+     see an-old-hope-theme.el for why this is necessary."))
+
      (custom-theme-set-faces 'an-old-hope
       ;; defaults
       (aoh-create-spec default :background very-dark-grey :foreground very-light-grey)
@@ -15380,15 +15570,17 @@
       (aoh-create-spec internal-border :foreground white :background white)
       (aoh-create-spec minibuffer-prompt :foreground yellow :weight bold)
 
-      (aoh-create-spec highlight :foreground very-dark-grey :background turquoise :distant-foreground turquoise :inherit bold)
+      (aoh-create-spec highlight :foreground very-dark-grey :background blue :distant-foreground blue :inherit bold)
 
       (aoh-create-spec region :background dark-grey :weight bold)
       (aoh-create-spec secondary-selection :inherit region)
 
-      (aoh-create-spec evil-search-highlight-persist-highlight-face :background line-highlight-bg :foreground orange :inherit bold)
-      (aoh-create-spec lazy-highlight :background orange :foreground black-dim)
-      (aoh-create-spec isearch :inherit lazy-highlight :weight bold)
+      ;; face for current search match. exiting now takes you to it.
+      (aoh-create-spec isearch :background purple :inherit bold)
+      (aoh-create-spec isearch-fail :inherit compilation-mode-line-fail)
       (aoh-create-spec match :foreground green-dim)
+      ;; face for matches other than the current match
+      (aoh-create-spec lazy-highlight :background blue-int :foreground black-dim)
 
       ;; delimeter colors just taken from https://github.com/gastrodia/rainbow-brackets
       ;; colors 5-8 just recycle 1-4, maybe come up with more.
@@ -15524,8 +15716,21 @@
       (aoh-create-spec hydra-posframe-face :background very-dark-grey :foreground very-light-grey)
       (aoh-create-spec hydra-posframe-border-face :inherit internal-border)
 
-      ;;; org-mode
-      (aoh-create-spec org-link :foreground turquoise :inherit bold)
+      ;;; ivy
+      ;; by default, it seems if ivy-highlight-face has its own spec, it'll interfere
+      ;; with the face of ivy-current-match. Which'll make it harder to tell which
+      ;; candidate is the current candidate.
+      ;;
+      ;; If ivy-highlight-face just inherits another face, then when both it and
+      ;; ivy-current-match are applied to a string, ivy-current-match will override
+      ;; ivy-highlight-face. Thus, this.
+      (aoh-create-spec ivy-actual-highlight-face
+        :foreground very-dark-grey :background turquoise
+        :distant-foreground turquoise :inherit bold)
+      (aoh-create-spec ivy-highlight-face :inherit ivy-actual-highlight-face)
+
+     ;;; org-mode
+      (aoh-create-spec org-link :foreground blue :inherit bold)
       (aoh-create-spec org-footnote :foreground blue)
 
       ;; Overridden by hl-todo-keyword-faces
