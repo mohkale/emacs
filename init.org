@@ -15531,6 +15531,11 @@
        `(quote (,face ((,cls ,(aoh-replace-color-syms spec))))))
      (put 'aoh-create-spec 'lisp-indent-function 'defun)
 
+     (with-eval-after-load 'ivy
+       (defface ivy-actual-highlight-face '((t (:inherit highlight)))
+         "face actually used by ivy to highlight some candidates.
+     see an-old-hope-theme.el for why this is necessary."))
+
      (custom-theme-set-faces 'an-old-hope
       ;; defaults
       (aoh-create-spec default :background very-dark-grey :foreground very-light-grey)
@@ -15572,15 +15577,17 @@
       (aoh-create-spec internal-border :foreground white :background white)
       (aoh-create-spec minibuffer-prompt :foreground yellow :weight bold)
 
-      (aoh-create-spec highlight :foreground very-dark-grey :background turquoise :distant-foreground turquoise :inherit bold)
+      (aoh-create-spec highlight :foreground very-dark-grey :background blue :distant-foreground blue :inherit bold)
 
       (aoh-create-spec region :background dark-grey :weight bold)
       (aoh-create-spec secondary-selection :inherit region)
 
-      (aoh-create-spec evil-search-highlight-persist-highlight-face :background line-highlight-bg :foreground orange :inherit bold)
-      (aoh-create-spec lazy-highlight :background orange :foreground black-dim)
-      (aoh-create-spec isearch :inherit lazy-highlight :weight bold)
+      ;; face for current search match. exiting now takes you to it.
+      (aoh-create-spec isearch :background purple :inherit bold)
+      (aoh-create-spec isearch-fail :inherit compilation-mode-line-fail)
       (aoh-create-spec match :foreground green-dim)
+      ;; face for matches other than the current match
+      (aoh-create-spec lazy-highlight :background blue-int :foreground black-dim)
 
       ;; delimeter colors just taken from https://github.com/gastrodia/rainbow-brackets
       ;; colors 5-8 just recycle 1-4, maybe come up with more.
@@ -15716,8 +15723,21 @@
       (aoh-create-spec hydra-posframe-face :background very-dark-grey :foreground very-light-grey)
       (aoh-create-spec hydra-posframe-border-face :inherit internal-border)
 
-      ;;; org-mode
-      (aoh-create-spec org-link :foreground turquoise :inherit bold)
+      ;;; ivy
+      ;; by default, it seems if ivy-highlight-face has its own spec, it'll interfere
+      ;; with the face of ivy-current-match. Which'll make it harder to tell which
+      ;; candidate is the current candidate.
+      ;;
+      ;; If ivy-highlight-face just inherits another face, then when both it and
+      ;; ivy-current-match are applied to a string, ivy-current-match will override
+      ;; ivy-highlight-face. Thus, this.
+      (aoh-create-spec ivy-actual-highlight-face
+        :foreground very-dark-grey :background turquoise
+        :distant-foreground turquoise :inherit bold)
+      (aoh-create-spec ivy-highlight-face :inherit ivy-actual-highlight-face)
+
+     ;;; org-mode
+      (aoh-create-spec org-link :foreground blue :inherit bold)
       (aoh-create-spec org-footnote :foreground blue)
 
       ;; Overridden by hl-todo-keyword-faces
