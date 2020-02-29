@@ -4649,6 +4649,11 @@
          :config
          (evil-mode 1)
 
+         ;; https://github.com/hlissner/doom-emacs/blob/develop/modules/editor/evil/config.el#L137
+         (advice-add #'evil-global-marker-p :before-until
+                     (defun evil--make-numbered-markers-global+ (char)
+                       (and (>= char ?2) (<= char ?9))))
+
          ;; evil-adjust: https://raw.githubusercontent.com/troyp/evil-adjust/master/evil-adjust.el
          (defmacro with-evil-adjust-to-eol (&rest body)
            `(let ((-last-evil-state evil-state)
