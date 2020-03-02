@@ -9749,7 +9749,14 @@
        (with-eval-after-load 'org
          (use-package org-pdftools
            :defer t
-           :straight (org-pdftools :type git :host github :repo "fuxialexander/org-pdftools")))
+           :straight (org-pdftools :type git :host github :repo "fuxialexander/org-pdftools")
+           :init
+           (org-link-set-parameters "pdftools"
+                                    :follow   #'org-pdftools-open
+                                    :complete #'org-pdftools-complete-link
+                                    :store    #'org-pdftools-store-link
+                                    :export   #'org-pdftools-export)
+           (add-hook 'org-store-link-functions 'org-pdftools-store-link)))
      #+END_SRC
 
 *** persp-mode
