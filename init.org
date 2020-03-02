@@ -1034,7 +1034,7 @@
         "hdk" 'describe-key
         "hdl" 'describe-last-keys ;; WARN not yet implemented
         "hdp" 'describe-package
-        "hds" 'describe-system-info
+        "hds" 'describe-syntax
         "hdt" 'describe-theme
         "hdv" 'describe-variable)
     #+END_SRC
@@ -12880,6 +12880,11 @@
            "oY" 'org-cut-subtree
            "on" 'org-next-link
            "op" 'org-previous-link)
+
+         (add-hook 'org-mode-hook
+                   (lambda (&rest _)
+                     (modify-syntax-entry ?< "_" org-mode-syntax-table)
+                     (modify-syntax-entry ?> "_" org-mode-syntax-table)))
 
          (setq-default org-src-window-setup 'current-window
                        org-babel-python-command "python3")
