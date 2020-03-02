@@ -12049,6 +12049,12 @@
          (defun python-shell-calculate-command ()
            "python3 -i")
 
+         (general-define-key
+           :states 'insert
+           :keymaps 'python-mode-map
+           "TAB"   'tab-to-tab-stop
+           "<tab>" 'tab-to-tab-stop)
+
          (leader/declare-prefix-for-mode!* 'python-mode
            "n" '("navigate" . "move-point")
            "e" "eval/exec"
