@@ -5033,13 +5033,16 @@
 
 ** Packages
 *** ace-link
-    let's you use an avy like interface to jump to a link in the visible region of the buffer.
-    cool, but I doub't I'll ever really use it :P
+    let's you use an avy like interface to jump to a link in the visible region
+    of the buffer.
 
-    #+BEGIN_SRC emacs-lisp :tangle no
+    #+BEGIN_SRC emacs-lisp
       (use-package ace-link
         :ensure t
-        :defer  t)
+        :defer  t
+        :init
+        (leader/set-keys
+          "j RET" 'ace-link))
     #+END_SRC
 
 *** adaptive-wrap
