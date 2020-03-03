@@ -7805,15 +7805,12 @@
       (use-package iedit
         :ensure t
         :defer  t
-        :commands (evil-multiedit-ex-match
-                   evil-multiedit-restore
+        :commands (evil-multiedit-match-all
+                   evil-multiedit-prev
                    evil-multiedit-next
                    evil-multiedit-match-and-next
                    evil-multiedit-match-and-prev
-                   evil-multiedit-prev
-                   evil-multiedit-toggle-marker-here
-                   evil-multiedit-toggle-or-restrict-region
-                   evil-multiedit-match-all
+
                    evil-multiedit
                    evil-multiedit-all)
         :init
@@ -7831,9 +7828,9 @@
 
           (general-define-key
             :states leader-norm-states
-            "ge" 'evil-multiedit
+            "gm" 'evil-multiedit
             "g*" 'evil-multiedit-all
-            "gE" 'evil-multiedit-restore)
+            "gM" 'evil-multiedit-restore)
 
           ;; (general-define-key
           ;;   :states 'visual
@@ -7843,7 +7840,9 @@
         :config
         (use-package evil-multiedit
           :ensure t
-          :defer  t
+          :demand t
+          :commands (evil-multiedit
+                     evil-multiedit-all)
           :config
 
           (defun evil-multiedit--multiedit (beg end)
