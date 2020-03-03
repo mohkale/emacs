@@ -9576,6 +9576,67 @@
           (concat mohkale-minor-mode-leader-key "-") 'olivetti-set-width))
     #+END_SRC
 
+*** outline-mode
+    #+BEGIN_SRC emacs-lisp
+      (use-package outline
+        :straight (outline :type built-in)
+        :defer t
+        :config
+        (advice-add 'outline-up-heading :around
+                    (defun outline-up-heading--goto-current-first+ (func arg &optional invisible-ok)
+                      "make `outline-up-heading' goto the current heading first
+      unless already there."
+                      (unless (outline-on-heading-p invisible-ok)
+                        (outline-backward-same-level 0)
+                        (when arg
+                          (setq arg (if (> arg 0) (- arg 1) (+ arg 1)))))
+
+                      (when arg
+                        (apply func arg invisible-ok))))
+
+        (defun outline-folded-p+ (&optional pos)
+          (save-excursion
+            (goto-char (line-end-position))
+            (outline-invisible-p)))
+
+        (defun outline-toggle-show-children+ ()
+          (interactive)
+          (if (outline-folded-p+)
+              (outline-show-subtree)
+            (outline-hide-subtree)))
+
+        (general-define-key
+          :states  'normal
+          :keymaps 'outline-mode-map
+          "gh" 'outline-up-heading
+          "gj" 'outline-next-heading
+          "gk" 'outline-previous-heading
+          "gl" 'outline-forward-same-level)
+
+        (general-define-key
+          :states  'motion
+          :keymaps 'outline-mode-map
+          :predicate '(outline-on-heading-p)
+          [remap evil-shift-right] 'outline-demote
+          [remap evil-shift-left]  'outline-promote
+          [remap drag-stuff-down]  'outline-move-subtree-down
+          [remap drag-stuff-up]    'outline-move-subtree-up
+          "TAB"   'outline-toggle-show-children+
+          "<tab>" 'outline-toggle-show-children+)
+
+        (leader/set-keys-for-mode! 'outline-mode
+          "m" 'outline-mark-subtree
+          "t" 'outline-hide-body ;; show subtree
+          "a" 'outline-show-all
+          ;; only show outline upto this level.
+          "h" 'outline-hide-sublevels
+          "l" 'outline-show-branches
+          "f" 'outline-hide-other ;; focus
+          ;; show remainder of branches in current hidden branch.
+          "q" 'outline-show-branches
+          "RET" 'outline-insert-heading))
+    #+END_SRC
+
 *** package
     #+BEGIN_SRC emacs-lisp
       (use-package package
