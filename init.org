@@ -7419,6 +7419,24 @@
                     :around #'eyebrowse-switch-window-config--when-new-zen-current-window))
     #+END_SRC
 
+*** finder-mode
+    #+BEGIN_SRC emacs-lisp
+      (use-package finder
+        :straight (finder :type built-in)
+        :defer t
+        :config
+
+        (evil-set-initial-state 'finder-mode 'motion)
+        (general-define-key
+          :keymaps 'finder-mode-map
+          "SPC" 'nil
+          "?"   'nil
+          [override-state] 'motion)
+
+        (leader/set-keys-for-mode! 'finder-mode
+          "?" 'finder-summary))
+    #+END_SRC
+
 *** flycheck
     on the fly syntax checker for emacs. finds where you've written bugs, adds an icon
     to the fringe and underlines it.
