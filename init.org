@@ -13184,7 +13184,6 @@
            :states '(normal insert)
            ;; NOTE meta keys insert headings with changed priority, shift keys insert todo headings
            ;; FIXME prefix arg doesn't work
-           ;; FIXME doesn't work when on a heading
            "C-<return>"   (evil-org-eol-call-anon
                            (org-insert-heading nil))
 
@@ -13239,8 +13238,8 @@
            :predicate '(or (org-table-p t)
                            (org-at-heading-p)
                            (org-at-item-p))
-           "C-j" 'org-metadown
-           "C-k" 'org-metaup)
+           [remap drag-stuff-down] 'org-metadown
+           [remap drag-stuff-up]   'org-metaup)
 
          ;; navigate throught tables or lists with tab in insert state.
          (general-define-key
@@ -13249,30 +13248,23 @@
            :predicate '(or (org-table-p t)
                            (org-at-heading-p)
                            (org-at-item-p))
-           "<tab>" 'org-cycle
-           "TAB" 'org-cycle
+           "<tab>"   'org-cycle
+           "TAB"     'org-cycle
            "<S-tab>" 'org-shifttab)
 
          (general-define-key
            :keymaps 'org-mode-map
            :states '(normal visual emacs)
-           "<tab>" 'org-cycle
-           "TAB" 'org-cycle
+           "<tab>"   'org-cycle
+           "TAB"     'org-cycle
            "<S-tab>" 'org-shifttab)
 
          (general-define-key
            :keymaps 'org-mode-map
-           :states '(normal visual)
+           :states '(normal insert visual)
            :predicate '(org-at-heading-p)
-           ">" 'org-demote-subtree
-           "<" 'org-promote-subtree)
-
-         (general-define-key
-           :keymaps 'org-mode-map
-           :states '(normal insert)
-           :predicate '(org-at-heading-p)
-           "C->" 'org-demote-subtree
-           "C-<" 'org-promote-subtree)
+           [remap evil-shift-right] 'org-demote-subtree
+           [remap evil-shift-left]  'org-promote-subtree)
 
          (defmacro org-read-date-command (name &rest body)
            "define a function for use in the calendar buffer for `calendar-read-date'."
