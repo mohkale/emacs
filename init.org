@@ -4532,6 +4532,10 @@
            :states 'visual
            "s" 'evil-surround-region)
 
+         (general-define-key
+           :states 'motion
+           "gs" 'evil-surround-edit)
+
          :bind (:map evil-surround-mode-map ("S" . nil)))
      #+END_SRC
 
@@ -7634,7 +7638,7 @@
           "C-j" 'flycheck-error-list-next-error
           "C-k" 'flycheck-error-list-previous-error
 
-          "gs" 'flycheck-error-list-check-source
+          "gS" 'flycheck-error-list-check-source
           "gg" 'flycheck-error-list-goto-first-error
           "G"  'flycheck-error-list-goto-last-error)
 
@@ -8451,7 +8455,6 @@
 
          (general-define-key
            :keymaps 'swiper-map
-           "C-q" nil
            "M-l" 'swiper-recenter-top-bottom
            "C-l" 'ivy-forward-char-or-partial-or-done
            "C-q" 'swiper-avy
@@ -8757,7 +8760,7 @@
            "O"       'ibuffer-do-occur
            "gr"      'ibuffer-update
            "gR"      'ibuffer-do-revert
-           "gs"      'ibuffer-do-save
+           "gw"      'ibuffer-do-save
            ;; "R" 'ibuffer-do-revert
            "R"       'ibuffer-do-toggle-read-only
            "r"       'ibuffer-change-marks
@@ -9099,7 +9102,7 @@
           "go" 'ein:worksheet-insert-cell-above
           "gO" 'ein:worksheet-insert-cell-below
           "gJ" 'ein:worksheet-merge-cell
-          "gs" 'ein:worksheet-split-cell-at-point
+          ;; "gs" 'ein:worksheet-split-cell-at-point
           "gj" 'ein:worksheet-goto-next-input
           "gk" 'ein:worksheet-goto-prev-input
           "gc" 'ein:worksheet-kill-cell)
@@ -9468,7 +9471,7 @@
           ;; occur-mode-mouse-goto
           "RET" 'occur-mode-goto-occurrence
           "go"  'occur-mode-goto-occurrence-other-window
-          "gs"  'occur-mode-display-occurrence
+          "gO"  'occur-mode-display-occurrence
           "j"   'evil-adjust-occur-next
           "k"   'evil-adjust-occur-prev
           "q"   'occur-cease-edit))
@@ -11934,8 +11937,8 @@
          (general-define-key
            :keymaps 'paredit-mode-map
            :states 'normal
-           "gsh" '(paredit-splice-sexp-killing-backward :which-key "splice-sexp-forward")
-           "gsl" '(paredit-splice-sexp-killing-forward :which-key "splice-sexp-backward"))
+           "gSh" '(paredit-splice-sexp-killing-backward :which-key "splice-sexp-forward")
+           "gSl" '(paredit-splice-sexp-killing-forward :which-key "splice-sexp-backward"))
 
          (general-define-key
            :keymaps 'paredit-mode-map
