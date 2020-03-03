@@ -365,6 +365,9 @@
       (add-hook 'emacs-startup-hook #'mohkale//display-out-of-date-configuration-warning)
 
       (setq mohkale-window-map (make-sparse-keymap))
+
+      (defvar mohkale-allow-unicode-emojis t
+        "when true, code points for emojis are assigned in default fontset")
     #+END_SRC
 
 *** Paths Setup
@@ -4092,6 +4095,29 @@
          ("<escape>" nil nil))
      #+END_SRC
 
+
+*** Fonts
+    #+BEGIN_SRC emacs-lisp
+      (when mohkale-allow-unicode-emojis
+        ;; adapted from: https://github.com/zonuexe/emoji-fontset.el/blob/master/emoji-fontset.el
+        (let ((emoji-font-family
+               (cl-case window-system
+                 ('w32 "Segoe UI Emoji")
+                 ('ns  "Apple Color Emoji")
+                 (t    "Symbola"))))
+          (cl-loop
+           for (x . y) in '((#x1f000 . #x1f02f) ;; Mahjong Tiles
+                            (#x1f0a0 . #x1f0ff) ;; Playing Cards
+                            (#x1f110 . #x1f19a) ;; Enclosed Alphanumeric Supplement
+                            ;; Regional Indicator Symbol, Enclosed Ideographic Supplement,
+                            ;; Emoticons, Transport and Map Symbols, Alchemical Symbols
+                            (#x1f1e6 . #x1f8ff))
+           do (setq x (decode-char 'ucs x)
+                    y (decode-char 'ucs y))
+           do (set-fontset-font "fontset-default" (cons x y) emoji-font-family))))
+    #+END_SRC
+
+
 ** Core Packages
    For packages that're need to properly setup other packages. This list won't be in any
    sort of order, beyond the messy order needed to ensure everything can be built from
@@ -7156,6 +7182,65 @@
          :commands electric-indent-mode
          :hook ((text-mode prog-mode) . electric-indent-mode))
      #+END_SRC
+
+*** emojify
+    #+BEGIN_SRC emacs-lisp
+      (use-package emojify
+        :ensure t
+        :defer  t
+        :hook ((org-mode              . emojify-mode)
+               (git-commit-mode       . emojify-mode)
+               (markdown-mode         . emojify-mode)
+               (lisp-interaction-mode . emojify-mode))
+        :init
+        (leader/declare-prefix "xm" "emoji" "emojis/kaomojis")
+
+        (leader/set-keys
+          "Me" 'emojify-mode
+          "xe" 'emojify-insert-emoji
+          "xE" 'emojify-describe-emoji-at-point
+          "xm/" 'emojify-apropos-emoji
+          "xml" 'emojify-insert-emoji
+          "xmd" 'emojify-describe-emoji
+          "xmf" 'emojify-download-emoji)
+
+        (defalias 'remove-duplicates #'cl-remove-duplicates)
+
+        :config
+        (general-define-key
+          :keymaps 'emojify-list-mode-map
+          :states 'motion
+          "gr" 'emojify-list-force-refresh
+          "Y"  'emojify-list-copy-emoji
+          "RET" 'emojify-list-describe-emoji)
+
+        (general-define-key
+          :keymaps 'emojify-description-mode
+          :states 'motion
+          "Y" 'emojify-description-copy-emoji)
+
+        (evil-set-initial-state 'emojify-description-mode 'motion)
+
+        ;; make emojis work like prettify-symbols-mode
+        (setq emojify-point-entered-behaviour 'uncover
+              emojify-emoji-styles '(unicode github))
+
+        (setq emojify-display-style
+              (if mohkale-allow-unicode-emojis
+                  'unicode
+                'image))
+
+        (use-package company-emoji
+          :ensure t
+          :defer  t
+          :init
+          (company/configure-mode (emojify-mode)
+            company-emoji)
+
+          :config
+          ;; never insert emojis as their unicode symbols.
+          (setq company-emoji-insert-unicode nil)))
+    #+END_SRC
 
 *** engine-mode
     search engine interaction for emacs. lets you create enteractive functions to run
@@ -13861,22 +13946,6 @@
     #+END_SRC
 
 *** Markdown
-**** company-emoji
-     #+BEGIN_SRC emacs-lisp
-       (use-package company-emoji
-         :ensure t
-         :defer  t
-         :config
-         (setq company-emoji-insert-unicode nil))
-     #+END_SRC
-
-**** emojify
-     #+BEGIN_SRC emacs-lisp
-       (use-package emojify
-         :ensure t
-         :defer  t)
-     #+END_SRC
-
 **** gh-md
      #+BEGIN_SRC emacs-lisp
        (use-package gh-md
@@ -13890,7 +13959,6 @@
          :ensure t
          :defer  t
          :hook ((markdown-mode . display-line-numbers-mode)
-                ;; (markdown-mode . emojify-mode)
                 (markdown-mode . flycheck-mode))
          :config
          (general-define-key
@@ -13929,9 +13997,6 @@
            "<S-iso-lefttab>" 'markdown-shifttab
            "<S-tab>"         'markdown-shifttab
            "<backtab>"       'markdown-shifttab)
-
-         (company/configure-mode (markdown-mode :major t)
-           company-emoji)
 
          (advice-add 'markdown-insert-list-item :after (lambda (&rest args)
                                                          (if (eq (char-before)
