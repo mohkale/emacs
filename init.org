@@ -14022,32 +14022,43 @@
          :hook ((markdown-mode . display-line-numbers-mode)
                 (markdown-mode . flycheck-mode))
          :config
+         (setq markdown-indent-on-enter 'indent-and-new-item)
+
          (general-define-key
            :keymaps 'markdown-mode-map
            :states 'normal
            "gh" 'markdown-up-heading
            "gj" 'markdown-outline-next
            "gk" 'markdown-outline-previous
-           "gl" 'markdown-outline-next-same-level)
+           "gl" 'markdown-outline-next-same-level
+           "}" 'markdown-forward-paragraph
+           "{" 'markdown-backward-paragraph)
 
          (general-define-key
            :keymaps 'markdown-mode-map
            :states 'insert
-           "<return>" 'markdown-enter-key
-           ;; "<backspace>" 'markdown-outdent-or-delete
-           ;; "<S-iso-lefttab>" 'markdown-outdent-or-delete
-           ;; "<S-tab>"         'markdown-outdent-or-delete
-           ;; "<backtab>"       'markdown-outdent-or-delete
-           )
+           "RET"      'markdown-enter-key
+           "<return>" 'markdown-enter-key)
+
+         (general-define-key
+           :keymaps 'markdown-mode-map
+           :states '(normal insert)
+           "C-<return>" 'markdown-insert-list-item)
 
          (general-define-key
            :keymaps 'markdown-mode-map
            :states '(insert normal)
-           "C-<return>" 'markdown-insert-list-item
-           "C-S-J" 'markdown-move-down
-           "C-S-K" 'markdown-move-up
-           "C-S-H" 'markdown-promote
-           "C-S-L" 'markdown-demote)
+           :predicate '(markdown-list-item-at-point-p)
+           [remap drag-stuff-down]  'markdown-move-down
+           [remap drag-stuff-up]    'markdown-move-up)
+
+         (general-define-key
+           :keymaps 'markdown-mode-map
+           :states '(insert normal)
+           :predicate '(or (markdown-list-item-at-point-p)
+                           (markdown-on-heading-p))
+           [remap evil-shift-right] 'markdown-demote
+           [remap evil-shift-left]  'markdown-promote)
 
          (general-define-key
            :keymaps 'markdown-mode-map
