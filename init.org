@@ -14007,7 +14007,11 @@
      #+BEGIN_SRC emacs-lisp
        (use-package gh-md
          :ensure t
-         :defer  t)
+         :defer  t
+         :init
+         (leader/set-keys-for-mode! 'markdown-mode
+           "rb" 'gh-md-render-buffer
+           "rr" 'gh-md-render-region))
      #+END_SRC
 
 **** markdown-mode
@@ -14055,25 +14059,64 @@
            "<S-tab>"         'markdown-shifttab
            "<backtab>"       'markdown-shifttab)
 
-         (advice-add 'markdown-insert-list-item :after (lambda (&rest args)
-                                                         (if (eq (char-before)
-                                                                 ?*)
-                                                             (evil-append nil)
-                                                           (evil-insert nil))))
+         (advice-add 'markdown-insert-list-item :before
+                     (defun markdown-insert-list-item--adjust-line+ (&rest args)
+                       "by default, inserting a new list item goes below the current item."
+                       (when (markdown-list-item-at-point-p)
+                         (save-excursion
+                           (goto-char (line-end-position))
+                           (newline))
 
+                         (markdown-forward-paragraph))))
+
+         (advice-add 'markdown-insert-list-item :after
+                     (defun markdown-insert-list-item--force-evil-insert+ (&rest args)
+                       (if (eq (char-before)
+                               ?\ )
+                           (evil-insert nil)
+                         (evil-append nil))))
+
+         ;;; evil-markdown-mode (Somelauw/evil-markdown)
+         (with-eval-after-load 'evil
+           (evil-declare-motion 'markdown-forward-paragraph)
+           (evil-declare-motion 'markdown-backward-paragraph)
+
+           ;; heading
+           (evil-declare-motion 'markdown-forward-same-level)
+           (evil-declare-motion 'markdown-backward-same-level)
+           (evil-declare-motion 'markdown-up-heading)
+           (evil-declare-motion 'markdown-next-heading)
+           (evil-declare-motion 'markdown-previous-heading)
+           (evil-declare-motion 'markdown-next-visible-heading)
+           (evil-declare-motion 'markdown-previous-visible-heading)
+
+           ;; other
+           (evil-declare-motion 'markdown-beginning-of-block)
+           (evil-declare-motion 'markdown-beginning-of-defun)
+           (evil-declare-motion 'markdown-end-of-block)
+           (evil-declare-motion 'markdown-end-of-block-element)
+           (evil-declare-motion 'markdown-end-of-defun)
+           (evil-declare-motion 'markdown-next-visible-heading)
+           (evil-declare-motion 'markdown-next-link)
+           (evil-declare-motion 'markdown-previous-visible-heading)
+           (evil-declare-motion 'markdown-previous-link)
+
+           ;; non-repeatible
+           (evil-declare-change-repeat 'markdown-cycle)
+           (evil-declare-change-repeat 'markdown-shifttab))
+
+         ;;; leader keys
          (leader/declare-prefix-for-mode!* 'markdown-mode
            "c" "check/complete"
-           "e" "export"
            "i" "insert"
            "ih" "header"
            "il" "link"
            "d" "delete"
-           "T" "toggle"
-           "n" "navigate"
-           "N" "narrow"
+           "M" "toggle"
+           "n" "narrow"
            "m" "mark"
-           "t" "table"
            "r" "render"
+           "t" "table"
            "ti" "insert"
            "td" "delete")
 
@@ -14083,28 +14126,36 @@
          ;;;  * markdown-indent-region
          ;;;  * markdown-outline-previous-same-level
 
+
+           "h" 'markdown-up
+           "j" 'markdown-next
+           "k" 'markdown-previous
+           "l" 'markdown-outline-next-same-level
+           "g" 'markdown-next-link
+           "G" 'markdown-previous-link
+           "}" 'markdown-forward-block
+           "{" 'markdown-backward-block
            "SPC" 'markdown-do
            "'" 'markdown-edit-code-block
            "f" 'markdown-follow-thing-at-point
            ">" 'markdown-blockquote-region
-           "<tab>" 'markdown-pre-region ;; preformat
+           "TAB" 'markdown-pre-region ;; preformat
 
+           ;; complete/checks
            "cc" 'markdown-complete
            "cb" 'markdown-complete-buffer
            "cr" 'markdown-check-refs
            "cR" 'markdown-unused-refs
            "cl" 'markdown-cleanup-list-numbers
 
-           "eo" 'markdown-open
-           "ee" 'markdown-export
-           "ep" 'markdown-preview
-           "ev" 'markdown-export-and-preview
-           "em" 'markdown-other-window
+           "o" 'markdown-open
+           "e" 'markdown-export
+           "p" 'markdown-preview
+           "v" 'markdown-export-and-preview
+           "O" 'markdown-other-window
 
-           "rb" 'gh-md-render-buffer
-           "rr" 'gh-md-render-region
-
-           "i <tab>" 'markdown-insert-image
+           ;; insert
+           "i TAB" 'markdown-insert-image
            "i*" 'markdown-insert-list-item
            "i!" 'markdown-insert-header-setext-1
            "i-" 'markdown-insert-hr
@@ -14144,37 +14195,32 @@
            "ilu" 'markdown-insert-uri
            "ilw" 'markdown-insert-wiki-link
 
+           ;; delete/kill
            "dd" 'markdown-kill-thing-at-point
            "db" 'markdown-kill-block
            "do" 'markdown-kill-outline
            "dy" 'markdown-kill-ring-save
 
-           "Tm" 'markdown-toggle-math
-           "Tf" 'markdown-toggle-fontify-code-blocks-natively
-           "Ti" 'markdown-toggle-inline-images
-           "Tu" 'markdown-toggle-url-hiding
-           "Tm" 'markdown-toggle-markup-hiding
-           "Tc" 'markdown-toggle-gfm-checkbox
-           "Tl" 'markdown-live-preview-mode
+           ;; toggles
+           "Mm" 'markdown-toggle-math
+           "Mf" 'markdown-toggle-fontify-code-blocks-natively
+           "Mi" 'markdown-toggle-inline-images
+           "Mu" 'markdown-toggle-url-hiding
+           "Mm" 'markdown-toggle-markup-hiding
+           "Mc" 'markdown-toggle-gfm-checkbox
+           "Ml" 'markdown-live-preview-mode
 
-           "nu" 'markdown-next-link
-           "nU" 'markdown-previous-link
-           "nb" 'markdown-forward-block
-           "nB" 'markdown-backward-block
-           "nh" 'markdown-up
-           "nj" 'markdown-next
-           "nk" 'markdown-previous
-           "nl" 'markdown-outline-next-same-level
-           "nL" 'markdown-outline-previous-same-level
+           ;; narrowing
+           "nb" 'markdown-narrow-to-block
+           "np" 'markdown-narrow-to-page
+           "ns" 'markdown-narrow-to-subtree
+           "nw" 'widen
 
-           "Nb" 'markdown-narrow-to-block
-           "Np" 'markdown-narrow-to-page
-           "Ns" 'markdown-narrow-to-subtree
-           "Nw" 'widen
-
+           ;; marks
            "ms" 'markdown-mark-subtree
            "mb" 'markdown-mark-block
 
+           ;; table
            "ts" 'markdown-table-sort-lines
            "tT" 'markdown-table-transpose
            "tt" 'markdown-insert-table
