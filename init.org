@@ -9124,6 +9124,48 @@
            (defalias 'ibuffer-persp-other #'ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)))
      #+END_SRC
 
+**** ibuffer-projectile
+     #+BEGIN_SRC emacs-lisp
+       (with-eval-after-load 'ibuffer
+         (use-package ibuffer-projectile
+           :ensure t
+           :defer  t
+           :commands (ibuffer-projectile-mode)
+           ;; :hook (ibuffer-mode . ibuffer-projectile-mode)
+           :config
+           (setq ibuffer-projectile-prefix
+                 (if (all-the-icons-available-p)
+                     (concat
+                      (all-the-icons-octicon "file-directory"
+                                             :face ibuffer-filter-group-name-face
+                                             :v-adjust -0.05)
+                      " ")
+                   "Project: "))
+
+           (defun ibuffer-projectile-hook (&rest _)
+             (ibuffer-projectile-set-filter-groups))
+
+           (define-minor-mode ibuffer-projectile-mode
+             "Generate ibuffer filters for projectile projects."
+             :lighter nil
+             :global  t
+             (if ibuffer-projectile-mode
+                 (progn
+                   (add-hook 'ibuffer-hook #'ibuffer-projectile-hook)
+                   (ibuffer-projectile-set-filter-groups))
+               (remove-hook 'ibuffer-hook #'ibuffer-projectile-hook)
+
+               (let ((ibuf (get-buffer "*Ibuffer*")))
+                 (when ibuf
+                   (with-current-buffer ibuf
+                     (setq ibuffer-filter-groups
+                           (seq-filter
+                            (lambda (x)
+                              (not (assoc 'projectile-root x)))
+                            ibuffer-filter-groups))
+                     (ibuffer-update nil t))))))))
+     #+END_SRC
+
 *** imenu
     see (and jump to) key points of interest in the current buffer using your completion framework
     of choice.
