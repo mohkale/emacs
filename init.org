@@ -212,9 +212,11 @@
       ;; this is now circumvented in early-init.el
       (unless (emacs>= "27")
         (menu-bar-mode -1)     ; dropdown menu list below frame title
-        (scroll-bar-mode -1)   ; scrolling bar shown on frames right side
         (tool-bar-mode -1)     ; short mini menu shown below the menu bar
         )
+
+      ;; needs to always be called, or spaceline cuts off at the end :(
+      (scroll-bar-mode -1)   ; scrolling bar shown on frames right side
 
       (blink-cursor-mode -1) ; cursor flashes annoyingly
     #+END_SRC
