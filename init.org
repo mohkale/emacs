@@ -12784,36 +12784,36 @@
 
 **** emmet-mode
      #+BEGIN_SRC emacs-lisp
-       (with-eval-after-load 'web-mode
-         (use-package emmet-mode
-           :ensure t
-           :defer  t
-           :hook (web-mode . emmet-mode)
-           :config
-           (general-define-key
-             :keymaps 'emmet-mode-keymap
-             "C-j" nil)
+       (use-package emmet-mode
+         :ensure t
+         :defer  t
+         :hook ((web-mode      . emmet-mode)
+                (markdown-mode . emmet-mode))
+         :config
+         (general-define-key
+           :keymaps 'emmet-mode-keymap
+           "C-j" nil)
 
-           (general-define-key
-             :states 'insert
-             :keymaps 'emmet-mode-keymap
-             "C-i" 'emmet-expand-line
-             ;; "TAB" 'emmet-expand-line
-             "<tab>"   'emmet-next-edit-point
-             "<S-tab>" 'emmet-prev-edit-point)
+         (general-define-key
+           :states 'insert
+           :keymaps 'emmet-mode-keymap
+           "C-i" 'emmet-expand-line
+           ;; "TAB" 'emmet-expand-line
+           "<tab>"   'emmet-next-edit-point
+           "<S-tab>" 'emmet-prev-edit-point)
 
-           (leader/with-major-mode-prefix
-             (leader/declare-prefix-for-mode 'emmet-mode
-               "e" "emmet" "emmet mode")
+         (leader/with-major-mode-prefix
+           (leader/declare-prefix-for-mode 'emmet-mode
+             "e" "emmet" "emmet mode")
 
-             (leader/set-keys-for-mode 'emmet-mode
-               "." 'emmet-expand-line
-               ;; "'" 'emmet-preview
-               "ee" 'emmet-expand-line
-               "ep" 'emmet-preview
-               "ew" 'emmet-wrap-with-markup
-               "en" 'emmet-next-edit-point
-               "eN" 'emmet-prev-edit-point))))
+           (leader/set-keys-for-mode 'emmet-mode
+             "." 'emmet-expand-line
+             ;; "'" 'emmet-preview
+             "ee" 'emmet-expand-line
+             "ep" 'emmet-preview
+             "ew" 'emmet-wrap-with-markup
+             "en" 'emmet-next-edit-point
+             "eN" 'emmet-prev-edit-point)))
      #+END_SRC
 
 **** company-web
