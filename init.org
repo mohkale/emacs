@@ -8383,6 +8383,17 @@
             (autoload-do-load (symbol-function 'hydra-ivy-custom/body))))
       #+END_SRC
 
+**** ivy-xref
+     #+BEGIN_SRC emacs-lisp
+       (use-package ivy-xref
+         :ensure t
+         :defer  t
+         :init
+         (when (emacs>= "27")
+           (setq xref-show-definitions-function #'ivy-xref-show-defs))
+         (setq xref-show-xrefs-function #'ivy-xref-show-xrefs))
+     #+END_SRC
+
 **** counsel
      a bunch of really useful functions to go alongside ivy.
 
