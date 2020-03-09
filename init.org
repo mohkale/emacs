@@ -6863,14 +6863,21 @@
          :straight (dired-x :type built-in)
          :hook (dired-mode . dired-omit-mode)
          :config
-         (setq dired-omit-files (concat dired-omit-files
-                                        "\\|^__pycache__$"
-                                        "\\|^\\.pytest_cache$"
-                                        "\\|^\\.gradle$"
-                                        "\\|^\\.sass-cache$"
-                                        "\\|^\\.jekyll-cache$"
-                                        "\\|^\\.git$"
-                                        "\\|^Pipfile")))
+         (setq dired-omit-files (rx (or
+                                     ".#"
+                                     (and bol
+                                          (or "."
+                                              ".."
+                                              ".git"
+                                              ".bundle"
+                                              ".dired"
+                                              "__pycache__"
+                                              ".pytest_cache"
+                                              ".gradle"
+                                              ".sass-cache"
+                                              ".jekyll-cache"
+                                              "Pipfile")
+                                          eol)))))
      #+END_SRC
 
 **** diredfl
