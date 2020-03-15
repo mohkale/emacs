@@ -13168,48 +13168,68 @@
         ;; -*- lisp-indent-function: 'common-lisp-indent-function -*-
         (require 'doct)
 
+        (defun org-capture-create-goto-heading-command (heading &optional heading-regexp)
+          "create a function to jump to HEADING, creating HEADING if it doesn't exist.
+        This function also smartly reacts to headings containing [/]. By default, if
+        [/] has been updated to [0/1], then org is just unable to find it.
+        "
+          (unless heading-regexp
+            (setq heading-regexp (regexp-quote heading))
+
+            (when (string-match-p (rx "[/]") heading-regexp)
+              (setq heading-regexp
+                    (replace-regexp-in-string
+                     (regexp-quote "[/]")
+                     "[[[:digit:]]*/[[:digit:]]*\\\\]"
+                     heading-regexp))))
+
+          (lambda ()
+            (let ((heading-point
+                   (ignore-errors
+                     (save-excursion
+                       (goto-char (point-min))
+                       (search-forward-regexp heading-regexp)
+                       (line-beginning-position)))))
+              (if heading-point
+                  (goto-char heading-point)
+                (goto-char (point-min))
+                (save-excursion
+                  (insert heading "\n"))))))
+
+        (defun org-get-link+ ()
+          "get the stringified result of `org-store-link'"
+          (with-temp-buffer
+            (org-insert-link-global)
+            (buffer-substring (point-min) (point-max))))
+
         ;; see also: https://www.gnu.org/software/emacs/manual/html_node/org/Template-expansion.html#Template-expansion
         (setq
          org-capture-templates
          (doct `((:group "TODOs"
-                  :type entry
-                  :file ,org-default-notes-file
-                  :prepend     t
-                  :empty-lines 0
-                  :function (lambda ()
-                              "goto TODO headline with numeric statistics value."
-                              (let* ((heading "* TODOs [/]")
-                                     (heading-regexp "* TODOs \\[[[:digit:]]*/[[:digit:]]*\\]")
-                                     (heading-point
-                                      (ignore-errors
-                                        (save-excursion
-                                          (goto-char (point-min))
-                                          (search-forward-regexp heading-regexp)
-                                          (line-beginning-position)))))
-                                (if heading-point
-                                    (goto-char heading-point)
-                                  (goto-char (point-min))
-                                  (save-excursion
-                                    (insert heading "\n")))))
-                  :before-finalize (lambda () (org-update-parent-todo-statistics))
-                  :template ("* %doct(todo-state) %?"
-                             "  %U")
-                  :todo-state "TODO"
-                  :children (("Todo" :keys "t")
-                             ("Todo with Clipboard"
-                              :keys "T"
-                              :template ("* %doct(todo-state) %?"
-                                         "  %U"
-                                         "  %c"))))
-                 (:group "professional"
-                  :type entry
-                  :file "university/university.org"
-                  :empty-lines 1
-                  :children (("Lecture"
-                              :keys "l"
-                              :clock-in t
-                              :template ("* [/] %^{title} %^g"
-                                         "  %?"))))))
+                         :type entry
+                         :file ,org-default-notes-file
+                         :prepend     t
+                         :empty-lines 0
+                         :function ,(org-capture-create-goto-heading-command "* TODOs [/]")
+                         :before-finalize ,#'org-update-parent-todo-statistics
+                         :template ("* %doct(todo-state) %?"
+                                    "  %U")
+                         :todo-state "TODO"
+                         :children (("Todo" :keys "t")
+                                    ("Todo with Clipboard"
+                                     :keys "T"
+                                     :template ("* %doct(todo-state) %?"
+                                                "  %U"
+                                                "  %c"))))
+                 (:group "education"
+                         :type entry
+                         :file "university/university.org"
+                         :empty-lines 1
+                         :children (("Lecture"
+                                     :keys "l"
+                                     :clock-in t
+                                     :template ("* [/] %^{title} %^g"
+                                                "  %?"))))))
 
          ;; templates for projectile-projects.
          counsel-projectile-org-capture-templates
