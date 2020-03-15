@@ -540,6 +540,7 @@
          mohkale-library-of-babel-file                      (etc! "babel-lib.org")
          multi-compile-history-file                         (var! "multi-compile-history.el")
          pcache-directory                                   (var! "pcache/")
+         persistent-scratch-save-file                       (var! "scratch.el")
          persp-save-dir                                     (var! "perspectives/")
          prescient-save-file                                (var! "prescient-save.el")
          projectile-cache-file                              (var! "projectile/cache.el")
@@ -931,7 +932,6 @@
         "bt" "buffer-read-only-mode")
 
       (leader/set-keys
-        "b RET" 'create-new-empty-buffer
         "b DEL" 'bury-buffer
         "bb" 'switch-to-buffer
         "bB" 'switch-to-buffer-other-window
@@ -947,7 +947,6 @@
         "bc" 'rename-buffer
         "bC" 'rename-uniquely
         "bo" 'occur
-        "bs" 'switch-to-scratch-buffer
         "bt" 'read-only-mode
         "by" 'copy-whole-buffer-to-clipboard)
     #+END_SRC
@@ -2460,8 +2459,7 @@
       (use-package mohkale-bufwin
         :straight (mohkale-bufwin :type built-in)
         :defer load-me-now-duration
-        :commands (switch-to-scratch-buffer
-                   kill-this-buffer-and-window-maybe
+        :commands (kill-this-buffer-and-window-maybe
                    switch-to-last-buffer
                    kill-all-windows-and-return-to-home
                    halt-and-catch-fire
@@ -2475,7 +2473,6 @@
                    set-window-dedication
                    async-shell-command-on-buffer
                    safe-erase-buffer
-                   create-new-empty-buffer
                    copy-whole-buffer-to-clipboard
                    split-window-right-and-focus
                    split-window-below-and-focus)
@@ -2492,68 +2489,6 @@
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-bufwin.el
-      (defvar scratch-buffer-name "*scratch*"
-        "name of users scratch buffer")
-
-      (defun create-new-empty-buffer (&optional buffer-name)
-        "creates and returns a new empty scratch like buffer
-      with prefix it prompts you for the name of the buffer.
-      if called interactively, the new buffer is switched to."
-        (interactive "P")
-        (let* ((def-buf-name scratch-buffer-name)
-               (buffer-name
-                (cond
-                 ((stringp buffer-name) buffer-name)
-                 (buffer-name (read-buffer "buffer name: " def-buf-name))
-                 (t                     def-buf-name)))
-               (buffer-name (generate-new-buffer-name buffer-name))
-               (buffer (get-buffer-create buffer-name)))
-          (with-current-buffer buffer
-            (funcall-interactively initial-major-mode))
-          (when (called-interactively-p)
-            (switch-to-buffer buffer))
-          buffer))
-
-      (defun switch-to-scratch-buffer (&optional prefix)
-        "switch to the scratch buffer
-      with prefix, prompts for which buffer names like the scratch
-      buffer to switch to. If none exists, a new scratch buffer will
-      be made. If only one exists, it will be switched to and if more
-      than one exists then prompts for it."
-        (interactive "P")
-        (if (not prefix)
-            ;; switch to original scratch buffer
-            (let ((buffer (get-buffer scratch-buffer-name)))
-              (if buffer
-                  (switch-to-buffer buffer)
-                (call-interactively 'create-new-empty-buffer)))
-          (let* ((buffer-list (seq-filter (lambda (x)
-                                            (string-match
-                                             (regexp-quote scratch-buffer-name)
-                                             (buffer-name x) 0))
-                                          (sort (buffer-list) (lambda (x y) (string<
-                                                                        (buffer-name x)
-                                                                        (buffer-name y))))))
-                 (buffer-names (mapcar #'buffer-name buffer-list))
-                 buffer)
-            (cond
-             ((zerop (length buffer-list))
-              (setq buffer (create-new-empty-buffer)))
-             ((eq 1 (length buffer-list))
-              (setq buffer (car buffer-list)))
-             (t
-              (require 'counsel)
-              (setq buffer (ivy-read "Switch to buffer: " buffer-names
-                                     :require-match t
-                                     :keymap ivy-switch-buffer-map
-                                     :matcher #'ivy--switch-buffer-matcher
-                                     :caller 'switch-to-scratch-buffer
-                                     :unwind #'counsel--switch-buffer-unwind
-                                     :update-fn 'counsel--switch-buffer-update-fn))))
-            (when (called-interactively-p)
-              (switch-to-buffer buffer))
-            buffer)))
-
       (defun switch-to-messages-buffer ()
         "switches to messages buffer"
         (interactive)
@@ -2811,6 +2746,111 @@
            (not (window-dedicated-p window)))))
 
       (provide 'mohkale-bufwin)
+    #+END_SRC
+
+*** multiscratch
+    #+BEGIN_SRC emacs-lisp
+      (use-package multiscratch
+        :commands (switch-to-scratch-buffer
+                   create-new-empty-buffer
+                   scratch-buffer-p)
+        :defer 30 ;; auto restore scratch buffers after 30-seconds.
+        :init
+        (leader/set-keys
+          "bs"    'switch-to-scratch-buffer
+          "b RET" 'create-new-empty-buffer)
+
+        :config
+        (use-package persistent-scratch
+          :ensure t
+          :init
+          (defun persistent-scratch--scratch-buffer-p (&optional buffer)
+            "persist all but the main scratch buffer."
+            (and (not (string= (buffer-name buffer) scratch-buffer-name))
+                 (scratch-buffer-p buffer)))
+
+          (setq persistent-scratch-autosave-interval 800
+                persistent-scratch-scratch-buffer-p-function #'persistent-scratch--scratch-buffer-p)
+
+          ;; force restoration on initial movement to a scratch buffer.
+          (when (file-exists-p persistent-scratch-save-file)
+            (persistent-scratch-restore))
+
+          (add-hook 'kill-emacs-hook
+                    (defun persistent-scratch--save-on-exit (&rest _)
+                      (persistent-scratch-save)))))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/multiscratch.el
+      (defvar scratch-buffer-name "*scratch*"
+        "name of users scratch buffer")
+
+      ;;;###autoload
+      (cl-defun create-new-empty-buffer (&optional buffer-name (is-scratch t))
+        "creates and returns a new empty scratch like buffer
+      with prefix it prompts you for the name of the buffer.
+      if called interactively, the new buffer is switched to."
+        (interactive "P")
+        (let* ((def-buf-name scratch-buffer-name)
+               (buffer-name
+                (cond
+                 ((stringp buffer-name) buffer-name)
+                 (buffer-name (read-buffer "buffer name: " def-buf-name))
+                 (t def-buf-name)))
+               (buffer-name (generate-new-buffer-name buffer-name))
+               (buffer (get-buffer-create buffer-name)))
+          (with-current-buffer buffer
+            (funcall-interactively initial-major-mode))
+          (when (called-interactively-p)
+            (switch-to-buffer buffer))
+          buffer))
+
+      (defun scratch-buffer-p (&optional buffer)
+        (string-match
+         (regexp-quote scratch-buffer-name)
+         (buffer-name buffer) 0))
+
+      (defun scratch-buffers ()
+        (sort
+         (seq-filter #'scratch-buffer-p (buffer-list))
+         (lambda (x y) (string< (buffer-name x) (buffer-name y)))))
+
+      ;;;###autoload
+      (defun switch-to-scratch-buffer (&optional prefix)
+        "switch to the scratch buffer
+      with prefix, prompts for which buffer named like the scratch
+      buffer to switch to. If none exists, a new scratch buffer will
+      be made. If only one exists, it will be switched to and if more
+      than one exists then prompts for it."
+        (interactive "P")
+        (if (not prefix)
+            ;; switch to original scratch buffer
+            (let ((buffer (get-buffer scratch-buffer-name)))
+              (if buffer
+                  (switch-to-buffer buffer)
+                (call-interactively 'create-new-empty-buffer)))
+          (let* ((buffer-list (scratch-buffers))
+                 (buffer-names (mapcar #'buffer-name buffer-list))
+                 (buffer
+                  (cond
+                   ((zerop (length buffer-list))
+                    (create-new-empty-buffer))
+                   ((eq 1 (length buffer-list))
+                    (car buffer-list))
+                   (t
+                    (require 'counsel)
+                    (setq buffer (ivy-read "Switch to buffer: " buffer-names
+                                           :require-match t
+                                           :keymap ivy-switch-buffer-map
+                                           :matcher #'ivy--switch-buffer-matcher
+                                           :caller 'switch-to-scratch-buffer
+                                           :unwind #'counsel--switch-buffer-unwind
+                                           :update-fn 'counsel--switch-buffer-update-fn))))))
+            (when (called-interactively-p)
+              (switch-to-buffer buffer))
+            buffer)))
+
+      (provide 'multiscratch)
     #+END_SRC
 
 *** evil
