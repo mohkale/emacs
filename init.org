@@ -212,9 +212,11 @@
       ;; this is now circumvented in early-init.el
       (unless (emacs>= "27")
         (menu-bar-mode -1)     ; dropdown menu list below frame title
-        (scroll-bar-mode -1)   ; scrolling bar shown on frames right side
         (tool-bar-mode -1)     ; short mini menu shown below the menu bar
         )
+
+      ;; needs to always be called, or spaceline cuts off at the end :(
+      (scroll-bar-mode -1)   ; scrolling bar shown on frames right side
 
       (blink-cursor-mode -1) ; cursor flashes annoyingly
     #+END_SRC
@@ -539,6 +541,7 @@
          mohkale-library-of-babel-file                      (etc! "babel-lib.org")
          multi-compile-history-file                         (var! "multi-compile-history.el")
          pcache-directory                                   (var! "pcache/")
+         persistent-scratch-save-file                       (var! "scratch.el")
          persp-save-dir                                     (var! "perspectives/")
          prescient-save-file                                (var! "prescient-save.el")
          projectile-cache-file                              (var! "projectile/cache.el")
@@ -879,6 +882,8 @@
       (leader/set-keys
         "SPC" 'execute-extended-command
         "TAB" 'switch-to-last-buffer
+        "ESC" 'exit-recursive-edit
+        "DEL" 'abort-recursive-edit
         ;; "<C-tab>" 'indent-back-to-normal ;; C-TAB doesn't work
         "!" 'shell-command
         "&" 'async-shell-command
@@ -930,7 +935,6 @@
         "bt" "buffer-read-only-mode")
 
       (leader/set-keys
-        "b RET" 'create-new-empty-buffer
         "b DEL" 'bury-buffer
         "bb" 'switch-to-buffer
         "bB" 'switch-to-buffer-other-window
@@ -946,7 +950,6 @@
         "bc" 'rename-buffer
         "bC" 'rename-uniquely
         "bo" 'occur
-        "bs" 'switch-to-scratch-buffer
         "bt" 'read-only-mode
         "by" 'copy-whole-buffer-to-clipboard)
     #+END_SRC
@@ -992,7 +995,10 @@
         "fe" '("emacs" . "emacs files")
         "fo" "open-externally"
 
-        "fv" "variables")
+        "fv" "variables"
+        "fvc" "copy"
+        "fvr" "remove"
+        )
 
       (leader/set-keys
         "f\"" 'recover-this-file
@@ -1019,8 +1025,17 @@
         "fev" 'emacs-version
 
         "fvd" 'add-dir-local-variable
-        "fvf" 'add-file-local-variable
-        "fvp" 'add-file-local-variable-prop-line)
+        "fvs" 'add-file-local-variable
+        "fvl" 'add-file-local-variable-prop-line
+
+        "fvcf" 'copy-dir-locals-to-file-locals
+        "fvcd" 'copy-file-locals-to-dir-locals
+        "fvcl" 'copy-dir-locals-to-file-locals-prop-line
+
+        "fvrv" 'kill-local-variable
+        "fvrd" 'delete-dir-local-variable
+        "fvrf" 'delete-file-local-variable
+        "fvrl" 'delete-file-local-variable-prop-line)
     #+END_SRC
 
 *** help
@@ -1101,6 +1116,7 @@
         "Mc" 'c++-mode
         "MC" 'c-mode
         "Mf" 'flyspell-mode
+        "MF" 'follow-mode
         "Mt" 'fundamental-mode
         "Mp" 'python-mode
         "Mr" 'enh-ruby-mode
@@ -1324,7 +1340,7 @@
           (add-hook (intern hook-name) #'mohkale//adjust-syntax-entry)))
     #+END_SRC
 
-** Methods
+** Setup/Methods
    Define methods for a bunch of purposes within the configuration here.
 
 *** Core
@@ -2447,8 +2463,7 @@
       (use-package mohkale-bufwin
         :straight (mohkale-bufwin :type built-in)
         :defer load-me-now-duration
-        :commands (switch-to-scratch-buffer
-                   kill-this-buffer-and-window-maybe
+        :commands (kill-this-buffer-and-window-maybe
                    switch-to-last-buffer
                    kill-all-windows-and-return-to-home
                    halt-and-catch-fire
@@ -2462,7 +2477,6 @@
                    set-window-dedication
                    async-shell-command-on-buffer
                    safe-erase-buffer
-                   create-new-empty-buffer
                    copy-whole-buffer-to-clipboard
                    split-window-right-and-focus
                    split-window-below-and-focus)
@@ -2479,68 +2493,6 @@
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-bufwin.el
-      (defvar scratch-buffer-name "*scratch*"
-        "name of users scratch buffer")
-
-      (defun create-new-empty-buffer (&optional buffer-name)
-        "creates and returns a new empty scratch like buffer
-      with prefix it prompts you for the name of the buffer.
-      if called interactively, the new buffer is switched to."
-        (interactive "P")
-        (let* ((def-buf-name scratch-buffer-name)
-               (buffer-name
-                (cond
-                 ((stringp buffer-name) buffer-name)
-                 (buffer-name (read-buffer "buffer name: " def-buf-name))
-                 (t                     def-buf-name)))
-               (buffer-name (generate-new-buffer-name buffer-name))
-               (buffer (get-buffer-create buffer-name)))
-          (with-current-buffer buffer
-            (funcall-interactively initial-major-mode))
-          (when (called-interactively-p)
-            (switch-to-buffer buffer))
-          buffer))
-
-      (defun switch-to-scratch-buffer (&optional prefix)
-        "switch to the scratch buffer
-      with prefix, prompts for which buffer names like the scratch
-      buffer to switch to. If none exists, a new scratch buffer will
-      be made. If only one exists, it will be switched to and if more
-      than one exists then prompts for it."
-        (interactive "P")
-        (if (not prefix)
-            ;; switch to original scratch buffer
-            (let ((buffer (get-buffer scratch-buffer-name)))
-              (if buffer
-                  (switch-to-buffer buffer)
-                (call-interactively 'create-new-empty-buffer)))
-          (let* ((buffer-list (seq-filter (lambda (x)
-                                            (string-match
-                                             (regexp-quote scratch-buffer-name)
-                                             (buffer-name x) 0))
-                                          (sort (buffer-list) (lambda (x y) (string<
-                                                                        (buffer-name x)
-                                                                        (buffer-name y))))))
-                 (buffer-names (mapcar #'buffer-name buffer-list))
-                 buffer)
-            (cond
-             ((zerop (length buffer-list))
-              (setq buffer (create-new-empty-buffer)))
-             ((eq 1 (length buffer-list))
-              (setq buffer (car buffer-list)))
-             (t
-              (require 'counsel)
-              (setq buffer (ivy-read "Switch to buffer: " buffer-names
-                                     :require-match t
-                                     :keymap ivy-switch-buffer-map
-                                     :matcher #'ivy--switch-buffer-matcher
-                                     :caller 'switch-to-scratch-buffer
-                                     :unwind #'counsel--switch-buffer-unwind
-                                     :update-fn 'counsel--switch-buffer-update-fn))))
-            (when (called-interactively-p)
-              (switch-to-buffer buffer))
-            buffer)))
-
       (defun switch-to-messages-buffer ()
         "switches to messages buffer"
         (interactive)
@@ -2798,6 +2750,111 @@
            (not (window-dedicated-p window)))))
 
       (provide 'mohkale-bufwin)
+    #+END_SRC
+
+*** multiscratch
+    #+BEGIN_SRC emacs-lisp
+      (use-package multiscratch
+        :commands (switch-to-scratch-buffer
+                   create-new-empty-buffer
+                   scratch-buffer-p)
+        :defer 30 ;; auto restore scratch buffers after 30-seconds.
+        :init
+        (leader/set-keys
+          "bs"    'switch-to-scratch-buffer
+          "b RET" 'create-new-empty-buffer)
+
+        :config
+        (use-package persistent-scratch
+          :ensure t
+          :init
+          (defun persistent-scratch--scratch-buffer-p (&optional buffer)
+            "persist all but the main scratch buffer."
+            (and (not (string= (buffer-name buffer) scratch-buffer-name))
+                 (scratch-buffer-p buffer)))
+
+          (setq persistent-scratch-autosave-interval 800
+                persistent-scratch-scratch-buffer-p-function #'persistent-scratch--scratch-buffer-p)
+
+          ;; force restoration on initial movement to a scratch buffer.
+          (when (file-exists-p persistent-scratch-save-file)
+            (persistent-scratch-restore))
+
+          (add-hook 'kill-emacs-hook
+                    (defun persistent-scratch--save-on-exit (&rest _)
+                      (persistent-scratch-save)))))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/multiscratch.el
+      (defvar scratch-buffer-name "*scratch*"
+        "name of users scratch buffer")
+
+      ;;;###autoload
+      (cl-defun create-new-empty-buffer (&optional buffer-name (is-scratch t))
+        "creates and returns a new empty scratch like buffer
+      with prefix it prompts you for the name of the buffer.
+      if called interactively, the new buffer is switched to."
+        (interactive "P")
+        (let* ((def-buf-name scratch-buffer-name)
+               (buffer-name
+                (cond
+                 ((stringp buffer-name) buffer-name)
+                 (buffer-name (read-buffer "buffer name: " def-buf-name))
+                 (t def-buf-name)))
+               (buffer-name (generate-new-buffer-name buffer-name))
+               (buffer (get-buffer-create buffer-name)))
+          (with-current-buffer buffer
+            (funcall-interactively initial-major-mode))
+          (when (called-interactively-p)
+            (switch-to-buffer buffer))
+          buffer))
+
+      (defun scratch-buffer-p (&optional buffer)
+        (string-match
+         (regexp-quote scratch-buffer-name)
+         (buffer-name buffer) 0))
+
+      (defun scratch-buffers ()
+        (sort
+         (seq-filter #'scratch-buffer-p (buffer-list))
+         (lambda (x y) (string< (buffer-name x) (buffer-name y)))))
+
+      ;;;###autoload
+      (defun switch-to-scratch-buffer (&optional prefix)
+        "switch to the scratch buffer
+      with prefix, prompts for which buffer named like the scratch
+      buffer to switch to. If none exists, a new scratch buffer will
+      be made. If only one exists, it will be switched to and if more
+      than one exists then prompts for it."
+        (interactive "P")
+        (if (not prefix)
+            ;; switch to original scratch buffer
+            (let ((buffer (get-buffer scratch-buffer-name)))
+              (if buffer
+                  (switch-to-buffer buffer)
+                (call-interactively 'create-new-empty-buffer)))
+          (let* ((buffer-list (scratch-buffers))
+                 (buffer-names (mapcar #'buffer-name buffer-list))
+                 (buffer
+                  (cond
+                   ((zerop (length buffer-list))
+                    (create-new-empty-buffer))
+                   ((eq 1 (length buffer-list))
+                    (car buffer-list))
+                   (t
+                    (require 'counsel)
+                    (setq buffer (ivy-read "Switch to buffer: " buffer-names
+                                           :require-match t
+                                           :keymap ivy-switch-buffer-map
+                                           :matcher #'ivy--switch-buffer-matcher
+                                           :caller 'switch-to-scratch-buffer
+                                           :unwind #'counsel--switch-buffer-unwind
+                                           :update-fn 'counsel--switch-buffer-update-fn))))))
+            (when (called-interactively-p)
+              (switch-to-buffer buffer))
+            buffer)))
+
+      (provide 'multiscratch)
     #+END_SRC
 
 *** evil
@@ -4880,8 +4937,8 @@
 
          (general-define-key
            :states leader-nnorm-states
-           "C->" 'evil-shift-right-line
-           "C-<" 'evil-shift-left-line)
+           "C->" 'evil-shift-right
+           "C-<" 'evil-shift-left)
 
          (general-define-key
            :states 'emacs
@@ -4907,10 +4964,13 @@
            "Y" (general-simulate-key "y$"))
 
          (general-define-key
-           :keymaps 'global-map
            :states '(normal insert)
            "C-k"   'evil-join-backwards
            "C-M-k" 'evil-join-backwards)
+
+         (general-define-key
+           :states 'normal
+           "K" 'evil-join-backwards)
 
          (general-define-key
            :states 'insert
@@ -4960,6 +5020,7 @@
          (leader/declare-prefix "sc" "search-noh")
 
          (leader/set-keys
+           "je" 'evil-goto-definition
            "id" 'evil-insert-digraph
            "sc" 'evil-ex-nohighlight
            "xu" 'evil-upcase
@@ -6846,14 +6907,21 @@
          :straight (dired-x :type built-in)
          :hook (dired-mode . dired-omit-mode)
          :config
-         (setq dired-omit-files (concat dired-omit-files
-                                        "\\|^__pycache__$"
-                                        "\\|^\\.pytest_cache$"
-                                        "\\|^\\.gradle$"
-                                        "\\|^\\.sass-cache$"
-                                        "\\|^\\.jekyll-cache$"
-                                        "\\|^\\.git$"
-                                        "\\|^Pipfile")))
+         (setq dired-omit-files (rx (or
+                                     ".#"
+                                     (and bol
+                                          (or "."
+                                              ".."
+                                              ".git"
+                                              ".bundle"
+                                              ".dired"
+                                              "__pycache__"
+                                              ".pytest_cache"
+                                              ".gradle"
+                                              ".sass-cache"
+                                              ".jekyll-cache"
+                                              "Pipfile")
+                                          eol)))))
      #+END_SRC
 
 **** diredfl
@@ -7340,6 +7408,8 @@
         :defer  t
         :hook ((org-mode              . emojify-mode)
                (git-commit-mode       . emojify-mode)
+               (web-mode              . emojify-mode)
+               (lisp-interaction-mode . emojify-mode)
                (markdown-mode         . emojify-mode)
                (lisp-interaction-mode . emojify-mode))
         :init
@@ -8366,6 +8436,17 @@
             (autoload-do-load (symbol-function 'hydra-ivy-custom/body))))
       #+END_SRC
 
+**** ivy-xref
+     #+BEGIN_SRC emacs-lisp
+       (use-package ivy-xref
+         :ensure t
+         :defer  t
+         :init
+         (when (emacs>= "27")
+           (setq xref-show-definitions-function #'ivy-xref-show-defs))
+         (setq xref-show-xrefs-function #'ivy-xref-show-xrefs))
+     #+END_SRC
+
 **** counsel
      a bunch of really useful functions to go alongside ivy.
 
@@ -8473,7 +8554,7 @@
                        (company-cancel)))
 
          (ivy-set-actions 'counsel-fonts
-                          '(("o" describe-font "describe-font")))
+                          '(("o" describe-font "describe")))
 
          (ivy-configure 'counsel-evil-registers :height ivy-height)
 
@@ -8756,6 +8837,9 @@
          (defvar ibuffer-show-buffer-icons nil
            "whether to show icons alongside the buffer")
 
+         (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold))
+               ibuffer-title-face '(:inherit (font-lock-type-face)))
+
          :config
          (evil-set-initial-state 'ibuffer-mode 'motion)
 
@@ -8986,10 +9070,14 @@
          (define-ibuffer-column icon (:name "  ")
            (let ((icon (if (and (buffer-file-name)
                                 (all-the-icons-auto-mode-match?))
-                           (all-the-icons-icon-for-file (file-name-nondirectory (buffer-file-name)) :v-adjust -0.05)
+                           (all-the-icons-icon-for-file
+                            (file-name-nondirectory (buffer-file-name))
+                            :v-adjust -0.05)
                          (all-the-icons-icon-for-mode major-mode :v-adjust -0.05))))
              (when (symbolp icon)
-               (setq icon (all-the-icons-faicon "file-o" :face 'all-the-icons-dsilver :height 0.8 :v-adjust 0.0)))
+               (setq icon (all-the-icons-faicon "file-o"
+                           :face 'all-the-icons-dsilver
+                           :height 0.8 :v-adjust 0.0)))
              icon))
 
          (setq ibuffer-formats
@@ -9084,6 +9172,48 @@
            :config
            (defalias 'ibuffer-persp-current #'ibuffer-persp-set-filter-groups-by-persp-name-not-nil)
            (defalias 'ibuffer-persp-other #'ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)))
+     #+END_SRC
+
+**** ibuffer-projectile
+     #+BEGIN_SRC emacs-lisp
+       (with-eval-after-load 'ibuffer
+         (use-package ibuffer-projectile
+           :ensure t
+           :defer  t
+           :commands (ibuffer-projectile-mode)
+           ;; :hook (ibuffer-mode . ibuffer-projectile-mode)
+           :config
+           (setq ibuffer-projectile-prefix
+                 (if (all-the-icons-available-p)
+                     (concat
+                      (all-the-icons-octicon "file-directory"
+                                             :face ibuffer-filter-group-name-face
+                                             :v-adjust -0.05)
+                      " ")
+                   "Project: "))
+
+           (defun ibuffer-projectile-hook (&rest _)
+             (ibuffer-projectile-set-filter-groups))
+
+           (define-minor-mode ibuffer-projectile-mode
+             "Generate ibuffer filters for projectile projects."
+             :lighter nil
+             :global  t
+             (if ibuffer-projectile-mode
+                 (progn
+                   (add-hook 'ibuffer-hook #'ibuffer-projectile-hook)
+                   (ibuffer-projectile-set-filter-groups))
+               (remove-hook 'ibuffer-hook #'ibuffer-projectile-hook)
+
+               (let ((ibuf (get-buffer "*Ibuffer*")))
+                 (when ibuf
+                   (with-current-buffer ibuf
+                     (setq ibuffer-filter-groups
+                           (seq-filter
+                            (lambda (x)
+                              (not (assoc 'projectile-root x)))
+                            ibuffer-filter-groups))
+                     (ibuffer-update nil t))))))))
      #+END_SRC
 
 *** imenu
@@ -10523,6 +10653,8 @@
            "pxv" 'projectile-run-vterm
            "pso" 'projectile-multi-occur
            "psR" 'projectile-replace
+           "pv"  'projectile-edit-dir-locals
+           "fvp" 'projectile-edit-dir-locals
            "p TAB" 'projectile-find-other-file
            "p DEL" 'projectile-browse-dirty-projects
            "p RET" 'projectile-find-file-dwim
@@ -11043,6 +11175,18 @@
       (use-package rainbow-mode
         :ensure t
         :defer  t)
+    #+END_SRC
+
+*** replace
+    #+BEGIN_SRC emacs-lisp
+      (use-package replace
+        :straight (replace :type built-in)
+        :defer t
+        :config
+        (dolist (func '(perform-replace
+                        query-replace))
+          (advice-add func :around
+                      #'display-buffer--restore-default-actions)))
     #+END_SRC
 
 *** tabulated-list-mode
@@ -11619,9 +11763,10 @@
         (leader/declare-prefix "ax" "xref")
 
         (leader/set-keys
-          "jx" 'xref-find-references
-          "j/" 'xref-find-apropos
-          "jz" 'xref-find-definitions
+          "jb" 'xref-pop-marker-stack
+          "jr" 'xref-find-references
+          "js" 'xref-find-apropos
+          "jg" 'xref-find-definitions
           ;; "axw" 'xref-find-definitions-other-window
           ;; "axf" 'xref-find-definitions-other-frame
           )
@@ -12667,6 +12812,12 @@
          (leader/set-keys "Mh" 'web-mode)
 
          :config
+         (add-hook 'hack-local-variables-hook
+                   (defun web-mode-fix-dirlocals+ (&rest _)
+                     "see issue #1118."
+                     (when (derived-mode-p major-mode 'web-mode)
+                       (web-mode-guess-engine-and-content-type))))
+
          (general-define-key
            :keymaps 'web-mode-map
            :states 'normal
@@ -12769,36 +12920,36 @@
 
 **** emmet-mode
      #+BEGIN_SRC emacs-lisp
-       (with-eval-after-load 'web-mode
-         (use-package emmet-mode
-           :ensure t
-           :defer  t
-           :hook (web-mode . emmet-mode)
-           :config
-           (general-define-key
-             :keymaps 'emmet-mode-keymap
-             "C-j" nil)
+       (use-package emmet-mode
+         :ensure t
+         :defer  t
+         :hook ((web-mode      . emmet-mode)
+                (markdown-mode . emmet-mode))
+         :config
+         (general-define-key
+           :keymaps 'emmet-mode-keymap
+           "C-j" nil)
 
-           (general-define-key
-             :states 'insert
-             :keymaps 'emmet-mode-keymap
-             "C-i" 'emmet-expand-line
-             ;; "TAB" 'emmet-expand-line
-             "<tab>"   'emmet-next-edit-point
-             "<S-tab>" 'emmet-prev-edit-point)
+         (general-define-key
+           :states 'insert
+           :keymaps 'emmet-mode-keymap
+           "C-i" 'emmet-expand-line
+           ;; "TAB" 'emmet-expand-line
+           "<tab>"   'emmet-next-edit-point
+           "<S-tab>" 'emmet-prev-edit-point)
 
-           (leader/with-major-mode-prefix
-             (leader/declare-prefix-for-mode 'emmet-mode
-               "e" "emmet" "emmet mode")
+         (leader/with-major-mode-prefix
+           (leader/declare-prefix-for-mode 'emmet-mode
+             "e" "emmet" "emmet mode")
 
-             (leader/set-keys-for-mode 'emmet-mode
-               "." 'emmet-expand-line
-               ;; "'" 'emmet-preview
-               "ee" 'emmet-expand-line
-               "ep" 'emmet-preview
-               "ew" 'emmet-wrap-with-markup
-               "en" 'emmet-next-edit-point
-               "eN" 'emmet-prev-edit-point))))
+           (leader/set-keys-for-mode 'emmet-mode
+             "." 'emmet-expand-line
+             ;; "'" 'emmet-preview
+             "ee" 'emmet-expand-line
+             "ep" 'emmet-preview
+             "ew" 'emmet-wrap-with-markup
+             "en" 'emmet-next-edit-point
+             "eN" 'emmet-prev-edit-point)))
      #+END_SRC
 
 **** company-web
@@ -13018,48 +13169,75 @@
         ;; -*- lisp-indent-function: 'common-lisp-indent-function -*-
         (require 'doct)
 
+        (defun org-capture-create-goto-heading-command (heading &optional heading-regexp)
+          "create a function to jump to HEADING, creating HEADING if it doesn't exist.
+        This function also smartly reacts to headings containing [/]. By default, if
+        [/] has been updated to [0/1], then org is just unable to find it.
+        "
+          (unless heading-regexp
+            (setq heading-regexp (regexp-quote heading))
+
+            (when (string-match-p (rx "[/]") heading-regexp)
+              (setq heading-regexp
+                    (replace-regexp-in-string
+                     (regexp-quote "[/]")
+                     "[[[:digit:]]*/[[:digit:]]*\\\\]"
+                     heading-regexp))))
+
+          (lambda ()
+            (let ((heading-point
+                   (ignore-errors
+                     (save-excursion
+                       (goto-char (point-min))
+                       (search-forward-regexp heading-regexp)
+                       (line-beginning-position)))))
+              (if heading-point
+                  (goto-char heading-point)
+                (goto-char (point-min))
+                (save-excursion
+                  (insert heading "\n"))))))
+
+        (defun org-get-link+ ()
+          "get the stringified result of `org-store-link'"
+          (with-temp-buffer
+            (org-insert-link-global)
+            (buffer-substring (point-min) (point-max))))
+
         ;; see also: https://www.gnu.org/software/emacs/manual/html_node/org/Template-expansion.html#Template-expansion
         (setq
          org-capture-templates
          (doct `((:group "TODOs"
-                  :type entry
-                  :file ,org-default-notes-file
-                  :prepend     t
-                  :empty-lines 0
-                  :function (lambda ()
-                              "goto TODO headline with numeric statistics value."
-                              (let* ((heading "* TODOs [/]")
-                                     (heading-regexp "* TODOs \\[[[:digit:]]*/[[:digit:]]*\\]")
-                                     (heading-point
-                                      (ignore-errors
-                                        (save-excursion
-                                          (goto-char (point-min))
-                                          (search-forward-regexp heading-regexp)
-                                          (line-beginning-position)))))
-                                (if heading-point
-                                    (goto-char heading-point)
-                                  (goto-char (point-min))
-                                  (save-excursion
-                                    (insert heading "\n")))))
-                  :before-finalize (lambda () (org-update-parent-todo-statistics))
-                  :template ("* %doct(todo-state) %?"
-                             "  %U")
-                  :todo-state "TODO"
-                  :children (("Todo" :keys "t")
-                             ("Todo with Clipboard"
-                              :keys "T"
-                              :template ("* %doct(todo-state) %?"
-                                         "  %U"
-                                         "  %c"))))
-                 (:group "professional"
-                  :type entry
-                  :file "university/university.org"
-                  :empty-lines 1
-                  :children (("Lecture"
-                              :keys "l"
-                              :clock-in t
-                              :template ("* [/] %^{title} %^g"
-                                         "  %?"))))))
+                         :type entry
+                         :file ,org-default-notes-file
+                         :prepend     t
+                         :empty-lines 0
+                         :function ,(org-capture-create-goto-heading-command "* TODOs [/]")
+                         :before-finalize ,#'org-update-parent-todo-statistics
+                         :template ("* %doct(todo-state) %?"
+                                    "  %U")
+                         :todo-state "TODO"
+                         :children (("Todo" :keys "t")
+                                    ("Todo with Clipboard"
+                                     :keys "T"
+                                     :template ("* %doct(todo-state) %?"
+                                                "  %U"
+                                                "  %c"))
+                                    ("Internship"
+                                     :keys "i"
+                                     :function ,(org-capture-create-goto-heading-command "* Job Search [/]")
+                                     :template ("* %doct(todo-state) [#%^{Priority|A|B|C}] %(org-get-link+) - %^{Company}"
+                                                "  DEADLINE: %^{deadline}t"
+                                                "%^{LOCATION}p%^{DURATION}p"
+                                                "  %?"))))
+                 (:group "education"
+                         :type entry
+                         :file "university/university.org"
+                         :empty-lines 1
+                         :children (("Lecture"
+                                     :keys "l"
+                                     :clock-in t
+                                     :template ("* [/] %^{title} %^g"
+                                                "  %?"))))))
 
          ;; templates for projectile-projects.
          counsel-projectile-org-capture-templates
@@ -13191,6 +13369,11 @@
                      :require-match t
                      :action (lambda (file-cons) (find-file (org! (cdr file-cons))))
                      :caller 'org-find-file)))
+
+       (ivy-set-actions
+        'org-find-file
+        '(("j" (lambda (file-cons) (find-file-other-window (org! (cdr file-cons)))) "other window")
+          ("f" (lambda (file-cons) (find-file-other-frame  (org! (cdr file-cons)))) "other frame")))
      #+END_SRC
 
 **** org-mode
@@ -13672,6 +13855,7 @@
          :init
          (with-eval-after-load 'org
            (add-to-list 'org-latex-packages-alist '("" "mathdots"))
+           (add-to-list 'org-latex-packages-alist '("" "fourier"))
 
            (when (host! 'desktop)
              (setq org-format-latex-options
@@ -14155,8 +14339,8 @@
          :defer  t
          :init
          (leader/set-keys-for-mode! 'markdown-mode
-           "rb" 'gh-md-render-buffer
-           "rr" 'gh-md-render-region))
+           "r" 'gh-md-render-buffer
+           "R" 'gh-md-render-region))
      #+END_SRC
 
 **** markdown-mode
@@ -14598,15 +14782,15 @@
               (apply 'leader/declare-prefix-for-mode* '(java-mode meghanada-mode) prefixes))
 
             (leader/declare-prefix-for-mode!* '(java-mode meghanada-mode)
-              mohkale--server-leader-key "meghanada")
+              "" "meghanada")
 
             ;; major-mode bindings
             (leader/set-keys-for-mode! 'java-mode
-              mohkale--server-leader-key mohkale-meghanada-map)
+              "" mohkale-meghanada-map)
 
             ;; global server-key bindings
             (leader/set-keys-for-mode 'meghanada-mode
-              mohkale--server-leader-key mohkale-meghanada-map))))
+              "" mohkale-meghanada-map))))
 
       (mohkale/load-meghanada)
     #+END_SRC
