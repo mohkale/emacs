@@ -13335,6 +13335,11 @@
                      :require-match t
                      :action (lambda (file-cons) (find-file (org! (cdr file-cons))))
                      :caller 'org-find-file)))
+
+       (ivy-set-actions
+        'org-find-file
+        '(("j" (lambda (file-cons) (find-file-other-window (org! (cdr file-cons)))) "other window")
+          ("f" (lambda (file-cons) (find-file-other-frame  (org! (cdr file-cons)))) "other frame")))
      #+END_SRC
 
 **** org-mode
