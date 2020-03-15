@@ -11170,6 +11170,18 @@
         :defer  t)
     #+END_SRC
 
+*** replace
+    #+BEGIN_SRC emacs-lisp
+      (use-package replace
+        :straight (replace :type built-in)
+        :defer t
+        :config
+        (dolist (func '(perform-replace
+                        query-replace))
+          (advice-add func :around
+                      #'display-buffer--restore-default-actions)))
+    #+END_SRC
+
 *** tabulated-list-mode
     #+BEGIN_SRC emacs-lisp
       (use-package tabulated-list
