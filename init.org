@@ -13220,7 +13220,14 @@
                                      :keys "T"
                                      :template ("* %doct(todo-state) %?"
                                                 "  %U"
-                                                "  %c"))))
+                                                "  %c"))
+                                    ("Internship"
+                                     :keys "i"
+                                     :function ,(org-capture-create-goto-heading-command "* Job Search [/]")
+                                     :template ("* %doct(todo-state) [#%^{Priority|A|B|C}] %(org-get-link+) - %^{Company}"
+                                                "  DEADLINE: %^{deadline}t"
+                                                "%^{LOCATION}p%^{DURATION}p"
+                                                "  %?"))))
                  (:group "education"
                          :type entry
                          :file "university/university.org"
