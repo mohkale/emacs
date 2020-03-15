@@ -12805,6 +12805,12 @@
          (leader/set-keys "Mh" 'web-mode)
 
          :config
+         (add-hook 'hack-local-variables-hook
+                   (defun web-mode-fix-dirlocals+ (&rest _)
+                     "see issue #1118."
+                     (when (derived-mode-p major-mode 'web-mode)
+                       (web-mode-guess-engine-and-content-type))))
+
          (general-define-key
            :keymaps 'web-mode-map
            :states 'normal
