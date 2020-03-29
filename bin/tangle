@@ -5,6 +5,7 @@
 
 require 'rake'
 require 'stringio'
+require 'rbconfig'
 require 'optparse'
 require 'fileutils'
 require 'shellwords'
@@ -88,8 +89,15 @@ end.parse!(into: options)
 options[:"tangled-file"]  = options[:"tangled-file"]  || options[:"config-file"].pathmap("%X.el")
 options[:"compiled-file"] = options[:"compiled-file"] || options[:"tangled-file"].pathmap("%X.elc")
 
-[:"config-file", :"tangled-file", :"compiled-file", :"error-file"].each do |arg|
-    options[arg] = File.expand_path(options[arg])
+[:"config-file", :"tangled-file", :"compiled-file", :"error-file"].each do |key|
+    value = options[key]
+    value = File.expand_path(value)
+
+    if RbConfig::CONFIG['host_os'] == 'cygwin'
+      value = `cygpath -wa #{Shellwords.escape value}`.strip
+    end
+
+    options[key] = value
 end
 
 NullStream = File.open(File::NULL, "w")
@@ -408,7 +416,7 @@ end
 
 
 
-if !File.exists?(options[:"config-file"])
+if !File.exists?(File.expand_path options[:"config-file"])
     puts "unable to find config file : %s" % options[:"config-file"].red
     exit 2
 end
