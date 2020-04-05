@@ -15816,6 +15816,17 @@
                   (defun latex-update-electric-math+ (&rest _)
                     (setq-local TeX-electric-math '("\\(" . "\\)"))))
 
+        ;; show process output on error
+        (advice-add 'TeX-command-sentinel :after
+                    (defun TeX-process-error-handler+ (p msg)
+                      (unless (zerop (process-exit-status p))
+                        (TeX-recenter-output-buffer nil))))
+
+        ;; for some reason, focus switches back to tex buffer
+        (advice-add 'TeX-recenter-output-buffer :after
+                    (defun TeX-recenter-focus (&rest _)
+                      (TeX-pop-to-buffer (TeX-active-buffer))))
+
         (eval
          `(configure-presym! ',mohkale-latex-modes
             ,@(cl-loop
