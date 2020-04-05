@@ -14726,6 +14726,70 @@
           "gk" 'ssh-config-host-prev))
     #+END_SRC
 
+*** makefile
+    #+BEGIN_SRC emacs-lisp
+      (use-package make-mode
+        :straight (makefile-mode :type built-in)
+        :defer t
+        :config
+        (defun makefile--enable-evil-motion-state (&rest _)
+          (evil-motion-state +1))
+
+        ;; tabs for indentation, spaces for allignment
+        (advice-add 'makefile-backslash-region :around
+                    (defun makefile-backslash-region--no-tabs (func &rest args)
+                      (let (indent-tabs-mode)
+                        (apply func args))))
+
+        (advice-add #'makefile-switch-to-browser          :after #'makefile--enable-evil-motion-state)
+        (advice-add #'makefile-create-up-to-date-overview :after #'makefile--enable-evil-motion-state)
+
+        (general-define-key
+          :keymaps 'makefile-mode-map
+          :states 'insert
+          "TAB" 'indent-for-tab-command
+          "<tab>" 'indent-for-tab-command)
+
+        (general-define-key
+          :keymaps 'makefile-mode-map
+          :states '(normal motion)
+          "gj" 'makefile-next-dependency
+          "gk" 'makefile-previous-dependency)
+
+        (general-define-key
+          :states  'motion
+          :keymaps 'makefile-browser-map
+          "j" 'makefile-browser-next-line
+          "k" 'makefile-browser-previous-line
+
+          "t"     'makefile-browser-toggle
+          "TAB"   'makefile-browser-toggle
+          "<tab>" 'makefile-browser-toggle
+          "RET"   'makefile-browser-insert-continuation
+
+          "I" 'makefile-browser-insert-selection-and-quit
+          "i" 'makefile-browser-insert-selection
+
+          [remap quit-window] 'makefile-browser-quit)
+
+        (leader/set-keys-for-mode! '(makefile-automake-mode
+                                     makefile-bsdmake-mode
+                                     makefile-gmake-mode
+                                     makefile-imake-mode
+                                     makefile-mode
+                                     makefile-makepp-mode)
+          "b" 'makefile-switch-to-browser
+          "o" 'makefile-create-up-to-date-overview
+          "p" 'makefile-pickup-everything
+          "f" 'makefile-pickup-filenames-as-targets
+
+          ":"   'makefile-insert-target-ref
+          "C-:" 'makefile-insert-target-ref
+
+          "\\"  'makefile-backslash-region
+          "TAB" 'makefile-insert-gmake-function))
+    #+END_SRC
+
 *** Markdown
 **** gh-md
      #+BEGIN_SRC emacs-lisp
