@@ -13693,7 +13693,17 @@
 
                    (t (fallback-action (called-interactively-p)))))))
 
-       (defun org-find-file (&optional arg)
+       ;;; org-find-file
+       (defvar org-find-file-last-file nil
+         "the last file found through `org-find-file'.")
+
+       (defun org-find-file--generate-candidate (file)
+         (let ((relative (file-relative-name file dotemacs-org-path)))
+           (if (string-prefix-p ".." relative)
+               (cons file file)
+             (cons relative file))))
+
+       (defun org-find-file (&optional arg initial-input)
          "find an org file.
        By default this function simply finds the default notes file, as indicated
        by `org-default-notes-file'. When ARG is non-nil, you are instead prompted
@@ -13702,31 +13712,53 @@
        "
          (interactive "P")
          (if (not arg)
-             (find-file org-default-notes-file)
-           (ivy-read "File file: "
+             (progn
+               (find-file org-default-notes-file)
+               (setq org-find-file-last-file
+                     (org-find-file--generate-candidate org-default-notes-file)))
+           (ivy-read "Find file: "
                      (cl-loop
-                      with relative-path = nil
                       for file in (cl-remove-duplicates
                                    (append (file-expand-wildcards (org! "*.org"))
                                            (file-expand-wildcards (org! "**/*.org"))
                                            org-agenda-files)
                                    :test (lambda (x y) (or (null y) (equal x y)))
                                    :from-end t)
-                      do (setq relative-path (file-relative-name file dotemacs-org-path))
-
-                      if (string-prefix-p ".." relative-path)
-                        collect (cons file file)
-                      else
-                        collect (cons relative-path file)
-                      end)
+                      collect (org-find-file--generate-candidate file))
+                     :initial-input initial-input
                      :require-match t
-                     :action (lambda (file-cons) (find-file (org! (cdr file-cons))))
+                     :preselect (or org-find-file-last-file
+                                    (car (org-find-file--generate-candidate
+                                          org-default-notes-file)))
+                     :action #'org-find-file-action
                      :caller 'org-find-file)))
+
+       ;; actions for org find file
+       (defun org-find-file-action (file)
+         (find-file file))
+
+       (defun org-find-file-other-window (file)
+         (find-file-other-window file))
+
+       (defun org-find-file-other-frame (file)
+         (find-file-other-frame file))
+
+       ;; convert cons back to file path
+       (defun org-find-file--filter-args (file)
+         (setq file (car file))
+         (setq org-find-file-last-file (car file)
+               file (org! (cdr file)))
+         (list file))
+
+       (dolist (func '(org-find-file-action
+                       org-find-file-other-window
+                       org-find-file-other-frame))
+         (advice-add func :filter-args #'org-find-file--filter-args))
 
        (ivy-set-actions
         'org-find-file
-        '(("j" (lambda (file-cons) (find-file-other-window (org! (cdr file-cons)))) "other window")
-          ("f" (lambda (file-cons) (find-file-other-frame  (org! (cdr file-cons)))) "other frame")))
+        '(("j" org-find-file-other-window "other window")
+          ("f" org-find-file-other-frame  "other frame")))
      #+END_SRC
 
 **** org-mode
