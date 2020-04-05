@@ -11868,6 +11868,146 @@
          (yas-load-directory mohkale-snippets-dir t))
      #+END_SRC
 
+**** licenses
+     use yas to generate and insert license headers for the current buffer.
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package mohkale-license
+         :defer t
+         :commands (insert-license
+                    license-reload-profile)
+         :init
+         (leader/set-keys
+           "ia" 'insert-license))
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-license.el
+       (require 'yasnippet)
+
+       (defvar license-dir (etc! "licenses")
+         "directory in which to find license snippets.")
+
+       (defvar license-dont-be-evil nil
+         "append don't be evil clause to licenses.
+       see [[https://en.wikipedia.org/wiki/Douglas_Crockford][Douglas Crockford]].")
+
+       (defvar license-last-inserted nil
+         "the fully populated last inserted license template.")
+
+       (defun license-load-profile (&optional file)
+         (or file
+             (setq file (join-path license-dir ".profile")))
+
+         (when (file-exists-p file)
+           (with-temp-buffer
+             (insert-file-contents file)
+             (read (current-buffer)))))
+
+       ;; load initial profile
+       (defvar license-profile
+         (ignore-errors
+           (license-load-profile))
+         "alist setting properties to auto insert in a license.
+       properties include: last-name, first-name")
+
+       (defun license-get-prop (prop &optional default)
+         (or (cdr (assoc prop license-profile))
+             default))
+
+       (cl-defun license-get-name
+           (&optional default (profile license-profile))
+         (let ((first-name (license-get-prop 'first-name))
+               (last-name  (license-get-prop 'last-name)))
+           (cond
+            ((and first-name last-name)
+             (concat first-name " " last-name))
+            (first-name first-name)
+            (last-name last-name)
+            (t default))))
+
+       ;;;###autoload
+       (defun license-reload-profile ()
+         "set `license-profile' by rereading the profile file."
+         (interactive)
+         (setq license-profile (license-load-profile)))
+
+       (defun license--licenses (&optional dir)
+         "return an alist of (basename . file) for all .license files in DIR.
+       Where DIR defaults to the current working directory (`default-directory')."
+         (cl-loop
+          for file in (file-expand-wildcards
+                       (concat (if dir
+                                   (concat dir "/")
+                                 default-directory)
+                               "*.license"))
+          collect (cons (file-name-base file) file)))
+
+       (defun license--read-license ()
+         (let ((licenses (license--licenses license-dir))
+               license)
+           (when (zerop (length licenses))
+             (error "no licenses found in dir: %s" default-directory))
+
+           (if (eq 1 (length licenses))
+               (setq license (car licenses))
+             (ivy-read "License: "
+                       licenses
+                       :require-match t
+                       :preselect (when license-last-inserted
+                                    (car license-last-inserted))
+                       :action (lambda (x) (setq license x))))
+
+           (with-temp-buffer
+             (insert-file-contents (cdr license))
+             (cons (car license)
+                   (buffer-substring (point-min) (point-max))))))
+
+       (cl-defmacro with-temp-buffer-and-same-vars ((&rest vars) &rest body)
+         "store the values of VARS in current buffer, and then create a
+       temp buffer reassigning the values of VARS and then invoking BODY."
+         (let* ((current-vars
+                 (cl-loop with name = nil
+                          for var in vars
+                          do (setq name (symbol-name var))
+                          collect (list (intern (concat "-current-" name))
+                                        var)))
+                (assign-vars
+                 (cl-loop for var in current-vars
+                          collect (list (nth 1 var) (car var)))))
+           `(let ,current-vars
+              (with-temp-buffer
+                (let ,assign-vars
+                  ,@body)))))
+       (put 'with-temp-buffer-and-same-vars 'lisp-indent-function 'defun)
+
+       (defun license--comment-template (template &optional prefix)
+         (with-temp-buffer-and-same-vars
+             (comment-start comment-end comment-style
+              comment-multi-line comment-add comment-continue)
+           (insert template)
+           (comment-region (point-min) (point-max) prefix)
+           (buffer-substring (point-min) (point-max))))
+
+       ;;;###autoload
+       (defun insert-license (&optional prefix)
+         "insert a license from the known license list.
+       with PREFIX, repeats insertion of the last inserted license."
+         (interactive "P")
+         (let* ((license
+                 (if (and prefix license-last-inserted)
+                     license-last-inserted
+                   (license--read-license)))
+                (comment-multi-line t))
+           (yas-expand-snippet
+            (license--comment-template (cdr license))
+            nil nil
+            '((yas-indent-line 'fixed)))
+
+           (setq license-last-inserted license)))
+
+       (provide 'mohkale-license)
+     #+END_SRC
+
 **** auto-yasnippet
      allows you to create dynamic/in-place snippets and repeatedly execute them.
 
