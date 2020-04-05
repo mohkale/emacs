@@ -2136,6 +2136,7 @@
                    in-comment-p
                    in-font-lock-comment-p
                    line-beginning-column
+                   yank-and-comment
                    point-to-coordinates
                    line-empty-p
                    list-faces))
@@ -2240,7 +2241,7 @@
 
 **** Formatting
      :PROPERTIES:
-     :header-args+: :tangle bin/mohkale/mohkale-text-query.el
+     :header-args+: :tangle bin/mohkale/mohkale-text.el
      :END:
 
 ***** Chunks
@@ -4706,7 +4707,6 @@
              ;; WARN binding to motion breaks things.
              :states  '(normal visual)
              :keymaps 'evil-matchit-mode-map
-             "g%" 'evilmi--simple-jump
              "%"  'evilmi-jump-items)))
      #+END_SRC
 
@@ -4937,6 +4937,7 @@
            :states leader-nnorm-states
            "C-a" 'beginning-of-line
            "M-a" 'end-of-line
+           "C-M-a" 'end-of-line
            "C-e" 'evil-copy-from-above
            "M-e" 'evil-copy-from-below)
 
@@ -5015,6 +5016,8 @@
            "zP" 'evil-scroll-left
            "gc" 'evil-toggle-comment
            "gC" 'evil-capitalize
+           "g@" 'what-cursor-position
+           "ga" 'evil-fill-and-move
            "gq" 'quit-window
            "g=" 'count-words
            "g-" 'evil-indent
@@ -5083,6 +5086,7 @@
          (general-define-key
            :states 'motion
            "C-w" nil
+           "m"   'evil-set-marker
            "-"   'negative-argument
            "C-;" 'evil-repeat-find-char
            "M-;" 'evil-repeat-find-char-reverse)
@@ -6784,8 +6788,8 @@
            :keymaps 'diff-mode-map
            "a" 'diff-apply-hunk ;; apply diff hunk to prompted file
            ;; NOTE prompts for file onto which diff is being applied
-           "d" 'diff-hunk-kill
-           "D" 'diff-file-kill
+           "x" 'diff-hunk-kill
+           "X" 'diff-file-kill
            "u" 'diff-undo
            "q" nil
            "s" 'diff-split-hunk
@@ -7106,6 +7110,8 @@
          :straight (dired :type built-in)
          :defer t
          :config
+         (push '(dired-mode . 1) mohkale-indent-config)
+
          (setq ls-lisp-dirs-first t
                ls-lisp-use-insert-directory-program t
                dired-listing-switches "-laXhv --group-directories-first"
@@ -7575,6 +7581,8 @@
                (git-commit-mode       . emojify-mode)
                (web-mode              . emojify-mode)
                (lisp-interaction-mode . emojify-mode)
+               (yaml-mode             . emojify-mode)
+               (sh-script-mode        . emojify-mode)
                (markdown-mode         . emojify-mode)
                (lisp-interaction-mode . emojify-mode))
         :init
@@ -7925,6 +7933,8 @@
         (setq flycheck-python-pycompile-executable "python3")
 
         (leader/set-keys
+          "ej" 'flycheck-next-error
+          "ek" 'flycheck-previous-error
           "e." 'hydra-flycheck/body
           "ec" 'flycheck-clear
           "ee" 'flycheck-explain-error-at-point
@@ -8280,7 +8290,7 @@
            ;; see issue: https://github.com/abo-abo/swiper/issues/2397
            (setq ivy-read-action-function #'ivy-hydra-read-action))
 
-         (push 'ivy-occur mohkale--whitespace-exempt-modes)
+         (push 'ivy-occur-mode mohkale--whitespace-exempt-modes)
 
          (setq ivy-preferred-re-builders
                '((ivy--regex-plus         . "ivy")
@@ -8385,6 +8395,9 @@
            "M-v"   nil ;; was ivy-scroll-down-command
            "C-'"   nil ;; was ivy-avy
            "C-M-y" nil ;; was ivy-insert-current-full
+
+           "C-r" 'evil-paste-from-register
+           "C-s" 'ivy-reverse-i-search
 
            "C-v"      'quoted-insert ;; was ivy-scroll-up-command
            "<return>" 'ivy-alt-done ;; also supports tramp expansion
@@ -11632,8 +11645,8 @@
           "G" 'View-scroll-to-buffer-end
           "zq" 'View-exit
           "zk" 'View-kill-and-leave
-          "C-j" 'View-scroll-line-forward
-          "C-k" 'View-scroll-line-backward
+          "gj" 'View-scroll-line-forward
+          "gk" 'View-scroll-line-backward
           ;; "C-d" 'View-scroll-half-page-forward
           ;; "C-u" 'View-scroll-half-page-backward
           "M-d" 'View-scroll-page-forward
@@ -14409,7 +14422,7 @@
                     :scale 1.5)))))
      #+END_SRC
 
-     #+BEGIN_SRC emacs-lisp :tangle ~/.emacs.d/bin/misc/org-live-latex-mode.el
+     #+BEGIN_SRC emacs-lisp :tangle bin/misc/org-live-latex-mode.el
        ;;; org-live-latex-mode.el --- render latex as you write -*- lexical-binding: t -*-
 
        ;; Copyright (C) 2015-2019  Free Software Foundation, Inc.
