@@ -5588,6 +5588,18 @@
           "**" 'calc
           "*y" 'calc-copy-to-buffer)
 
+        (with-eval-after-load 'evil
+          (advice-add 'evil-get-register :before-until
+                      (defun evil-register-*-is-calc (register &optional no-error)
+                        "make evils * register paste from head of calculator stack."
+                        (when (eq register ?*)
+                          (condition-case err
+                              (with-temp-buffer
+                                (calc-copy-to-buffer nil)
+                                (buffer-substring (point-min) (point-max)))
+                            (error (unless err (signal (car err) (cdr err)))
+                                   ""))))))
+
         :config
         (general-define-key
           :keymaps 'calc-mode-map
