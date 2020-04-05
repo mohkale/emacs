@@ -5601,11 +5601,148 @@
                                    ""))))))
 
         :config
+        (evil-set-initial-state 'calc-mode 'motion)
+
+        (add-hook 'calc-mode-hook
+                  (defun calc--disable-evil-snipe (&rest _)
+                    "overrides f, so disable it :P."
+                    (when (bound-and-true-p evil-snipe-local-mode)
+                      (evil-snipe-local-mode -1))))
+
+        (evil-define-command evil-calc-call-kbd-macro (count macro)
+          (interactive
+           (let (count macro register)
+             (setq count (prefix-numeric-value current-prefix-arg)
+                   register (or evil-this-register read-char))
+             (cond
+              ((eq register ?@)
+               (unless evil-last-register
+                 (user-error "No previously executed keyboard macro."))
+               (setq macro (evil-get-register evil-last-register t)))
+              (t
+               (setq macro (evil-get-register register t)
+                     evil-last-register register)))
+             (list count macro)))
+
+          (evil-with-single-undo
+            (let ((last-kbd-macro macro))
+              (dotimes (_ (or count 1))
+                (calc-call-last-kbd-macro)))))
+
+        (evil-define-motion evil-calc-next-line (count)
+          (interactive "<c>")
+          (evil-next-line count)
+
+          (when (eobp)
+            (calc-realign)
+
+            (when (evil-visual-state-p)
+              (previous-line)))
+
+          (goto-char (+ 4 (line-beginning-position))))
+
+        (evil-define-motion evil-calc-prev-line (count)
+          (interactive "<c>")
+          (evil-previous-line count)
+
+          (when (eq (point-min) (line-beginning-position))
+            (calc-goto-point-min))
+
+          (goto-char (+ 4 (line-beginning-position))))
+
+        (defun calc-goto-point-min ()
+          (interactive)
+          (goto-line 2)
+          (forward-char 4)
+          (recenter))
+
+        (advice-add 'calc-scroll-down :around
+                    (defun calc-scroll-down--make-goto-point-min (func &rest args)
+                      "for some reason, scrolling before `point-min' doesn't change point."
+                      (let ((current-point (point)))
+                        (apply func args)
+
+                        (when (eq (point) current-point)
+                          (calc-goto-point-min)))))
+
+        (defun evil-calc-visual-state ()
+          (interactive)
+          (when (string-match-p (rx bol (zero-or-more whitespace)
+                                    "." eol)
+                                (buffer-substring
+                                 (line-beginning-position)
+                                 (line-end-position)))
+            (funcall-interactively 'evil-calc-prev-line 1))
+
+          (evil-visual-line))
+
         (general-define-key
           :keymaps 'calc-mode-map
-          "C-w" mohkale-window-map
-          ;; WARN hard coded leader key
-          leader-key (general-simulate-key "C-SPC")))
+          "<override-state>" 'motion
+
+          "SPC" nil ;; causes recursion-overflow
+          "C-w" nil ;; calc-kill-region
+          "U"   nil ;; calc-undo
+          "D"   nil ;; calc-redo
+          "Y"   nil ;; empty prefix :P
+          "@"   nil ;; calcDigit-start
+          "h"   nil ;; calc-help-prefix
+          "i"   nil ;; calc-info
+          ;; copies head of stack to point in buffer.
+          "y"   nil ;; calc-copy-to-buffer
+          "C-d" nil ;; calc-pop
+
+          [remap quit-window] 'calc-quit)
+
+        (general-define-key
+          :states '(motion visual)
+          :keymaps 'calc-mode-map
+
+          "C-w" 'mohkale-window-map
+          "M-u" 'smart-universal-argument
+
+          "g"   nil
+          "gg"  'calc-goto-point-min ;; was calc-graph-grid
+          "gq"  'quit-window
+          "gQ"  'calc-graph-quit
+
+          "j" 'evil-calc-next-line
+          "k" 'evil-calc-prev-line)
+
+        (general-define-key
+          :states 'visual
+          :keymaps 'calc-mode-map
+          "x" 'calc-kill-region
+          "d" 'calc-kill-region
+          "y" 'calc-copy-region-as-kill
+          )
+
+        (general-define-key
+          :states 'motion
+          :keymaps 'calc-mode-map
+          "q"   'evil-record-macro
+          "@"   'evil-calc-call-kbd-macro
+          "y"   'calc-copy-as-kill
+          "v"   'evil-calc-visual-state
+          "u"   'calc-undo
+          "G"   'calc-realign
+          "C-r" 'calc-redo
+          "C-t" 'calc-transpose-lines
+
+          [remap evil-scroll-up]   'calc-scroll-down
+          [remap evil-scroll-down] 'calc-scroll-up
+
+          [remap quit-window] 'calc-quit
+
+          "f"   (general-simulate-key "u" :state 'emacs)
+          "C-v" (general-simulate-key "j" :state 'emacs)
+          "C-n" (general-simulate-key "k" :state 'emacs)
+          ;; "C-m" (general-simulate-key "v" :state 'emacs)
+          )
+
+        (leader/set-keys-for-mode! 'calc-mode
+          ;; TODO complete leader binding list :P.
+          "," 'calc-comma))
     #+END_SRC
 
 *** calendar
