@@ -13534,19 +13534,24 @@
                          :empty-lines 0
                          :function ,(org-capture-create-goto-heading-command "* TODOs [/]")
                          :before-finalize ,#'org-update-parent-todo-statistics
-                         :template ("* %doct(todo-state) %?"
+                         :template ("* %{todo-state} %?"
                                     "  %U")
                          :todo-state "TODO"
                          :children (("Todo" :keys "t")
                                     ("Todo with Clipboard"
                                      :keys "T"
-                                     :template ("* %doct(todo-state) %?"
+                                     :template ("* %{todo-state} %?"
                                                 "  %U"
                                                 "  %c"))
+                                    ("Itinerary"
+                                     :keys "d"
+                                     :prepend  nil
+                                     :function ,(org-capture-create-goto-heading-command "* Itinerary")
+                                     :template ("* %{todo-state} %?"))
                                     ("Internship"
                                      :keys "i"
                                      :function ,(org-capture-create-goto-heading-command "* Job Search [/]")
-                                     :template ("* %doct(todo-state) [#%^{Priority|A|B|C}] %(org-get-link+) - %^{Company}"
+                                     :template ("* %{todo-state} [#%^{Priority|A|B|C}] %(org-get-link+) - %^{Company}"
                                                 "  DEADLINE: %^{deadline}t"
                                                 "%^{LOCATION}p%^{DURATION}p"
                                                 "  %?"))))
