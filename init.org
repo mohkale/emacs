@@ -8838,6 +8838,18 @@
          :defer  t)
      #+END_SRC
 
+**** ivy-lsp
+     #+BEGIN_SRC emacs-lisp
+       (with-eval-after-load 'lsp-mode
+         (use-package lsp-ivy
+           :ensure t
+           :defer  t
+           :init
+           (leader/set-keys-for-mode 'lsp-mode
+             "jy" 'lsp-ivy-workspace-symbol
+             "jY" 'lsp-ivy-global-workspace-symbol)))
+     #+END_SRC
+
 *** ibuffer
 **** ibuffer
      #+BEGIN_SRC emacs-lisp
