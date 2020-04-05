@@ -13443,6 +13443,32 @@
                     org-link-edit-backward-barf))
      #+END_SRC
 
+**** org-link-minor-mode
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-link-minor-mode
+         :defer t
+         :straight (org-link-minor-mode :type git :host github
+                    :repo "seanohalpin/org-link-minor-mode")
+         :hook ((text-mode . enable-org-link-minor-mode)
+                (prog-mode . enable-org-link-minor-mode))
+         :commands ace-link--org-link-minor-mode+
+         :init
+         (advice-add 'ace-link :around #'ace-link--org-link-minor-mode+)
+
+         (defun enable-org-link-minor-mode (&rest _)
+           (unless (derived-mode-p 'major-mode 'org-mode)
+             (org-link-minor-mode +1)))
+
+         :config
+         (defun ace-link--org-link-minor-mode+ (func &rest args)
+           (condition-case err
+               (apply func args)
+             (error
+              (if (bound-and-true-p org-link-minor-mode)
+                  (ace-link-org)
+                (signal (car err) (cdr err)))))))
+     #+END_SRC
+
 **** org-toc
      #+BEGIN_SRC emacs-lisp
        (use-package toc-org
@@ -13717,6 +13743,7 @@
            "oc" 'org-capture
            "oa" 'org-agenda
            "ol" 'org-store-link
+           "oi" 'org-insert-link-global
            "oy" 'org-copy-subtree
            "oY" 'org-cut-subtree
            "on" 'org-next-link
