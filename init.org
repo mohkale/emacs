@@ -1267,6 +1267,10 @@
        "<C-backspace>"   'evil-delete-backward-word)
 
      (general-define-key
+       :states 'motion
+       "q" 'quit-window)
+
+     (general-define-key
        :states leader-norm-states
        "gr"    'revert-buffer
        "gR"    'read-only-mode
@@ -5009,12 +5013,12 @@
            "zP" 'evil-scroll-left
            "gc" 'evil-toggle-comment
            "gC" 'evil-capitalize
+           "gq" 'quit-window
            "g=" 'count-words
            "g-" 'evil-indent
            "g;" 'evil-repeat-find-char-reverse
            [remap eval-print-last-sexp] 'evil-adjust-eval-print-last-sexp
            [remap eval-replace-last-sexp] 'evil-adjust-eval-replace-last-sexp)
-
 
          (leader/declare-prefix "sc" "search-noh")
 
@@ -5606,7 +5610,7 @@
           :keymaps 'calendar-mode-map
           ;; see also https://github.com/emacs-evil/evil-collection/blob/master/evil-collection-calendar.el
           ;; globally useful
-          "q"  'calendar-exit
+          [remap quit-window] 'calendar-exit
           "p"  'calendar-print-day-of-year
           "c"  'calendar-count-days-region
           "?"  'calendar-goto-info-node
@@ -6238,7 +6242,7 @@
           "gk" 'widget-backward
 
           ;; quit
-          "q" 'Custom-buffer-done))
+          [remap quit-window] 'Custom-buffer-done))
     #+END_SRC
 
 *** dashboard
@@ -6621,7 +6625,7 @@
            "d" 'diff-hunk-kill
            "D" 'diff-file-kill
            "u" 'diff-undo
-           "q" 'quit-window
+           "q" nil
            "s" 'diff-split-hunk
            "i" 'diff-ignore-whitespace-hunk
 
@@ -8325,7 +8329,7 @@
            "o" 'compilation-display-error
 
            "gr" 'ivy-occur-revert-buffer
-           "q" 'quit-window))
+           "q" nil))
      #+END_SRC
 
 ***** collapse-directories
@@ -9736,7 +9740,7 @@
           "gk" 'evil-previous-line
 
           "R" 'occur-rename-buffer
-          "q" 'quit-window)
+          "q" nil)
 
         (evil-set-initial-state 'occur-edit-mode 'normal)
         (general-define-key
@@ -9748,7 +9752,7 @@
           "gO"  'occur-mode-display-occurrence
           "j"   'evil-adjust-occur-next
           "k"   'evil-adjust-occur-prev
-          "q"   'occur-cease-edit))
+          [remap quit-window] 'occur-cease-edit))
     #+END_SRC
 
 *** open-junk-file
@@ -9932,7 +9936,7 @@
           "i"   'package-menu-mark-install
           "u"   'package-menu-mark-unmark
           "x"   'package-menu-execute
-          "q"   'quit-window
+          "q"   nil
           "~"   'package-menu-mark-obsolete-for-deletion
           "gr"  'package-menu-refresh)
 
@@ -10061,7 +10065,7 @@
           "'" 'pdf-view-jump-to-register
           "`" 'pdf-view-jump-to-register
 
-          "q" 'quit-window
+          "q" nil
           "Q" 'kill-this-buffer
           "ZQ" 'kill-this-buffer
           "ZZ" 'quit-window)
@@ -10158,7 +10162,7 @@
 
           "a" 'tablist-flag-forward
 
-          "q"  'tablist-quit
+          [remap quit-window]  'tablist-quit
           "ZQ" 'tablist-quit
           "ZZ" 'tablist-quit)
 
@@ -10551,7 +10555,7 @@
           :states  'motion
           :keymaps 'proced-mode-map
 
-          "q"      'quit-window
+          "q"      nil
           "C-?"    'proced-help
 
           "<C-SPC>" 'proced-mark
@@ -11132,7 +11136,7 @@
           "RET" 'choose-completion
           "C-j" 'choose-completion
 
-          "q" 'quit-window
+          "q" nil
           "Q" 'delete-completion-window
 
           "j" 'next-completion
@@ -11449,7 +11453,7 @@
         (general-define-key
           :keymaps 'view-mode-map
           :states  'normal
-          "q" 'View-quit
+          [remap quit-window] 'View-quit
           "Q" 'View-quit-all
           "G" 'View-scroll-to-buffer-end
           "zq" 'View-exit
@@ -12092,7 +12096,7 @@
               :states  'motion
               :keymaps kmap
 
-              "q" 'quit-window
+              "q" nil
               "d" 'log-view-diff
               "=" 'log-view-diff
               "o" 'log-view-find-revision ; open current file at current commit
@@ -13049,7 +13053,7 @@
            :keymaps 'org-agenda-mode-map
            :states  'motion
            ;;; globally useful
-           "q" 'org-agenda-exit
+           [remap quit-window] 'org-agenda-exit
            "." 'org-agenda-goto-today
            "v" 'org-agenda-view-mode-dispatch
            "RET" 'org-agenda-goto
