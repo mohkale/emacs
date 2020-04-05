@@ -15799,10 +15799,14 @@
         :init
         (setq TeX-auto-save  t
               TeX-parse-self t
-              TeX-source-correlate-start-server t)
+              TeX-source-correlate-start-server t
+              tex-print-file-extension ".pdf")
 
         (defvar mohkale-latex-modes '(latex-mode tex-mode)
           "list of tex related modes. used for leader and pretty symbols.")
+
+        (push '(tex-mode   . 2) mohkale-indent-config)
+        (push '(latex-mode . 2) mohkale-indent-config)
 
         :config
         (push 'TeX-output-mode mohkale--whitespace-exempt-modes)
