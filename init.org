@@ -13784,6 +13784,15 @@
          (set-keymap-parent org-read-date-minibuffer-local-map minibuffer-local-map)
 
          :config
+
+         (setq org-archive-location
+               (concat (org! "archive.org") "::* %s"))
+
+         (setq org-archive-file-header-format
+               "# -*- mode: org; coding: utf-8-unix -*-
+       ,#+TITLE: Archive
+       ,#+STARTUP: content")
+
          ;; switch to insert state when capturing org templates
          (add-hook 'org-capture-mode-hook (lambda () (evil-insert nil)) t)
 
@@ -14016,8 +14025,8 @@
            "#" 'org-priority
            "`" 'org-toggle-latex-fragment
            "^" 'org-sort
-           "A" 'org-archive-subtree
-           "a" 'org-agenda
+           "A" 'org-agenda
+           "a" 'org-archive-subtree
            "b" 'org-tree-to-indirect-buffer
            ;; "C" 'evil-org-recompute-clocks
            "D" 'org-insert-drawer
@@ -14032,8 +14041,8 @@
            "N" 'org-add-note
            "o" 'org-clock-out
            "O" 'org-sort
-           "P" 'org-set-property
-           "p" 'org-pomodoro
+           "p" 'org-set-property
+           "P" 'org-pomodoro
            "q" 'org-set-tags-command
            "r" 'org-refile
            "R" 'org-refile-goto-last-stored
