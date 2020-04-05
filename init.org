@@ -15921,12 +15921,28 @@
           "T" "toggle"
           "p" "preview")
 
+        (general-define-key
+          :states 'motion
+          :keymaps 'TeX-error-overview-mode-map
+          "RET" 'TeX-error-overview-goto-source
+          "j" 'TeX-error-overview-next-error
+          "k" 'TeX-error-overview-previous-error
+          "o" 'TeX-error-overview-jump-to-source
+          [remap quit-window] 'TeX-error-overview-quit)
+
+        (leader/set-keys-for-mode! 'TeX-error-overview-mode
+          "b" 'TeX-error-overview-toggle-debug-bad-boxes
+          "w" 'TeX-error-overview-toggle-debug-warnings
+          "s" 'TeX-error-overview-toggle-suppress-ignored-warnings
+          "l" 'TeX-error-overview-goto-log)
+
         (leader/set-keys-for-mode! mohkale-latex-modes
           "SPC" 'TeX-command-master
           "b" 'LaTeX-environment ;; block but more interactive.
           "," 'TeX-command-smart
           "." 'TeX-command-run-all
           "l" 'TeX-recenter-output-buffer
+          "e" 'TeX-error-overview
           "k" 'TeX-kill-job
           "v" 'TeX-view
           "h" 'TeX-doc
