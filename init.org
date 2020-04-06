@@ -12650,6 +12650,32 @@
               "ts" 'vc-git-log-edit-toggle-signoff))))
     #+END_SRC
 
+**** smerge
+     #+BEGIN_SRC emacs-lisp
+       (use-package smerge-mode
+         :straight (smerge-mode :type built-in)
+         :defer t
+         :init
+         (leader/set-keys
+           "gi" 'smerge-mode)
+
+         :config
+         (leader/with-prefix "g"
+           (leader/set-keys-for-mode 'smerge-mode
+             "j" 'smerge-next
+             "k" 'smerge-prev
+             "c" 'smerge-keep-current
+             "m" 'smerge-keep-mine
+             "o" 'smerge-keep-other))
+
+         (general-define-key
+           :states '(normal motion)
+           :keymaps 'smerge-mode-map
+           "]g" 'smerge-next
+           "[g" 'smerge-prev))
+     #+END_SRC
+
+
 *** ztree
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package ztree
