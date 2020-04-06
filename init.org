@@ -16015,20 +16015,19 @@
 
 **** gitlink
      #+BEGIN_SRC emacs-lisp
-     (use-package git-link
-        :ensure t
-        :defer  t
-        :init
-        (leader/declare-prefix "gl" "links")
+       (use-package git-link
+          :ensure t
+          :defer  t
+          :init
+          (leader/declare-prefix "gy" "links")
 
-        (leader/set-keys
-          "gll" 'spacemacs/git-link
-          "glL" 'spacemacs/git-link-copy-url-only
-          "glc" 'spacemacs/git-link-commit
-          "glC" 'spacemacs/git-link-commit-copy-url-only)
+          (leader/set-keys
+            "gyl" 'git-link
+            "gyc" 'git-link-commit
+            "gyh" 'git-link-homepage)
 
-        ;; default is to open the generated link
-        (setq git-link-open-in-browser t))
+          ;; default is to open the generated link
+          (setq git-link-open-in-browser nil))
      #+END_SRC
 
 **** transient
