@@ -12445,9 +12445,6 @@
                    vc-switch-backend        ;; not using git... for shame :P
                    vc-update-change-log)
         :init
-        ;;; include vc leader key in defaults leader keys
-        (leader/declare-prefix "V" "version control")
-
         (leader/with-prefix leader-diff-mode-prefix
           (leader/set-keys
             ;; "=v" 'vc-ediff
@@ -12456,17 +12453,21 @@
         (push 'vc-annotate-mode mohkale--whitespace-exempt-modes)
         (push 'vc-git-log-view-mode mohkale--whitespace-exempt-modes)
 
-        ;; need to require for bindings to show up :(
+        (leader/with-prefix "g"
+          (leader/set-keys
+            "a" 'vc-annotate
+            "r" 'vc-revision-other-window
+            "=" 'vc-root-diff
+            "v" 'vc-region-history
+            "l" 'vc-print-log
+            "L" 'vc-print-root-log
+            "R" 'vc-rename-file
+            "u" 'vc-revert
+            "#" 'vc-create-tag
+            "d" 'vc-dir))
+
         :config
         (require 'vc-git) ;; supported
-
-        (leader/set-keys "V" vc-prefix-map)
-
-        (general-define-key
-          :keymaps 'vc-prefix-map
-          "C-=" 'vc-ediff
-          "r"   'vc-rename-file
-          "R"   'vc-retrieve-tag)
 
         (advice-add 'vc-region-history :after (lambda (&rest args)
                                                 (when (evil-visual-state-p)
@@ -12485,8 +12486,8 @@
         (general-define-key
           :states  'motion
           :keymaps 'vc-annotate-mode-map
-          "C-j" 'vc-annotate-prev-revision ;; older revisions
-          "C-k" 'vc-annotate-next-revision ;; newer revisions
+          "gj" 'vc-annotate-prev-revision ;; older revisions
+          "gk" 'vc-annotate-next-revision ;; newer revisions
           "C-t" 'vc-annotate-toggle-annotation-visibility
           "RET" 'vc-annotate-goto-line
 
@@ -12542,8 +12543,8 @@
           "o"   'vc-dir-display-file
           "RET" 'vc-dir-find-file
 
-          "C-j" 'vc-dir-next-line
-          "C-k" 'vc-dir-previous-line
+          "gj" 'vc-dir-next-line
+          "gk" 'vc-dir-previous-line
           "M-j" 'vc-dir-next-directory
           "M-k" 'vc-dir-previous-directory)
 
@@ -12589,18 +12590,18 @@
               ;; move to next message, then reallign to top
               ;; (kbd "C-j") (lambda! (log-view-msg-next)
               ;;               (call-interactively 'evil-scroll-line-to-top))
-              "C-j" 'log-view-msg-next
-              "C-k" 'log-view-msg-prev
+              "gj" 'log-view-msg-next
+              "gk" 'log-view-msg-prev
 
               "M-j" 'log-view-file-next
               "M-k" 'log-view-file-prev
 
-              "C-M-j" 'diff-hunk-next
+              "gl" 'diff-hunk-next
               ;; TODO reallign diff to propper location on move down without trapping on a single diff
               ;; (kbd "M-j") (lambda! (diff-hunk-next)
               ;;               (call-interactively 'evil-scroll-line-to-top)
               ;;               (evil-previous-line 3))
-              "C-M-k" (lambda! (diff-hunk-prev) (evil-previous-line 3)))
+              "gh" (lambda! (diff-hunk-prev) (evil-previous-line 3)))
 
             (leader/set-keys-for-mode! mode
               "p" 'log-view-diff-changeset
@@ -15876,25 +15877,21 @@
               ;; show magit status in a full screen window.
               magit-display-buffer-function 'magit-display-buffer-fullframe-status-v1)
 
-        ;; On Windows, we must use Git GUI to enter username and password
-        ;; See: https://github.com/magit/magit/wiki/FAQ#windows-cannot-push-via-https
+        ;; On Windows, we must use Git GUI to enter username and password. See [[https://github.com/magit/magit/wiki/FAQ#windows-cannot-push-via-https][here]].
         (when (eq window-system 'w32)
           (setenv "GIT_ASKPASS" "git-gui--askpass"))
 
-        (leader/declare-prefix*
-          "g" "magit"
-          "gd" "diff"
-          "gf" "file")
+        (leader/with-prefix "g"
+          (leader/declare-prefix*
+            "" "magit")
 
-        (leader/set-keys
-          "gm" 'magit-dispatch
-          "g$" 'magit-process-buffer
-          "g!" 'magit-run
-          "gfh" 'magit-log-buffer-file
-          "gm"  'magit-dispatch-popup
-          "gs"  'magit-status
-          "gS"  'magit-stage-file
-          "gU"  'magit-unstage-file)
+          (leader/set-keys
+            "$" 'magit-process-buffer
+            "!" 'magit-run
+            "g" 'magit-dispatch
+            "s" 'magit-status
+            "u" 'magit-unstage-file
+            "h" 'magit-log-buffer-file))
 
         :config
         (advice-add 'magit-section-up :around
