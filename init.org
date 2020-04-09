@@ -12957,9 +12957,15 @@
          (use-package anaconda-mode
            :ensure t
            :defer  t
-           :hook ((python-mode . anaconda-mode)
-                  (python-mode . anaconda-eldoc-mode))
+           :hook ((python-mode . enable-anaconda-mode+)
+                  (anaconda-mode . anaconda-eldoc-mode))
+           :commands enable-anaconda-mode+
            :config
+           (defun enable-anaconda-mode+ ()
+             "run anaconda-mode unless you're in a remote file."
+             (unless (file-remote-p (buffer-file-name))
+               (anaconda-mode +1)))
+
            (leader/set-keys-for-mode! 'python-mode
              "TAB" 'anaconda-mode-complete
              "hh" 'anaconda-mode-show-doc
