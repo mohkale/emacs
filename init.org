@@ -322,6 +322,8 @@
         '((desktop . "MK-DT")
           (macbook . "MK-Macbook"))
         "list of devices I own.")
+      (defvar mohkale-man-command (if (windows-p) 'woman 'man)
+        "preferred command used for manuals")
 
       (defun host! (id)
         "check if current host matches ID
@@ -782,6 +784,7 @@
     | ibuffer-persp       | 6395294e2dd368866d79a81d37c27961e0f871937ccd82cff317e5ad67c52652 | https://raw.githubusercontent.com/rakshasa/ibuffer-persp/master/ibuffer-persp.el          |
     | org-link-edit       | ac84061d951ef9ef82794ba7f4416afb6da4283a182490a11ae455077321814c | https://raw.githubusercontent.com/kyleam/org-link-edit/master/org-link-edit.el            |
     | hydra-posframe      | a828d588082f0f011459f13aecf04e8a610ab150c566b6a18cd279c006a881a3 | https://raw.githubusercontent.com/Ladicle/hydra-posframe/master/hydra-posframe.el         |
+    | org-man             | 9a98ad950304cc2f195298d8a62a668365b8aedb98cfb45b2bfdb475f51239b9 | https://raw.githubusercontent.com/aspiers/orgmode/master/contrib/lisp/org-man.el          |
 
     #+BEGIN_SRC emacs-lisp :var package-list=non-melpa-packages
       (defun external-packages/download-external-package (url dest-path)
@@ -924,6 +927,7 @@
         "aE" 'package-list-packages
         "af" 'list-faces-display
         "am" 'man
+        "aM" 'woman
         "aP" 'proced
         "ap" 'list-processes
         "au" 'undo-tree-visualize
@@ -14696,6 +14700,16 @@
                      (t (insert " ")))))))
      #+END_SRC
 
+**** org-man
+     #+BEGIN_SRC emacs-lisp
+       (with-eval-after-load 'org-mode
+         (use-package org-man
+           :straight (org-man :type built-in)
+           :defer nil
+           :config
+           (setq org-man-command mohkale-man-command)))
+     #+END_SRC
+
 *** JSON
     #+BEGIN_SRC emacs-lisp
       (use-package json-mode
@@ -17000,6 +17014,13 @@
       (aoh-create-spec font-latex-sectioning-3-face :inherit font-lock-function-name-face)
       (aoh-create-spec font-latex-sectioning-4-face :inherit font-lock-function-name-face)
       (aoh-create-spec font-latex-sectioning-5-face :inherit font-lock-function-name-face)
+
+      ;;; man/woman
+      (aoh-create-spec Man-underline :foreground green-int :inherit bold)
+      (aoh-create-spec woman-addition :foreground purple)
+      (aoh-create-spec woman-bold :foreground red :inherit bold)
+      (aoh-create-spec woman-unknown :inherit error)
+      (aoh-create-spec woman-italic :foreground green)
       )
 
      (custom-theme-set-variables 'an-old-hope
