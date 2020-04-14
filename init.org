@@ -84,7 +84,7 @@
          (load "~/.emacs.d/early-init.el"))
 
        (add-hook 'emacs-startup-hook
-                 (defun post-init-setup+ (&rest _)
+                 (lambda (&rest _)
                    ;; switch focus to any error or compilation windows
                    (let* ((window-list  (window-list))
                           (window-count (length window-list))
@@ -121,7 +121,6 @@
             enable-local-variables t                                               ; allow safe variables, even alongside unsafe ones
             hl-line-sticky-flag nil                                                ; only highlight line in active window
             auto-save-interval 50                                                  ; auto-save as frequently as possible
-            display-line-numbers-type 'relative                                    ; prefer relative line numbers when available
             backup-by-copying t                                                    ; don't clobber symlinks
             which-key-enable-extended-define-key t                                 ; let's you pass a cons to define-key
             kept-new-versions 15                                                   ; keep this many latest versions of file
@@ -136,49 +135,7 @@
             kill-whole-line              t ; kill-line includes eol
             help-window-select           t ; always
 
-            recentf-max-saved-items 2048
-            recentf-exclude '("/tmp/"
-                              "/ssh:"
-                              "/sudo:"
-                              ;; ctags
-                              "/TAGS$"
-                              ;; global
-                              "/GTAGS$"
-                              "/GRAGS$"
-                              "/GPATH$"
-                              "COMMIT_EDITMSG"
-                              "tmp\\.[^/\\]*$"
-                              ;; binary
-                              "\\.mkv$"
-                              "\\.mp[34]$"
-                              "\\.avi$"
-                              "\\.docx?$"
-                              ;; subtitles
-                              "\\.sub$"
-                              "\\.srt$"
-                              "\\.ass$")
-
-            ; Always Use UTF8, NO CARRIAGE RETURNS
-            ; this... might be overkill. see setq-default
-            ;; coding-system-for-read  'utf-8-unix
-            ;; coding-system-for-write 'utf-8-unix
-
-            frame-title-format
-                ;; sets the title string displayed on the frame above. Format of the command is
-                ;; a printf like string. Wrap any code you want evaluated conditionally into a list
-                ;; and if the first value of that list is a string, it will be evaluated. You can
-                ;; include variables anywhere in the string, including sublists, but no functions.
-                ;;
-                ;; See the format guide here: https://www.emacswiki.org/emacs/FrameTitle
-            `(,(user-login-name)
-              "@"
-              ,(system-name)
-              " [%*] %m"
-              (:eval (when (derived-mode-p 'pdf-view-mode)
-                       (format "(%d/%d)"
-                               (pdf-view-current-page)
-                               (pdf-cache-number-of-pages))))
-              (buffer-file-name " : %f")))
+            recentf-max-saved-items 2048)
 
       (setq-default indent-tabs-mode nil
                     save-place t ; auto enable save-place mode
@@ -190,11 +147,34 @@
                     default-buffer-file-coding-system 'utf-8-unix
                     buffer-file-coding-system 'utf-8-unix
                     echo-keystrokes 0.02)
+
+      (advice-add 'display-startup-echo-area-message :around #'ignore)
+
+      (put 'narrow-to-region 'disabled nil) ;; re-enable
+    #+END_SRC
+
+    Set the string emacs shows at the title bar.
+
+    #+BEGIN_SRC emacs-lisp
+      (setq frame-title-format
+            ;; sets the title string displayed on the frame above. Format of the command is
+            ;; a printf like string. Wrap any code you want evaluated conditionally into a list
+            ;; and if the first value of that list is a string, it will be evaluated. You can
+            ;; include variables anywhere in the string, including sublists, but no functions.
+            ;;
+            ;; See the format guide here: https://www.emacswiki.org/emacs/FrameTitle
+            `(,(user-login-name)
+              "@"
+              ,(system-name)
+              " [%*] %m"
+              (:eval (when (derived-mode-p 'pdf-view-mode)
+                       (format "(%d/%d)"
+                               (pdf-view-current-page)
+                               (pdf-cache-number-of-pages))))
+              (buffer-file-name " : %f")))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
-      (put 'narrow-to-region 'disabled nil) ;; re-enable
-
       (set-face-attribute 'default nil
                           :family "Source Code Pro"
                           ;; height value is 1/10pt. so 100 = 10pt
@@ -222,7 +202,8 @@
       (blink-cursor-mode -1) ; cursor flashes annoyingly
     #+END_SRC
 
-    Create some aliases for functions that're are hard to remember or weirdly named or just too long.
+    Create some aliases for functions that're are hard to remember or
+    weirdly named or just too long.
 
     #+BEGIN_SRC emacs-lisp
       (defalias 'yes-or-no-p 'y-or-n-p)
@@ -240,73 +221,6 @@
       (defalias 'java-debugger    #'jdb)
     #+END_SRC
 
-    customise display-buffer-alist to prioritise switching focus to displayed
-    buffers, instead of showing them and then making me have to switch to them
-    and then exit.
-
-    #+BEGIN_SRC emacs-lisp
-      ;; frankly, display buffers alist is badly documented.
-      ;; there's a quick and simple article exploring how it
-      ;; works [[https://www.simplify.ba/articles/2016/01/25/display-buffer-alist/][here]]
-      ;;
-      ;; in the meantime, the following is a breif~er~ summary
-      ;;   1. the car of each entry should be a regex matching a buffer
-      ;;      name or a function taking a buffer and an action argument.
-      ;;   2. the second item (car (cdr list)) should be a list of or a
-      ;;      single display handler function which takes a buffer and
-      ;;      an alist as an argument. Each entry in the list is invoked
-      ;;      until one which returns non nil is encountered.
-      ;;   3. the remaining list items should be an alists providing options.
-
-      ;; changing at startup messes up the display of the dashboard :(
-      (defun display-buffer-alist--update-handlers ()
-        (defvar display-buffer--default-fallback-action
-          display-buffer-fallback-action
-          "the value for fallback actions without my configuration")
-
-        (advice-add 'display-startup-echo-area-message :around #'ignore)
-
-        (defun display-buffer--restore-default-actions (func &rest args)
-          (let ((display-buffer-fallback-action
-                 display-buffer--default-fallback-action))
-            (apply func args)))
-
-        (setq display-buffer-fallback-action
-              ;; by default, focus on displayed windows
-              '((display-buffer--maybe-same-window-and-focus
-                 display-buffer-reuse-window-and-focus
-                 display-buffer--maybe-pop-up-frame-or-window-and-focus
-                 display-buffer-in-previous-window-and-focus
-                 display-buffer-use-some-window-and-focus
-                 display-buffer-pop-up-frame-and-focus)))
-
-        (push '("*Async Shell Command*"
-                (display-buffer-reuse-window
-                 display-buffer--maybe-pop-up-frame-or-window-and-focus
-                 display-buffer-in-side-window-and-focus)
-                (side          . bottom)
-                (window-height . 0.5))
-              display-buffer-alist)
-
-        (push '("*compilation*"
-                (display-buffer-reuse-window-and-focus
-                 display-buffer--maybe-pop-up-frame-or-window-and-focus
-                 display-buffer-in-side-window-and-focus)
-                (side          . bottom)
-                (window-height . 0.5))
-              display-buffer-alist)
-
-        (dolist (buffer-name '("*image-dired-display-image*"
-                               "*Anaconda*"
-                               "magit-diff: "
-                               "*Flycheck error messages*"
-                               "*HTTP Response*"))
-          (push `(,buffer-name ,@display-buffer--default-fallback-action)
-                display-buffer-alist)))
-
-      (add-hook 'emacs-startup-hook #'display-buffer-alist--update-handlers)
-    #+END_SRC
-
 *** Config Variables
     #+BEGIN_SRC emacs-lisp
       (defvar load-me-now-duration 120
@@ -318,10 +232,6 @@
       more likely then not I'm going to end up requiring them quite
       soon afterwards.")
 
-      (defvar mohkale-hosts-alist
-        '((desktop . "MK-DT")
-          (macbook . "MK-Macbook"))
-        "list of devices I own.")
       (defvar mohkale-man-command (if (windows-p) 'woman 'man)
         "preferred command used for manuals")
 
@@ -336,43 +246,7 @@
         (when id
           (string-equal id (system-name))))
 
-      (defvar mohkale-should-compile-config nil
-        "when truthy, building the configuration file also compiles the lisp file")
-
-      (defun mohkale/refresh-config-file-p ()
-        "true if config org file needs to be retangled and/or compiled
-       see https://snipplr.com/view/14292/autocompiled-emacs-file/ for example
-
-       NOTE assumes tangled elisp file exists... otherwise what's calling this."
-        ;; checks in order:
-        ;;     * compiled file doesn't exist when it should
-        ;;     * config file is newer than tangled file
-        ;;     * tangled file is newer than compiled file (if it should exists)
-        ;;
-        ;; That last check shouldn't be necessary, but better safe than sorry.
-        (or (and mohkale-should-compile-config
-                 (not (file-exists-p mohkale-mohkale-elc-config-file)))
-            (file-newer-than-file-p mohkale-mohkale-config-file
-                                    mohkale-mohkale-el-config-file)
-            (and mohkale-should-compile-config
-                 (file-newer-than-file-p mohkale-mohkale-el-config-file
-                                         mohkale-mohkale-elc-config-file))))
-
-      ;; (add-hook 'kill-emacs-hook (lambda () (and (mohkale/refresh-config-file-p)
-      ;;                                            (mohkale/build-configuration-file))))
-
-      (defun mohkale//display-out-of-date-configuration-warning ()
-        (when (mohkale/refresh-config-file-p)
-          (display-warning 'init
-                           (concat "your configuration file is out of date: "
-                                   mohkale-mohkale-config-file))))
-
-      (add-hook 'emacs-startup-hook #'mohkale//display-out-of-date-configuration-warning)
-
       (setq mohkale-window-map (make-sparse-keymap))
-
-      (defvar mohkale-allow-unicode-emojis t
-        "when true, code points for emojis are assigned in default fontset")
     #+END_SRC
 
 *** Paths Setup
@@ -411,7 +285,6 @@
                (defalias (quote ,alias) (symbol-function (quote ,join-sym)))))))
       (put 'dotemacs-initialise-path 'lisp-indent-function 'defun)
 
-      ;; inspiration: https://github.com/emacscollective/no-littering/blob/master/no-littering.el
       (dotemacs-initialise-path etc "etc")
       (dotemacs-initialise-path bin "bin")
       (dotemacs-initialise-path var "var")
@@ -423,27 +296,39 @@
     #+BEGIN_SRC emacs-lisp :var --mohkale-config-file=(buffer-file-name)
       (require 'bytecomp)
 
-      (defconst mohkale-config-root (etc! "mohkale")
-        "path to the configuration directory under which my general purpose
-      configuration files will reside.")
-
       (defconst mohkale-package-root (bin! "mohkale")
         "path to where any tangled executeable elisp files should reside")
 
-      (defconst mohkale-mohkale-config-file --mohkale-config-file
+      (defconst dotemacs-file --mohkale-config-file
         "path to my custom user config file.")
 
-      (defconst mohkale-mohkale-el-config-file (concat (file-name-sans-extension
-                                                        mohkale-mohkale-config-file)
-                                                       ".el")
-        "path to my custom user config file after being tangled into emacs lisp.")
+      (defconst dotemacs-el-file (concat (file-name-sans-extension dotemacs-file) ".el")
+        "path to my emacs entry point after being compiled.")
 
-      (defconst mohkale-mohkale-elc-config-file (byte-compile-dest-file mohkale-mohkale-el-config-file)
-        "path to my custom user config file after being tangled into emacs lisp and then compiled.")
+      (defvar emacs-hosts-file (etc! "hosts")
+        "file containing host informating for my hosts")
+
+      (add-hook 'emacs-startup-hook
+                (lambda ()
+                  "warn me when my init.el file is out of date"
+                  (when (file-newer-than-file-p dotemacs-file
+                                                dotemacs-el-file)
+                    (display-warning 'init
+                                     (concat "your configuration file is out of date: "
+                                             dotemacs-file)))))
+
+      (defvar mohkale-hosts-alist
+        (if (file-exists-p emacs-hosts-file)
+            (with-temp-buffer
+              (insert-file-contents emacs-hosts-file)
+              (read (current-buffer)))
+          (warn "hosts config file not found: %s" emacs-hosts-file))
+        "list of devices I own.")
     #+END_SRC
 
-    stop emacs from littering over my dotemacs directory by specifying alternative values for most
-    paths in packages I've installed (at one point or another). This was inspired by [[https://github.com/emacscollective/no-littering/blob/master/no-littering.el][no-littering.el]].
+    stop emacs from littering over my dotemacs directory by specifying alternative values for
+    most paths in packages I've installed (at one point or another). This was inspired by
+    [[https://github.com/emacscollective/no-littering/blob/master/no-littering.el][no-littering.el]].
 
     #+BEGIN_SRC emacs-lisp :results silent
       (with-no-warnings
@@ -452,7 +337,6 @@
          package-user-dir                                   (bin! "elpa/")
          external-packages-directory                        (bin! "misc")
 
-         ;;; Builtin Emacs Library Path Options
          abbrev-file-name                                   (etc! "abbrev.el")
          auto-insert-directory                              (etc! "auto-insert")
          auto-save-list-file-prefix                         (var! "auto-save" "sessions/")
@@ -465,7 +349,6 @@
          eshell-aliases-file                                (var! "eshell" "aliases")
          eshell-login-script                                (etc! "eshell" "loginrc")
          eshell-rc-script                                   (etc! "eshell" "eshrc")
-         emacs-session-directory                            (var! "x-sessions/")
          eww-bookmarks-directory                            (var! "eww/")
          gamegrid-user-score-file-directory                 (var! "gamegrid/")
          ido-save-directory-list-file                       (var! "ido-save-directory-list.el")
@@ -502,71 +385,9 @@
          url-configuration-directory                        (var! "url/configuration/")
 
          ;;; third party
-         ac-comphist-file                                   (var! "ac-comphist.el")
-         anaconda-mode-installation-directory               (var! "anaconda/")
-         bbdb-file                                          (var! "bbdb/bbdb.el")
-         bbdb-vcard-directory                               (var! "bbdb/vcard/")
-         bm-repository-file                                 (var! "bm-repository.el")
-         bmkp-current-bookmark-file                         (var! "bmkp/current-bookmark.el")
-         bmkp-last-bookmark-file                            (var! "bmkp/last-bookmark.el")
-         bookiez-file                                       (var! "bookiez")
-         company-statistics-file                            (var! "company/statistics.el")
-         company-tabnine-binaries-folder                    (var! "company/tabnine-binaries")
-         debbugs-gnu-persistency-file                       (var! "debbugs.el")
-         dired-recent-directories-file                      (var! "dired/recent.el")
-         elfeed-db-directory                                (var! "elfeed/db/")
-         elfeed-enclosure-default-dir                       (var! "elfeed/enclosures/")
-         elmo-msgdb-directory                               (var! "elmo/")
-         elmo-split-log-file                                (var! "elmo/split-log")
-         emms-directory                                     (var! "emms/")
-         emojify-emojis-dir                                 (var! "emojify/")
-         geben-temporary-file-directory                     (var! "geben/")
-         helm-adaptive-history-file                         (var! "helm/adaptive-history.el")
-         helm-backup-path                                   (var! "helm/backup/")
-         helm-github-stars-cache-file                       (var! "helm/github-stars-cache.el")
-         hl-highlight-save-file                             (var! "hl-save.el")
-         httpd-root                                         (var! "simple-httpd/")
-         indium-chrome-data-dir                             (var! "indium/chrome-profile")
-         indium-workspace-file                              (var! "indium/workspaces.el")
-         irfc-directory                                     (var! "irfc/")
-         junk-file-directory                                (var! "junk-files")
-         keyfreq-file                                       (var! "keyfreq.el")
-         keyfreq-file-lock                                  (var! "keyfreq.lock")
-         logview-cache-filename                             (var! "logview-cache")
-         logview-views-file                                 (etc! "logview-views")
-         lsp-server-root                                    (var! "lsp/servers")
-         lsp-session-file                                   (var! "lsp/session")
-         lsp-server-install-dir                             (var! "lsp/servers")
-         org-ditaa-jar-path                                 (var! "org/bin/ditaa.jar")
-         org-ditaa-eps-jar-path                             (var! "org/bin/ditaaEps.jar")
-         plantuml-jar-path                                  (var! "org/bin/plantuml.jar")
-         org-projectile-projects-directory                  (org! "projects/")
-         org-projectile-projects-file                       (org! "projects/global.org")
-         mohkale-library-of-babel-file                      (etc! "babel-lib.org")
-         multi-compile-history-file                         (var! "multi-compile-history.el")
-         pcache-directory                                   (var! "pcache/")
-         persistent-scratch-save-file                       (var! "scratch.el")
-         persp-save-dir                                     (var! "perspectives/")
-         prescient-save-file                                (var! "prescient-save.el")
-         projectile-cache-file                              (var! "projectile/cache.el")
-         projectile-known-projects-file                     (var! "projectile/known-projects.el")
-         purpose-default-layout-file                        (etc! "window-purpose/default-layout.el")
-         purpose-layout-dirs                                `(,(etc! "window-purpose/layouts/"))
-         rake-cache-file                                    (var! "rake.cache")
          request-storage-directory                          (var! "requests")
-         smex-save-file                                     (var! "smex-save.el")
-         tldr-directory-path                                (var! "tldr/")
-         transient-history-file                             (var! "transient/history.el")
-         org-pdftools-root-dir                              "~/multimedia/pdfs"
-         transient-levels-file                              (etc! "transient/levels.el")
          straight-base-dir                                  (bin! "") ;; weird way to configure it, but okay
-         transient-values-file                              (etc! "transient/values.el")
-         treemacs-persist-file                              (var! "treemacs/persist.org")
-         vimish-fold-dir                                    (var! "vimish-fold/")
-         mohkale-snippets-dir                               (etc! "snippets/")
-         yas-snippet-dirs                                   '(yasnippet-snippets-dir)
-         yasnippet-snippets-dir                             mohkale-snippets-dir
-         xkcd-cache-dir                                     (var! "xkcd")
+         straight-bootstrap-file                            (bin! "straight/repos/straight.el/bootstrap.el")
          ))
 
     #+END_SRC
@@ -577,66 +398,33 @@
 
     #+BEGIN_SRC emacs-lisp
       (with-no-warnings
-        ;;; where do autosave files get stored
-        (setq auto-save-file-name-transforms
-              `((".*" ,(var! "auto-save" "sessions/") t)))
+        (setq
+         ;;; where do autosave files get stored
+         auto-save-file-name-transforms `((".*" ,(var! "auto-save" "sessions/") t))
 
-        ;;; where do backup files get stored
-        (setq backup-directory-alist
-              `(("." . ,(var! "backups/"))))
+         ;;; where do backup files get stored
+         backup-directory-alist `(("." . ,(var! "backups/")))
 
-        ;;; where do undo-tree auto-saves go.
-        (setq undo-tree-history-directory-alist
-              `(("." . ,(var! "undo"))))
-
-        ;; depends on platuml-jar-path being defined
-        (setq org-plantuml-jar-path plantuml-jar-path)
-
-        ;; installation file for the straight package manager.
-        (setq straight-bootstrap-file (concat straight-base-dir
-                                              "straight/repos/straight.el/bootstrap.el"))
-
-        (setq undo-tree-skip-autosave-regex+
-              (rx
-               (or
-                ;; match extensions in filename
-                (and (or ".pdf" ".log") eol)
-                ;; match exact file paths
-                (and
-                 (or
-                  ;; wildcard regexp match. any match is a valid match.
-                  (and "[*Org Src")
-                  ;; match from the beginning of the line
-                  (and
-                   bol
-                   (or
-                    (eval dotemacs-var-path)
-                    (eval (concat straight-base-dir "straight/"))
-                    (eval package-user-dir)
-                    (eval external-packages-directory)
-                    (eval bookmark-default-file)
-                    (eval mohkale-library-of-babel-file)
-                    (eval mohkale-dashboard-banners-directory))))))))
-
-        ;; I've only tested this on window/cygwin but aspell appears to be quite broken :P
-        ;;   * I can't specify a path to any directory not within my home directory.
-        ;;   * I can't specify any absolute path, even when that path is within my home directory.
-        ;;   * If I want to reference a file in a subdirectory of my home directory, the path must begin with a
-        ;;     slash.
-        ;; THIS IS WAY TOO UNINTUITIVE.
-        (setq ispell-personal-dictionary
-              (file-relative-name (etc! "/ispell/dict.txt") "~"))
-
-        ;; only accepts absolute paths and doesn't automatically append ".exe" when on windows.
-        (setq pdf-info-epdfinfo-program (expand-file-name
-                                         (var! (concat "pdf-tools/epdfinfo"
-                                                       (when (windows-p)
-                                                         ".exe")))))
-
-        (with-eval-after-load 'x-win
-          (advice-add 'emacs-session-filename :override
-                      (defun emacs-session-custom-filename (session-id)
-                        (join-path emacs-session-directory (concat "session." session-id))))))
+         recentf-exclude '("/tmp/"
+                           "/ssh:"
+                           "/sudo:"
+                           ;; ctags
+                           "/TAGS$"
+                           ;; global
+                           "/GTAGS$"
+                           "/GRAGS$"
+                           "/GPATH$"
+                           "COMMIT_EDITMSG"
+                           "tmp\\.[^/\\]*$"
+                           ;; binary
+                           "\\.mkv$"
+                           "\\.mp[34]$"
+                           "\\.avi$"
+                           "\\.docx?$"
+                           ;; subtitles
+                           "\\.sub$"
+                           "\\.srt$"
+                           "\\.ass$")))
     #+END_SRC
 
     Post path setup. Do some stuff with your newly cleaned emacs :smile:.
@@ -644,25 +432,11 @@
     #+BEGIN_SRC emacs-lisp
       (push mohkale-package-root load-path)
 
-      (when (file-exists-p custom-file)
-        (load custom-file))
+      (and (file-exists-p custom-file) (load custom-file))
 
       (setenv "EDITOR"
               (concat "emacsclient --no-wait --suppress-output --server-file '"
                       (expand-file-name server-auth-dir) "server'"))
-
-    #+END_SRC
-
-
-    Add more paths to PATH for emacs to find when looking for executables. This is mostly where
-    programs used only (or installed) by emacs will go.
-
-    #+BEGIN_SRC emacs-lisp
-      (setq exec-path
-            (append exec-path
-                    `(,(join-path lsp-server-root "kotlin/bin")
-                      ,(join-path lsp-server-root "kotlin/debugger/bin")
-                      ,(join-path lsp-server-root "haskell"))))
 
     #+END_SRC
 
@@ -672,19 +446,12 @@
 
     #+BEGIN_SRC emacs-lisp
       (dolist (ensured-path `(,@desktop-path
-                              ,eww-bookmarks-directory
-                              ,newsticker-dir
                               ,external-packages-directory
                               ,dotemacs-org-path
-                              ,yasnippet-snippets-dir
-                              ,emacs-session-directory
                               ,(var! "org/bin")
-                              ,(var! "bbdb/")
                               ,(var! "company/")
                               ,(var! "elfeed/")
-                              ,(var! "helm/")
                               ,(var! "projectile/")
-                              ,(var! "bmkp/")
                               ,(var! "emojify/")
                               ,(var! "lsp/")
                               ,(var! "pdf-tools/")))
@@ -715,7 +482,6 @@
        package-archives
        (append '(("melpa" . "https://melpa.org/packages/")
                  ;; ("org"       . "http://orgmode.org/elpa/")
-                 ;; ("marmalade" . "http://marmalade-repo.org/packages/")
                  ("gnu"       . "http://elpa.gnu.org/packages/"))))
 
       (package-initialize) ;; TODO find a way to remove this... without breaking everything
@@ -762,8 +528,9 @@
     #+END_SRC
 
 *** External Packages
-    Install the following the packages directly, compare against the hash value when given
-    and then begin package initialisation.
+    Install the following the packages directly each of them are simple files with no
+    effective dependencies; retrieve the files and then compare them against their hash
+    value +when given+. If the simple hash check fails, cancel them.
 
     #+NAME: non-melpa-packages
     | name                | hash            | url                                                                                       |
@@ -1225,6 +992,11 @@
 
 ** Global Bindings
    #+BEGIN_SRC emacs-lisp
+     (general-unbind
+       "M-h" ;; was backward-kill-sentence
+       "C-M-\\" ;; was indent-region
+       "C-k")
+
      (general-define-key
        ;; "ESC" nil ;; WARN never do this... it broke everything
 
@@ -1238,30 +1010,24 @@
        "M-&"             'async-shell-command-on-region
        "C-M-&"           'async-shell-command-on-buffer
 
-       ;; "C-SPC"           nil ;; emacs like binding
        "C-@" (general-simulate-key "C-SPC") ;; C-SPC in terminal
 
        ;; rebound to default-indent-new-line in emacs>=27 and that's
        ;; bugged out in org mode.
        "C-M-j" 'indent-new-comment-line
 
-       "M-l"             'recenter-top-bottom
-       "M-h"             nil
-       ;; "M-l"             'kill-sentence
-       ;; "M-h"             'backward-kill-sentence
+       "M-l"             'recenter-top-bottom ;; was kill-sentence
        "M-L"             'downcase-word
        "M-H"             'upcase-word
        "C-M-a"           'mark-whole-buffer
        "C-/"             'toggle-comment-at-point
        "C-S-/"           'toggle-comment-at-point-alt
-       "C-M-\\"          nil ;; was indent-region
        "C-M--"           'indent-region
        "C-M-h"           'left-word
        "C-M-l"           'right-word
        "M-j"             'custom-insert-line-below
        "M-k"             'custom-insert-line-above
        "M-r"             'revert-buffer
-       "C-k"             nil
        "C-q"             'quit-window
        "C-v"             'quoted-insert
        "C-j"             'newline-and-indent
@@ -1310,8 +1076,8 @@
               (insert-char ,char (prefix-numeric-value prefix))))))
 
      (general-define-key
-      :states leader-nnorm-states
-      "S-M-SPC" (defun-save-excursion-insert-char space ? ))
+       :states leader-nnorm-states
+       "S-M-SPC" (defun-save-excursion-insert-char space ? ))
    #+END_SRC
 
 ** Mohkale
@@ -1319,12 +1085,9 @@
     animate-birthday-present on your birthday... yippeee :)
 
     #+BEGIN_SRC emacs-lisp
-      ;; (time-since '(0 0 0 8 12 1999 3 nil nil))
-
       (when (string-equal (format-time-string "%d.%m" (current-time))
                           "08.12")
-        (add-hook 'emacs-startup-hook
-                  'animate-birthday-present))
+        (add-hook 'emacs-startup-hook 'animate-birthday-present))
     #+END_SRC
 
 *** Syntax
@@ -1352,7 +1115,7 @@
 ** Setup/Methods
    Define methods for a bunch of purposes within the configuration here.
 
-*** Core
+*** Lib
     basic syntax sugar functions, inspired by [[https://github.com/hlissner/doom-emacs/blob/develop/core/core-lib.el][doom]].
 
     #+BEGIN_SRC emacs-lisp
@@ -1406,7 +1169,7 @@
            ,@body))
       (put 'plist-bind! 'lisp-indent-function 'defun)
 
-      ;; source https://www.emacswiki.org/emacs/DestructiveOperations#toc4
+      ;; source [[https://www.emacswiki.org/emacs/DestructiveOperations#toc4][Destructive Operations]].
       (defun nconc-safe (ls1 ls2)
         "`nconc', but avoids creating circular lists."
         (let ((tail ls1))
@@ -1451,32 +1214,21 @@
      (use-package mohkale
        :straight (mohkale :type built-in)
        :defer load-me-now-duration
-       :commands (mohkale/eval-configuration-file
-                  mohkale/build-configuration-file
-                  mohkale/find-configuration-file
-                  mohkale/find-tangled-config-file
-                  mohkale/eval-configuration-file
-                  mohkale/build-configuration-file
-                  mohkale//tangle-configuration-file
-                  mohkale//compile-configuration-files
-                  mohkale/find-dotfile-file)
+       :commands (mohkale/eval-dotfile-file
+                  mohkale/find-dotfile-file
+                  mohkale/find-tangled-dotfile-file)
        :init
        (setq mohkale--server-leader-key "y")
 
        (leader/declare-prefix*
-         "ou" "find-uni-file"
-         "feb" "build-config"
-         "fec" "find-config"
-         "fer" "eval-config"
-         "fet" "find-tangled-config"
-         "fed" "find-dotfile")
+         "fec" "find-dotfile"
+         "fev" "eval-dotfile"
+         "fet" "find-tangled-dotfile")
 
        (leader/set-keys
-         "feb" 'mohkale/build-configuration-file
-         "fec" 'mohkale/find-configuration-file
-         "fer" 'mohkale/eval-configuration-file
-         "fed" 'mohkale/find-dotfile-file
-         "fet" 'mohkale/find-tangled-config-file))
+         "fec" 'mohkale/find-dotfile-file
+         "fel" 'mohkale/eval-dotfile-file
+         "fet" 'mohkale/find-tangled-dotfile-file))
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale.el
@@ -1497,38 +1249,12 @@
                     (find-file ,file-path)))
               (find-file ,file-path)))))
 
-     (mohkale/defun-mohkale-find-package-file dotfile        "init.el" user-emacs-directory)
-     (mohkale/defun-mohkale-find-package-file configuration  mohkale-mohkale-config-file)
-     (mohkale/defun-mohkale-find-package-file tangled-config mohkale-mohkale-el-config-file)
+     (mohkale/defun-mohkale-find-package-file dotfile         dotemacs-file)
+     (mohkale/defun-mohkale-find-package-file tangled-dotfile dotemacs-el-file)
 
-     (defun mohkale/eval-configuration-file ()
+     (defun mohkale/eval-dotfile-file ()
        (interactive)
-       (org-babel-load-file mohkale-mohkale-config-file))
-
-     (defun mohkale//tangle-configuration-file ()
-       (let ((file    mohkale-mohkale-config-file)
-             (el-file mohkale-mohkale-el-config-file))
-         (when (file-newer-than-file-p file el-file)
-           (require 'org)
-           (org-babel-tangle-file file el-file))))
-
-     (defun mohkale//compile-configuration-files ()
-       (require 'bytecomp)
-       (byte-compile-file mohkale-mohkale-el-config-file)
-
-       (let ((tangled-files (directory-files-recursively dotemacs-bin-path
-                                                         ".*\\.el$"))
-             (packages-dir (expand-file-name package-user-dir)))
-         (dolist (file tangled-files)
-           (unless (string-prefix-p packages-dir file)
-             (byte-compile-file file)))))
-
-     (defun mohkale/build-configuration-file ()
-       (interactive)
-       (mohkale//tangle-configuration-file)
-
-       (when mohkale-should-compile-config
-         (mohkale//compile-configuration-files)))
+       (org-babel-load-file dotemacs-file))
 
      (provide 'mohkale)
    #+END_SRC
@@ -1694,17 +1420,19 @@
 
 *** Hooks/Handlers
     #+BEGIN_SRC emacs-lisp
-      (defun no-junk-please-were-unixish ()
-        "auto convert found files to use unix EOL formats"
-        (let ((coding-str (symbol-name buffer-file-coding-system)))
-          (when (string-match "-\\(?:dos\\|mac\\)$" coding-str)
-            (set-buffer-file-coding-system 'unix))))
+      ;; (defun no-junk-please-were-unixish ()
+      ;;   "auto convert found files to use unix EOL formats"
+      ;;   (let ((coding-str (symbol-name buffer-file-coding-system)))
+      ;;     (when (string-match "-\\(?:dos\\|mac\\)$" coding-str)
+      ;;       (set-buffer-file-coding-system 'unix))))
 
-      (add-hook 'find-file-hook 'no-junk-please-were-unixish)
+      ;; (add-hook 'find-file-hook 'no-junk-please-were-unixish)
+    #+END_SRC
 
-      (add-hook 'prog-mode-hook        'display-line-numbers-mode)
-      (add-hook 'fundamental-mode-hook 'display-line-numbers-mode)
+    prevent annoying error messages when you try to go before the start of the buffer
+    or off the end of the buffer.
 
+    #+BEGIN_SRC emacs-lisp
       (setq command-error-function
             (defun mohkale--command-error-function (data context caller)
               "hide some error message"
@@ -1712,7 +1440,9 @@
                                             beginning-of-buffer
                                             end-of-buffer)))
                 (command-error-default-function data context caller))))
+    #+END_SRC
 
+    #+BEGIN_SRC emacs-lisp
       (defun inhibit-messages-wrapper (func &rest args)
         (let ((inhibit-message t))
           (apply func args)))
@@ -1732,19 +1462,30 @@
       (advice-add 'load-theme
                   :after (defun load-theme-execute-hooks (&rest args)
                            (run-hooks 'after-load-theme-hook)))
+    #+END_SRC
 
-      ;;; whitespace exemption
-      (defvar mohkale--whitespace-exempt-modes '(help-mode
-                                                 Buffer-menu-mode
-                                                 ibuffer-mode
-                                                 eshell-mode
-                                                 term-mode
-                                                 minibuffer-inactive-mode
-                                                 eshell-mode)
+    Configure displaying of trailing whitespace. Now I personally am not a fan of source code
+    with invisable trailing whitespace, it takes up meaningless space ([[https://www.youtube.com/watch?v=SsoOG6ZeyUI][insert completely unrelated
+    video here]]) and probably annoys the hell out of other people with editors smart enough to
+    see it.
+
+    So I enable displaying of trailing whitespace by default in every mode. That way you can
+    see and remove it. If you'd like to disable whitespace display, then you'll have to append
+    to either of the following variables.
+
+    #+BEGIN_SRC emacs-lisp
+      (defvar whitespace-exempt-modes '(help-mode
+                                        Buffer-menu-mode
+                                        ibuffer-mode
+                                        eshell-mode
+                                        term-mode
+                                        minibuffer-inactive-mode
+                                        eshell-mode)
         "modes under which no trailing whitespace is shown")
 
-      (defvar mohkale--whitespace-exempt-buffers '("\\*Ibuffer confirmation\\*"
-                                                   "\\*Org Export Dispatcher\\*")
+      (defvar whitespace-exempt-buffers
+        (list (rx "*Ibuffer confirmation*")
+              (rx "*Org Export Dispatcher*"))
         "regular expressions matching buffer names under which no trailing
       whitespace is shown.")
 
@@ -1758,28 +1499,28 @@
                   regexps (cdr regexps)))
           (not (not match-found))))
 
-      (defun mohkale//set-trailing-whitespace--mode-based (&optional dont-set)
+      (defun set-trailing-whitespace--mode-based (&optional dont-set)
         "check the mode of the current buffer, to see whether trailing
       whitespace should be shown. with the optional parameter `dont-set'
       trailing whitespace will not be set.
 
       This function returns what the desired value of `show-trailing-whitespace'
       should be."
-        (let ((show (not (and mohkale--whitespace-exempt-modes
+        (let ((show (not (and whitespace-exempt-modes
                               (apply 'derived-mode-p
-                                     mohkale--whitespace-exempt-modes)))))
+                                     whitespace-exempt-modes)))))
           (prog1
               show
             (unless dont-set
               (setq show-trailing-whitespace show)))))
 
-      (defun mohkale//set-trailing-whitespace--name-based (&optional dont-set)
+      (defun set-trailing-whitespace--name-based (&optional dont-set)
         "check the name of the current buffer, to see whether trailing
-      whitespace should be shown. see `mohkale//set-trailing-whitespace--mode-based'."
-        (let ((show (not (and mohkale--whitespace-exempt-buffers
+      whitespace should be shown. see `set-trailing-whitespace--mode-based'."
+        (let ((show (not (and whitespace-exempt-buffers
                               (apply 'chain-match-regexp
                                      (buffer-name)
-                                     mohkale--whitespace-exempt-buffers)))))
+                                     whitespace-exempt-buffers)))))
           (prog1
               show
             (unless dont-set
@@ -1787,15 +1528,29 @@
 
       (defun mohkale/set-trailing-whitespace (&rest args)
         (setq show-trailing-whitespace
-              (and (mohkale//set-trailing-whitespace--mode-based t)
-                   (mohkale//set-trailing-whitespace--name-based t))))
+              ;; when both name and mode decide you can show
+              ;; whitespace, then show it. otherwise when at
+              ;; least one says no, then hide it.
+              (and (set-trailing-whitespace--mode-based t)
+                   (set-trailing-whitespace--name-based t))))
 
       ;; add switch-to-buffer hook because some functions, such as ibuffers confirmation
       ;; popup use switch-to-buffer instead of display buffer and there's no easy way
       ;; to modify it.
       (add-hook 'switch-to-buffer-hook #'mohkale/set-trailing-whitespace)
-      (add-hook 'after-change-major-mode-hook (lambda (&rest args) (mohkale//set-trailing-whitespace--mode-based)))
+      (add-hook 'after-change-major-mode-hook (lambda (&rest args)
+                                                (set-trailing-whitespace--mode-based)))
+    #+END_SRC
 
+    Configure the preferred indentation for buffers. Emacs doesn't really have a nice builtin
+    way to do this across multiple modes. I got tired of always having to remember special
+    variables for each mode so I've defined the following alist to store indent configurations
+    and a command ~set-indent-offset~ which automatically (or manually sets the desired
+    indent).
+
+    TODO no way to set indent in a directory local way.
+
+    #+BEGIN_SRC emacs-lisp
       ;; indent configuration
       (defvar mohkale-indent-config '((t . 4))
         "alist configuring preferred indentation for buffers.
@@ -1886,8 +1641,15 @@
 
     #+END_SRC
 
-    A neat idea, but feels like more hassle than it's worth. Maybe recheck if I face
-    any more issues where this would come in useful.
+    Auto clear the echo area after a certain idle interval. Why? because emacs has a tendency
+    to hang when doing a lot of tasks (eg. updating packages). When this package installation
+    finished emacs keeps the last message in the minibuffer meaning the only way to tell if
+    emacs is ready to carry on is to hit a key. I can't count the number of times I've just
+    stood around for 2 minutes wondering when it'll be done, only to find it finished a while
+    ago and I just didn't recieve any notification :angry:.
+
+    A neat idea, but feels like more hassle than it's worth. Maybe recheck if I face any more
+    issues where this would come in useful.
 
     #+BEGIN_SRC emacs-lisp :tangle no
       ;; auto clear echo area after given delay... when the echo area just
@@ -1930,17 +1692,16 @@
 
 *** Yank Indent Adjust
     adjust indentation of yanked text in some modes... because doing so manually is
-    a pain :tongue_out:.
+    a pain :tongue:.
 
     #+BEGIN_SRC emacs-lisp
-      ;; initially sourced from: https://github.com/magnars/.emacs.d/blob/master/defuns/editing-defuns.el#L99-L124
+      ;; initially sourced from, the venerable, [[https://github.com/magnars/.emacs.d/blob/master/defuns/editing-defuns.el#L99-L124][magnars]]
       (require 'dash)
 
       (defvar yank-indent-modes '(prog-mode
                                   sgml-mode
                                   js2-mode)
-        "Modes in which to indent regions that are yanked (or yank-popped)
-      set to nil, if you want to indent yanked text everywhere.")
+        "Modes in which to automatically indent regions that are yanked (or yank-popped).")
 
       (defvar yank-advised-indent-threshold 1000
         "Threshold (# chars) over which indentation does not automatically occur.")
@@ -1986,7 +1747,7 @@
 
 *** Display Functions
     #+BEGIN_SRC emacs-lisp
-      (use-package mohkale-buffer-display
+      (use-package mohkale-display-buffer-functions
        :defer t
        :commands (display-buffer--maybe-same-window-and-focus
                   display-buffer--maybe-pop-up-frame-or-window-and-focus
@@ -2002,7 +1763,7 @@
                   display-buffer-right-and-focus))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-buffer-display.el
+    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-display-buffer-functions.el
       (defmacro display-buffer--create-focus-method (func)
         `(defun ,(intern (concat (symbol-name func) "-and-focus")) (buffer alist)
            (let ((window (,func buffer alist)))
@@ -2062,7 +1823,7 @@
       (display-buffer--create-focus-method display-buffer-left)
       (display-buffer--create-focus-method display-buffer-right)
 
-      (provide 'mohkale-buffer-display)
+      (provide 'mohkale-display-buffer-functions)
     #+END_SRC
 
 *** Misc
@@ -2120,7 +1881,7 @@
                 (get-text-property (point) 'keymap)
                 (get-text-property (point) 'local-map))))
           (apply #'message
-                 (concat 
+                 (concat
                   "Overlay keymap: %s\n"
                   "Overlay local-map: %s\n"
                   "Text-property keymap: %s\n"
@@ -2547,7 +2308,7 @@
         (defun window-zen (&optional prefix)
           "Maximize buffer or undo maximize buffer
       pass prefix to also restore original point."
-          ;; from https://gist.github.com/3402786
+          ;; from [[https://gist.github.com/3402786][here]].
           (interactive "P")
           (if (and (= 1 (length (window-list)))
                    (assoc window-zen-register register-alist))
@@ -2570,7 +2331,7 @@
       (defun shell-command-on-buffer (&optional prefix)
         "Asks for a command and executes it in inferior shell with current buffer
       as input. if prefix is given, output of command is inserted in current buffer
-      at point. Again... how is this not a built in command :(."
+      at point."
         (interactive "P")
         (let ((command (read-shell-command "Shell command on buffer: "))
               (input-buffer (current-buffer)) output-buffer process-output)
@@ -2588,8 +2349,7 @@
 
       (defun async-shell-command-on-region (&optional start end prefix)
         "same as `async-shell-command', but also sends the current region
-      as stdin to the asynchronous process... why this isn't a built in
-      command escapes me."
+      as stdin to the asynchronous process. "
         (interactive "r\nP")
         (require 'subr-x) ;; needed for string-empty-p
 
@@ -2660,32 +2420,32 @@
                '((side . right)
                  (window-width . 0.5)))))
 
-      (cl-defmacro window-route (&rest paths)
-        "macro to see which window exists at the end of a route
-      from the current window.
+      ;; (cl-defmacro window-route (&rest paths)
+      ;;   "macro to see which window exists at the end of a route
+      ;; from the current window.
 
-      Accepts up, down, left & right as direction markers & every
-      route begins from the top left hand side of the current window."
-        `(let ((paths ',paths))
-           (if (not paths)
-               (selected-window)
-             (condition-case err
-                 (save-excursion
-                   ;; goto start to ensure route begins from
-                   ;; top left hand side of current window.
-                   (goto-char (max (point-min) (window-start)))
-                   (goto-char (line-beginning-position))
-                   (save-selected-window
-                     (let (head)
-                       ;; TODO check whether to goto top left hand side here.
-                       (while (setq head (pop paths))
-                         (cond
-                          ((eq head 'up)    (windmove-up))
-                          ((eq head 'down)  (windmove-down))
-                          ((eq head 'left)  (windmove-left))
-                          ((eq head 'right) (windmove-right))))
-                       (selected-window))) )
-               (user-error (message "window-route: %s" err))))))
+      ;; Accepts up, down, left & right as direction markers & every
+      ;; route begins from the top left hand side of the current window."
+      ;;   `(let ((paths ',paths))
+      ;;      (if (not paths)
+      ;;          (selected-window)
+      ;;        (condition-case err
+      ;;            (save-excursion
+      ;;              ;; goto start to ensure route begins from
+      ;;              ;; top left hand side of current window.
+      ;;              (goto-char (max (point-min) (window-start)))
+      ;;              (goto-char (line-beginning-position))
+      ;;              (save-selected-window
+      ;;                (let (head)
+      ;;                  ;; TODO check whether to goto top left hand side here.
+      ;;                  (while (setq head (pop paths))
+      ;;                    (cond
+      ;;                     ((eq head 'up)    (windmove-up))
+      ;;                     ((eq head 'down)  (windmove-down))
+      ;;                     ((eq head 'left)  (windmove-left))
+      ;;                     ((eq head 'right) (windmove-right))))
+      ;;                  (selected-window))) )
+      ;;          (user-error (message "window-route: %s" err))))))
 
       ;; (defun window-expand-up ()
       ;;   "Expand current window into region of window above.
@@ -2763,6 +2523,13 @@
     #+END_SRC
 
 *** multiscratch
+    An extension of the persistent scratch function which provides functions to create a new
+    scratch buffer and interactively switch to one.
+
+    WARN multiscratch doesn't save the first scratch buffer. That's a real scratch buffer,
+    which's expected to get erased every time emacs is killed. All other scratche buffers are
+    properly restored though.
+
     #+BEGIN_SRC emacs-lisp
       (use-package multiscratch
         :commands (switch-to-scratch-buffer
@@ -2778,21 +2545,20 @@
         (use-package persistent-scratch
           :ensure t
           :init
-          (defun persistent-scratch--scratch-buffer-p (&optional buffer)
+          (defun multiscratch-scratch-buffer-p (&optional buffer)
             "persist all but the main scratch buffer."
             (and (not (string= (buffer-name buffer) scratch-buffer-name))
                  (scratch-buffer-p buffer)))
 
-          (setq persistent-scratch-autosave-interval 800
-                persistent-scratch-scratch-buffer-p-function #'persistent-scratch--scratch-buffer-p)
+          (setq persistent-scratch-save-file (var! "scratch.el")
+                persistent-scratch-autosave-interval 800
+                persistent-scratch-scratch-buffer-p-function #'multiscratch-scratch-buffer-p)
 
           ;; force restoration on initial movement to a scratch buffer.
           (when (file-exists-p persistent-scratch-save-file)
             (persistent-scratch-restore))
 
-          (add-hook 'kill-emacs-hook
-                    (defun persistent-scratch--save-on-exit (&rest _)
-                      (persistent-scratch-save)))))
+          (add-hook 'kill-emacs-hook #'persistent-scratch-save)))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/multiscratch.el
@@ -2868,6 +2634,8 @@
     #+END_SRC
 
 *** evil
+    Where I keep my own evil operators/commands/*witchcraft*.
+
     #+BEGIN_SRC emacs-lisp
       (use-package mohkale-evil
         :defer t
@@ -4175,6 +3943,7 @@
         :init
         (leader/set-keys
           "xl" 'lorem-ipsum-overlay)
+
         :config
         ;; used in a bunch of places
         (defvar lorem-ipsum-text nil))
@@ -4310,28 +4079,27 @@
        (provide 'unpackaged)
      #+END_SRC
 
-*** Fonts
+*** Fonts/Emojis
     #+BEGIN_SRC emacs-lisp
-      (when mohkale-allow-unicode-emojis
-        ;; adapted from: https://github.com/zonuexe/emoji-fontset.el/blob/master/emoji-fontset.el
-        (let ((emoji-font-family
-               (cl-case window-system
-                 ('w32 "Segoe UI Emoji")
-                 ('ns  "Apple Color Emoji")
-                 (t    "Symbola"))))
-          (cl-loop
-           for (x . y) in '((#x1f000 . #x1f02f) ;; Mahjong Tiles
-                            (#x1f0a0 . #x1f0ff) ;; Playing Cards
-                            (#x1f110 . #x1f19a) ;; Enclosed Alphanumeric Supplement
-                            ;; Regional Indicator Symbol, Enclosed Ideographic Supplement,
-                            ;; Emoticons, Transport and Map Symbols, Alchemical Symbols
-                            (#x1f1e6 . #x1f8ff))
-           do (setq x (decode-char 'ucs x)
-                    y (decode-char 'ucs y))
-           do (set-fontset-font "fontset-default" (cons x y) emoji-font-family))))
+      ;; adapted from [[https://github.com/zonuexe/emoji-fontset.el/blob/master/emoji-fontset.el][emoji-fontset]]
+      (let ((emoji-font-family
+             (cl-case window-system
+               ('w32 "Segoe UI Emoji")
+               ('ns  "Apple Color Emoji")
+               (t    "Symbola"))))
+        (cl-loop
+         for (x . y) in '((#x1f000 . #x1f02f) ;; Mahjong Tiles
+                          (#x1f0a0 . #x1f0ff) ;; Playing Cards
+                          (#x1f110 . #x1f19a) ;; Enclosed Alphanumeric Supplement
+                          ;; Regional Indicator Symbol, Enclosed Ideographic Supplement,
+                          ;; Emoticons, Transport and Map Symbols, Alchemical Symbols
+                          (#x1f1e6 . #x1f8ff))
+         do (setq x (decode-char 'ucs x)
+                  y (decode-char 'ucs y))
+         do (set-fontset-font "fontset-default" (cons x y) emoji-font-family)))
     #+END_SRC
 
-** Core Packages
+** Core
    For packages that're need to properly setup other packages. This list won't be in any
    sort of order, beyond the messy order needed to ensure everything can be built from
    scratch.
@@ -4349,20 +4117,19 @@
       (use-package spaceline
         :straight t
         :demand   t
-        ;; :hook (helm-mode . spaceline-helm-mode)
-        :init
+        :config
         (setq spaceline-buffer-id-max-length 25
-              spaceline-org-clock            t
-              winum-auto-setup-mode-line     nil
-              powerline-default-separator    'slant)
+              spaceline-org-clock t
+              winum-auto-setup-mode-line nil
+              powerline-default-separator 'slant
 
-        (when (display-graphic-p)
-          (setq spaceline-window-numbers-unicode    t
-                spaceline-window-number-p           t
-                ;; having two unicode numbers next to each other
-                ;; is IMO ugly, so disable the workspace one :(.
-                spaceline-workspace-number-p        nil
-                spaceline-workspace-numbers-unicode t))
+              spaceline-window-number-p t
+              spaceline-window-numbers-unicode t
+
+              ;; having two unicode numbers next to each other
+              ;; is IMO ugly, so disable the workspace one :(.
+              spaceline-workspace-number-p nil
+              spaceline-workspace-numbers-unicode t)
 
         (setq-default mode-line-format (spaceline-spacemacs-theme))
 
@@ -4385,18 +4152,15 @@
                         :inherit (highlight spaceline-evil-motion))))
           "face for evil multiedit face")
 
-        (push '(operator . spaceline-evil-operator)
-              spaceline-evil-state-faces)
-
-        (push '(multiedit . spaceline-evil-multiedit)
-              spaceline-evil-state-faces)
+        (push '(operator  . spaceline-evil-operator)  spaceline-evil-state-faces)
+        (push '(multiedit . spaceline-evil-multiedit) spaceline-evil-state-faces)
 
         (defvar spaceline--highlight-evil-operator-face t
           "when true, spaceline will highlight operator state
       like it would any other state.")
 
         (setq spaceline-highlight-face-func
-              (defun mohkale-spaceline-highlight-face ()
+              (defun spaceline-highlight-face+ ()
                 (if (active-minibuffer-window)
                     'spaceline-minibuffer
                   ;; (spaceline-highlight-face-evil-state)
@@ -4414,7 +4178,6 @@
         ;; by default, colors seem to glitch out on change
         (add-hook 'after-load-theme-hook #'powerline-reset)
 
-        :config
         (defun spaceline--face-icon-height (face)
           (let ((height (face-attribute face :height)))
             (unless (eq height 'unspecified)
@@ -4648,12 +4411,14 @@
      #+END_SRC
 
 *** persp-mode
-    configure an ease of use macro to programatically define custom macros. the general functionality is sourced from [[https://github.com/syl20bnr/spacemacs/blob/master/layers/%25252Bspacemacs/spacemacs-layouts/funcs.el#L161][spacemacs]].
+    configure an ease of use macro to programatically define custom perspectives. the general
+    functionality is sourced from [[https://github.com/syl20bnr/spacemacs/blob/master/layers/%25252Bspacemacs/spacemacs-layouts/funcs.el#L161][spacemacs]].
 
     #+BEGIN_SRC emacs-lisp
-      (defvar mohkale--custom-perspectives (make-hash-table
-                                       :size 26
-                                       :test 'string-hash-table-test)
+      (defvar mohkale--custom-perspectives
+        (make-hash-table
+         :size 26
+         :test 'string-hash-table-test)
         "all the defined custom perspectives.")
 
       ;; source: [[https://github.com/syl20bnr/spacemacs/blob/master/layers/%252Bspacemacs/spacemacs-layouts/funcs.el#L161]]
@@ -4674,7 +4439,6 @@
                      (delete-other-windows)
                      ,@body)))
              (puthash ,name (quote ,func) mohkale--custom-perspectives))))
-
       (put 'mohkale//define-custom-perspective 'lisp-indent-function 'defun)
 
       (defun mohkale/switch-to-custom-perspective (&optional name)
@@ -4726,9 +4490,9 @@
                          (?\[ . ("[" . "]"))
                          (?\{ . ("{" . "}"))
 
-                         (?\) . ("( " . " )")) ; alias above
-                         (?\] . ("[ " . " ]")) ; alias above
-                         (?\} . ("{ " . " }")) ; alias above
+                         (?\) . ("( " . " )"))
+                         (?\] . ("[ " . " ]"))
+                         (?\} . ("{ " . " }"))
 
                          (?# . ("#{" . "}")) ; ruby string interpolation
                          (?b . ("(" . ")"))
@@ -4786,7 +4550,7 @@
          evil-snipe-mode
          evil-snipe-local-mode
          :hook (evil-mode . evil-snipe-mode)
-         :init
+         :config
          (setq evil-snipe-scope 'buffer                                      ; how far can a snipe take place
                evil-snipe-repeat-scope 'buffer                               ; how far repeating previous snipe can take place.
                evil-snipe-enable-highlight nil                               ; don't highlight after jump
@@ -4802,7 +4566,6 @@
          (defvar mohkale-evil-find-scopes-to-line nil
            "when true, evil-snipe-{f,F,t,T} (I.E. for single finds) only extends to EOL.")
 
-         :config
          (defmacro evil-snipe-with-normalised-settings (&rest body)
            `(let ((evil-snipe-enable-highlight nil)                           ; don't highlight jump matches after jump
                   (evil-snipe-enable-incremental-highlight nil)               ; don't highlight jump matches while searching
@@ -4857,13 +4620,10 @@
            ";"  'evil-snipe-repeat
            "g;" 'evil-snipe-repeat-reverse)
 
-         (general-define-key
+         (general-unbind
            :keymaps 'evil-snipe-mode-map
            :states  '(motion normal)
-           "S" nil
-           "s" nil
-           "X" nil
-           "x" nil))
+           "S" "s" "X" "x"))
      #+END_SRC
 
 **** evil-exchange
@@ -5145,10 +4905,10 @@
        (with-eval-after-load 'magit
          (use-package evil-magit
            :ensure t
-           :init
+           :config
            (setq evil-magit-state 'motion
                  evil-magit-use-y-for-yank t)
-           :config
+
            (general-define-key
              :states `(,evil-magit-state visual)
              :keymaps 'magit-mode-map
@@ -5503,31 +5263,14 @@
           "o" 'Buffer-menu-multi-occur
           "T" 'Buffer-menu-visit-tags-table)
 
+        (general-unbind
+          :keymaps 'Buffer-menu-mode-map
+          "0" "1" "2" "<" ">" "?" "C-d" "C-k" "S-SPC"
+          "SPC" "<backtab>" "TAB" "T" "b" "e" "f" "g"
+          "h" "n" "p" "t" "v")
+
         (general-define-key
           :keymaps 'Buffer-menu-mode-map
-          "0"         nil
-          "1"         nil
-          "2"         nil
-          "<"         nil
-          ">"         nil
-          "?"         nil
-          "C-d"       nil
-          "C-k"       nil
-          "S-SPC"     nil
-          "SPC"       nil
-          "<backtab>" nil
-          "TAB"       nil
-          "T"         nil
-          "b"         nil
-          "e"         nil
-          "f"         nil
-          "g"         nil
-          "h"         nil
-          "n"         nil
-          "p"         nil
-          "t"         nil
-          "v"         nil
-
           "C-SPC" 'Buffer-menu-mark
           "S-DEL" 'Buffer-menu-bury
           "r"   'Buffer-menu-toggle-read-only
@@ -5560,7 +5303,7 @@
           "M-l" 'buf-move-right)
 
         :config
-        ;; https://www.emacswiki.org/emacs/TransposeWindows
+        ;; See [[https://www.emacswiki.org/emacs/TransposeWindows][Transpose Windows]]
         (defun rotate-windows (arg)
           "Rotate your windows; use the prefix argument to rotate the other direction"
           (interactive "P")
@@ -5758,10 +5501,8 @@
     #+BEGIN_SRC emacs-lisp
       (use-package calendar
         :defer t
-        :init
-        (push 'calendar-mode mohkale--whitespace-exempt-modes)
-
         :config
+        (push 'calendar-mode whitespace-exempt-modes)
         (evil-set-initial-state 'calendar-mode 'motion)
 
         (general-define-key
@@ -5812,10 +5553,8 @@
     #+BEGIN_SRC emacs-lisp
       (use-package add-log
         :defer t
-        :init
-        (push 'change-log-mode mohkale--whitespace-exempt-modes)
-
         :config
+        (push 'change-log-mode whitespace-exempt-modes)
         (evil-set-initial-state 'change-log-mode 'motion)
 
         (leader/set-keys-for-mode! 'change-log-mode
@@ -5841,7 +5580,9 @@
         :defer  t
         :commands (display-compilation-buffer
                    mohkale/set-compilation-bindings)
-        :init
+        :config
+        (push 'compilation-mode whitespace-exempt-modes)
+
         (setq compilation-read-command nil
               compilation-scroll-output t)
 
@@ -5863,22 +5604,10 @@
             "k" 'kill-compilation
             "f" 'next-error-follow-minor-mode)
 
-          (general-define-key
+          (general-unbind
             :keymaps map
-            "S-SPC" nil
-            "SPC"   nil
-            "DEL"   nil
-            "M-p"   nil
-            "M-n"   nil
-            "M-{"   nil
-            "M-}"   nil
-            "0"     nil
-            "h"     nil
-            "g"     nil
-            "?"     nil
-            "n"     nil
-            "p"     nil
-            "<override-state>" nil)
+            "S-SPC" "SPC" "DEL" "M-p" "M-n" "M-{" "M-}"
+            "0" "h" "g" "?" "n" "p" "<override-state>")
 
           (general-define-key
             :keymaps map
@@ -5897,9 +5626,6 @@
             :keymaps map
             :states  '(replace insert)
             "ESC" 'evil-motion-state))
-
-        :config
-        (push 'compilation-mode mohkale--whitespace-exempt-modes)
 
         (let* ((compilation-buffer-name "*compilation*"))
           (defun compilation-safely-close-window ()
@@ -5955,8 +5681,6 @@
                     (compilation-safely-close-window)))))))
 
         ;; NOTE setq kept for debug purposes, defvar only works on first call
-        ;; (setq compilation-auto-kill-window 2)
-        ;; (setq compilation-dont-auto-kill-window-when '(warnings))
         (add-hook 'compilation-finish-functions 'mohkale/compilation-finish-function)
 
         (add-hook 'compilation-start-hook
@@ -5985,11 +5709,10 @@
 
         (mohkale/set-compilation-bindings 'compilation-mode 'compilation-mode-map)
 
-        (general-define-key
+        (general-unbind
           :states  'motion
           :keymaps 'compilation-mode-map
-          "j" nil
-          "k" nil))
+          "j" "k"))
     #+END_SRC
 
 *** comint - command interpreter
@@ -5997,15 +5720,12 @@
       (use-package comint
         :straight (comint :type built-in)
         :defer t
-        :hook ((comint-mode . (lambda () (setq-local evil-emacs-state-cursor 'bar)))
-               ;; (comint-mode . blink-cursor-mode)
-               )
+        :hook ((comint-mode . (lambda ()
+                                (setq-local evil-emacs-state-cursor 'bar))))
         :commands (mohkale--comint-set-bindings
                    mohkale--comint-set-leader-keys)
-        :init
-        (push 'comint-mode mohkale--whitespace-exempt-modes)
-
         :config
+        (push 'comint-mode whitespace-exempt-modes)
         (evil-set-initial-state 'comint-mode 'emacs)
 
         (setq comint-mode-map (make-sparse-keymap) ;; reset all
@@ -6166,6 +5886,7 @@
         company-mode
         global-company-mode
         :commands (company/configure-mode)
+
         :init
         (general-define-key
           :states 'insert
@@ -6174,6 +5895,9 @@
         (defalias 'case #'cl-case) ; TODO remove when company fixes cl issues.
 
         :config
+        (setq company-statistics-file         (var! "company/statistics.el")
+              company-tabnine-binaries-folder (var! "company/tabnine-binaries"))
+
         (global-company-mode)
 
         (defvar universal-company-backends+
@@ -6349,10 +6073,9 @@
         :ensure t
         :defer  t
         :hook (company-mode . company-quickhelp-mode)
-        :init
+        :config
         (setq company-quickhelp-delay nil)
 
-        :config
         (general-define-key
           :keymaps 'company-active-map
           "C-h" 'company-quickhelp-manual-begin))
@@ -6362,11 +6085,10 @@
     #+BEGIN_SRC emacs-lisp
       (use-package cus-edit
         :defer t
-        :init
-        (push 'Custom-mode mohkale--whitespace-exempt-modes)
-        (push 'customize-mode mohkale--whitespace-exempt-modes)
-
         :config
+        (push 'Custom-mode whitespace-exempt-modes)
+        (push 'customize-mode whitespace-exempt-modes)
+
         (evil-set-initial-state 'Custom-mode 'normal)
 
         (leader/set-keys-for-mode! 'Custom-mode
@@ -6546,7 +6268,6 @@
          :commands goto-home-buffer
          :init
          (leader/set-keys "bh" 'goto-home-buffer)
-         (push 'dashboard-mode mohkale--whitespace-exempt-modes)
 
          (defun get-loaded-packages+ ()
            "return the number of packages loaded so far"
@@ -6558,6 +6279,7 @@
          :config
          (require 'all-the-icons)
 
+         (push 'dashboard-mode whitespace-exempt-modes)
          (evil-set-initial-state 'dashboard-mode 'motion)
 
          (setq inhibit-startup-screen t
@@ -6769,9 +6491,8 @@
            (leader/set-keys
              "SPC" 'diff-buffer-with-file))
 
-         (push 'diff-mode mohkale--whitespace-exempt-modes)
-
          :config
+         (push 'diff-mode whitespace-exempt-modes)
          (evil-set-initial-state 'diff-mode 'motion)
 
          (leader/set-keys-for-mode! 'diff-mode
@@ -6857,9 +6578,9 @@
              "b" 'ediff-buffers
              "w" 'ediff-windows))
 
-         (push 'ediff-meta-mode mohkale--whitespace-exempt-modes)
-
          :config
+         (push 'ediff-meta-mode whitespace-exempt-modes)
+
          (setq-default ediff-window-setup-function       'ediff-setup-windows-plain
                        ediff-split-window-function       'split-window-horizontally
                        ediff-merge-split-window-function 'split-window-horizontally
@@ -6982,10 +6703,10 @@
              "b" 'vdiff-buffers
              "B" 'vdiff-buffers3))
 
+         :config
          (defvar vdiff-use-relative-line-numbers nil
            "when true, line numbers in vdiff sessions are relative")
 
-         :config
          (defun vdiff-setup (&rest args)
            (let ((inhibit-message t))
              (toggle-truncate-lines +1)
@@ -7073,6 +6794,18 @@
           (transient-suffix-put 'magit-dispatch "E" :command 'vdiff-magit))
       #+END_SRC
 
+*** display-line-numbers-mode
+    #+BEGIN_SRC emacs-lisp
+      (use-package display-line-numbers
+        :straight (display-line-numbers :type built-in)
+        :defer t
+        :hook ((prog-mode . display-line-numbers-mode)
+               (text-mode . display-line-numbers-mode))
+        :config
+        ;; prefer relative line numbers when available
+        (setq-default display-line-numbers-type 'relative))
+    #+END_SRC
+
 *** dired
 **** dired-x
      #+BEGIN_SRC emacs-lisp
@@ -7121,9 +6854,10 @@
                dired-listing-switches "-laXhv --group-directories-first"
                dired-auto-revert-buffer t
                dired-hide-details-hide-symlink-targets nil
-               dired-recursive-copies t)
+               dired-recursive-copies t
+               dired-recent-directories-file (var! "dired/recent.el"))
 
-         (push 'dired-mode mohkale--whitespace-exempt-modes)
+         (push 'dired-mode whitespace-exempt-modes)
 
          (defun dired-goto-home-dir (&optional other-window)
            "goto users home directory
@@ -7264,13 +6998,14 @@
            "f/ C-|" 'dired-do-relsymlink-regexp
            "f/ M-|" 'dired-do-hardlink-regexp)
 
-         (let ((erase-bindings '("#" "$" "%" "*" "." ":" "?" "~" "<" "=" ">" "a" "A" "B"
-                                 "c" "C-M-d" "C-M-n" "C-M-p" "C-M-u" "C-o" "e" "f" "F"
-                                 "g" "G" "h" "H" "I" "j" "k" "l" "L" "M" "M-$" "M-(" "M-{"
-                                 "M-}" "M-DEL" "M-G" "n" "N" "O" "p" "P" "Q" "s" "SPC" "0"
-                                 "S-SPC" "t" "T" "v" "V" "w" "W" "X" "y" "Y" "Z" "u")))
-           (dolist (binding erase-bindings)
-             (define-key dired-mode-map (kbd binding) nil))))
+         (general-unbind
+           :keymaps 'dired-mode-map
+           "#" "$" "%" "*" "." ":" "?" "~" "<" "=" ">" "a"
+           "A" "B" "c" "C-M-d" "C-M-n" "C-M-p" "C-M-u" "C-o"
+           "e" "f" "F" "g" "G" "h" "H" "I" "j" "k" "l" "L" "M"
+           "M-$" "M-(" "M-{" "M-}" "M-DEL" "M-G" "n" "N" "O" "p"
+           "P" "Q" "s" "SPC" "0" "S-SPC" "t" "T" "v" "V" "w" "W"
+           "X" "y" "Y" "Z" "u"))
      #+END_SRC
 
 **** dired-all-the-icons
@@ -7320,11 +7055,12 @@
          :straight (image-dired :type built-in)
          :defer t
          :commands (persp-custom-@dired-slideshow)
-         :init
-         (push 'image-dired-thumbnail-mode mohkale--whitespace-exempt-modes)
+         :config
          (puthash "@dired-slideshow" 'persp-custom-@dired-slideshow mohkale--custom-perspectives)
 
          :config
+         (push 'image-dired-thumbnail-mode whitespace-exempt-modes)
+
           ;;; fixed weird moves line, not thumbnail
          (defun image-dired-slideshow-step ()
            "Step to next file, if `image-dired-slideshow-times' has not been reached."
@@ -7507,6 +7243,80 @@
           "C-<down>" 'drag-stuff-down))
     #+END_SRC
 
+*** display-buffer
+    customise display-buffer-alist to prioritise switching focus to displayed
+    buffers, instead of showing them and then making me have to switch to them
+    and then exit.
+
+    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale-display-buffer.el
+      ;; frankly, display buffers alist is badly documented.
+      ;; there's a quick and simple article exploring how it
+      ;; works [[https://www.simplify.ba/articles/2016/01/25/display-buffer-alist/][here]]
+      ;;
+      ;; in the meantime, the following is a breif~er~ summary
+      ;;   1. the car of each entry should be a regex matching a buffer
+      ;;      name or a function taking a buffer and an action argument.
+      ;;   2. the second item (car (cdr list)) should be a list of or a
+      ;;      single display handler function which takes a buffer and
+      ;;      an alist as an argument. Each entry in the list is invoked
+      ;;      until one which returns non nil is encountered.
+      ;;   3. the remaining list items should be an alists providing options.
+
+      ;; changing at startup messes up the display of the dashboard :(
+      (defvar default-display-buffer-action
+        display-buffer-fallback-action
+        "the value for fallback actions without my configuration")
+
+      (defun restore-default-display-buffer-actions (func &rest args)
+        "restore the default display buffer actions used by emacs."
+        (let ((display-buffer-fallback-action
+               default-display-buffer-action))
+          (apply func args)))
+
+      (setq display-buffer-fallback-action
+            ;; by default, focus on displayed windows
+            '((display-buffer--maybe-same-window-and-focus
+               display-buffer-reuse-window-and-focus
+               display-buffer--maybe-pop-up-frame-or-window-and-focus
+               display-buffer-in-previous-window-and-focus
+               display-buffer-use-some-window-and-focus
+               display-buffer-pop-up-frame-and-focus)))
+
+      (push '("*Async Shell Command*"
+              (display-buffer-reuse-window
+               display-buffer--maybe-pop-up-frame-or-window-and-focus
+               display-buffer-in-side-window-and-focus)
+              (side          . bottom)
+              (window-height . 0.5))
+            display-buffer-alist)
+
+      (push '("*compilation*"
+              (display-buffer-reuse-window-and-focus
+               display-buffer--maybe-pop-up-frame-or-window-and-focus
+               display-buffer-in-side-window-and-focus)
+              (side          . bottom)
+              (window-height . 0.5))
+            display-buffer-alist)
+
+      (dolist (buffer-name '("*image-dired-display-image*"
+                             "*Anaconda*"
+                             "magit-diff: "
+                             "*Flycheck error messages*"
+                             "*HTTP Response*"))
+        (push `(,buffer-name ,@default-display-buffer-action)
+              display-buffer-alist))
+
+      (provide 'mohkale-display-buffer)
+    #+END_SRC
+
+    make sure to require this file after emacs has finished starting up.
+
+    #+BEGIN_SRC emacs-lisp
+      (add-hook 'emacs-startup-hook
+                (lambda ()
+                  (require 'mohkale-display-buffer)))
+    #+END_SRC
+
 *** ebuku
     emacs interface to the [[https://github.com/jarun/buku][buku]] bookmark manager.
 
@@ -7561,11 +7371,13 @@
 
      #+BEGIN_SRC emacs-lisp
        (use-package elec-pair
-         :hook ((text-mode prog-mode) . electric-pair-mode)
+         :hook ((prog-mode . electric-pair-mode)
+                (text-mode . electric-pair-mode))
          :commands electric-pair-mode
          :config
-         (setq electric-pair-preserve-balance nil)
-         (setq electric-pair-skip-whitespace nil)
+         (setq electric-pair-preserve-balance nil
+               electric-pair-skip-whitespace  nil)
+
          (electric-pair-mode 1))
      #+END_SRC
 
@@ -7573,7 +7385,8 @@
      #+BEGIN_SRC emacs-lisp
        (use-package electric
          :commands electric-indent-mode
-         :hook ((text-mode prog-mode) . electric-indent-mode))
+         :hook ((text-mode . electric-indent-mode)
+                (prog-mode . electric-indent-mode)))
      #+END_SRC
 
 *** emojify
@@ -7604,6 +7417,8 @@
         (defalias 'remove-duplicates #'cl-remove-duplicates)
 
         :config
+        (setq emojify-emojis-dir (var! "emojify/"))
+
         (general-define-key
           :keymaps 'emojify-list-mode-map
           :states 'motion
@@ -7620,12 +7435,8 @@
 
         ;; make emojis work like prettify-symbols-mode
         (setq emojify-point-entered-behaviour 'uncover
-              emojify-emoji-styles '(unicode github))
-
-        (setq emojify-display-style
-              (if mohkale-allow-unicode-emojis
-                  'unicode
-                'image))
+              emojify-emoji-styles '(unicode github)
+              emojify-display-style 'unicode)
 
         (use-package company-emoji
           :ensure t
@@ -7907,8 +7718,8 @@
         :straight (finder :type built-in)
         :defer t
         :config
-
         (evil-set-initial-state 'finder-mode 'motion)
+
         (general-define-key
           :keymaps 'finder-mode-map
           "SPC" 'nil
@@ -7934,8 +7745,6 @@
                    flycheck-error-list-goto-last-error
                    flycheck-list-errors--goto-first-error)
         :init
-        (setq flycheck-python-pycompile-executable "python3")
-
         (leader/set-keys
           "ej" 'flycheck-next-error
           "ek" 'flycheck-previous-error
@@ -7952,6 +7761,8 @@
           "ev" 'flycheck-verify-setup)
 
         :config
+        (setq flycheck-python-pycompile-executable "python3")
+
         (use-package flycheck-pos-tip
           :ensure t
           :defer  t
@@ -8133,7 +7944,8 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package hl-line
-        :hook ((text-mode prog-mode) . hl-line-mode))
+        :hook ((prog-mode . hl-line-mode)
+               (text-mode . hl-line-mode)))
     #+END_SRC
 
 *** hl-todo
@@ -8143,7 +7955,8 @@
       (use-package hl-todo
         :ensure t
         :defer  t
-        :hook ((text-mode prog-mode) . global-hl-todo-mode)
+        :hook ((prog-mode . global-hl-todo-mode)
+               (text-mode . global-hl-todo-mode))
         :init
         (leader/set-keys
           "jt" 'hl-todo-next
@@ -8182,7 +7995,7 @@
           (add-hook 'after-init-hook 'hydra-posframe-mode))
 
         :config
-        ;; source for following section: https://github.com/jerrypnz/.emacs.d/blob/master/config/jp-base.el
+        ;; source for following section [[https://github.com/jerrypnz/.emacs.d/blob/master/config/jp-base.el][here]].
         (defun mohkale--frame-bottom-poshandler (info)
           (cons (car (posframe-poshandler-frame-center info))
                 (- (cdr (posframe-poshandler-frame-bottom-left-corner info)) 20)))
@@ -8280,21 +8093,20 @@
          :straight t
          :defer    nil
          :commands (ivy-toggle-mark)
-         :init
+         :config
+         (ivy-mode +1)
+
          (setq ivy-height 15
                counsel-evil-registers-height 15
                ivy-use-virtual-buffers t
                projectile-completion-system 'ivy
                ivy-magic-tilde nil)
 
-         :config
-         (ivy-mode +1)
-
          (when (emacs>= "27")
            ;; see issue: https://github.com/abo-abo/swiper/issues/2397
            (setq ivy-read-action-function #'ivy-hydra-read-action))
 
-         (push 'ivy-occur-mode mohkale--whitespace-exempt-modes)
+         (push 'ivy-occur-mode whitespace-exempt-modes)
 
          (setq ivy-preferred-re-builders
                '((ivy--regex-plus         . "ivy")
@@ -8357,7 +8169,7 @@
                (ivy--mark (ivy-state-current ivy-last)))))
 
          (with-eval-after-load "persp-mode"
-           ;; thanks https://gist.github.com/Bad-ptr/1aca1ec54c3bdb2ee80996eb2b68ad2d#file-persp-ivy-el
+           ;; thanks [[https://gist.github.com/Bad-ptr/1aca1ec54c3bdb2ee80996eb2b68ad2d#file-persp-ivy-el][Bad-ptr]].
            (add-hook 'ivy-ignore-buffers
                      (lambda (b)
                        (when persp-mode
@@ -8639,13 +8451,6 @@
          :after ivy
          :diminish
          :init
-         (setq counsel-find-file-occur-use-find t
-               counsel-evil-registers-height ivy-height
-               counsel-find-file-ignore-regexp "\\.#.+")
-
-         (when (windows-p)
-           (setq counsel-rg-base-command "rg --with-filename --no-heading --line-number --path-separator // --color never %s ."))
-
          (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
          (fset 'describe-bindings (symbol-function 'counsel-descbinds))
 
@@ -8713,7 +8518,13 @@
            "C-M-y" 'counsel-yank-pop)
 
          :config
-         (setq ivy-initial-inputs-alist mohkale--ivy-initial-inputs-alist)
+         (setq ivy-initial-inputs-alist mohkale--ivy-initial-inputs-alist
+               counsel-find-file-occur-use-find t
+               counsel-evil-registers-height ivy-height
+               counsel-find-file-ignore-regexp "\\.#.+")
+
+         (when (windows-p)
+           (setq counsel-rg-base-command "rg --with-filename --no-heading --line-number --path-separator // --color never %s ."))
 
          (counsel-mode +1)
 
@@ -8769,6 +8580,7 @@
            "M-s" 'swiper-isearch-thing-at-point
            [remap isearch-forward] 'swiper-isearch)
 
+         :config
          (defvar swiper-persistent-highlight nil
            "if swiper is using evil-search for searching, determine
        whether to persistently highlight the search results or not.
@@ -8779,7 +8591,6 @@
 
          (setq swiper-min-highlight most-positive-fixnum) ;; never highlight
 
-         :config
          (advice-add #'swiper--remember-search-history :around
                      (defun swiper--clear-evil-highlight (func &rest args)
                        "see `swiper-persistent-highlight'."
@@ -9003,7 +8814,9 @@
      #+BEGIN_SRC emacs-lisp
        (use-package smex
          :ensure t
-         :defer  t)
+         :defer  t
+         :config
+         (setq smex-save-file (var! "smex-save.el")))
      #+END_SRC
 
 **** ivy-lsp
@@ -9028,13 +8841,13 @@
          (leader/set-keys
            "bm" 'ibuffer)
 
+         :config
          (defvar ibuffer-show-buffer-icons nil
            "whether to show icons alongside the buffer")
 
          (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold))
                ibuffer-title-face '(:inherit (font-lock-type-face)))
 
-         :config
          (evil-set-initial-state 'ibuffer-mode 'motion)
 
          (setq mohkale-ibuffer-filter-map (make-sparse-keymap))
@@ -9127,44 +8940,11 @@
            "m%" 'ibuffer-mark-read-only-buffers
            "mz" 'ibuffer-mark-compressed-file-buffers)
 
-         (general-define-key
+         (general-unbind
            :keymaps 'ibuffer-mode-map
-           "+"                nil
-           "-"                nil
-           "0"                nil
-           "f"                nil
-           "SPC"              nil
-           "S-SPC"            nil
-           ">"                nil
-           "<"                nil
-           "?"                nil
-           "h"                nil
-           "X"                nil
-           "F"                nil
-           "C-d"              nil
-           "C-t"              nil
-           "b"                nil
-           "n"                nil
-           "g"                nil
-           "p"                nil
-           "w"                nil
-           "s"                nil
-           "`"                nil
-           ","                nil
-           "*"                nil
-           "/"                nil
-           "A"                nil
-           "C-c"              nil
-           "C-x"              nil
-           "M-s"              nil
-           "M-g"              nil
-           "M-n"              nil
-           "M-p"              nil
-           "M-{"              nil
-           "M-}"              nil
-           "M-o"              nil
-           "M-DEL"            nil
-           "%"                nil)
+           "+" "-" "0" "f" "SPC" "S-SPC" ">" "<" "?" "h" "X" "F" "C-d" "C-t"
+           "b" "n" "g" "p" "w" "s" "`" "," "*" "/" "A" "C-c" "C-x" "M-s" "M-g"
+           "M-n" "M-p" "M-{" "M-}" "M-o" "M-DEL" "%")
 
          (general-define-key
            :keymaps 'ibuffer-mode-map
@@ -9260,7 +9040,7 @@
                 (ibuffer--bytes-to-human-readable-file-sizes total))))
            (ibuffer--bytes-to-human-readable-file-sizes (buffer-size)))
 
-         ;; Source: https://github.com/seagle0128/.emacs.d/blob/master/lisp/init-ibuffer.el
+         ;; Source [[https://github.com/seagle0128/.emacs.d/blob/master/lisp/init-ibuffer.el][seagle0128]]
          (define-ibuffer-column icon (:name "  ")
            (let ((icon (if (and (buffer-file-name)
                                 (all-the-icons-auto-mode-match?))
@@ -9453,6 +9233,15 @@
         (evil-ex-define-cmd "spell" #'flyspell-buffer)
 
         :config
+        ;; I've only tested this on window/cygwin but aspell appears to be quite broken :P
+        ;;   * I can't specify a path to any directory not within my home directory.
+        ;;   * I can't specify any absolute path, even when that path is within my home directory.
+        ;;   * If I want to reference a file in a subdirectory of my home directory, the path must begin with a
+        ;;     slash.
+        ;; THIS IS WAY TOO UNINTUITIVE.
+        (setq ispell-personal-dictionary
+              (file-relative-name (etc! "/ispell/dict.txt") "~"))
+
         (leader/with-prefix mohkale-minor-mode-leader-key
           (leader/set-keys-for-mode 'flyspell-mode
             "."  'hydra-flyspell/body
@@ -9499,6 +9288,7 @@
         :init
         (with-eval-after-load 'org
           (push '(ein . t) org-babel-load-languages))
+
         :config
         (defun evil-write--ein-save-buffer (&rest args)
           (when (derived-mode-p 'ein:notebook-mode 'ein:notebook-multilang-mode)
@@ -9586,19 +9376,19 @@
     insert placeholder text in the lorem-ipsum-dolor format.
 
     #+BEGIN_SRC emacs-lisp
-            (use-package lorem-ipsum
-              :ensure nil
-              :defer  t
-              :commands (Lorem-ipsum-insert-list
-                         Lorem-ipsum-insert-paragraphs
-                         Lorem-ipsum-insert-sentences)
-              :init
-              (leader/declare-prefix "il" "lorem-ipsum")
+      (use-package lorem-ipsum
+        :ensure nil
+        :defer  t
+        :commands (Lorem-ipsum-insert-list
+                   Lorem-ipsum-insert-paragraphs
+                   Lorem-ipsum-insert-sentences)
+        :init
+        (leader/declare-prefix "il" "lorem-ipsum")
 
-              (leader/set-keys
-                "ill" 'Lorem-ipsum-insert-list
-                "ilp" 'Lorem-ipsum-insert-paragraphs
-                "ils" 'Lorem-ipsum-insert-sentences))
+        (leader/set-keys
+          "ill" 'Lorem-ipsum-insert-list
+          "ilp" 'Lorem-ipsum-insert-paragraphs
+          "ils" 'Lorem-ipsum-insert-sentences))
     #+END_SRC
 
 *** language-server
@@ -9612,7 +9402,9 @@
          (setq lsp-prefer-flymake             nil
                lsp-enable-snippet             nil
                lsp-enable-symbol-highlighting nil
-               mohkale-lsp-map (make-sparse-keymap))
+               mohkale-lsp-map (make-sparse-keymap)
+               lsp-session-file (var! "lsp/session")
+               lsp-server-install-dir (var! "lsp/servers"))
 
          (leader/with-prefix mohkale--server-leader-key
            (leader/declare-prefix-for-mode* 'lsp-mode
@@ -9657,12 +9449,11 @@
             :defer  t
             ;; :hook (lsp-mode-hook . lsp-ui-mode)
             :commands (lsp-ui-mode)
-            :init
+            :config
             ;; only really installed for flycheck support
             (setq lsp-ui-sideline-enable nil
                   lsp-ui-doc-enable nil)
 
-            :config
             (leader/with-prefix mohkale--server-leader-key
               (leader/declare-prefix-for-mode 'lsp-mode
                 "p" "peek")
@@ -9684,6 +9475,7 @@
             :config
             ;; reduces write lag
             (setq company-lsp-cache-candidates t)
+
             (company/configure-mode (lsp-mode)
               company-lsp)))
       #+END_SRC
@@ -9851,7 +9643,6 @@
       (add-hook 'minibuffer-exit-hook #'restore-garbage-collection+)
     #+END_SRC
 
-
 *** miniedit
     write the minibuffer contents to a buffer. edit, then paste new contents back to minibuffer.
 
@@ -9894,7 +9685,7 @@
         :config
         ;; occur-mode-display-occurrence
         (advice-add 'occur-mode-display-occurrence :around
-                    #'display-buffer--restore-default-actions)
+                    #'restore-default-display-buffer-actions)
 
         (leader/set-keys-for-mode! '(occur-mode occur-edit-mode)
           "e" 'occur-edit-mode
@@ -9958,8 +9749,9 @@
         :init
         (leader/set-keys
           "fJ" 'open-junk-file)
+
         :config
-        (setq open-junk-file-format (join-path junk-file-directory "%Y/%m/%d-%H%M%S"))
+        (setq open-junk-file-format (var! "junk-files/%Y/%m/%d-%H%M%S"))
 
         (defun goto-junk-file-directory ()
           (interactive)
@@ -10167,7 +9959,8 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package paren
-        :hook ((text-mode prog-mode) . show-paren-mode)
+        :hook ((prog-mode . show-paren-mode)
+               (text-mode . show-paren-mode))
         :init (setq sp-highlight-pair-overlay nil))
     #+END_SRC
 
@@ -10212,10 +10005,15 @@
         :defer  t
         :mode ("\\.pdf$" . pdf-view-mode)
         :hook (pdf-view-mode . hide-mode-line-mode)
-        :init
+        :config
         (setq-default pdf-view-display-size 'fit-page)
 
-        :config
+        ;; only accepts absolute paths and doesn't automatically append ".exe" when on windows.
+        (let ((epdfinfo-program (expand-file-name (var! "pdf-tools/epdfinfo"))))
+          (when (windows-p)
+            (setq epdfinfo-program (concat epdfinfo-program ".exe")))
+          (setq pdf-info-epdfinfo-program epdfinfo-program))
+
         (evil-set-initial-state 'pdf-view-mode 'motion)
 
         ;; (pdf-tools-install)
@@ -10419,6 +10217,8 @@
                                     :complete #'org-pdftools-complete-link
                                     :store    #'org-pdftools-store-link
                                     :export   #'org-pdftools-export)
+
+           ;; (setq org-pdftools-root-dir "~/multimedia/pdfs")
            (add-hook 'org-store-link-functions 'org-pdftools-store-link)))
      #+END_SRC
 
@@ -10427,19 +10227,20 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package persp-mode
-        ;; unbound functions:
-        ;;    persp-kill-buffer
-        ;;    persp-save-and-kill
-
         :ensure t
         :defer  load-me-now-duration
         :diminish persp-mode
+
+        ;; unbound functions:
+        ;;    persp-kill-buffer
+        ;;    persp-save-and-kill
         :commands (ivy-find-file-new-perspective
                    switch-to-persp-by-num
                    persp-switch
                    persp-kill-current
                    persp-add-current-buffer
                    persp-remove-current-buffer)
+
         :init
         (leader/set-keys
           "ba" 'persp-add-current-buffer
@@ -10451,8 +10252,10 @@
         :config
         (require 'eyebrowse)
 
+        (setq persp-autokill-buffer-on-remove 'kill-weak
+              persp-save-dir (var! "perspectives/"))
+
         (persp-mode +1)
-        (setq persp-autokill-buffer-on-remove 'kill-weak)
 
         (defun ivy-find-file-new-perspective--action (file)
           (let* ((name (if current-prefix-arg
@@ -10877,22 +10680,16 @@
                                                (apply 'true-projectile-project-root args)))))
              (apply func args)))
 
-         (advice-add 'projectile-regenerate-tags :around #'projectile-ensure-no-trailing-slash-in-root)
-
-         (setq projectile-project-search-path '("~/programming/projects/"
-                                                "~/programming/repos/"
-                                                "~/programming/.modules/python/"
-                                                "~/programming/")
+         (setq projectile-project-search-path '("~/programming/repos/")
                projectile-tags-backend 'xref ;; opt into gtags
                projectile-indexing-method 'alien ;; never use native
-               projectile-tags-command "ctags -Re -f \"%s\" %s \"%s\"")
+               projectile-tags-command "ctags -Re -f \"%s\" %s \"%s\""
+               projectile-cache-file (var! "projectile/cache.el")
+               projectile-known-projects-file (var! "projectile/known-projects.el"))
 
-         (dolist (path projectile-project-search-path)
-           ;; ensure project paths exist
-           (unless (file-exists-p path)
-             (mkdir path t)))
+         (advice-add 'projectile-regenerate-tags :around #'projectile-ensure-no-trailing-slash-in-root)
 
-         (unless (unix-p)
+         (when (windows-p)
            ;; fixes search glitches on windows when using cygwin... also strips out leading ./ because
            ;; ivy seems to recognise ./ paths as distinct from their non ./ counterparts... maybe that's
            ;; projectiles fault... who knows. also exclude special emacs backup files from search results.
@@ -11015,7 +10812,9 @@
           "cR" 'rake-rerun)
 
         :config
-        (setq rake-completion-system 'ivy-read)
+        (setq rake-completion-system 'ivy-read
+              rake-cache-file (var! "rake.cache"))
+
         (defalias 'rake-refresh #'rake-regenerate-cache))
     #+END_SRC
 
@@ -11064,7 +10863,7 @@
          (add-hook 'restclient-response-mode-hook
                    'evil-motion-state)
 
-         (push "*HTTP Response*" mohkale--whitespace-exempt-buffers)
+         (push (rx "*HTTP Response*") whitespace-exempt-buffers)
 
          (defun restclient ()
            "create a new buffer in restclient mode"
@@ -11121,11 +10920,10 @@
         :demand t
         :commands (server-kill-clients-for-buffer)
         :config
-        ;; see http://emacshorrors.com/posts/determining-if-the-server-is-started-or-the-wonders-of-server-running-p.html
-        ;; for why this is sometimes useless :(
+        ;; see [[http://emacshorrors.com/posts/determining-if-the-server-is-started-or-the-wonders-of-server-running-p.html][emacs-horrors]] for why this is sometimes useless :(
         (or (server-running-p) (server-start))
 
-        ;; see https://superuser.com/questions/295156/how-to-set-the-exit-status-for-emacsclient
+        ;; see [[https://superuser.com/questions/295156/how-to-set-the-exit-status-for-emacsclienti][here]].
         (defun server-kill-clients-for-buffer (&optional prefix)
           "Sends error exit command to every client for the current buffer."
           (interactive "P")
@@ -11254,10 +11052,9 @@
         :commands (smart-universal-argument
                    universal-argument-batch-increment
                    universal-argument-batch-decrement)
-        :init
-        (push 'messages-buffer-mode mohkale--whitespace-exempt-modes)
-
         :config
+        (push 'messages-buffer-mode whitespace-exempt-modes)
+
         (defmacro defun-universal-argument-operation (name docstring &rest body)
           `(defun ,name ()
              ,docstring
@@ -11380,7 +11177,7 @@
         (dolist (func '(perform-replace
                         query-replace))
           (advice-add func :around
-                      #'display-buffer--restore-default-actions)))
+                      #'restore-default-display-buffer-actions)))
     #+END_SRC
 
 *** tabulated-list-mode
@@ -11458,21 +11255,10 @@
                   (goto-char (+ (line-beginning-position)
                                 (plist-get properties :current-column)))))))))
 
-        (general-define-key
+        (general-unbind
           :keymaps 'tabulated-list-mode-map
-          "SPC"   nil
-          "ESC"   nil
-          "0"     nil
-          "<"     nil
-          ">"     nil
-          "?"     nil
-          "g"     nil
-          "h"     nil
-          "n"     nil
-          "p"     nil
-          "DEL"   nil
-          "S-SPC" nil
-          "gr" 'revert-buffer))
+          "SPC" "ESC" "0" "<" ">" "?" "g" "h"
+          "n" "p" "DEL" "S-SPC" ))
     #+END_SRC
 
 *** tags
@@ -11573,19 +11359,40 @@
         :ensure t
         :defer  t
         :diminish
-        :init
-        (push 'undo-tree-visualizer-mode mohkale--whitespace-exempt-modes)
-
-        (defvar undo-tree-skip-autosave-regex+ nil
-          "don't create an undo-tree auto-save for file if `buffer-file-name' \
-      matches this regexp.")
+        :config
+        (push 'undo-tree-visualizer-mode
+               whitespace-exempt-modes)
 
         (setq undo-tree-auto-save-history t
               ;; TODO look into undoing within region
               ;; undo-tree-enable-undo-in-region t
               )
 
-        :config
+        ;;; where do undo-tree auto-saves go.
+        (setq undo-tree-history-directory-alist
+              `(("." . ,(var! "undo"))))
+
+        (defvar undo-tree-skip-autosave-regex+
+          (rx
+           (or
+            ;; match extensions in filename
+            (and (or ".pdf" ".log") eol)
+            ;; match exact file paths
+            (and
+             (or
+              ;; wildcard regexp match. any match is a valid match.
+              (and "[*Org Src")
+              ;; match from the beginning of the line
+              (and bol (or
+                        (eval dotemacs-var-path)
+                        (eval (concat straight-base-dir "straight/"))
+                        (eval package-user-dir)
+                        (eval external-packages-directory)
+                        (eval bookmark-default-file)
+                        (eval mohkale-dashboard-banners-directory)))))))
+          "don't create an undo-tree auto-save for file if `buffer-file-name' \
+      matches this regexp.")
+
         (advice-add 'undo-tree-save-history :around
                     (defun undo-tree-save-history--respect-ignore+ (func &rest args)
                       "respect `undo-tree-skip-autosave-regex+'.
@@ -11599,11 +11406,9 @@
                     (defun undo-tree-save-history--suppress-message+ (func &rest args)
                       (with-no-write-messages (apply func args))))
 
-        (general-define-key
+        (general-unbind
           :keymaps 'undo-tree-map
-          "C-/" nil
-          "C-_" nil
-          "C-?" nil))
+          "C-/" "C-_" "C-?"))
     #+END_SRC
 
 *** uuidgen
@@ -11665,10 +11470,10 @@
                                )
         :hook ((text-mode . vimish-fold-mode)
                (prog-mode . vimish-fold-mode))
-        :init
-        (setq vimish-fold-allow-nested t)
-
         :config
+        (setq vimish-fold-allow-nested t)
+        (setq vimish-fold-dir (var! "vimish-fold/"))
+
         (add-hook 'vimish-fold-mode-hook
                   (defun vimish-fold-setup-evil+ ()
                     (if vimish-fold-mode
@@ -11904,16 +11709,6 @@
         :ensure t
         :demand t
         :after which-key
-        :commands (winum-select-window-1
-                   winum-select-window-2
-                   winum-select-window-3
-                   winum-select-window-4
-                   winum-select-window-5
-                   winum-select-window-6
-                   winum-select-window-7
-                   winum-select-window-8
-                   winum-select-window-9
-                   winum-select-window-by-number)
         :init
         (general-define-key
           :keymaps 'mohkale-window-map
@@ -11926,8 +11721,7 @@
           "7" 'winum-select-window-7
           "8" 'winum-select-window-8
           "9" 'winum-select-window-9
-          "0" 'winum-select-window-by-number
-          )
+          "0" 'winum-select-window-by-number)
 
         :config
         (winum-mode)
@@ -11945,6 +11739,17 @@
         (push (cons '("\\(.*\\) 0" . "winum-select-window-by-number")
                     '("\\1 0"      . "window-by-prompt"))
               which-key-replacement-alist))
+    #+END_SRC
+
+*** xwin
+    #+BEGIN_SRC emacs-lisp
+      (use-package x-win
+        :straight (x-win :type built-in)
+        :defer t
+        :config
+        (advice-add 'emacs-session-filename :override
+                    (defun mohkale-emacs-session-filename (session-id)
+                      (concat (var! "x-sessions/session.") session-id))))
     #+END_SRC
 
 *** xref
@@ -12007,8 +11812,6 @@
                     yas-new-snippet
                     yas-visit-snippet-file)
          :init
-         (setq yas-triggers-in-field t)
-
          (leader/set-keys
            "iSn" 'yas-new-snippet
            "fS" 'yas-visit-snippet-file)
@@ -12019,6 +11822,10 @@
            "M-I" 'yas-expand)
 
          :config
+         (setq yas-triggers-in-field t
+               yasnippet-snippets-dir (etc! "snippets/")
+               yas-snippet-dirs '(yasnippet-snippets-dir))
+
          (yas-global-mode 1)
 
          (general-define-key
@@ -12031,9 +11838,7 @@
          (leader/set-keys-for-mode! 'snippet-mode
            "m" 'yas-load-snippet-buffer-and-close
            "l" 'load-snippet-buffer
-           "t" 'yas-tryout-snippet)
-
-         (yas-load-directory mohkale-snippets-dir t))
+           "t" 'yas-tryout-snippet))
      #+END_SRC
 
 **** licenses
@@ -12359,7 +12164,7 @@
          :defer  t
          :delight "YCMD"
          :hook (ycmd-mode . ycmd-eldoc-setup)
-         :init
+         :config
          ;; NOTE to enable ycmd completion, hook ycmd-mode into any desired
          ;;      buffers and include company-ycmd in the company backends for
          ;;      the mode.
@@ -12369,7 +12174,6 @@
                ycmd-server-command `("python3" "-u" ,(expand-file-name "~/.vim/plugged/YouCompleteMe/third_party/ycmd/ycmd"))
                mohkale-ycmd-map (make-sparse-keymap))
 
-         :config
          ;; (ycmd-toggle-force-semantic-completion)
 
          (leader/with-prefix mohkale--server-leader-key
@@ -12454,8 +12258,8 @@
             ;; "=v" 'vc-ediff
             "v" 'vc-diff))
 
-        (push 'vc-annotate-mode mohkale--whitespace-exempt-modes)
-        (push 'vc-git-log-view-mode mohkale--whitespace-exempt-modes)
+        (push 'vc-annotate-mode whitespace-exempt-modes)
+        (push 'vc-git-log-view-mode whitespace-exempt-modes)
 
         (leader/with-prefix "g"
           (leader/set-keys
@@ -12965,6 +12769,8 @@
                   (anaconda-mode . anaconda-eldoc-mode))
            :commands enable-anaconda-mode+
            :config
+           (setq anaconda-mode-installation-directory (var! "anaconda/"))
+
            (defun enable-anaconda-mode+ ()
              "run anaconda-mode unless you're in a remote file."
              (unless (file-remote-p (buffer-file-name))
@@ -13002,13 +12808,13 @@
      #+BEGIN_SRC emacs-lisp
        (with-eval-after-load 'python
          (use-package py-isort
-             :ensure t
-             :defer  t
-             :init
-             (leader/declare-prefix-for-mode! 'python-mode "i" "imports")
-             (leader/set-keys-for-mode! 'python-mode
-               "is" 'py-isort-buffer
-               "ir" 'py-isort-region)))
+           :ensure t
+           :defer  t
+           :init
+           (leader/declare-prefix-for-mode! 'python-mode "i" "imports")
+           (leader/set-keys-for-mode! 'python-mode
+             "is" 'py-isort-buffer
+             "ir" 'py-isort-region)))
      #+END_SRC
 
 **** pip-requirements
@@ -13040,9 +12846,8 @@
          :hook (python-mode . flycheck-mode)
          :init
          (defalias 'python-repl 'run-python)
-         (evil-set-initial-state 'inferior-python-mode 'emacs)
-
          :config
+         (evil-set-initial-state 'inferior-python-mode 'emacs)
          (setq python--prettify-symbols-alist nil)
 
          (configure-presym! 'python-mode
@@ -13239,7 +13044,7 @@
          :defer  t
          :init
          (defalias 'ruby-repl 'inf-ruby)
-         (push 'inf-ruby-mode mohkale--whitespace-exempt-modes)
+         (push 'inf-ruby-mode whitespace-exempt-modes)
 
          (leader/declare-prefix-for-mode!
            mohkale-ruby-mode "r" "REPL")
@@ -13486,11 +13291,12 @@
      #+END_SRC
 
 **** simple-httpd
-     #+BEGIN_SRC emacs-lisp
+     #+BEGIN_SRC emacs-lisp :tangle no
        (use-package simple-httpd
          :ensure t
          :defer  t
          :config
+         (setq httpd-root (var! "simple-httpd/"))
          (setq httpd-port 35343))
      #+END_SRC
 
@@ -13651,7 +13457,8 @@
          :straight (org-link-minor-mode :type git :host github
                     :repo "seanohalpin/org-link-minor-mode")
          :hook ((text-mode . enable-org-link-minor-mode)
-                (prog-mode . enable-org-link-minor-mode))
+                (prog-mode . enable-org-link-minor-mode)
+                (conf-mode . enable-org-link-minor-mode))
          :commands ace-link--org-link-minor-mode+
          :init
          (advice-add 'ace-link :around #'ace-link--org-link-minor-mode+)
@@ -13987,56 +13794,62 @@
                      (modify-syntax-entry ?< "_" org-mode-syntax-table)
                      (modify-syntax-entry ?> "_" org-mode-syntax-table)))
 
-         (setq-default org-src-window-setup 'current-window
-                       org-babel-python-command "python3")
-
-         (setq org-todo-keywords '((sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED"))
-               org-refile-targets '((nil :maxlevel . 9)
-                                    (org-agenda-files :maxlevel . 9))
-               org-log-done 'time ; record when a TODO item is done.
-               org-outline-path-complete-in-steps nil ; refile in a single go
-               org-refile-use-outline-path t  ; show full paths for refiling
-               org-cycle-separator-lines 0 ; prevents weird coloring of collapsed trees
-               org-log-into-drawer "LOGBOOK" ; where org-add-note stores notes
-
-               ;; break org-cycle-seperator-lines from working automatically
-               ;; org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
-
-               ;; native tabs are slow and unreliable... :sad:
-               ;; org-src-tab-acts-natively t ;; tab is native to block language
-               )
-
-         (setq org-agenda-files
-               (append
-                (file-expand-wildcards (org! "*.org"))
-                (file-expand-wildcards (org! "university/*.org"))))
-
-         ;; Initialised here to prevent org from defining a bunch of keys I won't
-         ;; end up using :P
-         (setq org-read-date-minibuffer-local-map (make-sparse-keymap))
-         (set-keymap-parent org-read-date-minibuffer-local-map minibuffer-local-map)
-
          :config
+         (setq-default org-src-window-setup 'current-window
+                       org-babel-python-command "python3"
+                       org-ditaa-jar-path (var! "org/bin/ditaa.jar")
+                       org-ditaa-eps-jar-path (var! "org/bin/ditaaEps.jar")
+                       org-plantuml-jar-path (var! "org/bin/plantuml.jar")
 
-         (setq org-archive-location
-               (concat (org! "archive.org") "::* %s"))
+
+
+                       org-todo-keywords '((sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED"))
+                       org-refile-targets '((nil :maxlevel . 9)
+                                            (org-agenda-files :maxlevel . 9))
+                       org-log-done 'time ; record when a TODO item is done.
+                       org-outline-path-complete-in-steps nil ; refile in a single go
+                       org-refile-use-outline-path t  ; show full paths for refiling
+                       org-cycle-separator-lines 0 ; prevents weird coloring of collapsed trees
+                       org-log-into-drawer "LOGBOOK" ; where org-add-note stores notes
+
+                       ;; break org-cycle-seperator-lines from working automatically
+                       ;; org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
+
+                       ;; native tabs are slow and unreliable... :sad:
+                       ;; org-src-tab-acts-natively t ;; tab is native to block language
+
+                       org-agenda-files (append
+                                         (file-expand-wildcards (org! "*.org"))
+                                         (file-expand-wildcards (org! "university/*.org")))
+
+                       org-archive-location (concat (org! "archive.org") "::* %s")
+                       )
 
          (setq org-archive-file-header-format
                "# -*- mode: org; coding: utf-8-unix -*-
        ,#+TITLE: Archive
        ,#+STARTUP: content")
 
+         ;; Initialised here to prevent org from defining a bunch of keys I won't
+         ;; end up using :P
+         (setq org-read-date-minibuffer-local-map (make-sparse-keymap))
+         (set-keymap-parent org-read-date-minibuffer-local-map minibuffer-local-map)
+
          ;; switch to insert state when capturing org templates
          (add-hook 'org-capture-mode-hook (lambda () (evil-insert nil)) t)
 
          (advice-add 'org-edit-src-code :after
-                     (defun org-src--prevent-window-config-being-saved-wrapper (&rest args)
-                       "prevents org mode from saving and restoring the window config
-       sorrunding a source code edit. it's annoyingly frustrating, so turn it off"
+                     (lambda (&rest args)
+                       "prevents org mode from restoring the window config before
+       source code edit. when you run `org-edit-src-code' the window configuration
+       from before the edit is saved, and when you exit the session it's restored.
+       Any windows/buffers you open while in an edit get erased. This prevents that
+       happening."
                        (setq org-src--saved-temp-window-config nil)))
 
-         (when (file-exists-p mohkale-library-of-babel-file)
-           (org-babel-lob-ingest mohkale-library-of-babel-file))
+         (let ((lob-file (etc! "babel-lib.org")))
+           (when (file-exists-p lob-file)
+             (org-babel-lob-ingest lob-file)))
 
          (advice-add 'org-edit-src-code :before (lambda (&rest args)
                                                   (unless (eq evil-state 'normal)
@@ -14128,15 +13941,15 @@
 
            "C-." 'org-toggle-heading)
 
-         (general-define-key
+         (general-unbind
            :keymaps 'org-mode-map
            ;; "C-M-<return>" 'org-meta-return
-           "<C-tab>"      nil
-           "M-S-<return>" nil
-           "C-e"          nil
-           "M-e"          nil
-           "M-h"          nil
-           "C-j"          nil)
+           "<C-tab>" "M-S-<return>" "C-e" "M-e" "M-h" "C-j")
+
+         (evil-set-command-property 'org-outline-smart-up-level :jump t)
+         (evil-set-command-property 'org-forward-heading-same-level :jump t)
+         (evil-set-command-property 'org-backward-heading-same-level :jump t)
+         (evil-set-command-property 'org-next-visible-heading :jump t)
 
          (general-define-key
            ;; most bindings stolen from: https://github.com/edwtjo/evil-org-mode
@@ -14415,7 +14228,10 @@
            )
 
          :config
-         (setq org-projectile-per-project-filepath
+         (setq org-projectile-projects-directory (org! "projects/")
+               org-projectile-projects-file      (org! "projects/global.org")
+
+               org-projectile-per-project-filepath
                (defun mohkale--org-projectile-path (project-path)
                  (let* ((project-path (replace-regexp-in-string "/$" "" project-path)))
                    (concat (file-name-nondirectory project-path) ".org"))))
@@ -14744,12 +14560,12 @@
          :defer  t
          :mode ("\\.sql" . sql-mode)
          :hook (sql-mode . flycheck-mode)
-         :init
+         :config
          (setq sql-sqlite-options '("-interactive"))
-         (push 'sql-interactive-mode mohkale--whitespace-exempt-modes)
+         (push 'sql-interactive-mode whitespace-exempt-modes)
 
          (evil-set-initial-state 'sql-interactive-mode 'emacs)
-         :config
+
          ;; see [here](https://truongtx.me/2014/08/23/setup-emacs-as-an-sql-database-client)
          ;; for a guide on how to make quick database access easier. or if you've already got
          ;; an interactive session running, use sql-save-connection to append it to a local
@@ -14886,6 +14702,7 @@
          :config
          (leader/declare-prefix-for-mode!* 'sh-mode
            "<tab>" "indentation")
+
          (leader/set-keys-for-mode! 'sh-mode
            ":" 'sh-set-shell
            "0" 'sh-beginning-of-command
@@ -15662,12 +15479,16 @@
      #+END_SRC
 
 **** indium
-     looks cool... but tad too much setup for me & requires you to src_sh{npm install -g indium}.
+     looks cool... but tad too much setup for me & requires you to src_sh{npm install -g
+     indium}.
 
      #+BEGIN_SRC emacs-lisp :tangle no
        (use-package indium
          :ensure t
-         :defer  t)
+         :defer  t
+         :config
+         (setq indium-chrome-data-dir (var! "indium/chrome-profile")
+               indium-workspace-file  (var! "indium/workspaces.el")))
      #+END_SRC
 
 **** skewer-mode
@@ -15810,8 +15631,8 @@
          :ensure t
          :defer  t
          :init
-         (push 'haskell-interactive-mode mohkale--whitespace-exempt-modes)
-         (push 'inferior-haskell-mode mohkale--whitespace-exempt-modes)
+         (push 'haskell-interactive-mode whitespace-exempt-modes)
+         (push 'inferior-haskell-mode whitespace-exempt-modes)
          (defalias 'haskell-repl #'run-haskell)
 
          :config
@@ -15947,11 +15768,11 @@
                         (magit-section-goto (magit-current-section)))
                        (t (apply func args)))))
 
-        (setq mohkale--whitespace-exempt-modes
+        (setq whitespace-exempt-modes
               (append '(magit-status-mode
                         magit-log-mode
                         magit-diff-mode)
-                      mohkale--whitespace-exempt-modes))
+                      whitespace-exempt-modes))
 
         (leader/set-keys-for-mode 'magit-log-select-mode
           "," 'magit-log-select-pick
@@ -16056,6 +15877,10 @@
           :ensure t
           :defer  t
           :config
+          (setq transient-history-file (var! "transient/history.el")
+                transient-values-file (etc! "transient/values.el")
+                transient-levels-file (etc! "transient/levels.el"))
+
           (general-define-key
             :keymaps 'transient-base-map
             ;;; escape means quit too
@@ -16120,8 +15945,8 @@
         (push '(latex-mode . 2) mohkale-indent-config)
 
         :config
-        (push 'TeX-output-mode mohkale--whitespace-exempt-modes)
-        (push 'TeX-special-mode mohkale--whitespace-exempt-modes)
+        (push 'TeX-output-mode whitespace-exempt-modes)
+        (push 'TeX-special-mode whitespace-exempt-modes)
 
         (add-hook 'plain-TeX-mode-hook
                   (defun tex-update-electric-math+ (&rest _)
@@ -16360,6 +16185,8 @@
           "zH" 'hl-toggle-global)
 
         :config
+        (setq hl-highlight-save-file (var! "hl-save.el"))
+
         (evil-define-operator hl-toggle-local (beg end)
           (if (bound-and-true-p hl-highlight-mode)
               (let ((regexp (regexp-quote (buffer-substring-no-properties beg end))))
