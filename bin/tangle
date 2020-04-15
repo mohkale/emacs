@@ -53,6 +53,14 @@ parser = OptionParser.new do |opts|
     file == '-' ? STDERR : File.open(file, 'a')
   end
 
+  opts.on('-d', '--dependency=FILE', 'add FILE as a tangle dependency') do |file|
+    if options[:dependency]
+      [*options[:dependency], File.expand_path(file)]
+    else
+      [File.expand_path(file)]
+    end
+  end
+
   opts.on('-i', '--[no-]interactive', 'force treatment of STDOUT as terminal or not.')
 
   opts.on('-v', '--[no-]verbose', 'raise verbosity of program output')
@@ -82,7 +90,12 @@ display_file = options[:file]
 options[:file] = File.expand_path options[:file]
 if %w[cygwin msys].include? RbConfig::CONFIG['host_os']
   options[:file] = `cygpath -wa #{Shellwords.escape options[:file]}`.strip
+
+  options[:dependency] = options[:dependency].map do |file|
+    `cygpath -wa #{Shellwords.escape file}`.strip
+  end
 end
+options[:files] = [options[:file], *options[:dependency]]
 
 # provides an incremental iterator over chars using counter
 ProgressIterator = Struct.new(:chars, :counter) do
@@ -209,14 +222,16 @@ def tangle_targets(file)
   default_target = File.join(File.dirname(file), File.basename(file, '.*') + '.el')
   tangle_regexp = '.*:tangle "?([^ "]+)"?'
 
+  ignore_files = %w[yes no]
+
   File.open(file, 'r') do |fd|
     fd.each do |line|
       line = line.strip.chomp
 
       if line =~ /^#\+PROPERTY: #{tangle_regexp}/i
-        default_target = $1
+        default_target = $1 unless ignore_files.include?($1)
       elsif line =~ /^#\+BEGIN_SRC #{tangle_regexp}/i || line =~ /:header-args\+: #{tangle_regexp}/i
-        tangle_targets << $1 unless $1 == 'no'
+        tangle_targets << $1 unless ignore_files.include?($1)
       end
     end
   end
@@ -279,8 +294,11 @@ Indicator.new(options).wrap do |i|
   Dir.chdir File.dirname(options[:file])
 
   i.message = "checking tangle targets"
-  targets = tangle_targets(options[:file])
-  if targets_uptodate(options[:file], targets)
+  all_uptodate = options[:files].reduce(true) do |acc, file|
+    acc && targets_uptodate(file, tangle_targets(file))
+  end
+
+  if all_uptodate
     i.state = Indicator::OK
     i.message = "all tangle targets are up to date"
     return
