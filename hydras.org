@@ -36,26 +36,21 @@ standalone org file containing hydra definitions.
   (general-define-key
     "C-x TAB" 'hydra-indent/body)
 
-  (leader/declare-prefix*
-    "x." "hydra-text-zoom"
-    "l"  "layouts")
-
-  (leader/declare-prefix
-    "H" "hydras" "cut off one head, two more shall take it's place")
-
   (leader/set-keys
-    "H TAB" 'hydra-indent/body
-    "He"    'hydra-flycheck/body
-    "Hc"    'hydra-org-clock/body
-    "Hl"    'hydra-persp/body
-    "HL"    'hydra-eyebrowse/body
-    "Hx"    'hydra-text-zoom/body
-    "Hv"    'hydra-vlc-rc/body
-    "Hm"    'hydra-visual-move/body
-    "Hh"    'hydra-winman/body
+    "H" '("hydras" . "cut off one head, two more shall take it's place")
 
-    "x."    'hydra-text-zoom/body
-    "l"     'hydra-persp/body)
+    "H TAB" '("hydra-indent"      . hydra-indent/body)
+    "He"    '("hydra-flycheck"    . hydra-flycheck/body)
+    "Hc"    '("hydra-org-clock"   . hydra-org-clock/body)
+    "Hl"    '("hydra-persp"       . hydra-persp/body)
+    "HL"    '("hydra-eyebrowse"   . hydra-eyebrowse/body)
+    "Hx"    '("hydra-text-zoom"   . hydra-text-zoom/body)
+    "Hv"    '("hydra-vlc"         . hydra-vlc-rc/body)
+    "Hm"    '("hydra-visual-move" . hydra-visual-move/body)
+    "Hh"    '("hydra-winman"      . hydra-winman/body)
+
+    "x."    '("hydra-text-zoom" . hydra-text-zoom/body)
+    "l"     '("hydra-layouts"   . hydra-persp/body))
 #+END_SRC
 
 * text-zoom

@@ -629,49 +629,35 @@
        :demand   t
        :straight (spaceleader :type git :host github :repo "mohkale/spaceleader")
        :config
-       ;; WARN hard coded leader-key and prefix
+       (require 'spaceleader-base)
 
        (general-define-key
          :keymaps 'override
          :states leader-norm-states
-         "C-," (general-simulate-key "SPC m"))
+         "C-," (eval
+                `(general-simulate-key
+                   ,(concat leader-key " " leader-major-mode-prefix))))
 
        (general-define-key
          :keymaps 'override
          :states leader-nnorm-states
-         "C-," (general-simulate-key "C-SPC m"))
+         "C-," (eval
+                `(general-simulate-key
+                   ,(concat leader-nnorm-key " " leader-major-mode-prefix))))
 
        (general-define-key
          :states leader-norm-states
-         "C-SPC" (general-simulate-key "SPC")))
+         "C-SPC" (eval
+                  `(general-simulate-key ,leader-key))))
    #+END_SRC
 
-*** emacs-root
+*** global-leaders
     #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix*
-        "SPC" "M-x"
-        "TAB" "last-buffer")
-
       (leader/set-keys
-        "SPC" 'execute-extended-command
+        "TAB" "last-buffer"
         "TAB" 'switch-to-last-buffer
-        "ESC" 'exit-recursive-edit
-        "DEL" 'abort-recursive-edit
+
         ;; "<C-tab>" 'indent-back-to-normal ;; C-TAB doesn't work
-        "!" 'shell-command
-        "&" 'async-shell-command
-        "-" 'line-width
-        "." 'repeat
-        "1" 'winum-select-window-1
-        "2" 'winum-select-window-2
-        "3" 'winum-select-window-3
-        "4" 'winum-select-window-4
-        "5" 'winum-select-window-5
-        "6" 'winum-select-window-6
-        "7" 'winum-select-window-7
-        "8" 'winum-select-window-8
-        "9" 'winum-select-window-9
-        "0" 'winum-select-window-by-number
         "U" 'universal-argument
         "u" 'smart-universal-argument)
 
@@ -679,299 +665,77 @@
         :keymaps 'universal-argument-map
         "M-u" 'universal-argument-batch-increment
         "M-U" 'universal-argument-batch-decrement)
-    #+END_SRC
-
-*** applications
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix*
-        "a" "applications"
-        "au" "undo tree")
 
       (leader/set-keys
-        "a:" 'eshell
-        "aC" 'calc-dispatch
-        "ac" 'calendar
-        "ad" 'ido-dired
-        "aE" 'package-list-packages
-        "af" 'list-faces-display
-        "am" 'man
-        "aM" 'woman
-        "aP" 'proced
-        "ap" 'list-processes
-        "au" 'undo-tree-visualize
-        "aX" 'customize)
-    #+END_SRC
-
-*** buffers
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix*
-        "b" "buffers"
-        "bt" "buffer-read-only-mode")
+        "aE" 'package-list-packages)
 
       (leader/set-keys
-        "b DEL" 'bury-buffer
-        "bb" 'switch-to-buffer
-        "bB" 'switch-to-buffer-other-window
-        "bd" 'kill-this-buffer
         "be" 'safe-erase-buffer
-        "bE" 'erase-buffer
         "bK" 'kill-this-buffer
         "bk" 'kill-this-buffer-and-window-maybe
         "bM" 'switch-to-messages-buffer
-        "bm" 'buffer-menu
-        "bn" 'next-buffer
-        "bN" 'previous-buffer
-        "bc" 'rename-buffer
-        "bC" 'rename-uniquely
-        "bo" 'occur
-        "bt" 'read-only-mode
         "by" 'copy-whole-buffer-to-clipboard)
-    #+END_SRC
-
-*** compile/comments
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix "c" "compile/comments")
 
       (leader/set-keys
-        ;; compile
-        "c M-SPC" 'compile
         "cd" 'close-compilation-window ;; WARN not yet implemented
-        "cs" 'kill-compilation
-        "cr" 'recompile
         "cb" 'display-compilation-buffer
-
-        ;; comment
         "cy" 'yank-and-comment
-        "ck" 'comment-kill
-        "c[" 'comment-box
-        "ci" 'comment-indent
-
         "cc" 'toggle-comment-at-point
         "cC" 'toggle-comment-at-point-alt)
-    #+END_SRC
-
-*** error
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix "e" "errors")
 
       (leader/set-keys
-        ;; TODO make flycheck aliases
-        "en" 'next-error
-        "eN" 'previous-error
-        "ep" 'previous-error)
-    #+END_SRC
-
-*** files
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix*
-        "f"  "files"
-        "fC" "files/convert"
-        "fe" '("emacs" . "emacs files")
-        "fo" "open-externally"
-
-        "fv" "variables"
-        "fvc" "copy"
-        "fvr" "remove"
-        )
-
-      (leader/set-keys
-        "f\"" 'recover-this-file
-        "f'" 'recover-file
         "f~" 'write-backup
         "fa" 'write-autosave
-        "fc" 'copy-file
         "fD" 'delete-buffer-file
-        "fF" 'find-file-at-point
-        "ff" 'find-file
-        "fo" 'find-file-other-window
-        "fl" 'find-file-literally
-        "f|" 'find-file-at-point
-        ;; "fo" 'open-file-or-directory-in-external-app ;; TODO implement
         "fR" 'rename-buffer-file
         "fy" 'show-and-copy-buffer-file-name
         "f%" 'show-and-copy-buffer-file-basename
-        "sF" 'find-dired
-        "fq" 'find-file-literally
-
-        "fCd" 'unix2dos
-        "fCu" 'dos2unix
-
-        "fev" 'emacs-version
-
-        "fvd" 'add-dir-local-variable
-        "fvs" 'add-file-local-variable
-        "fvl" 'add-file-local-variable-prop-line
-
-        "fvcf" 'copy-dir-locals-to-file-locals
-        "fvcd" 'copy-file-locals-to-dir-locals
-        "fvcl" 'copy-dir-locals-to-file-locals-prop-line
-
-        "fvrv" 'kill-local-variable
-        "fvrd" 'delete-dir-local-variable
-        "fvrf" 'delete-file-local-variable
-        "fvrl" 'delete-file-local-variable-prop-line)
-    #+END_SRC
-
-*** help
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix*
-        "h"  "help"
-        "hd" "help-describe")
+        ;; "fo" 'open-file-or-directory-in-external-app ;; TODO implement
+      )
 
       (leader/set-keys
-        "hn" 'view-emacs-news
-
-        "h/" 'apropos-command
-        "h RET" 'view-order-manuals
-        "hg" 'describe-gnu-project
-        "hl" 'view-lossage ;; show last few entered commands
-        "hw" 'where-is ;; show where a command is bound
-        "hp" 'view-emacs-problems
-        "ht" 'view-emacs-todo
-
-        "hdo" 'describe-symbol
-        "hdi" 'describe-input-method
-        "hdL" 'describe-language-environment
-        "hdb" 'describe-bindings
-        "hdc" 'describe-char
-        "hdu" 'describe-coding-system
-        "hdF" 'describe-face
-        "hdk" 'describe-key
-        "hdK" 'describe-key-briefly
         "hdl" 'describe-last-keys ;; WARN not yet implemented
-        "hdp" 'describe-package
-        "hdP" 'finder-by-keyword
-        "hds" 'describe-syntax
-        "hdt" 'describe-theme
-        "hdv" 'describe-variable)
-    #+END_SRC
-
-*** insert
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix "i" "insert")
+        )
 
       (leader/set-keys
+        "i"  "insert"
         "ij" 'custom-insert-line-below
         "ik" 'custom-insert-line-above)
-    #+END_SRC
 
-*** jump
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix "j" "jump")
-    #+END_SRC
-
-*** modes
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix*
-        "M" "modes"
-        "Md" "dired")
+      (leader/set-keys "j" "jump")
 
       (leader/set-keys
-        "Mz" 'zone
-        "Ml" 'emacs-lisp-mode
-        "ML" 'lisp-interaction-mode
-        "Mc" 'c++-mode
-        "MC" 'c-mode
-        "Mf" 'flyspell-mode
-        "MF" 'follow-mode
-        "Mt" 'fundamental-mode
-        "Mp" 'python-mode
-        "Mr" 'enh-ruby-mode
-        "Ms" 'shell-script-mode
-        "Mw" 'whitespace-mode
-        "Mo" 'org-mode
-        "Mx" 'hexl-mode
-        "M M-d" 'decipher
-        "M M-r" 'toggle-rot13-mode
-        "Mv" 'visual-line-mode
-
+        "Md" "dired"
+        ;; TODO bind in dired
         "Mdd" 'toggle-editable-dired
         "Mde" 'invoke-editable-dired
         "Md <escape>" 'wdired-abort-changes
-        "Mdq" 'wdired-abort-changes)
-    #+END_SRC
+        "Mdq" 'wdired-abort-changes
+        )
 
-*** minor
-    #+BEGIN_SRC emacs-lisp
       (defvar mohkale-minor-mode-leader-key "q"
         "leader key for minor mode bindings.
       this leader prefix is expected to be muddled and unreliable...
       due to tonnes of different minor modes collabratively binding to it.
       That said... I need a place to put minor-mode keys and this was
       unoccupied.")
-    #+END_SRC
-
-*** narrowing & numbers
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix "n" "narrrow/numbers")
 
       (leader/set-keys
-        "nr" 'narrow-to-region
-        "np" 'narrow-to-page
-        "nw" 'widen)
-    #+END_SRC
-
-*** text
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix*
-        "x" "text")
-
-      (leader/set-keys
-        "xa" 'describe-text-properties
         "xf" 'list-faces
         "xc" 'evil-capitalize
         "xp" 'pad-line-with-space-to-length
         "xP" 'pad-line-with-char-to-length
-        "xt" 'remove-all-trailing-whitespace)
-    #+END_SRC
-
-*** toggles
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix*
-        "t" "toggles"
-        "tn" "toggle-line-numbers")
+        "xt" 'remove-all-trailing-whitespace
+        )
 
       (leader/set-keys
         "t TAB" 'set-indent-offset
-        "tl" 'toggle-truncate-lines
         "tL" 'toggle-lexical-binding
-        "tw" 'toggle-word-wrap
-        "t|" 'toggle-scroll-bar
-        "t-" 'toggle-horizontal-scroll-bar
-        "td" 'toggle-debug-on-error
-        "tq" 'toggle-debug-on-quit
-        "tm" 'toggle-frame-maximized
-        "tn" 'display-line-numbers-mode
-        "tf" 'toggle-frame-fullscreen
-        "tg" 'toggle-tool-bar-mode-from-frame
-        "tG" 'toggle-menu-bar-mode-from-frame
-        "tu" 'toggle-uniquify-buffer-names
-        "te" 'toggle-indicate-empty-lines
-        "ta" 'toggle-text-mode-auto-fille
-        "tR" 'read-only-mode
-        "tr" 'toggle-relative-linum
-        "tc" 'toggle-case-fold-search
-        "ti" 'toggle-input-method
-        "ts" 'toggle-save-place-globally)
-    #+END_SRC
-
-*** search
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix*
-        "s" "search/symbol")
+        "tr" 'toggle-relative-linum)
 
       (leader/set-keys
-        "sg" 'rgrep
-        "sF" 'find-dired
-        "sf" 'find-grep-dired)
-    #+END_SRC
-
-*** window
-    #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix "w" "windows")
-
-      (leader/set-keys
-        "w" 'mohkale-window-map)
+        "w" "windows"
+        "w" mohkale-window-map)
     #+END_SRC
 
 ** Global Bindings
@@ -1045,7 +809,8 @@
      (general-define-key
        :keymaps 'mohkale-window-map
        "m"   'window-zen
-       "C-m" 'window-zen
+       "RET" 'window-zen
+       ; "C-m" 'window-zen
        "M"   'window-zen-restore
        "M-m" 'window-zen-restore)
 
@@ -1204,15 +969,10 @@
        :init
        (setq mohkale--server-leader-key "y")
 
-       (leader/declare-prefix*
-         "fec" "find-dotfile"
-         "fev" "eval-dotfile"
-         "fet" "find-tangled-dotfile")
-
        (leader/set-keys
-         "fec" 'mohkale/find-dotfile-file
-         "fel" 'mohkale/eval-dotfile-file
-         "fet" 'mohkale/find-tangled-dotfile-file))
+         "fec" '("find-dotfile" . mohkale/find-dotfile-file)
+         "fel" '("eval-dotfile" . mohkale/eval-dotfile-file)
+         "fet" '("find-tangled-dotfile" . mohkale/find-tangled-dotfile-file)))
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/mohkale.el
@@ -3582,12 +3342,10 @@
            [remap eval-print-last-sexp] 'evil-adjust-eval-print-last-sexp
            [remap eval-replace-last-sexp] 'evil-adjust-eval-replace-last-sexp)
 
-         (leader/declare-prefix "sc" "search-noh")
-
          (leader/set-keys
            "je" 'evil-goto-definition
            "id" 'evil-insert-digraph
-           "sc" 'evil-ex-nohighlight
+           "sc" '("search-noh" . evil-ex-nohighlight)
            "xu" 'evil-upcase
            "xd" 'evil-downcase)
 
@@ -3642,7 +3400,6 @@
 
          (general-define-key
            :states 'motion
-           "C-w" nil
            "m"   'evil-set-marker
            "-"   'negative-argument
            "C-;" 'evil-repeat-find-char
@@ -4048,7 +3805,7 @@
         :config
         (evil-set-initial-state 'Buffer-menu-mode 'motion)
 
-        (leader/set-keys-for-mode! 'Buffer-menu-mode
+        (leader/set-keys-for-major-mode 'Buffer-menu-mode
           "1" 'Buffer-menu-1-window
           "2" 'Buffer-menu-2-window
           "f" 'Buffer-menu-toggle-files-only
@@ -4125,14 +3882,6 @@
       (use-package calc
         :defer t
         :init
-        (leader/declare-prefix
-          "*" "calculator")
-
-        (leader/set-keys
-          "*." 'calc-dispatch
-          "**" 'calc
-          "*y" 'calc-copy-to-buffer)
-
         (with-eval-after-load 'evil
           (advice-add 'evil-get-register :before-until
                       (defun evil-register-*-is-calc (register &optional no-error)
@@ -4285,7 +4034,7 @@
           ;; "C-m" (general-simulate-key "v" :state 'emacs)
           )
 
-        (leader/set-keys-for-mode! 'calc-mode
+        (leader/set-keys-for-major-mode 'calc-mode
           ;; TODO complete leader binding list :P.
           "," 'calc-comma))
     #+END_SRC
@@ -4350,7 +4099,7 @@
         (push 'change-log-mode whitespace-exempt-modes)
         (evil-set-initial-state 'change-log-mode 'motion)
 
-        (leader/set-keys-for-mode! 'change-log-mode
+        (leader/set-keys-for-major-mode 'change-log-mode
           "SPC" 'change-log-goto-source
           "f" 'change-log-find-file
           "j" 'add-log-edit-next-comment
@@ -4392,7 +4141,7 @@
         the window will not be autokilled.")
 
         (defun mohkale/set-compilation-bindings (mode map)
-          (leader/set-keys-for-mode! mode
+          (leader/set-keys-for-major-mode mode
             "RET" 'recompile
             "k" 'kill-compilation
             "f" 'next-error-follow-minor-mode)
@@ -4638,12 +4387,8 @@
         (mohkale--comint-set-bindings 'comint-mode-map)
 
         (defun mohkale--comint-set-leader-keys (mode)
-          (leader/declare-prefix-for-mode!* mode
-            "k" "kill"
-            "s" "subjob")
-
-          (leader/set-keys-for-mode! mode
-            "kz" 'comint-send-eof
+          (leader/set-keys-for-major-mode mode
+            "z" 'comint-send-eof
             "*" 'comint-insert-previous-argument
             "r" 'comint-dynamic-list-input-ring
             "m" 'comint-clear-buffer
@@ -4653,6 +4398,8 @@
             ">" 'comint-write-output
             "t" 'comint-show-output
             "o" 'comint-delete-output
+
+            "s" "subjob"
             "ss" 'comint-stop-subjob
             "sq" 'comint-quit-subjob
             "si" 'comint-interrupt-subjob))
@@ -4884,7 +4631,7 @@
 
         (evil-set-initial-state 'Custom-mode 'normal)
 
-        (leader/set-keys-for-mode! 'Custom-mode
+        (leader/set-keys-for-major-mode 'Custom-mode
           "SPC" 'customize-apropos
           "g" 'customize-group
           "f" 'customize-face
@@ -5279,16 +5026,15 @@
          :commands (diff-mode diff-buffer-with-file)
          :init
          (leader/with-prefix leader-diff-mode-prefix
-           (leader/declare-prefix "" "diff" "interactive diff sessions")
-
            (leader/set-keys
+             "" "diff"
              "SPC" 'diff-buffer-with-file))
 
          :config
          (push 'diff-mode whitespace-exempt-modes)
          (evil-set-initial-state 'diff-mode 'motion)
 
-         (leader/set-keys-for-mode! 'diff-mode
+         (leader/set-keys-for-major-mode 'diff-mode
            "r" 'diff-refine-hunk
            "c" 'diff-kill-applied-hunks ;; clean displayed hunks only works on hunks below point.
            "k" 'diff-file-kill
@@ -5462,7 +5208,7 @@
          ;;   "S-RET" 'ediff-show-meta-buff-from-registry
          ;;   "?" 'ediff-toggle-verbose-help-meta-buffer)
 
-         (leader/set-keys-for-mode! 'ediff-meta-mode
+         (leader/set-keys-for-major-mode 'ediff-meta-mode
            "tf" 'ediff-toggle-filename-truncation
            "tv" 'ediff-toggle-verbose-help-meta-buffer)
 
@@ -5485,10 +5231,8 @@
          :defer  t
          :init
          (leader/with-prefix leader-diff-mode-prefix
-           (leader/declare-prefix
-             "" "diff")
-
            (leader/set-keys
+             "" "diff"
              "RET" 'vdiff-merge-conflict
              "d" 'vdiff-current-file
              "f" 'vdiff-files
@@ -5541,11 +5285,6 @@
            "zC" 'vdiff-close-other-folds)
 
          (leader/with-prefix leader-diff-mode-prefix
-           (leader/declare-prefix-for-mode* '(vdiff-mode vdiff-3way-mode)
-             "TAB" "refine"
-             "t"   "toggle"
-             "z"   "folds")
-
            (leader/set-keys-for-mode '(vdiff-mode vdiff-3way-mode)
              "-" 'vdiff-switch-buffer
              "." 'vdiff-hydra/body
@@ -5556,6 +5295,7 @@
              ">" 'vdiff-send-changes-and-step
              "<" 'vdiff-send-changes
 
+             "TAB"     "refine"
              "TAB TAB" 'vdiff-refine-this-hunk
              "TAB DEL" 'vdiff-remove-refinements-in-hunk
              "TAB RET" 'vdiff-refine-all-hunks
@@ -5564,6 +5304,7 @@
              ;; 'vdiff-refine-all-hunks-symbol
              ;; 'vdiff-refine-all-hunks-word
 
+             "t"  "toggle"
              "ti" 'vdiff-toggle-case
              "tw" 'vdiff-toggle-whitespace)))
      #+END_SRC
@@ -5717,17 +5458,7 @@
            "C-k" 'dired-prev-subdir
            "C-l" 'dired-goto-max-subdir)
 
-         (leader/declare-prefix-for-mode!* 'dired-mode
-           "r" "rename"
-           "d" '("delete" . "mark for deletion")
-           "m" "mark"
-           "e" "emacs"
-           "c" "change"
-           "f" "filesystem"
-           "f/" '("search" . "on regexp matches")
-           "fp" '("EasyPG" . "GNU Pretty Good Privacy"))
-
-         (leader/set-keys-for-mode! 'dired-mode
+         (leader/set-keys-for-major-mode 'dired-mode
            "?" 'dired-summary ;; like transient state
            "#" 'dired-clean-directory
            "o" 'browse-url-of-dired-file ;; open in external app
@@ -5736,15 +5467,18 @@
            "g" 'dired-goto-file ;; prompt for file to visit in current buffer
            "s" 'dired-sort-toggle-or-edit
 
+           "r"  "rename"
            "ru" 'dired-upcase
            "rd" 'dired-downcase
 
            ;; flag means mark delete
+           "d"  "delete"
            "d&" 'dired-flag-garbage-files
            "d~" 'dired-flag-backup-files
            "d/" 'dired-flag-files-regexp
            "d#" 'dired-flag-auto-save-files
 
+           "m"  "mark"
            "mm" 'dired-toggle-marks
            "mu" 'dired-unmark
            "m DEL" 'dired-unmark-backward
@@ -5757,16 +5491,19 @@
            "m(" 'dired-mark-sexp
 
            ;; emacs related bindings
+           "e"  "emacs"
            "ec" 'dired-do-byte-compile
            "el" 'dired-do-load
            "ef" 'dired-do-find-marked-files
 
            ;; change fs property commands
+           "c"  "change"
            "cg" 'dired-do-chgrp
            "cm" 'dired-do-chmod
            "co" 'dired-do-chown
 
            ;; filesystem
+           "f"  "filesystem"
            "fg" 'dired-do-find-regexp             ;; grep marked files
            "fs" 'dired-do-find-regexp-and-replace ;; substitute
            "fi" 'dired-info
@@ -5777,12 +5514,14 @@
            "fZ" 'epa-dired-do-encrypt-to ;; compress as
 
            ;; EasyPG/GPG
+           "fp"  "GPG"
            "fpd" 'epa-dired-do-decrypt
            "fpe" 'epa-dired-do-encrypt
            "fps" 'epa-dired-do-sign
            "fpv" 'epa-dired-do-verify
 
            ;; operations bound to regexp search
+           "f/"     "search"
            "f/c"    'dired-do-copy-regexp
            "f/r"    'dired-do-rename-regexp
            "f/h"    'dired-do-hardlink-regexp
@@ -5908,18 +5647,16 @@
            "<mouse-1>" 'image-dired-mouse-select-thumbnail
            "<mouse-2>" 'image-dired-mouse-display-image)
 
-         (leader/declare-prefix-for-mode* 'image-dired-thumbnail-mode
-           "mt" '("tagging" . "tag/describe images")
-           "me" '("edit"    . "edit images"))
-
-         (leader/set-keys-for-mode! 'image-dired-thumbnail-mode
+         (leader/set-keys-for-major-mode 'image-dired-thumbnail-mode
            "g" 'image-dired-jump-original-dired-buffer
            "m" 'image-dired
 
+           "t"  "tagging"
            "td" 'image-dired-thumbnail-set-image-description
-           "tt"  'image-dired-tag-thumbnail
-           "tT"  'image-dired-tag-thumbnail-remove
+           "tt" 'image-dired-tag-thumbnail
+           "tT" 'image-dired-tag-thumbnail-remove
 
+           "e" "edit"
            "el" 'image-dired-rotate-thumbnail-left
            "eL" 'image-dired-rotate-original-left
            "er" 'image-dired-rotate-thumbnail-right
@@ -5955,7 +5692,7 @@
            "<up>"    'image-scroll-down
            "<down>"  'image-scroll-up)
 
-         (leader/set-keys-for-mode! 'image-dired-display-image-mode
+         (leader/set-keys-for-major-mode 'image-dired-display-image-mode
            "h" 'image-bol ; far left   edge
            "j" 'image-eob ; far bottom edge
            "k" 'image-bob ; far top    edge
@@ -6196,16 +5933,8 @@
                (markdown-mode         . emojify-mode)
                (lisp-interaction-mode . emojify-mode))
         :init
-        (leader/declare-prefix "xm" "emoji" "emojis/kaomojis")
-
         (leader/set-keys
-          "Me" 'emojify-mode
-          "xe" 'emojify-insert-emoji
-          "xE" 'emojify-describe-emoji-at-point
-          "xm/" 'emojify-apropos-emoji
-          "xml" 'emojify-insert-emoji
-          "xmd" 'emojify-describe-emoji
-          "xmf" 'emojify-download-emoji)
+          "xm" 'emojify-insert-emoji)
 
         (defalias 'remove-duplicates #'cl-remove-duplicates)
 
@@ -6297,7 +6026,7 @@
         :defer  t
         :init
         (let ((engine-prefix "se"))
-          (leader/declare-prefix engine-prefix "engines")
+          (leader/set-keys engine-prefix "engines")
 
           (dolist (engine engines)
             (let* ((key               (nth 1 engine))
@@ -6310,14 +6039,13 @@
                    (key (unless (string-empty-p key)
                           (concat engine-prefix key))))
               (when key
-                (leader/declare-prefix  key engine)
-                (leader/set-keys key function-identifier))
+                (leader/set-keys key `(,engine . ,function-identifier)))
               (autoload function-identifier "engine-mode.el" nil t)))
 
           (dolist (alias prefix-aliases)
             (let* ((prefix (concat engine-prefix (car alias)))
                    (name   (nth 1 alias)))
-              (leader/declare-prefix prefix name))))
+              (leader/set-keys prefix name))))
 
         :config
         (dolist (engine engines)
@@ -6373,20 +6101,18 @@
              (when (>= beginning-word-point bol)
                (call-interactively 'backward-kill-word))))
 
-         (leader/declare-prefix-for-mode!* 'eshell-mode
-           "i" "insert"
-           "k" "kill/signal")
-
-         (leader/set-keys-for-mode! 'eshell-mode
+         (leader/set-keys-for-major-mode 'eshell-mode
            "o"   'eshell-show-output
            "O"   'eshell-mark-output
            "TAB" 'counsel-esh-history
            "RET" 'eshell-queue-input
 
+           "i"  "insert"
            "ib" 'eshell-insert-buffer-name
            "ip" 'eshell-insert-process
            "ie" 'eshell-insert-envvar
 
+           "k"  "kill/signal"
            "kz" 'eshell-send-eof-to-process
            "kc" 'eshell-interrupt-process
            "kq" 'eshell-quit-process)
@@ -6519,7 +6245,7 @@
           "?"   'nil
           [override-state] 'motion)
 
-        (leader/set-keys-for-mode! 'finder-mode
+        (leader/set-keys-for-major-mode 'finder-mode
           "?" 'finder-summary))
     #+END_SRC
 
@@ -6641,7 +6367,7 @@
           "gg" 'flycheck-error-list-goto-first-error
           "G"  'flycheck-error-list-goto-last-error)
 
-        (leader/set-keys-for-mode! 'flycheck-error-list-mode
+        (leader/set-keys-for-major-mode 'flycheck-error-list-mode
           "e" 'flycheck-error-list-explain-error
           "s" 'flycheck-error-list-check-source ;; syntax check buffer
           "f" 'flycheck-error-list-set-filter
@@ -6702,11 +6428,11 @@
                    describe-mode
                    describe-function)
         :init
-        (leader/declare-prefix "hdm" "describe-mode")
         (leader/set-keys
-          "hdm" 'describe-buffer
+          "hdm" '("describe-mode" . describe-buffer)
           "hdf" 'describe-function
           "hdK" 'describe-keymap))
+    #+END_SRC
     #+END_SRC
 
 *** hide-comnt
@@ -7093,8 +6819,8 @@
          (evil-set-initial-state 'ivy-occur-mode 'motion)
          (evil-set-initial-state 'ivy-occur-grep-mode 'motion)
 
-         (leader/set-keys-for-mode! '(ivy-occur-mode
-                                      ivy-occur-grep-mode)
+         (leader/set-keys-for-major-mode '(ivy-occur-mode
+                                           ivy-occur-grep-mode)
            ;; 'ivy-wgrep-change-to-wgrep-mode
            "SPC" 'ivy-occur-read-action
            "m"   'ivy-occur-toggle-calling)
@@ -7247,11 +6973,11 @@
          (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
          (fset 'describe-bindings (symbol-function 'counsel-descbinds))
 
-         (leader/declare-prefix*
+         (leader/set-keys
            "r"  "register/rings/resume"
            "fs" "recursive-find")
 
-         (leader/set-keys-for-mode! 'org-mode
+         (leader/set-keys-for-major-mode 'org-mode
            "g" 'counsel-org-goto
            "G" 'counsel-org-goto-all)
 
@@ -7498,7 +7224,7 @@
            :defer  t
            :after  counsel
            :init
-           (leader/set-keys-for-mode! 'python-mode
+           (leader/set-keys-for-major-mode 'python-mode
              "hd" 'counsel-pydoc)))
      #+END_SRC
 
@@ -7542,7 +7268,7 @@
            :defer  t
            :after counsel
            :config
-           (leader/set-keys-for-mode! '(css-mode less-css-mode)
+           (leader/set-keys-for-major-mode '(css-mode less-css-mode)
              "g" 'counsel-css)))
      #+END_SRC
 
@@ -7688,12 +7414,7 @@
            "<down>" 'ibuffer-pop-filter-group
            "<up>"   'ibuffer-pop-filter)
 
-         (leader/declare-prefix-for-mode!* 'ibuffer-mode
-           "g" "jump/goto"
-           "m" "mark"
-           "/" "filter")
-
-         (leader/set-keys-for-mode! 'ibuffer-mode
+         (leader/set-keys-for-major-mode 'ibuffer-mode
            ;; unbound:
            ;;  * ibuffer-do-print
            "1"   'ibuffer-visit-buffer-1-window
@@ -7712,11 +7433,16 @@
            ;; "s"   'ibuffer-do-replace-regexp
            "T"   'ibuffer-visit-tags-table
            "f"   'ibuffer-find-file
-           "gg"  'ibuffer-jump-to-buffer
-           "gf"  'ibuffer-jump-to-filter-group
            "|"   'ibuffer-do-shell-command-pipe-replace
            "~"   'ibuffer-do-toggle-modified
 
+           "g"  "jump/goto"
+           "gg" 'ibuffer-jump-to-buffer
+           "gf" 'ibuffer-jump-to-filter-group
+
+           "/" "filter"
+
+           "m"  "mark"
            "mm" 'ibuffer-toggle-marks
            "m/" 'ibuffer-mark-by-file-name-regexp
            ;; "m M-/" 'ibuffer-mark-by-name-regexp
@@ -8090,7 +7816,7 @@
 
         (advice-add 'evil-write :before-until #'evil-write--ein-save-buffer)
 
-        (leader/set-keys-for-mode! 'ein:notebooklist-mode
+        (leader/set-keys-for-major-mode 'ein:notebooklist-mode
           "f" 'ein:file-open
           "n" 'ein:notebook-open
           "r" 'ein:notebooklist-reload)
@@ -8108,7 +7834,7 @@
           "gp" 'ein:notebooklist-prev-item)
 
         (dolist (mode '(ein:notebook-mode ein:notebook-multilang-mode))
-          (leader/set-keys-for-mode! mode
+          (leader/set-keys-for-major-mode mode
             "." 'hydra-ein/body
             "'" 'ein:edit-cell-contents
             leader-major-mode-key 'ein:worksheet-execute-cell
@@ -8176,9 +7902,8 @@
                    Lorem-ipsum-insert-paragraphs
                    Lorem-ipsum-insert-sentences)
         :init
-        (leader/declare-prefix "il" "lorem-ipsum")
-
         (leader/set-keys
+          "il"  "lorem-ipsum"
           "ill" 'Lorem-ipsum-insert-list
           "ilp" 'Lorem-ipsum-insert-paragraphs
           "ils" 'Lorem-ipsum-insert-sentences))
@@ -8200,32 +7925,32 @@
                lsp-server-install-dir (var! "lsp/servers"))
 
          (leader/with-prefix mohkale--server-leader-key
-           (leader/declare-prefix-for-mode* 'lsp-mode
-             "" "server"
-             "w" "workspaces"
-             "l" "lens"
-             "r" "refactor"
-             "g" "goto")
-
            (leader/set-keys-for-mode 'lsp-mode
+             "" "server"
+
              "?"   'lsp-describe-session
              "|"   'lsp-describe-thing-at-point
              "e"   'lsp-execute-code-action
              "h"   'lsp-document-highlight
-             "wR"  'lsp-restart-workspace
-             "wa"  'lsp-workspace-folders-add
-             "wr"  'lsp-workspace-folders-remove
-             "ws"  'lsp-workspace-folders-switch
              "DEL" 'lsp-disconnect
 
+             "w"  "workspace"
+             "wR" 'lsp-restart-workspace
+             "wa" 'lsp-workspace-folders-add
+             "wr" 'lsp-workspace-folders-remove
+             "ws" 'lsp-workspace-folders-switch
+
+             "l"  "lens"
              "ll" 'lsp-lens-mode
              "ls" 'lsp-lens-show
              "lh" 'lsp-lens-hide
 
+             "r"  "refactor"
              "rr" 'lsp-format-buffer
              "ri" 'lsp-organize-imports
              "rc" 'lsp-rename
 
+             "g"  "goto"
              "gg" 'lsp-goto-type-definition
              "gG" 'lsp-goto-implementation
              "gF" 'lsp-find-implementation
@@ -8248,10 +7973,8 @@
                   lsp-ui-doc-enable nil)
 
             (leader/with-prefix mohkale--server-leader-key
-              (leader/declare-prefix-for-mode 'lsp-mode
-                "p" "peek")
-
               (leader/set-keys-for-mode 'lsp-mode
+                "p" "peek"
                 "pg" 'lsp-ui-peek-find-definitions
                 "pG" 'lsp-ui-peek-find-definitions))))
       #+END_SRC
@@ -8335,14 +8058,12 @@
 
 *** macro/kmacro/edmacro
     #+BEGIN_SRC emacs-lisp
-      (leader/declare-prefix*
+      (leader/set-keys
         "k"  "macros/lisp")
 
       (use-package kmacro
         :init
         (leader/with-prefix "k"
-          (leader/declare-prefix "c" "counter" "macro-counter")
-
           (leader/set-keys
             ;; 'edit-kbd-macro ;; any named macro
             ;; 'apply-macro-to-region-lines
@@ -8350,6 +8071,7 @@
             "i" 'insert-kbd-macro
             "q" 'kbd-macro-query ;; prompt at macro point
 
+            "c"  "counter"
             "cs" 'kmacro-set-counter
             "c=" 'kmacro-set-counter
             "cc" 'kmacro-insert-counter
@@ -8370,7 +8092,7 @@
             "b"   'kmacro-bind-to-key))
 
         :config
-        (leader/set-keys-for-mode! 'edmacro-mode
+        (leader/set-keys-for-major-mode 'edmacro-mode
           "," 'edmacro-finish-edit
           "i" 'edmacro-insert-key))
     #+END_SRC
@@ -8480,14 +8202,14 @@
         (advice-add 'occur-mode-display-occurrence :around
                     #'restore-default-display-buffer-actions)
 
-        (leader/set-keys-for-mode! '(occur-mode occur-edit-mode)
+        (leader/set-keys-for-major-mode '(occur-mode occur-edit-mode)
           "e" 'occur-edit-mode
           "R" 'occur-rename-buffer
           "g" 'occur-mode-goto-occurrence
           "G" 'occur-mode-goto-occurrence-other-window
           "l" 'occur-mode-display-occurrence)
 
-        (leader/set-keys-for-mode! 'occur-edit-mode
+        (leader/set-keys-for-major-mode 'occur-edit-mode
           "," 'occur-cease-edit)
 
         (defun evil-adjust-occur-next ()
@@ -8678,7 +8400,7 @@
           "TAB"   'outline-toggle-show-children+
           "<tab>" 'outline-toggle-show-children+)
 
-        (leader/set-keys-for-mode! 'outline-mode
+        (leader/set-keys-for-major-mode 'outline-mode
           "m" 'outline-mark-subtree
           "t" 'outline-hide-body ;; show subtree
           "a" 'outline-show-all
@@ -8716,13 +8438,12 @@
           "~"   'package-menu-mark-obsolete-for-deletion
           "gr"  'package-menu-refresh)
 
-        (leader/declare-prefix-for-mode!* 'package-menu-mode
-          "m" "mark")
-
-        (leader/set-keys-for-mode! 'package-menu-mode
+        (leader/set-keys-for-major-mode 'package-menu-mode
           "h" 'package-menu-hide-package
           "?" 'package-menu-quick-help
           "/" 'package-menu-filter
+
+          "m"  "mark"
           "m~" 'package-menu-mark-obsolete-for-deletion
           "mu" 'package-menu-mark-unmark
           "mi" 'package-menu-mark-install
@@ -8765,24 +8486,22 @@
         :ensure t
         :defer  t
         :init
-        (leader/declare-prefix*
-          "xr" "regular expressions"
-          "xre" "elisp"
-          "xrp" "pcre")
-
         (leader/set-keys
+          "xr"   "regexp"
           "xr'"  'rxt-convert-to-strings
           "xr/"  'rxt-explain
           "xrc"  'rxt-convert-syntax
           "xrt"  'rxt-toggle-elisp-rx
           "xrx"  'rxt-convert-to-rx
 
+          "xre"  "elisp"
           "xre'" 'rxt-elisp-to-strings
           "xre/" 'rxt-explain-elisp
           "xrep" 'rxt-elisp-to-pcre
           "xret" 'rxt-toggle-elisp-rx
           "xrex" 'rxt-elisp-to-rx
 
+          "xrp"  "PCRE"
           "xrp'" 'rxt-pcre-to-strings
           "xrp/" 'rxt-explain-pcre
           "xrpe" 'rxt-pcre-to-elisp
@@ -8857,7 +8576,7 @@
           :states 'visual
           "y" 'pdf-view-kill-ring-save)
 
-        (leader/set-keys-for-mode! 'pdf-view-mode
+        (leader/set-keys-for-major-mode 'pdf-view-mode
           ;; "-" 'pdf-view-fit-height-to-window
           ;; "|" 'pdf-view-fit-width-to-window
           ;; "|" 'pdf-view-fit-page-to-window
@@ -8901,7 +8620,7 @@
           "<C-up>" 'outline-move-subtree-up
           "<C-down>" 'outline-move-subtree-down)
 
-        (leader/set-keys-for-mode! 'pdf-outline-buffer-mode
+        (leader/set-keys-for-major-mode 'pdf-outline-buffer-mode
           "f" 'pdf-outline-follow-mode
           "m" 'outline-mark-subtree)
 
@@ -8948,7 +8667,7 @@
           "ZQ" 'tablist-quit
           "ZZ" 'tablist-quit)
 
-        (leader/set-keys-for-mode! 'pdf-occur-buffer-mode-map
+        (leader/set-keys-for-major-mode 'pdf-occur-buffer-mode-map
           "/!" 'tablist-negate-filter
           "//" 'tablist-display-filter
           "/=" 'tablist-push-equal-filter
@@ -9304,10 +9023,9 @@
         :straight (emacs-piper :type git :host gitlab :repo "howardabrams/emacs-piper")
         :commands (piper-ui)
         :init
-        (leader/declare-prefix "|" "piper" "interactive emacs pipeline")
-
         (leader/with-prefix "|"
           (leader/set-keys
+            ""    "piper"
             "RET" 'piper-ui
             "|"   'piper
             "o"   'piper-other
@@ -9325,10 +9043,8 @@
         :config
         (evil-set-initial-state 'proced-mode 'motion)
 
-        (leader/declare-prefix-for-mode!* 'proced-mode
-          "m" "mark")
-
-        (leader/set-keys-for-mode! 'proced-mode
+        (leader/set-keys-for-major-mode 'proced-mode
+          "m"  "mark"
           "ma" 'proced-mark-all
           "mu" 'proced-unmark-all
           "mp" 'proced-mark-parents
@@ -9409,11 +9125,8 @@
                     projectile-ivy-persp-switch-project
                     projectile-show-and-copy-project-dir)
          :init
-         (leader/declare-prefix*
-           "p" '("projectile" . "project management")
-           "px" "execute")
-
          (leader/set-keys
+           "p"  "projectile"
            "p!" 'projectile-run-shell-command-in-root
            "p%" 'projectile-replace-regexp
            "p&" 'projectile-run-async-shell-command-in-root
@@ -9436,11 +9149,6 @@
            "p[" 'projectile-previous-project-buffer
            "p]" 'projectile-next-project-buffer
            "pt" 'projectile-test-project
-           "pxe" 'projectile-run-eshell
-           "pxi" 'projectile-run-ielm
-           "pxt" 'projectile-run-term
-           "pxs" 'projectile-run-shell
-           "pxv" 'projectile-run-vterm
            "pso" 'projectile-multi-occur
            "psR" 'projectile-replace
            "pv"  'projectile-edit-dir-locals
@@ -9448,7 +9156,14 @@
            "p TAB" 'projectile-find-other-file
            "p DEL" 'projectile-browse-dirty-projects
            "p RET" 'projectile-find-file-dwim
-           "p M-RET" 'projectile-find-file-dwim-other-window)
+           "p M-RET" 'projectile-find-file-dwim-other-window
+
+           "px"  "execute"
+           "pxe" 'projectile-run-eshell
+           "pxi" 'projectile-run-ielm
+           "pxt" 'projectile-run-term
+           "pxs" 'projectile-run-shell
+           "pxv" 'projectile-run-vterm)
 
          (advice-add 'delete-buffer-file :after (lambda (&rest r)
                                                   (when (projectile-project-p)
@@ -9577,8 +9292,6 @@
          (general-define-key
            [remap counsel-org-capture] 'counsel-projectile-org-capture)
 
-         (leader/declare-prefix "ps" "search")
-
          (leader/set-keys
            ;; 'counsel-projectile-org-agenda
            "fp"    'counsel-projectile-switch-project
@@ -9586,11 +9299,13 @@
            "pf"    'counsel-projectile-find-file
            "pd"    'counsel-projectile-find-dir
            "pb"    'counsel-projectile-switch-to-buffer
-           "psg"   'counsel-projectile-grep
-           "psv"   'counsel-projectile-git-grep
-           "psa"   'counsel-projectile-ag
-           "psr"   'counsel-projectile-rg
-           "p SPC" 'counsel-projectile))
+           "p SPC" 'counsel-projectile
+
+           "ps"  "search"
+           "psg" 'counsel-projectile-grep
+           "psv" 'counsel-projectile-git-grep
+           "psa" 'counsel-projectile-ag
+           "psr" 'counsel-projectile-rg))
      #+END_SRC
 
 *** rake
@@ -9624,22 +9339,14 @@
 
          :config
          (let ((leader leader-major-mode-key))
-           (leader/set-keys-for-mode! 'restclient-mode
-             "RET"   'restclient-http-send-current
-             "M-RET" 'restclient-http-send-current-raw
-             leader  'restclient-http-send-current-stay-in-window
-             "y"     'restclient-copy-curl-command
+           (leader/set-keys-for-major-mode 'restclient-mode
+             "RET"   '("execute-current" . restclient-http-send-current)
+             "M-RET" '("execute-current-raw" . restclient-http-send-current-raw)
+             leader  '("execute-current-same-window" . restclient-http-send-current-stay-in-window)
+             "y"     '("yank-curl-command" . restclient-copy-curl-command)
              "m"     'restclient-mark-current
              "n"     'restclient-narrow-to-current
-             "w"     'widen)
-
-           (leader/declare-prefix-for-mode!* 'restclient-mode
-             "RET"   "execute-current"
-             "M-RET" "execute-current-raw"
-             leader  "execute-current-same-window"
-             "y"     "yank-curl-command"
-             "m"     "mark-current"
-             "n"     "narrow-to-current"))
+             "w"     'widen))
 
          (general-define-key
            :states 'normal
@@ -9893,9 +9600,8 @@
                         message-mode))
           (evil-set-initial-state mode 'motion))
 
-        (leader/declare-prefix "i TAB" "indent" "indentation")
-
         (leader/set-keys
+          "i TAB"       "indent"
           "i TAB <tab>" 'indent-region
           "i TAB RET"   'split-line
           "i TAB SPC"   'just-one-space
@@ -10060,16 +9766,15 @@
         :ensure t
         :defer  t
         :init
-        (leader/declare-prefix "T" "tags")
-
         (leader/set-keys
+          "T"  "tags"
           "TD" 'ggtags-delete-tags
           "T/" 'ggtags-grep)
 
         :config
         ;; NOTE ggtags-global-mode is not a global mode... global is
         ;;      for GNU *global* tagging system
-        (leader/set-keys-for-mode! 'ggtags-global-mode
+        (leader/set-keys-for-major-mode 'ggtags-global-mode
           "r" 'recompile
           "f" 'next-error-follow-minor-mode))
     #+END_SRC
@@ -10213,7 +9918,7 @@
         :init
         (leader/set-keys
           "iU" 'uuidgen
-          ;; "U" '(:prefix-command mohkale-insert-uuid-map :which-key "uuid")
+          ;; "U" '("uuid" . :prefix-command mohkale-insert-uuid-map)
           ;; "U1" 'uuidgen-1
           ;; "U4" 'uuidgen-4
           ;; "UU" 'uuidgen-U
@@ -10358,12 +10063,12 @@
         (setq vlc-rc-map (make-sparse-keymap))
 
         (leader/with-prefix "v"
-          (leader/declare-prefix*
-            "" '("VLC" . "VideoLanCodec")
-            "s" "set"
-            "t" "toggle")
+          (leader/set-keys
+            "" "VLC"
+            "" vlc-rc-map
 
-          (leader/set-keys "" vlc-rc-map))
+            "s" "set"
+            "t" "toggle"))
 
         (general-define-key
           :keymaps 'dired-mode-map
@@ -10552,8 +10257,6 @@
       (use-package xref
         :defer t
         :init
-        (leader/declare-prefix "ax" "xref")
-
         (leader/set-keys
           "jb" 'xref-pop-marker-stack
           "jr" 'xref-find-references
@@ -10587,7 +10290,7 @@
           "M-RET" 'xref-show-location-at-point
           "TAB" 'xref-quit-and-goto-xref)
 
-        (leader/set-keys-for-mode! 'xref--xref-buffer-mode
+        (leader/set-keys-for-major-mode 'xref--xref-buffer-mode
           "s" 'xref-query-replace-in-results))
     #+END_SRC
 
@@ -10628,7 +10331,7 @@
            "C-l" 'yas-next-field
            "C-h" 'yas-prev-field)
 
-         (leader/set-keys-for-mode! 'snippet-mode
+         (leader/set-keys-for-major-mode 'snippet-mode
            "m" 'yas-load-snippet-buffer-and-close
            "l" 'load-snippet-buffer
            "t" 'yas-tryout-snippet))
@@ -10937,9 +10640,8 @@
          :ensure t
          :defer  t
          :init
-         (leader/declare-prefix "iS" "auto-yasnippet")
-
          (leader/set-keys
+           "iS"  "auto-yasnippet"
            "iSc" 'aya-create
            "iSe" 'aya-expand
            "iSw" 'aya-persist-snippet)
@@ -10971,6 +10673,7 @@
 
          (leader/with-prefix mohkale--server-leader-key
            (leader/set-keys-for-mode 'ycmd-mode
+             ""  "ycmd"
              "y" 'ycmd-mode
              "Y" 'global-ycmd-mode
              "n" 'ycmd-open
@@ -10988,6 +10691,8 @@
              "SPC" 'ycmd-toggle-force-semantic-completion
              "C-r" 'ycmd-refactor-rename
              "C-c" 'ycmd-display-completions
+
+             "g"  "jump"
              "gg" 'ycmd-goto
              "gG" 'ycmd-goto-imprecise
              "gt" 'ycmd-goto-type
@@ -10995,11 +10700,7 @@
              "gD" 'ycmd-goto-declaration
              "gr" 'ycmd-goto-references
              "gi" 'ycmd-goto-include
-             "gI" 'ycmd-goto-implementation)
-
-           (leader/declare-prefix-for-mode* 'ycmd-mode
-             ""  "ycmd"
-             "g" "jump")))
+             "gI" 'ycmd-goto-implementation)))
      #+END_SRC
 
 **** company-ycmd
@@ -11096,15 +10797,14 @@
           "D" 'vc-annotate-show-changeset-diff-revision-at-line
           "t" 'vc-annotate-toggle-annotation-visibility)
 
-        (leader/declare-prefix-for-mode!* 'vc-annotate-mode
-          "g" "goto")
-
-        (leader/set-keys-for-mode! 'vc-annotate-mode
+        (leader/set-keys-for-major-mode 'vc-annotate-mode
           "m"     'vc-next-action
           "l"     'vc-annotate-show-log-revision-at-line
           "d"     'vc-annotate-show-diff-revision-at-line
           "D"     'vc-annotate-show-changeset-diff-revision-at-line
           "t"     'vc-annotate-toggle-annotation-visibility
+
+          "g"     "goto"
           "gg"    'vc-annotate-goto-line
           "gc"    'vc-annotate-revision-at-line
           "gp"    'vc-annotate-revision-previous-to-line
@@ -11149,7 +10849,7 @@
           "M-j" 'vc-dir-next-directory
           "M-k" 'vc-dir-previous-directory)
 
-        (leader/set-keys-for-mode! 'vc-dir-mode
+        (leader/set-keys-for-major-mode 'vc-dir-mode
           "i" 'vc-log-incoming
           "o" 'vc-log-incoming
           "l" 'vc-print-log
@@ -11204,7 +10904,7 @@
               ;;               (evil-previous-line 3))
               "gh" (lambda! (diff-hunk-prev) (evil-previous-line 3)))
 
-            (leader/set-keys-for-mode! mode
+            (leader/set-keys-for-major-mode mode
               "p" 'log-view-diff-changeset
               "a" 'log-view-annotate-version
               "m" 'log-view-toggle-mark-entry
@@ -11228,17 +10928,14 @@
 
             ;; (evil-redirect-digit-argument kmap "0" 'log-edit-beginning-of-line)
 
-            (leader/declare-prefix-for-mode* mode
-              "mi" '("insert" . "insert shortcuts")
-              "mt" '("toggle" . "toggle commit status"))
-
-            (leader/set-keys-for-mode! mode
+            (leader/set-keys-for-major-mode mode
               "d" 'log-edit-show-diff
               "f" 'log-edit-show-files
               "?" 'log-edit-mode-help
               "SPC" 'log-edit-done
               "DEL" 'log-edit-kill-buffer
 
+              "i"  "insert"
               "ic" 'log-edit-insert-changelog
               "if" 'log-edit-insert-filenames
               "iC" 'log-edit-insert-changelog-entries
@@ -11247,6 +10944,7 @@
               "iF" 'log-edit-insert-filenames-without-changelog
               "im" 'log-edit-insert-message-template
 
+              "t"  "toggle"
               "ta" 'vc-git-log-edit-toggle-amend
               "ts" 'vc-git-log-edit-toggle-signoff))))
     #+END_SRC
@@ -11298,7 +10996,7 @@
           "M-TAB" 'ztree-perform-soft-action
           "DEL"   'ztree-move-up-in-tree)
 
-        (leader/set-keys-for-mode! 'ztree-mode
+        (leader/set-keys-for-major-mode 'ztree-mode
           "TAB" 'ztree-jump-side
           "n"   'ztree-dir-widen-to-parent
           "w"   'ztree-dir-narrow-to-dir
@@ -11328,12 +11026,9 @@
          :defer  t
          :hook (elisp-mode . elisp-slime-nav-mode)
          :config
-         (leader/declare-prefix-for-mode! 'emacs-lisp-mode
-           "h"  "describe-symbol-at-point")
-
-         (leader/set-keys-for-mode! 'emacs-lisp-mode
+         (leader/set-keys-for-major-mode 'emacs-lisp-mode
            "gp" 'elisp-slime-nav-find-elisp-thing-at-point
-           "h" 'elisp-slime-nav-describe-elisp-thing-at-point))
+           "h" '("describe-symbol-at-point" . elisp-slime-nav-describe-elisp-thing-at-point)))
      #+END_SRC
 
 **** evil-lisp-state
@@ -11342,7 +11037,7 @@
          :ensure t
          :defer  t
          :init
-         (leader/set-keys-for-mode! 'emacs-lisp-mode
+         (leader/set-keys-for-major-mode 'emacs-lisp-mode
            "el" 'lisp-state-eval-sexp-end-of-line
            "." 'lisp-state-toggle-lisp-state))
      #+END_SRC
@@ -11360,7 +11055,7 @@
              "X" 'pp-eval-expression))
 
          (with-eval-after-load 'elisp-mode
-           (leader/set-keys-for-mode! '(emacs-lisp-mode lisp-interaction-mode)
+           (leader/set-keys-for-major-mode '(emacs-lisp-mode lisp-interaction-mode)
              "eM" 'pp-macroexpand-expression
              "em" 'pp-macroexpand-last-sexp
              "ex" 'pp-eval-last-sexp
@@ -11402,8 +11097,8 @@
          (general-define-key
            :keymaps 'paredit-mode-map
            :states 'normal
-           "gSh" '(paredit-splice-sexp-killing-backward :which-key "splice-sexp-forward")
-           "gSl" '(paredit-splice-sexp-killing-forward :which-key "splice-sexp-backward"))
+           "gSh" '("splice-sexp-forward" . paredit-splice-sexp-killing-backward)
+           "gSl" '("splice-sexp-backward" . paredit-splice-sexp-killing-forward))
 
          (general-define-key
            :keymaps 'paredit-mode-map
@@ -11504,19 +11199,13 @@
          (push '(lisp-interaction-mode . 2) mohkale-indent-config)
 
          (let ((lisp-modes '(emacs-lisp-mode lisp-interaction-mode)))
-           (leader/declare-prefix-for-mode!* lisp-modes
-             "e" "eval"
-
-             ;; method aliases
-             "g" "jump-to-definition"
-             "G" "jump-to-definition-other-window")
-
-           (leader/set-keys-for-mode! lisp-modes
+           (leader/set-keys-for-major-mode lisp-modes
              "'" 'ielm
              "c" 'emacs-lisp-byte-compile
              "i" 'indent-sexp
 
              ;; eval
+             "e"  "eval"
              "eb" 'eval-buffer
              "ee" 'eval-last-sexp
              "eE" 'eval-replace-last-sexp
@@ -11525,8 +11214,8 @@
              ;; "et" 'elisp-transcript
 
              ;; jump
-             "g" 'xref-find-definitions
-             "G" 'xref-find-definitions-other-window
+             "g" '("goto-definition" . xref-find-definitions)
+             "G" '("goto-definition-other-window" . xref-find-definitions-other-window)
 
              ;; tests
              "t" 'ert
@@ -11569,7 +11258,7 @@
              (unless (file-remote-p (buffer-file-name))
                (anaconda-mode +1)))
 
-           (leader/set-keys-for-mode! 'python-mode
+           (leader/set-keys-for-major-mode 'python-mode
              "TAB" 'anaconda-mode-complete
              "hh" 'anaconda-mode-show-doc
 
@@ -11591,8 +11280,8 @@
            :ensure t
            :defer  t
            :init
-           (leader/declare-prefix-for-mode! 'python-mode "i" "imports")
-           (leader/set-keys-for-mode! 'python-mode
+           (leader/set-keys-for-major-mode 'python-mode
+             "i"  "imports"
              "ii" 'pytimport-remove-unused
              "iu" 'pyimport-insert-missing)))
      #+END_SRC
@@ -11604,8 +11293,8 @@
            :ensure t
            :defer  t
            :init
-           (leader/declare-prefix-for-mode! 'python-mode "i" "imports")
-           (leader/set-keys-for-mode! 'python-mode
+           (leader/set-keys-for-major-mode 'python-mode
+             "i"  "imports"
              "is" 'py-isort-buffer
              "ir" 'py-isort-region)))
      #+END_SRC
@@ -11626,7 +11315,7 @@
            :ensure t
            :defer  t
            :init
-           (leader/set-keys-for-mode! 'python-mode
+           (leader/set-keys-for-major-mode 'python-mode
              "y" 'yapfify-buffer
              "Y" 'yapfify-region)))
      #+END_SRC
@@ -11655,22 +11344,16 @@
            "TAB"   'tab-to-tab-stop
            "<tab>" 'tab-to-tab-stop)
 
-         (leader/declare-prefix-for-mode!* 'python-mode
-           "n" '("navigate" . "move-point")
-           "e" "eval/exec"
-           "h" "help"
-           "g" "jump"
-
-           "d" "method-signature")
-
-         (leader/set-keys-for-mode! 'python-mode
+         (leader/set-keys-for-major-mode 'python-mode
            "r" 'run-python ;; REPL
            "R" 'python-shell-switch-to-shell
            "m" 'python-mark-defun
            "v" 'python-check
+           "s" 'python-describe-at-point
            ;; unbound: python-nav-forward-sexp[-safe]
            ;;          python-nav-backward-sexp[-safe]
 
+           "n"  "navigate"
            "nh" 'python-nav-forward-statement
            "nj" 'python-nav-forward-block
            "nk" 'python-nav-backward-block
@@ -11680,6 +11363,7 @@
            "n0" 'python-nav-beginning-of-block
            "n$" 'python-nav-end-of-block
            "nm" 'python-nav-if-name-main
+
            "n C-0" 'python-nav-beginning-of-statement
            "n C-$" 'python-nav-end-of-statement
            "n M-j" 'python-nav-forward-defun
@@ -11687,9 +11371,10 @@
            ;; "n M-0" 'python-nav-beginning-of-defun
            "n M-$" 'python-nav-end-of-defun
 
+           "h"  "help"
            "hp" 'python-eldoc-at-point
-           "s" 'python-describe-at-point
 
+           "e"  "eval/exec"
            "ed" 'python-shell-send-defun
            "eb" 'python-shell-send-buffer
            "ef" 'python-shell-send-file
@@ -11731,7 +11416,7 @@
          :mode ("\\.rb$" . ruby-mode)
          :interpreter "ruby"
          :config
-         (leader/set-keys-for-mode! 'ruby-mode
+         (leader/set-keys-for-major-mode 'ruby-mode
            "'" 'ruby-toggle-string-quotes
            "{" 'ruby-toggle-block))
      #+END_SRC
@@ -11749,19 +11434,17 @@
          (setq enh-ruby-deep-indent-paren nil
                enh-ruby-hanging-paren-deep-indent-level 2)
 
-         (leader/declare-prefix-for-mode!* 'enh-ruby-mode
-           "i" "insert/format"
-           "n" "navigate")
-
-         (leader/set-keys-for-mode! 'enh-ruby-mode
+         (leader/set-keys-for-major-mode 'enh-ruby-mode
            "m" 'enh-ruby-mark-defun
            "f" 'enh-ruby-find-file
            "e" 'enh-ruby-find-error
 
-           "i <tab>" 'enh-ruby-indent-exp
+           "i"  "insert"
            "ie" 'enh-ruby-insert-end
            "it" 'enh-ruby-indent-exp
+           "i <tab>" 'enh-ruby-indent-exp
 
+           "n"  "navigate"
            "nh" 'enh-ruby-backward-sexp
            "nl" 'enh-ruby-forward-sexp
            "nk" 'enh-ruby-up-sexp
@@ -11818,14 +11501,14 @@
            (company/configure-mode (robe-mode)
              company-robe)
 
-           (leader/declare-prefix-for-mode! mohkale-ruby-mode "g" "jump/goto")
-
-           (leader/set-keys-for-mode! mohkale-ruby-mode
+           (leader/set-keys-for-major-mode mohkale-ruby-mode
              "rs" 'robe-start ;; REPL
              "h" 'robe-doc
 
              ;; jumping
              "SPC" 'robe-ask
+
+             "g"  "goto"
              "gg" 'robe-jump
              "gm" 'robe-jump-to-module)))
      #+END_SRC
@@ -11839,10 +11522,8 @@
          (defalias 'ruby-repl 'inf-ruby)
          (push 'inf-ruby-mode whitespace-exempt-modes)
 
-         (leader/declare-prefix-for-mode!
-           mohkale-ruby-mode "r" "REPL")
-
-         (leader/set-keys-for-mode! mohkale-ruby-mode
+         (leader/set-keys-for-major-mode mohkale-ruby-mode
+           "r"  "REPL"
            "rr" 'inf-ruby
            "rg" 'inf-ruby-console-gem
            "rz" 'inf-ruby-console-zues
@@ -11863,10 +11544,8 @@
            (add-hook mohkale-ruby-mode-hook #'ruby-tools-mode)
 
            :config
-           (leader/declare-prefix-for-mode!
-             mohkale-ruby-mode "i" "insert")
-
-           (leader/set-keys-for-mode! mohkale-ruby-mode
+           (leader/set-keys-for-major-mode mohkale-ruby-mode
+             "i"  "insert"
              "i:" 'ruby-tools-to-symbol
              "i{" 'ruby-tools-interpolate
              "i <backspace>" 'ruby-tools-clear-string
@@ -11881,10 +11560,8 @@
            :ensure t
            :defer  t
            :init
-           (leader/declare-prefix-for-mode!*
-             mohkale-ruby-mode "b" "bundler")
-
-           (leader/set-keys-for-mode! mohkale-ruby-mode
+           (leader/set-keys-for-major-mode mohkale-ruby-mode
+             "b"  "bundler"
              "rb" 'bundle-console
              "bf" 'bundle-open
              "bi" 'bundle-install
@@ -11943,17 +11620,7 @@
            :states 'normal
            "<tab>" 'web-mode-fold-or-unfold)
 
-         (leader/declare-prefix-for-mode!* 'web-mode
-           "m" "mark"
-           "d" "delete/kill"
-           "D" "DOM"
-           "n" "navigate"
-           "na" "attributes"
-           "nt" "tags"
-           "r" "refactor"
-           "i" "insert")
-
-         (leader/set-keys-for-mode! 'web-mode
+         (leader/set-keys-for-major-mode 'web-mode
            ;; unbound:
            ;;   * web-mode-buffer-highlight
            ;;   * web-mode-element-mute-blanks
@@ -11979,6 +11646,7 @@
            ;; "tw" 'web-mode-whitespace-show
 
            ;; insert
+           "i"  "insert"
            "ia" 'web-mode-attribute-insert
            "ip" 'web-mode-element-wrap ; wrap current element in a new element with name from prompt
            "ic" 'web-mode-element-clone
@@ -11986,6 +11654,7 @@
            "ie" 'web-mode-element-insert-at-point ; converts word before point to tag
 
            ;; refactor/insert
+           "r"  "refactor"
            "rs" 'web-mode-tag-attributes-sort
            "r(" 'web-mode-element-extract  ; add linebreak before every tag in body
            "r)" 'web-mode-element-contract ; collapse tag into a single line
@@ -11997,11 +11666,13 @@
            "rF" 'web-mode-element-children-fold-or-unfold ; collapse the children of current tags body, not body itself
 
            ;; delete
+           "d"  "delete"
            "da" 'web-mode-attribute-kill
            "de" 'web-mode-element-kill
            "dp" 'web-mode-element-vanish ; delete element, but move body up a level instead of erasing it
 
            ;; DOM
+           "D"  "DOM"
            "Da" 'web-mode-dom-apostrophes-replace
            "Ds" 'web-mode-dom-entities-replace
            "Dq" 'web-mode-dom-quotes-replace
@@ -12012,6 +11683,7 @@
            "hj" 'web-mode-jshint
 
            ;; mark
+           "m"  "mark"
            "mT" 'web-mode-tag-select
            ; only works while between <>
            "mt" 'web-mode-element-select
@@ -12020,6 +11692,7 @@
            "mm" 'web-mode-mark-and-expand
 
            ;; navigation
+           "n"  "navigate"
            "n0" 'web-mode-element-beginning
            "n$" 'web-mode-element-end
            "nn" 'web-mode-tag-match
@@ -12028,10 +11701,14 @@
            "nk" 'web-mode-element-previous
            "nh" 'web-mode-element-parent
            ;; "nt" 'web-mode-dom-traverse
+
+           "na"  "attributes"
            "na0" 'web-mode-attribute-beginning
            "na$" 'web-mode-attribute-end
            "nah" 'web-mode-attribute-previous
            "nal" 'web-mode-attribute-next
+
+           "nt"  "tags"
            "nt0" 'web-mode-tag-beginning
            "nt$" 'web-mode-tag-end
            "nth" 'web-mode-tag-previous
@@ -12059,10 +11736,8 @@
            "<S-tab>" 'emmet-prev-edit-point)
 
          (leader/with-major-mode-prefix
-           (leader/declare-prefix-for-mode 'emmet-mode
-             "e" "emmet" "emmet mode")
-
            (leader/set-keys-for-mode 'emmet-mode
+             "e" "emmet"
              "." 'emmet-expand-line
              ;; "'" 'emmet-preview
              "ee" 'emmet-expand-line
@@ -12100,9 +11775,8 @@
            :ensure t
            :defer  t
            :init
-           (leader/declare-prefix-for-mode! 'web-mode "rb" "beautify")
-
-           (leader/set-keys-for-mode! 'web-mode
+           (leader/set-keys-for-major-mode 'web-mode
+             "rb"  "beautify"
              "rbh" 'web-beautify-htlm
              "rbj" 'web-beautify-js
              "rbc" 'web-beautify-css)))
@@ -12119,18 +11793,13 @@
          :config
          (evil-set-initial-state 'org-agenda-mode 'motion)
 
-         (leader/declare-prefix-for-mode!* 'org-agenda-mode
-           "c" '("clock/calendar" . "time management based prefix keys")
-           "m" '("modes" . "minor modes to support agenda mode")
-           "p" '("priority" . "alter/view an entries priority")
-           "/" '("search/filter" . "search / filter org agenda"))
-
-         (leader/set-keys-for-mode! 'org-agenda-mode
+         (leader/set-keys-for-major-mode 'org-agenda-mode
            "." 'hydra-org-agenda/body
            "A" 'org-agenda-append-agenda
            "C" 'org-agenda-columns
 
            ;;; filter/search
+           "/"  "filter/search"
            "/c" 'org-agenda-filter-by-category
            "/e" 'org-agenda-filter-by-effort
            "//" 'org-agenda-filter-by-regexp
@@ -12144,6 +11813,7 @@
            "/u" 'org-agenda-bulk-unmark-all
 
            ;;; clock/calendar/diary
+           "c"  "clock/calendar"
            "cp" 'org-agenda-date-prompt
            "cc" 'org-agenda-clock-in
            "co" 'org-agenda-clock-out
@@ -12152,6 +11822,7 @@
            "c M-c" 'org-agenda-convert-date
 
            ;;; agenda minor modes
+           "m"  "modes"
            "ma" 'org-agenda-archives-mode
            "md" 'org-agenda-day-view
            "mc" 'org-agenda-clockreport-mode
@@ -12163,6 +11834,7 @@
            "mm" 'org-agenda-month-view
 
            ;;; priorities
+           "p"  "priority"
            "pp" 'org-agenda-priority
            "pu" 'org-agenda-priority-up
            "pd" 'org-agenda-priority-down)
@@ -12570,9 +12242,8 @@
                 (org-mode . hl-todo-mode))
          :init
          ;;; leader keys outside of org mode
-         (leader/declare-prefix "o" "org")
-
          (leader/set-keys
+           "o"  "org"
            "oc" 'org-capture
            "oa" 'org-agenda
            "ol" 'org-store-link
@@ -12834,22 +12505,7 @@
          ;; |_|\___|\__,_|\__,_|\___|_|       |_|\_\___|\__, |___/
          ;;                                             |___/
 
-         (leader/declare-prefix-for-mode!* 'org-mode
-           "c" "clock/calendar"
-           "e" "export"
-           "h" "headings"
-           "I" "insert"
-           "S" "subtrees"
-           "t" "tables"
-           "m" "mark/move"
-           "n" "narrow"
-           "x" "text"
-
-           "td" "delete"
-           "ti" "insert"
-           "tt" "toggle")
-
-         (leader/set-keys-for-mode! 'org-mode
+         (leader/set-keys-for-major-mode 'org-mode
            "RET" 'org-ctrl-c-ret
            "TAB" 'org-todo
            "SPC" 'org-display-outline-path
@@ -12897,6 +12553,7 @@
            "M-c" 'org-columns
            "M-p" 'org-delete-property
 
+           "c"  "clock/calendar"
            "c<" 'org-date-from-calendar
            "c>" 'org-goto-calendar
            "cC" 'org-clock-out
@@ -12910,13 +12567,16 @@
            "c." 'hydra-org-clock/body
            "c C-c" 'org-clock-cancel
 
+           "e"  "export"
            "ee" 'org-export-dispatch
            "eh" 'org-html-export-to-html
 
+           "h"  "headings"
            "hI" 'org-insert-heading
            "hi" 'org-insert-heading-after-current
            "hs" 'org-insert-subheading
 
+           "I"  "insert"
            "Ia" 'org-attach
            "If" 'org-footnote-new
            ;; "Ik" 'insert-keybinding-org
@@ -12924,21 +12584,25 @@
            ;; "Is" 'org-download-screenshot
            ;; "Iy" 'org-download-yank
 
+           "m"  "mark/move"
            "ms" 'org-mark-subtree
            "me" 'org-mark-element
            "mb" 'org-babel-mark-block
            "mm." 'hydra-org-navigate/body
 
+           "n"  "narrow"
            "nb" 'org-narrow-to-block
            "ns" 'org-narrow-to-subtree
            "ne" 'org-narrow-to-element
            "nw" 'widen
 
+           "S"  "subtrees"
            "Sh" 'org-promote-subtree
            "Sj" 'org-move-subtree-down
            "Sk" 'org-move-subtree-up
            "Sl" 'org-demote-subtree
 
+           "t" "tables"
            "t'"  'org-table-edit-field
            "ta"  'org-table-align
            "tb"  'org-table-blank-field
@@ -12959,15 +12623,22 @@
            "tr"  'org-table-recalculate
            "ts"  'org-table-sort-lines
            "tw"  'org-table-wrap-region
+
+           "td"  "delete"
            "tdc" 'org-table-delete-column
            "tdr" 'org-table-delete-row
+
+           "ti"  "insert"
            "tic" 'org-table-insert-column
            "ti-" 'org-table-hline-and-move
            "tih" 'org-table-insert-hline
            "tir" 'org-table-insert-row
+
+           "tt"  "toggle"
            "ttf" 'org-table-toggle-formula-debugger
            "tto" 'org-table-toggle-coordinate-overlays
 
+           ;; "x"  "text"
            ;; "xb" 'org-bold
            ;; "xc" 'org-code
            ;; "xi" 'org-italic
@@ -13009,14 +12680,10 @@
                                           (delq nil (mapcar (lambda (file) (when (file-exists-p file) file))
                                                             (org-projectile-todo-files))))))
 
-         (leader/declare-prefix*
-           "po" "org-projectile-goto-todos"
-           "pO" "org-projectile-capture")
-
          (leader/set-keys
            "op" 'org-projectile-find-todo-file
            ;; "op" 'org-projectile-goto-location-for-project
-           "po" 'org-projectile-goto-location-for-project
+           "po" '("org-projectile-goto-todos" . org-projectile-goto-location-for-project)
            ;; "pO" 'org-projectile-helm-template-or-project
            )
 
@@ -13328,7 +12995,7 @@
         :hook (json-mode . flycheck-mode)
 
         :config
-        (leader/set-keys-for-mode! 'json-mode
+        (leader/set-keys-for-major-mode 'json-mode
           "b" 'json-mode-beautify
           "/" 'json-mode-kill-path
           "t" 'json-toggle-boolean
@@ -13363,23 +13030,23 @@
          ;; for a guide on how to make quick database access easier. or if you've already got
          ;; an interactive session running, use sql-save-connection to append it to a local
          ;; variable from which you can just paste it in here.
-         (leader/declare-prefix-for-mode* 'sql-mode
-           "e" "eval/exec"
-           "l" "list")
-
-         (leader/set-keys-for-mode! 'sql-mode
+         (leader/set-keys-for-major-mode 'sql-mode
            "0" 'sql-beginning-of-statement
            "$" 'sql-end-of-statement
            "i" 'sql-show-sqli-buffer
            "t" 'sql-toggle-pop-to-buffer-after-send-region
+
+           "e"  "eval"
            "eb" 'sql-send-buffer
            "ep" 'sql-send-paragraph
            "er" 'sql-send-region
            "es" 'sql-send-string
+
+           "l"  "list"
            "ll" 'sql-list-all
            "lt" 'sql-list-table)
 
-         (leader/set-keys-for-mode! 'sql-interactive-mode
+         (leader/set-keys-for-major-mode 'sql-interactive-mode
            "t" 'sql-list-table
            "a" 'sql-list-all))
 
@@ -13396,9 +13063,8 @@
            :hook ((sql-mode . sqlup-mode)
                   (sql-interactive-mode . sqlup-mode))
            :config
-           (leader/declare-prefix-for-mode 'sql-mode
-             "u" "upcase")
-           (leader/set-keys-for-mode! 'sql-mode
+           (leader/set-keys-for-major-mode 'sql-mode
+             "u"  "upcase"
              "ur" 'sqlup-capitalize-keywords-in-region
              "ub" 'sqlup-capitalize-keywords-in-buffer)
 
@@ -13427,7 +13093,7 @@
           :states 'insert
           "<tab>" 'yaml-indent-line)
 
-        (leader/set-keys-for-mode! 'yaml-mode
+        (leader/set-keys-for-major-mode 'yaml-mode
           "n" 'yaml-narrow-to-block-literal
           "f" 'yaml-fill-paragraph
           "v" 'yaml-mode-version)
@@ -13449,20 +13115,20 @@
           "<tab>"     'csv-forward-field
           "<backtab>" 'csv-backward-field)
 
-        (leader/declare-prefix-for-mode!* 'csv-mode
-          "s" "sort"
-          "v" "yank")
-
-        (leader/set-keys-for-mode! 'csv-mode
+        (leader/set-keys-for-major-mode 'csv-mode
           "a"  'csv-align-fields
           "d"  'csv-kill-fields
           "i"  'csv-toggle-invisibility
           "r"  'csv-reverse-region
+          "t"  'csv-transpose
+          "u"  'csv-unalign-fields
+
+          "s" "sort"
           "sf" 'csv-sort-fields
           "sn" 'csv-sort-numeric-fields
           "so" 'csv-toggle-descending
-          "t"  'csv-transpose
-          "u"  'csv-unalign-fields
+
+          "v" "yank"
           "vf" 'csv-yank-fields
           "vt" 'csv-yank-as-new-table))
     #+END_SRC
@@ -13493,10 +13159,7 @@
          :hook ((sh-script-mode . electric-pair-mode)
                 (sh-script-mode . flycheck-mode))
          :config
-         (leader/declare-prefix-for-mode!* 'sh-mode
-           "<tab>" "indentation")
-
-         (leader/set-keys-for-mode! 'sh-mode
+         (leader/set-keys-for-major-mode 'sh-mode
            ":" 'sh-set-shell
            "0" 'sh-beginning-of-command
            "$" 'sh-end-of-command
@@ -13522,10 +13185,11 @@
            "i(" 'sh-function
            "i+" 'sh-add
 
-           "<tab> -" 'sh-learn-line-indent
-           "<tab> =" 'sh-set-indent
-           "<tab> |" 'sh-learn-buffer-indent
-           "<tab> ?" 'sh-show-indent)
+           "TAB"   "indent"
+           "TAB -" 'sh-learn-line-indent
+           "TAB =" 'sh-set-indent
+           "TAB |" 'sh-learn-buffer-indent
+           "TAB ?" 'sh-show-indent)
 
          (advice-add 'sh-set-shell :around 'inhibit-messages-wrapper))
      #+END_SRC
@@ -13592,12 +13256,12 @@
 
           [remap quit-window] 'makefile-browser-quit)
 
-        (leader/set-keys-for-mode! '(makefile-automake-mode
-                                     makefile-bsdmake-mode
-                                     makefile-gmake-mode
-                                     makefile-imake-mode
-                                     makefile-mode
-                                     makefile-makepp-mode)
+        (leader/set-keys-for-major-mode '(makefile-automake-mode
+                                          makefile-bsdmake-mode
+                                          makefile-gmake-mode
+                                          makefile-imake-mode
+                                          makefile-mode
+                                          makefile-makepp-mode)
           "b" 'makefile-switch-to-browser
           "o" 'makefile-create-up-to-date-overview
           "p" 'makefile-pickup-everything
@@ -13617,7 +13281,7 @@
          :ensure t
          :defer  t
          :init
-         (leader/set-keys-for-mode! 'markdown-mode
+         (leader/set-keys-for-major-mode 'markdown-mode
            "r" 'gh-md-render-buffer
            "R" 'gh-md-render-region))
      #+END_SRC
@@ -13725,21 +13389,7 @@
            (evil-declare-change-repeat 'markdown-shifttab))
 
          ;;; leader keys
-         (leader/declare-prefix-for-mode!* 'markdown-mode
-           "c" "check/complete"
-           "i" "insert"
-           "ih" "header"
-           "il" "link"
-           "d" "delete"
-           "M" "toggle"
-           "n" "narrow"
-           "m" "mark"
-           "r" "render"
-           "t" "table"
-           "ti" "insert"
-           "td" "delete")
-
-         (leader/set-keys-for-mode! 'markdown-mode
+         (leader/set-keys-for-major-mode 'markdown-mode
          ;;; unbound commands:
          ;;;  * markdown-outdent-region
          ;;;  * markdown-indent-region
@@ -13761,6 +13411,7 @@
            "TAB" 'markdown-pre-region ;; preformat
 
            ;; complete/checks
+           "c"  "check/complete"
            "cc" 'markdown-complete
            "cb" 'markdown-complete-buffer
            "cr" 'markdown-check-refs
@@ -13774,6 +13425,7 @@
            "O" 'markdown-other-window
 
            ;; insert
+           "i"  "insert"
            "i TAB" 'markdown-insert-image
            "i*" 'markdown-insert-list-item
            "i!" 'markdown-insert-header-setext-1
@@ -13797,6 +13449,8 @@
            "ip" 'markdown-insert-pre
            "iq" 'markdown-insert-blockquote
            "is" 'markdown-insert-strike-through
+
+           "ih"  "header"
            "ih!" 'markdown-insert-header-setext-1
            "ih1" 'markdown-insert-header-atx-1
            "ih2" 'markdown-insert-header-atx-2
@@ -13809,18 +13463,22 @@
            "ihh" 'markdown-insert-header-dwim
            "ihs" 'markdown-insert-header-setext-2
            "iht" 'markdown-insert-header-setext-1
+
+           "il"  "link"
            "ill" 'markdown-insert-link
            "ilf" 'markdown-insert-footnote
            "ilu" 'markdown-insert-uri
            "ilw" 'markdown-insert-wiki-link
 
            ;; delete/kill
+           "d"  "delete"
            "dd" 'markdown-kill-thing-at-point
            "db" 'markdown-kill-block
            "do" 'markdown-kill-outline
            "dy" 'markdown-kill-ring-save
 
            ;; toggles
+           "M"  "toggle"
            "Mm" 'markdown-toggle-math
            "Mf" 'markdown-toggle-fontify-code-blocks-natively
            "Mi" 'markdown-toggle-inline-images
@@ -13830,24 +13488,31 @@
            "Ml" 'markdown-live-preview-mode
 
            ;; narrowing
+           "n"  "narrow"
            "nb" 'markdown-narrow-to-block
            "np" 'markdown-narrow-to-page
            "ns" 'markdown-narrow-to-subtree
            "nw" 'widen
 
            ;; marks
+           "m"  "mark"
            "ms" 'markdown-mark-subtree
            "mb" 'markdown-mark-block
 
            ;; table
+           "t"  "table"
            "ts" 'markdown-table-sort-lines
            "tT" 'markdown-table-transpose
            "tt" 'markdown-insert-table
            "tn" 'markdown-insert-table
            "tc" 'markdown-table-convert-region
+
+           "ti"  "insert"
            "tir" 'markdown-table-insert-row
            "tic" 'markdown-table-insert-column
            "tit" 'markdown-insert-table
+
+           "td"  "delete"
            "tdr" 'markdown-table-delete-row
            "tdc" 'markdown-table-delete-column))
      #+END_SRC
@@ -13907,7 +13572,7 @@
          ;;   company-ycmd company-c-headers)
 
          (defun mohkale//set-c-mode-bindings (mode)
-           (leader/set-keys-for-mode! mode
+           (leader/set-keys-for-major-mode mode
              "S" 'c-set-style
              "D" 'c-display-defun-name
              "m" 'c-mark-function
@@ -13939,7 +13604,7 @@
            :defer  t
            :init
            (dolist (mode '(c-mode c++-mode))
-             (leader/set-keys-for-mode! mode
+             (leader/set-keys-for-major-mode mode
                "D" 'disaster))))
      #+END_SRC
 
@@ -13952,15 +13617,14 @@
          :config
          (setq kotlin-tab-width 4)
 
-         (leader/declare-prefix-for-mode! 'kotlin-mode
-           "e" "eval")
-
-         (leader/set-keys-for-mode! 'kotlin-mode
+         (leader/set-keys-for-major-mode 'kotlin-mode
            "r" 'kotlin-repl
-           "e-" 'kotlin-send-line
-           "e|" 'kotlin-send-block
-           "er" 'kotlin-send-region
-           "eb" 'kotlin-send-buffer
+
+           "e"     "eval"
+           "e-"    'kotlin-send-line
+           "e|"    'kotlin-send-block
+           "er"    'kotlin-send-region
+           "eb"    'kotlin-send-buffer
            "e S--" 'kotlin-send-line-and-focus
            "e S-|" 'kotlin-send-block-and-focus
            "eR"    'kotlin-send-region-and-focus
@@ -14054,17 +13718,15 @@
             "t C-SPC" 'meghanada-debug-junit-test-case)
 
           (leader/with-prefix mohkale--server-leader-key
-            (let ((prefixes (list "c" "compile/run"
-                                  "t" "test"
-                                  "S" "server"
-                                  "i" "insert/refactor")))
-              (apply 'leader/declare-prefix-for-mode* '(java-mode meghanada-mode) prefixes))
-
-            (leader/declare-prefix-for-mode!* '(java-mode meghanada-mode)
-              "" "meghanada")
+            (leader/set-keys-for-major-mode '(java-mode meghanada-mode)
+              ""  "meghanada"
+              "c" "compile/run"
+              "t" "test"
+              "S" "server"
+              "i" "insert/refactor")
 
             ;; major-mode bindings
-            (leader/set-keys-for-mode! 'java-mode
+            (leader/set-keys-for-major-mode 'java-mode
               "" mohkale-meghanada-map)
 
             ;; global server-key bindings
@@ -14113,18 +13775,16 @@
            :states  'insert
            ;; properly formets javadocs
            "<return>" 'js2-line-break)
+           "<return>" 'js2-line-break
+           "RET"      'js2-line-break)
 
-         (leader/declare-prefix-for-mode!* 'js2-mode
-           "i" "insert"
-           "h" "help"
-           "H" "hide/show"
-           "Hh" "hide"
-           "Hs" "show")
-
-         (leader/set-keys-for-mode! 'js2-mode
+         (leader/set-keys-for-major-mode 'js2-mode
+           "i"  "insert"
+           "h"  "help"
            "gg" 'js2-jump-to-definition
 
            ;; toggle hide-show
+           "H"  "hide/show"
            "HH" 'js2-mode-show-all
            "Hw" 'js2-mode-toggle-warnings-and-errors
            "He" 'js2-mode-toggle-element
@@ -14132,12 +13792,14 @@
            "Hf" 'js2-mode-toggle-hide-functions
 
            ;; hide
+           "Hh" "hide"
            "Hhw" 'js2-mode-hide-warnings-and-errors
            "Hhe" 'js2-mode-hide-element
            "Hhc" 'js2-mode-show-comments
            "Hhf" 'js2-mode-hide-functions
 
            ;; show
+           "Hs" "show"
            "Hsw" 'js2-mode-display-warnings-and-errors
            "Hse" 'js2-mode-show-element
            "Hsc" 'js2-mode-hide-comments
@@ -14206,7 +13868,7 @@
            ;;   :states 'insert
            ;;   "@" 'js-doc-insert-tag)
 
-           (leader/set-keys-for-mode! 'js2-mode
+           (leader/set-keys-for-major-mode 'js2-mode
              "i@" 'js-doc-insert-tag
                                                ; only works from within method
              "i)" 'js-doc-insert-function-doc
@@ -14237,14 +13899,12 @@
            (advice-add 'js2r-extract-method   :after #'js2r-exit-visual-mode-after-func-call)
            (advice-add 'js2r-extract-function :after #'js2r-exit-visual-mode-after-func-call)
 
-           (leader/declare-prefix-for-mode! 'js2-mode
-             "e" "extract")
-
-           (leader/set-keys-for-mode! 'js2-mode
+           (leader/set-keys-for-major-mode 'js2-mode
              "[" 'js2r-expand-node-at-point
              "]" 'js2r-contract-node-at-point
 
-                                               ; doesn't work unless executed from within a function
+             ;; doesn't work unless executed from within a function
+             "e"  "extract"
              "ef" 'js2r-extract-function
              "em" 'js2r-extract-method
              "ev" 'js2r-extract-var
@@ -14360,7 +14020,7 @@
        (use-package css-mode
          :defer t
          :config
-         (leader/set-keys-for-mode! 'css-mode
+         (leader/set-keys-for-major-mode 'css-mode
            "?" 'css-lookup-symbol
            "b" 'web-beautify-css)
 
@@ -14451,24 +14111,22 @@
              :keymaps 'haskell-mode-map
              "<tab>" 'haskell-indent-cycle))
 
-         (leader/declare-prefix-for-mode!* 'haskell-mode
-           "r" "refactor"
-           "i" "insert"
-           "s" "session")
-
-         (leader/set-keys-for-mode! 'haskell-mode
+         (leader/set-keys-for-major-mode 'haskell-mode
            "TAB"   'haskell-indent-cycle
            "S-TAB" 'haskell-delete-indentation
 
+           "r"  "refactor"
            "ri" 'haskell-mode-format-imports
            "rI" 'haskell-sort-imports
 
+           "i"  "insert"
            "is" 'haskell-mode-toggle-scc-at-point
            "i|" 'haskell-indent-insert-guard
            "iw" 'haskell-indent-insert-where
            "io" 'haskell-indent-insert-other
            "i=" 'haskell-indent-insert-equal
 
+           "s"  "session"
            "sc" 'haskell-session-change
            "sC" 'haskell-session-change-target
            "sk" 'haskell-session-kill
@@ -14542,10 +14200,8 @@
           (setenv "GIT_ASKPASS" "git-gui--askpass"))
 
         (leader/with-prefix "g"
-          (leader/declare-prefix*
-            "" "magit")
-
           (leader/set-keys
+            ""  "magit"
             "$" 'magit-process-buffer
             "!" 'magit-run
             "g" 'magit-dispatch
@@ -14608,14 +14264,13 @@
           "RET" 'magit-visit-thing)
 
         (leader/with-major-mode-prefix
-          (leader/declare-prefix-for-mode* 'git-commit-mode
-            "i" "insert")
-
           (leader/set-keys-for-mode 'git-commit-mode
             "s"  'git-commit-save-message
             "d"  'magit-diff-while-committing
             "j"  'git-commit-next-message
             "k"  'git-commit-prev-message
+
+            "i"  "insert"
             "ia" 'git-commit-ack ;; knowledgement
             "iS" 'git-commit-suggested
             "im" 'git-commit-modified
@@ -14653,9 +14308,8 @@
           :ensure t
           :defer  t
           :init
-          (leader/declare-prefix "gy" "links")
-
           (leader/set-keys
+            "gy"  "links"
             "gyl" 'git-link
             "gyc" 'git-link-commit
             "gyh" 'git-link-homepage)
@@ -14770,7 +14424,7 @@
           :keymaps 'latex-mode-map
           "C-M-i" nil)
 
-        (leader/set-keys-for-mode! mohkale-latex-modes
+        (leader/set-keys-for-major-mode mohkale-latex-modes
           "{" 'latex-insert-block
           "}" 'latex-close-block)
 
@@ -14847,13 +14501,6 @@
                       (output-pdf "start")
                       (output-html "start"))))
 
-        (leader/declare-prefix-for-mode!* mohkale-latex-modes
-          "z" "fold"
-          "TAB" "indent"
-          "M" "mode"
-          "T" "toggle"
-          "p" "preview")
-
         (general-define-key
           :states 'motion
           :keymaps 'TeX-error-overview-mode-map
@@ -14863,13 +14510,13 @@
           "o" 'TeX-error-overview-jump-to-source
           [remap quit-window] 'TeX-error-overview-quit)
 
-        (leader/set-keys-for-mode! 'TeX-error-overview-mode
+        (leader/set-keys-for-major-mode 'TeX-error-overview-mode
           "b" 'TeX-error-overview-toggle-debug-bad-boxes
           "w" 'TeX-error-overview-toggle-debug-warnings
           "s" 'TeX-error-overview-toggle-suppress-ignored-warnings
           "l" 'TeX-error-overview-goto-log)
 
-        (leader/set-keys-for-mode! mohkale-latex-modes
+        (leader/set-keys-for-major-mode mohkale-latex-modes
           "SPC" 'TeX-command-master
           "b" 'LaTeX-environment ;; block but more interactive.
           "," 'TeX-command-smart
@@ -14886,6 +14533,7 @@
           "m" 'LaTeX-mark-environment ;; or LaTeX-mark-section
 
           ;; preview
+          "p"   "preview"
           "pb"  'preview-buffer
           "pc"  'preview-clearout
           "pd"  'preview-document
@@ -14896,6 +14544,7 @@
           "ps"  'preview-section
 
           ;; fold
+          "z" "fold"
           "z=" 'TeX-fold-math
           "zz" 'TeX-fold-dwim
           "zb" 'TeX-fold-buffer
@@ -14911,18 +14560,21 @@
           "zc" 'TeX-fold-clearout-item
 
           ;; indentation
+          "TAB"   "indent"
           "TAB b" 'LaTeX-fill-environ
           "TAB p" 'LaTeX-fill-paragra
           "TAB r" 'LaTeX-fill-region
           "TAB s" 'LaTeX-fill-section
 
           ;; modes
+          "M"  "mode"
           "Mp" 'TeX-PDF-mode ;; toggle between PDF and DVI output.
           "Ms" 'TeX-source-correlate-mode
           "Mi" 'TeX-interactive-mode
           "Mm" 'LaTeX-math-mode
 
           ;; toggle
+          "T"  "toggle"
           "Tb" 'TeX-toggle-debug-bad-boxes
           "Td" 'TeX-toggle-debug-warnings
           "Ts" 'TeX-toggle-suppress-ignored-warnings))
