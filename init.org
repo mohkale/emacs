@@ -81,7 +81,7 @@
              file-name-handler-alist nil)
 
        (unless (emacs>= "27")
-         (load "~/.emacs.d/early-init.el"))
+         (load (concat user-emacs-directory "early-init.el")))
 
        (add-hook 'emacs-startup-hook
                  (lambda (&rest _)
@@ -503,6 +503,7 @@
       ;; ideally I'd like to use straight exclusively, but
       ;; it's really slow when you have a lot of packages.
       (let ((bootstrap-file straight-bootstrap-file)
+            (straight-install-dir straight-base-dir)
             (bootstrap-version 5))
         (unless (file-exists-p straight-bootstrap-file)
           (with-current-buffer
@@ -2720,7 +2721,7 @@
 
     #+BEGIN_SRC emacs-lisp
     <<tangle-hydras()>>
-    (load "~/.emacs.d/hydras.el")
+    (load (concat user-emacs-directory "hydras.el"))
     #+END_SRC
 
 *** unpackaged
@@ -15044,7 +15045,7 @@
 ** server-installation-scripts
    #+NAME: server-install-path
    #+BEGIN_SRC emacs-lisp :results value :tangle no
-     (expand-file-name "~/.emacs.d/var/lsp/servers")
+     (expand-file-name (concat user-emacs-directory  "var/lsp/servers"))
    #+END_SRC
 
    #+NAME: set_shell_banner
