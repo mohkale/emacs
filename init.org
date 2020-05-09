@@ -142,6 +142,7 @@
                     truncate-lines t ; don't split long lines onto next lines
                     scroll-conservatively 101 ; smooth... enough scrolling going line by line
                     scroll-preserve-screen-position t
+                    major-mode 'text-mode
                     cursor-in-non-selected-windows nil
                     default-buffer-file-coding-system 'utf-8-unix
                     buffer-file-coding-system 'utf-8-unix
@@ -2108,7 +2109,6 @@
 
                 (with-current-buffer program-buffer
                   (comint-send-eof)
-                  (evil-normal-state)
 
                   (unless (get-buffer-process program-buffer)
                     (funcall-interactively 'initial-major-mode)))
@@ -3212,6 +3212,7 @@
          :demand t
          :init
          (setq-default evil-cross-lines t
+                       evil-default-state 'motion
                        evil-want-C-i-jump nil
                        evil-want-C-u-scroll t
                        evil-want-visual-char-semi-exclusive t
@@ -3227,6 +3228,10 @@
 
          :config
          (evil-mode 1)
+
+         (evil-set-initial-state 'prog-mode 'normal)
+         (evil-set-initial-state 'text-mode 'normal)
+         (evil-set-initial-state 'conf-mode 'normal)
 
          ;; https://github.com/hlissner/doom-emacs/blob/develop/modules/editor/evil/config.el#L137
          (advice-add #'evil-global-marker-p :before-until
@@ -3248,17 +3253,17 @@
          (put 'with-evil-adjust-to-eol 'lisp-indent-function 'defun)
 
          (general-define-key
+          "M-g" 'evil-change-to-initial-state)
+
+         (general-define-key
            :states '(insert replace)
            "<S-escape>" 'evil-shift-normal-state)
 
          (general-define-key
-           :keymaps 'override
-           :states leader-nnorm-states
-           "C-a" 'beginning-of-line
-           "M-a" 'end-of-line
-           "C-M-a" 'end-of-line
-           "C-e" 'evil-copy-from-above
-           "M-e" 'evil-copy-from-below)
+          :states '(motion insert)
+          "C-a" 'beginning-of-line
+          "M-a" 'end-of-line
+          "C-M-a" 'end-of-line)
 
          (general-define-key
            :states leader-nnorm-states
@@ -3273,9 +3278,7 @@
            :states 'normal
            "gU" nil
            "gu" 'evil-upcase
-           "gd" 'evil-downcase
-           "gj" 'evil-next-visual-line
-           "gk" 'evil-previous-visual-line)
+           "gd" 'evil-downcase)
 
          ;; because I keep overshadowing the above two
          (general-define-key
@@ -3320,7 +3323,8 @@
 
            "C-d" nil ; erase
            "C-t" nil ; erase
-           )
+           "C-e" 'evil-copy-from-above
+           "M-e" 'evil-copy-from-below)
 
          (general-define-key
            :states 'visual
@@ -3405,7 +3409,9 @@
            "m"   'evil-set-marker
            "-"   'negative-argument
            "C-;" 'evil-repeat-find-char
-           "M-;" 'evil-repeat-find-char-reverse)
+           "M-;" 'evil-repeat-find-char-reverse
+           "gj" 'evil-next-visual-line
+           "gk" 'evil-previous-visual-line)
 
          (general-define-key
            :keymaps 'evil-ex-completion-map
@@ -3457,10 +3463,12 @@
        (with-eval-after-load 'magit
          (use-package evil-magit
            :ensure t
-           :config
+           :init
            (setq evil-magit-state 'motion
-                 evil-magit-use-y-for-yank t)
+                 evil-magit-use-y-for-yank t
+                 evil-magit-emacs-to-default-state-modes nil)
 
+           :config
            (general-define-key
              :states `(,evil-magit-state visual)
              :keymaps 'magit-mode-map
@@ -3805,8 +3813,6 @@
         :straight (buff-menu :type built-in)
         :defer t
         :config
-        (evil-set-initial-state 'Buffer-menu-mode 'motion)
-
         (leader/set-keys-for-major-mode 'Buffer-menu-mode
           "1" 'Buffer-menu-1-window
           "2" 'Buffer-menu-2-window
@@ -4047,7 +4053,6 @@
         :defer t
         :config
         (push 'calendar-mode whitespace-exempt-modes)
-        (evil-set-initial-state 'calendar-mode 'motion)
 
         (general-define-key
           :states  'motion
@@ -4643,7 +4648,7 @@
           "l" 'widget-forward)
 
         (general-define-key
-          :states  'normal
+          :states  'motion
           :keymaps 'custom-mode-map
 
           ;; motion
@@ -4822,7 +4827,6 @@
          (require 'all-the-icons)
 
          (push 'dashboard-mode whitespace-exempt-modes)
-         (evil-set-initial-state 'dashboard-mode 'motion)
 
          (setq inhibit-startup-screen t
                initial-buffer-choice (when (< (length command-line-args) 2)
@@ -5034,7 +5038,6 @@
 
          :config
          (push 'diff-mode whitespace-exempt-modes)
-         (evil-set-initial-state 'diff-mode 'motion)
 
          (leader/set-keys-for-major-mode 'diff-mode
            "r" 'diff-refine-hunk
@@ -5194,7 +5197,6 @@
              "SPC" leader-map))
 
          (add-hook 'ediff-keymap-setup-hook #'ediff--customize-ediff-mode-map)
-
          ;; (evil-set-initial-state 'ediff-meta-mode 'motion)
 
          ;; (general-define-key
@@ -5413,8 +5415,6 @@
            (interactive)
            (call-interactively 'evil-scroll-up)
            (dired-move-to-filename))
-
-         (evil-set-initial-state 'dired-mode 'motion)
 
          (general-define-key
            :keymaps 'dired-mode-map
@@ -5955,8 +5955,6 @@
           :states 'motion
           "Y" 'emojify-description-copy-emoji)
 
-        (evil-set-initial-state 'emojify-description-mode 'motion)
-
         ;; make emojis work like prettify-symbols-mode
         (setq emojify-point-entered-behaviour 'uncover
               emojify-emoji-styles '(unicode github)
@@ -6239,8 +6237,6 @@
         :straight (finder :type built-in)
         :defer t
         :config
-        (evil-set-initial-state 'finder-mode 'motion)
-
         (general-define-key
           :keymaps 'finder-mode-map
           "SPC" 'nil
@@ -6407,7 +6403,6 @@
       (use-package grep
         :defer t
         :config
-        (evil-set-initial-state 'grep-mode 'motion)
         (mohkale/set-compilation-bindings 'grep-mode 'grep-mode-map))
     #+END_SRC
 
@@ -6818,9 +6813,6 @@
            "C-d" 'ivy-reverse-i-search-kill)
 
          ;; ivy-occur
-         (evil-set-initial-state 'ivy-occur-mode 'motion)
-         (evil-set-initial-state 'ivy-occur-grep-mode 'motion)
-
          (leader/set-keys-for-major-mode '(ivy-occur-mode
                                            ivy-occur-grep-mode)
            ;; 'ivy-wgrep-change-to-wgrep-mode
@@ -8384,7 +8376,7 @@
             (outline-hide-subtree)))
 
         (general-define-key
-          :states  'normal
+          :states  'motion
           :keymaps 'outline-mode-map
           "gh" 'outline-up-heading
           "gj" 'outline-next-heading
@@ -8628,6 +8620,7 @@
           "m" 'outline-mark-subtree)
 
         (evil-set-initial-state 'pdf-occur-buffer-mode 'motion)
+
         (defvar pdf-occur-buffer-mode-map (make-sparse-keymap))
         (general-define-key
           :states  'motion
@@ -9352,7 +9345,7 @@
              "w"     'widen))
 
          (general-define-key
-           :states 'normal
+           :states 'motion
            :keymaps 'restclient-mode-map
            "gj" 'restclient-jump-next
            "gk" 'restclient-jump-prev)
@@ -9601,12 +9594,6 @@
                     universal-argument-increment-by)
             (let* ((prefix-value (prefix-numeric-value prefix-arg)))
               (setq prefix-arg (- prefix-value universal-argument-increment-by)))))
-
-        (dolist (mode `(messages-buffer-mode
-                        completion-list-mode
-                        special-mode
-                        message-mode))
-          (evil-set-initial-state mode 'motion))
 
         (leader/set-keys
           "i TAB"       "indent"
@@ -13246,7 +13233,7 @@
         (general-define-key
           :keymaps '(ssh-config-mode-map
                      ssh-known-hosts-mode-map)
-          :states leader-norm-states
+          :states 'motion
           "gj" 'ssh-config-host-next
           "gk" 'ssh-config-host-prev))
     #+END_SRC
@@ -13277,7 +13264,7 @@
 
         (general-define-key
           :keymaps 'makefile-mode-map
-          :states '(normal motion)
+          :states 'motion
           "gj" 'makefile-next-dependency
           "gk" 'makefile-previous-dependency)
 
@@ -13339,7 +13326,7 @@
 
          (general-define-key
            :keymaps 'markdown-mode-map
-           :states 'normal
+           :states 'motion
            "gh" 'markdown-up-heading
            "gj" 'markdown-outline-next
            "gk" 'markdown-outline-previous
