@@ -138,7 +138,6 @@
             recentf-max-saved-items 2048)
 
       (setq-default indent-tabs-mode nil
-                    save-place t ; auto enable save-place mode
                     show-trailing-whitespace nil
                     truncate-lines t ; don't split long lines onto next lines
                     scroll-conservatively 101 ; smooth... enough scrolling going line by line
@@ -9401,17 +9400,22 @@
 
 *** save-place
     remembers the cursor position in open files... so when I reopen them I'm taken to that point
-    immeadiately. It's a cool feature, but not really essential. Generally, when I open a file,
-    I'll look around a bit to see where I was and what I was doing. Jumping to where I was
-    immediately only helps with one of those problems & it seems like a bad habit to depend on
-    that to remind me... use org capture for that and mode dependent jump keys to get to where
-    you need to. quick & easy.
+    immeadiately.
 
-    #+BEGIN_SRC emacs-lisp :tangle no
-      (use-package saveplace
-        :commands (save-place-mode)
-        :init
-        (save-place-mode +1))
+    #+BEGIN_SRC emacs-lisp
+      (if (emacs>= "25.1")
+          (save-place-mode +1)
+        (require 'saveplace)
+        (setq-default save-place t))
+
+      (setq save-place-forget-unreadable-files nil
+            save-place-ignore-files-regexp (rx
+                                            (or "COMMIT_EDITMSG"
+                                                "svn-commit"
+                                                (and "hg-editor-" (one-or-more num))
+                                                (and (or ".txt" ".tmp") eol)
+                                                (and bol (or "/tmp/"))
+                                                (and "bzr_log." (one-or-more num)))))
     #+END_SRC
 
 *** server
