@@ -680,8 +680,7 @@
         "cd" 'close-compilation-window ;; WARN not yet implemented
         "cb" 'display-compilation-buffer
         "cy" 'yank-and-comment
-        "cc" 'toggle-comment-at-point
-        "cC" 'toggle-comment-at-point-alt)
+        "cc" 'compile)
 
       (leader/set-keys
         "f~" 'write-backup
@@ -4137,15 +4136,90 @@
 
         (defvar compilation-auto-kill-window 2
           "if non-nil, after a successfull compilation the compilation
-        window, if open, will automatically be deleted. If set to
-        a numerical value, window will be deleted after that many
-        seconds.")
+      window, if open, will automatically be deleted.
 
-        (defvar compilation-dont-auto-kill-window-when '(warnings)
+      If set to a numerical value, window will be deleted after that many
+      seconds.")
+
+        (defvar compilation-dont-auto-kill-window-when '(warnings focus)
           "specify not to kill the window when warning, error or info given.
-        a list which can take in any symbol from (errors infos warnings). If any
-        of the corresponding notifications are encountered during compilation
-        the window will not be autokilled.")
+      a list which can take in any symbol from (errors infos warnings).
+
+      you can also specify a symbol, focus, to cancel window killing when
+      the compilation window was already open when the compilation was
+      started.")
+
+        (defvar compilation-was-open-p nil
+          "true whether the compilation window was visible when compilation began.")
+
+        (advice-add 'compilation-start :before
+                    (defun compilation-check-window-was-open+ (command &optional mode name-function highlight-regexp)
+                      ;; name-of-mode and buf-name sourced from compile.el
+                      (let* ((mode (or mode 'compilation-mode))
+                             (name-of-mode (if (eq mode t)
+                                               "compilation"
+                                             (replace-regexp-in-string "-mode\\'" "" (symbol-name mode))))
+                             (buf-name (compilation-buffer-name name-of-mode mode name-function))
+                             buf)
+                        (setq compilation-was-open-p
+                              (and (setq buf (get-buffer buf-name))
+                                   (get-buffer-window buf)
+                                   t)))))
+
+        (defun compilation-safely-close-window+ (compilation-buffer)
+          (when (and compilation-buffer
+                     (not (get-buffer-process compilation-buffer)))
+            ;; don't skip if new compilation began before window
+            ;; from previous compilation has been killed.
+            (quit-windows-on compilation-buffer)))
+
+        (defun compilation-cancel-auto-kill-p+ ()
+          "whether to cancel compilation window auto-kill due to `compilation-dont-auto-kill-window-when'."
+          (let ((associations '((errors   . compilation-num-errors-found)
+                                (warnings . compilation-num-warnings-found)
+                                (infos    . compilation-num-infos-found))))
+            (cl-loop for (name . var) in associations
+                     when (and (member name compilation-dont-auto-kill-window-when)
+                               (not (zerop (eval var))))
+                     collect (symbol-name name))))
+
+        (defun compilation-finish-function+ (buf str)
+          "hook to automatically hide compilation output."
+          (when (and compilation-auto-kill-window
+                     (and (member 'focus compilation-dont-auto-kill-window-when)
+                          (not compilation-was-open-p))
+                     ;; an abnormal exit automatically cancels window kill
+                     (not (string-match-p ".*exited abnormally.*" str)))
+            (let* ((terminate-window t))
+              (let ((notifications (compilation-cancel-auto-kill-p+)))
+                (when notifications
+                  (message "window kill suspended due to encountering: %s"
+                           (combine-and-quote-strings notifications))
+                  (setq terminate-window nil)))
+
+              (when terminate-window
+                (if (numberp compilation-auto-kill-window) ;; kill after delay
+                    (run-at-time (concat (number-to-string compilation-auto-kill-window)
+                                         " sec")
+                                 nil 'compilation-safely-close-window+ buf)
+                  (compilation-safely-close-window+ buf))))))
+
+        (add-hook 'compilation-finish-functions 'compilation-finish-function+)
+
+        (add-hook 'compilation-finish-functions
+                  (lambda (&rest _)
+                    (when (eq major-mode 'comint-mode)
+                      (compilation-mode))))
+
+        (defun display-compilation-buffer ()
+          (interactive)
+          (let ((buffer-name (if compilation-buffer-name-function
+                                 (funcall compilation-buffer-name-function "compilation")
+                               "*compilation*")))
+            (if (not buffer-name)
+                (message "compilation buffer doesn't exist")
+              (display-buffer buffer-name))))
+
 
         (defun mohkale/set-compilation-bindings (mode map)
           (leader/set-keys-for-major-mode mode
@@ -4175,86 +4249,6 @@
             :keymaps map
             :states  '(replace insert)
             "ESC" 'evil-motion-state))
-
-        (let* ((compilation-buffer-name "*compilation*"))
-          (defun compilation-safely-close-window ()
-            (let* ((compilation-buffer (get-buffer compilation-buffer-name))
-                   (compilation-process (get-buffer-process compilation-buffer)))
-              (unless (or (not compilation-buffer) compilation-process)
-                ;; don't skip if new compilation began before window
-                ;; from previous compilation has been killed.
-                (quit-windows-on compilation-buffer))))
-
-          (defun mohkale/compilation-finish-function (buf str)
-            "post compilation command hook
-      uses the above two variables to determine whether or not (and when)
-      to kill the compilation window. By default, no attempt to kill will
-      take place when compilation-auto-kill-window is nil. Otherwise the
-      window will be killed unless the compilation processes exit code is
-      non 0.
-
-      UPDATE added compilation-dont-auto-kill-window-when option so window
-      kill can be aborted should any important information be given during
-      the compilation process."
-            (when (and compilation-auto-kill-window
-                       ;; an abnormal exit automatically cancels window kill
-                       (not (string-match-p ".*exited abnormally.*" str)))
-              ;; no abnormalities prepare to exit compilation window
-              (let* ((terminate-window t)) ; set to nil to terminate window kill
-
-                ;; check if config variable determines window should be kept open
-                (when compilation-dont-auto-kill-window-when ; non nil
-                  (unless (listp compilation-dont-auto-kill-window-when)
-                    (error "compilation-dont-auto-kill-window-when failed listp"))
-
-                  (let ((encountered-errors '()))
-                    (and (member 'errors compilation-dont-auto-kill-window-when)
-                         (> compilation-num-errors-found 0)
-                         (push "errors" encountered-errors))
-                    (and (member 'warnings compilation-dont-auto-kill-window-when)
-                         (> compilation-num-warnings-found 0)
-                         (push "warnings" encountered-errors))
-                    (and (member 'infos compilation-dont-auto-kill-window-when)
-                         (> compilation-num-infos-found 0)
-                         (push "information" encountered-errors))
-                    (when (> (length encountered-errors) 0)
-                      (message "window kill suspended due to encountering: %s"
-                               (combine-and-quote-strings encountered-errors))
-                      (setq terminate-window nil))))
-
-                (when terminate-window
-                  (if (numberp compilation-auto-kill-window) ;; kill after delay
-                      (run-at-time (concat (number-to-string compilation-auto-kill-window)
-                                           " sec")
-                                   nil 'compilation-safely-close-window)
-                    (compilation-safely-close-window)))))))
-
-        ;; NOTE setq kept for debug purposes, defvar only works on first call
-        (add-hook 'compilation-finish-functions 'mohkale/compilation-finish-function)
-
-        (add-hook 'compilation-start-hook
-                  (defun compilation--set-initial-evil-state (&rest args)
-                    "use insert state when running an interactive compilation"
-                    (when (eq major-mode 'comint-mode)
-                      (evil-insert-state +1))))
-
-        (add-hook 'compilation-finish-functions
-                  (defun compilation--restore-initial-evil-state (&rest args)
-                    "revert to initial state unless already in initial state"
-                    (let ((desired-state (evil-initial-state 'compilation-mode)))
-                      (unless (eq evil-state desired-state)
-                        (funcall-interactively (intern (concat "evil-"
-                                                               (symbol-name desired-state)
-                                                               "-state")))))))
-
-        (defun display-compilation-buffer ()
-          (interactive)
-          (let ((buffer-name (if compilation-buffer-name-function
-                                 (funcall compilation-buffer-name-function "compilation")
-                               "*compilation*")))
-            (if (not buffer-name)
-                (message "compilation buffer doesn't exist")
-              (display-buffer buffer-name))))
 
         (mohkale/set-compilation-bindings 'compilation-mode 'compilation-mode-map)
 
