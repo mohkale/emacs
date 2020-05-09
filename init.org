@@ -757,6 +757,8 @@
        "M-&"             'async-shell-command-on-region
        "C-M-&"           'async-shell-command-on-buffer
 
+       "C-z" 'suspend-frame
+
        "C-@" (general-simulate-key "C-SPC") ;; C-SPC in terminal
 
        ;; rebound to default-indent-new-line in emacs>=27 and that's
@@ -3212,7 +3214,8 @@
          (setq-default evil-cross-lines t
                        evil-want-C-i-jump nil
                        evil-want-C-u-scroll t
-                       evil-want-visual-char-semi-exclusive t)
+                       evil-want-visual-char-semi-exclusive t
+                       evil-toggle-key "M-z")
 
          (defun evil-set-initial-state+ (mode state)
            (with-eval-after-load 'evil
