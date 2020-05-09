@@ -12677,6 +12677,14 @@
          :straight (org-src :type built-in)
          :defer t
          :config
+         (general-define-key
+           :keymaps 'org-src-mode-map
+           [remap evil-write] 'org-edit-src-save
+           [remap evil-quit] 'org-edit-src-abort
+           ;; save and then quit
+           [remap evil-save-and-close] 'org-edit-src-exit
+           [remap evil-save-modified-and-close] 'org-edit-src-exit)
+
          (leader/with-major-mode-prefix
            (leader/set-keys-for-mode 'org-src-mode
              "," 'org-edit-src-exit
