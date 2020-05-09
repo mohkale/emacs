@@ -8487,6 +8487,7 @@
         :init
         (leader/set-keys
           "xr"   "regexp"
+          "xrb"  'regexp-builder
           "xr'"  'rxt-convert-to-strings
           "xr/"  'rxt-explain
           "xrc"  'rxt-convert-syntax
@@ -9681,6 +9682,39 @@
                         query-replace))
           (advice-add func :around
                       #'restore-default-display-buffer-actions)))
+    #+END_SRC
+
+*** regexp-builder
+    #+BEGIN_SRC emacs-lisp
+      (use-package re-builder
+        :config
+        (setq reb-re-syntax 'rx)
+        ;; (evil-set-initial-state 'reb-lisp-mode 'insert)
+
+        (general-define-key
+         :keymaps 'reb-lisp-mode-map
+         :states 'normal
+         "gj" 'reb-next-match
+         "gk" 'reb-prev-match
+         [remap quit-window] 'reb-quit)
+
+        (defun reb-save-and-quit+ ()
+          "copy regexp and then exit reb."
+          (interactive)
+          (reb-copy)
+          (reb-quit))
+
+        (leader/set-keys-for-major-mode 'reb-lisp-mode
+          "," 'reb-save-and-quit+
+          "s" 'reb-copy ;; as string
+          "q" 'reb-quit
+
+          "b" 'reb-change-target-buffer
+          "c" 'reb-toggle-case
+          "y" 'reb-copy ;; as string
+          "u" 'reb-force-update
+          "s" 'reb-enter-subexp-mode
+          "TAB" 'reb-change-syntax))
     #+END_SRC
 
 *** tabulated-list-mode
