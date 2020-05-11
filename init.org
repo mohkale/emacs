@@ -3476,6 +3476,37 @@
          (add-hook 'lisp-interaction-mode-hook #'evil-args--adjust-for-elisp))
      #+END_SRC
 
+**** evil-easymotion
+     #+BEGIN_SRC emacs-lisp
+       (use-package evil-easymotion
+         :ensure t
+         :defer  t
+         :init
+         (leader/with-prefix "jm"
+           (leader/set-keys
+             ""   "motion"
+             "w"  'evilem-motion-forward-word-begin
+             "W"  'evilem-motion-forward-WORD-begin
+             "e"  'evilem-motion-forward-word-end
+             "E"  'evilem-motion-forward-WORD-end
+             "b"  'evilem-motion-backward-word-begin
+             "B"  'evilem-motion-backward-WORD-begin
+             ;; "ge" 'evilem-motion-backward-word-end
+             ;; "gE" 'evilem-motion-backward-WORD-end
+             "j"  'evilem-motion-next-line
+             "k"  'evilem-motion-previous-line
+             "J"  'evilem-motion-next-visual-line
+             "K"  'evilem-motion-previous-visual-line
+             "t"  'evilem-motion-find-char-to
+             "T"  'evilem-motion-find-char-to-backward
+             "f"  'evilem-motion-find-char
+             "F"  'evilem-motion-find-char-backward
+             "*"  'evilem-motion-search-word-forward
+             "#"  'evilem-motion-search-word-backward
+             "-"  'evilem-motion-previous-line-first-non-blank
+             "+"  'evilem-motion-next-line-first-non-blank)))
+     #+END_SRC
+
 **** evil-magit
      #+BEGIN_SRC emacs-lisp
        (with-eval-after-load 'magit
