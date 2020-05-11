@@ -729,6 +729,7 @@
 
       (leader/set-keys
         "t TAB" 'set-indent-offset
+        "th" 'toggle-buffer-header
         "tL" 'toggle-lexical-binding
         "tr" 'toggle-relative-linum)
 
@@ -1600,17 +1601,35 @@
         (interactive "P")
         (message "prefix is: %s" prefix))
 
-      (defun toggle-relative-linum (&optional prefix)
-        "toggle relative line numbers in the current buffer
-      by default, doesn't do anything if line numbers aren't visible.
+      (defvar-local header-line-actual-format nil
+        "value of `header-line-format' before being modified by `toggle-buffer-header'.")
 
-      pass the prefix argument to force display of line numbers first."
+      (defun toggle-buffer-header (&optional arg)
         (interactive "P")
-        (when (or prefix display-line-numbers)
-          (setq display-line-numbers
-                (if (eq display-line-numbers 'relative)
-                    t
-                  'relative))))
+        (let ((showing (if arg
+                           (not (zerop (prefix-numeric-value arg)))
+                         header-line-actual-format)))
+          (if showing
+              (if (not  header-line-actual-format)
+                  (user-error "tried to restore header-line: nil")
+                (setq header-line-format  header-line-actual-format
+                      header-line-actual-format nil))
+            (setq header-line-actual-format header-line-format
+                  header-line-format nil))))
+
+      (defun toggle-relative-linum (&optional arg)
+        "toggle relative line numbers in the current buffer
+      when ARG is given and is 0, then relative line numbers are disabled,
+      otherwise if ARG is greater than 0 then they're enabled and if ARG is
+      nil then relative line-numbers are toggled."
+        (interactive "P")
+        (setq display-line-numbers
+              (cond
+               ((and arg (zerop (prefix-numeric-value arg)))
+                t)
+               (arg 'relative)
+               (t
+                (if (eq display-line-numbers 'relative) t 'relative)))))
 
       (defun keymaps-at-point ()
         "List entire keymaps present at point."
@@ -6435,7 +6454,7 @@
         :commands hide/show-comments-toggle
         :init
         (leader/set-keys
-          "th" 'hide/show-comments-toggle))
+          "t/" 'hide/show-comments-toggle))
     #+END_SRC
 
 *** hide-modeline
@@ -9415,7 +9434,13 @@
     #+BEGIN_SRC emacs-lisp
       (use-package server
         :demand t
-        :commands (server-kill-clients-for-buffer)
+        :commands (server-kill-clients-for-buffer
+                   server-header-mode--toggle-show-headers)
+        :init
+        (leader/set-keys
+          "t1" '("toggle-client-headers"       . server-header-mode--toggle-show-headers)
+          "t2" '("toggle-client-headers-local" . server-header-mode--toggle-show-headers-local))
+
         :config
         ;; see [[http://emacshorrors.com/posts/determining-if-the-server-is-started-or-the-wonders-of-server-running-p.html][emacs-horrors]] for why this is sometimes useless :(
         (or (server-running-p) (server-start))
@@ -9437,8 +9462,36 @@
                       "automatically save file before server exit"
                       (save-buffer)))
 
+        (defvar server-header-mode-show-header t
+          "when true, any new buffers in which `server-header-mode' is activated
+      will have the header shown.")
+
+        (defun server-header-mode--toggle-show-headers (&optional arg local)
+          (interactive "P")
+          (let ((value (cond
+                        (arg
+                         (not (zerop (prefix-numeric-value arg))))
+                        (t (not server-header-mode-show-header)))))
+            (if local
+                (setq-local server-header-mode-show-header value)
+              (setq server-header-mode-show-header value))
+
+            (toggle-buffer-header arg)
+
+            (message "%s client headers in %s"
+                     (if server-header-mode-show-header
+                         (propertize "showing" 'face 'compilation-info)
+                       (propertize "hiding" 'face 'compilation-error))
+                     (if local
+                         "the current buffer"
+                       "all buffers"))))
+
+        (defun server-header-mode--toggle-show-headers-local (&optional arg)
+          (interactive "P")
+          (server-header-mode--toggle-show-headers arg t))
+
         ;; add ,, and ,q like bindings in server edit sessions, like org-edit-src-code
-        (define-minor-mode mohkale-server-mode
+        (define-minor-mode server-header-mode
           "a dummy minor mode for files being edited by `server'.
       makes it easier to bind keys (& leaders :grinning: for them)."
           nil
@@ -9446,22 +9499,23 @@
           '(([remap evil-write] . server-edit)
             ([remap evil-save-and-close] . server-edit)
             ([remap evil-quit-all-with-error-code] . server-abort))
-          (when mohkale-server-mode
+          (when (and server-header-mode
+                     server-header-mode-show-header)
             (setq header-line-format
                   (substitute-command-keys
                    "Editing an emacsclient sesssion.  Exit with '\\[server-edit]' or abort with '\\[server-abort]'"))))
 
         (add-hook 'server-switch-hook
-                  (defun server-switch--enable-mohkale-server-mode ()
+                  (defun server-switch--enable-server-header-mode ()
                     (when server-buffer-clients
                       (unless (or (bound-and-true-p magit-mode)
                                   (bound-and-true-p git-commit-mode))
-                        (mohkale-server-mode)))))
+                        (server-header-mode)))))
 
-        (add-hook 'server-done-hook (lambda () (mohkale-server-mode -1)))
+        (add-hook 'server-done-hook (lambda () (server-header-mode -1)))
 
         (leader/with-major-mode-prefix
-          (leader/set-keys-for-mode 'mohkale-server-mode
+          (leader/set-keys-for-mode 'server-header-mode
             "," 'server-edit
             "q" 'server-abort)))
     #+END_SRC
