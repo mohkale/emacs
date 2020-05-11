@@ -4487,7 +4487,12 @@
 
         :config
         (setq company-statistics-file         (var! "company/statistics.el")
-              company-tabnine-binaries-folder (var! "company/tabnine-binaries"))
+              company-tabnine-binaries-folder (var! "company/tabnine-binaries")
+              company-tooltip-align-annotations t)
+
+        ;; don't let display steal focus
+        (advice-add 'company-show-location   :around 'restore-default-display-buffer-actions)
+        (advice-add 'company-show-doc-buffer :around 'restore-default-display-buffer-actions)
 
         (global-company-mode)
 
@@ -4555,6 +4560,41 @@
                     "pop configured company backends for the current MAJOR-MODE"
                     (company/configure-mode--pop-backends+ major-mode)))
 
+        (defun company-first-candidate+ ()
+          (interactive)
+          (company-set-selection 0))
+
+        (defun company-last-candidate+ ()
+          (interactive)
+          (company-set-selection (max 0 (1- company-candidates-length))))
+
+        (defun company-complete-next-char+ (&optional count)
+          "insert the next COUNT characters from the current candidate."
+          (interactive "p")
+          (or count (setq count 1))
+
+          (when (company-manual-begin)
+            (let* ((candidate (nth company-selection company-candidates))
+                   (remaining-input
+                    (substring candidate (length company-prefix))))
+              (if (or (<= (length remaining-input) 1)
+                      (>= count (length remaining-input)))
+                  (company-complete-selection)
+                (company--insert-candidate
+                 (concat company-prefix
+                         (substring remaining-input 0 count)))))))
+
+        (defun company-complete-common-or-next-char+ (&optional count)
+          "complete the common part of the current selection or insert
+      upto COUNT characters from the current candidate."
+          (interactive)
+          (if (and (not (cdr company-candidates))
+                   (equal company-common (car company-candidates)))
+              (company-complete-selection)
+            (if (string-prefix-p company-prefix company-common)
+                (company-complete-next-char+ count)
+              (company--insert-candidate company-common))))
+
         ;; inspired by this issue: https://github.com/company-mode/company-mode/issues/839
         (cl-defmacro company/configure-mode ((mode &key major (use-universal t) predicate) &rest backends)
           "configure company backends for a given mode
@@ -4590,46 +4630,50 @@
 
         (setq company-require-match nil)
 
-        (let* ((bindings '("C-1"     company-complete-number
-                           "C-2"     company-complete-number
-                           "C-3"     company-complete-number
-                           "C-4"     company-complete-number
-                           "C-5"     company-complete-number
-                           "C-6"     company-complete-number
-                           "C-7"     company-complete-number
-                           "C-8"     company-complete-number
-                           "C-j"     company-select-next
-                           "C-k"     company-select-previous
-                           "C-d"     company-next-page
-                           "C-u"     company-previous-page
-                           "C-l"     company-complete-selection
-                           "C-M-h"   company-show-doc-buffer
-                           "<C-tab>" company-complete-common-or-cycle
-                           "<tab>"   company-complete-selection
-                           ;; "C-:"     counsel-company
-                           ;; "C-:"     helm-company
-                           "C-h"     company-quickhelp-manual-begin
-                           "C-/"     company-filter-candidates))
-               (unset-bindings (mapcar (lambda (value)
-                                         (if (stringp value)
-                                             value
-                                           nil))
-                                       bindings)))
-          (defun mohkale/unset-company-bindings (&rest args)
-            (apply 'general-define-key
-                   :keymaps 'override
-                   :states  'insert
-                   unset-bindings))
+        (defvar mohkale-company-menu-bindings
+          `("C-1"     company-complete-number
+            "C-2"     company-complete-number
+            "C-3"     company-complete-number
+            "C-4"     company-complete-number
+            "C-5"     company-complete-number
+            "C-6"     company-complete-number
+            "C-7"     company-complete-number
+            "C-8"     company-complete-number
+            "M-l"     company-complete-common-or-next-char+
+            "C-j"     company-select-next
+            "C-k"     company-select-previous
+            "C-d"     company-next-page
+            "C-u"     company-previous-page
+            "C-l"     company-complete-selection
+            ;; "C-M-h"   company-show-doc-buffer
+            "<C-tab>" company-complete-common-or-cycle
+            "<tab>"   company-complete-selection
+            ;; "C-h"     company-quickhelp-manual-begin
+            "C-/"     company-filter-candidates
+            "C-s"     company-filter-candidates
+            "C-o"     company-last-candidate+
+            "M-o"     company-first-candidate+)
+          "bindings which override any local bindings while the company popup is active.
+      DO NOT alter this (by setting a new value) while the popup is active, or be prepared
+      to restart emacs.")
 
-          (defun mohkale/set-company-bindings (&rest args)
-            (apply 'general-define-key
-                   :keymaps 'override
-                   :states  'insert
-                   bindings)))
+        (defun company-set-bindings+ (&rest args)
+          (apply 'general-define-key
+                 :keymaps 'override
+                 :states  'insert
+                 mohkale-company-menu-bindings))
 
-        (add-hook 'company-completion-started-hook 'mohkale/set-company-bindings)
-        (add-hook 'company-completion-finished-hook 'mohkale/unset-company-bindings)
-        (add-hook 'company-completion-cancelled-hook 'mohkale/unset-company-bindings)
+        (defun company-unset-bindings+ (&rest args)
+          (apply 'general-define-key
+                 :keymaps 'override
+                 :states  'insert
+                 (cl-loop for (i . arg) in (-zip (number-sequence 0 (length mohkale-company-menu-bindings))
+                                                 mohkale-company-menu-bindings)
+                          collect (if (zerop (% i 2)) arg nil))))
+
+        (add-hook 'company-completion-started-hook   'company-set-bindings+)
+        (add-hook 'company-completion-finished-hook  'company-unset-bindings+)
+        (add-hook 'company-completion-cancelled-hook 'company-unset-bindings+)
 
         (general-define-key
           :keymaps 'company-search-map
@@ -4642,17 +4686,17 @@
           "C-7"    'company-complete-number
           "C-8"    'company-complete-number
           "C-9"    'company-complete-number
-          ;; "C-j"       'company-select-next
-          ;; "C-k"       'company-select-previous
-          ;; "TAB"       'company-complete-selection
-          "C-v"    'company-search-toggle-filtering ; show filtered/all
+          "C-f"    'company-search-toggle-filtering ; show filtered/all
+          "C-s"    'company-search-repeat-forward
+          "C-r"    'company-search-repeat-backward
+          "C-n"    'company-search-repeat-forward
+          "C-p"    'company-search-repeat-backward
           "ESC"    'company-search-abort)
 
         (general-define-key
           :keymaps 'company-active-map
-          "C-w" nil ;; was company-show-location)
-          )
-      )
+          "C-w" nil ;; was company-show-location
+          "C-e" 'company-show-location))
     #+END_SRC
 
 *** company-quickhelp
@@ -7068,9 +7112,9 @@
              "oh" 'counsel-org-agenda-headlines))
 
          (with-eval-after-load 'company
-           (general-define-key
-             :keymaps 'company-mode-map
-             "C-:" 'counsel-company))
+           (setq mohkale-company-menu-bindings
+                 (append mohkale-company-menu-bindings
+                         '("C-:" counsel-company))))
 
          (leader/set-keys
            "ae" 'counsel-package
@@ -7136,10 +7180,6 @@
                                    (counsel-find-file (if (string-empty-p dir)
                                                           last-directory
                                                         dir)))))))
-
-         (advice-add 'counsel-company :before
-                     (defun counsel-company--hide-popup (&rest args)
-                       (company-cancel)))
 
          (ivy-set-actions 'counsel-fonts
                           '(("o" describe-font "describe")))
