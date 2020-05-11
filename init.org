@@ -6312,7 +6312,8 @@
         :defer  t
         ;; :delight " ⓢ"
         :delight "FlyCheck"
-        :commands (flycheck-last-error
+        :commands (toggle-flycheck-messages
+                   flycheck-last-error
                    flycheck-error-list-goto-first-error
                    flycheck-error-list-goto-last-error
                    flycheck-list-errors--goto-first-error)
@@ -6330,9 +6331,36 @@
           "el" 'flycheck-list-errors
           "eS" 'flycheck-set-checker-executable
           "es" 'flycheck-select-checker
-          "ev" 'flycheck-verify-setup)
+          "ev" 'flycheck-verify-setup
+          "te" 'toggle-flycheck-messages)
 
         :config
+        (defvar-local flycheck-original-display-errors-function nil
+          "the value of `flycheck-display-errors-function' before being toggled
+      by `toggle-flycheck-messages'.")
+
+        (defun toggle-flycheck-messages (&optional prefix)
+          (interactive "P")
+          (let ((enabling
+                 (cond
+                  (prefix
+                   (not (zerop (prefix-numeric-value prefix))))
+                  (t flycheck-original-display-errors-function))))
+            (when (and enabling
+                       (not flycheck-original-display-errors-function))
+              (user-error "trying to restore a non-existant error function"))
+
+            (if enabling
+                (setq flycheck-display-errors-function flycheck-original-display-errors-function
+                      flycheck-original-display-errors-function nil)
+              (setq flycheck-original-display-errors-function flycheck-display-errors-function
+                    flycheck-display-errors-function nil))
+
+            (message "%s flycheck messages"
+                     (if enabling
+                         (propertize "enabled" 'face 'compilation-info)
+                       (propertize "disabled" 'face 'compilation-error)))))
+
         (setq flycheck-python-pycompile-executable "python3")
 
         (use-package flycheck-pos-tip
@@ -6343,8 +6371,7 @@
 
         (setq-default flycheck-disabled-checkers '(emacs-lisp-checkdoc))
 
-        ;; update fringe for flycheck
-        ;; src: https://github.com/syl20bnr/spacemacs/blob/master/layers/%2Bcheckers/syntax-checking/packages.el
+        ;; update fringe for flycheck [[https://github.com/syl20bnr/spacemacs/blob/master/layers/%2Bcheckers/syntax-checking/packages.el][src]].
         (define-fringe-bitmap 'mohkale-flycheck-fringe-indicator
           (vector #b00000000
                   #b00000000
