@@ -221,6 +221,117 @@
       (defalias 'java-debugger    #'jdb)
     #+END_SRC
 
+*** Term
+    Try to enable extra keycodes available in newer terminals, such that you can hae
+    GUI like bindings in terminal emacs.
+
+    #+BEGIN_SRC emacs-lisp
+      ;; Make emacs in tmux behave like xterm. Source [[https://wiki.archlinux.org/index.php/Emacs#Shift_.2B_Arrow_keys_not_working_in_emacs_within_tmux][here]].
+      (advice-add 'terminal-init-screen :before
+                  (defun tmux (&rest _)
+                    "Apply xterm keymap, allowing use of keys passed through tmux."
+                    (when (getenv "TMUX")
+                      (let ((map (copy-keymap xterm-function-map)))
+                        (set-keymap-parent map (keymap-parent input-decode-map))
+                        (set-keymap-parent input-decode-map map)))))
+
+      (defun enable-xterm-mouse-mode ()
+        (xterm-mouse-mode +1))
+
+      (advice-add 'terminal-init-xterm :after #'enable-xterm-mouse-mode)
+      (advice-add 'terminal-init-tmux  :after #'enable-xterm-mouse-mode)
+
+      (defun mohkale/setup-frame-bindings (&optional frame)
+        (with-selected-frame (or frame (selected-frame))
+          ;; for some reason, C-/ is remapped to C-_, but (kbd "C-/") isn't C-_,
+          ;; it's this bizarre vector here.
+          (define-key input-decode-map "" [67108911])
+
+          ;; reclaim key combinations from terminal. See initial source [[https://emacs.stackexchange.com/questions/220/how-to-bind-c-i-as-different-from-tab][here]].
+          ;; NOTE: in GUI, the behaviour shouldn't have changed. The following keys haven't
+          ;; been reclaimed, but the GUI variants override the term versions anyways, so you
+          ;; shouldn't really notice.
+          ;;
+          ;; | reclaimed | key       | num | name | terminal-key | notes                       |
+          ;; |-----------+-----------+-----+------+--------------+-----------------------------|
+          ;; | [ ]       | backspace | 127 | DEL  | Ctrl+?       | Maybe translated to Ctrl+h  |
+          ;; | [X]       | tab       |   9 | TAB  | Ctrl+I       |                             |
+          ;; | [ ]       | linefeed  |  10 | LFD  | Ctrl+j       | Few keyboards have this key |
+          ;; | [X]       | return    |  13 | RET  | Ctrl+m       |                             |
+          ;; | [X]       | escape    |  27 | ESC  | Ctrl+[       |                             |
+          ;;
+
+          ;; WARN for this to work, you can't use (kbd key) because that automatically
+          ;; gets translated to the original keys. You'll have to use [key] directly.
+          ;; You'll also need to declare some input combination to be (effectively) key
+          ;; for your terminal, see the xterm eg below.
+          (define-key input-decode-map [?\C-i] [C-i]) ;; was TAB
+          (if (display-graphic-p)
+              ;; GUI specific remappings
+              (progn
+                (define-key input-decode-map "	"  [C-i])
+                (define-key input-decode-map [?\C-m] [C-m]))
+            ;; terminal remappings
+            (define-key input-decode-map "	"    nil))
+
+          ;; evaluate the following to translate reclaimed bindings back for
+          ;; terminals which don't specify any special key combinations for the
+          ;; reclaimed keys :cry:.
+          ;; (define-key function-key-map [C-i]  "	")
+          ;; (define-key function-key-map [C-m]  "")
+          (define-key function-key-map [C-\[] "")                             ; I don't mind this being taken
+
+          ;; some extra bindings I've got in st, see term/xterm.el
+          (when (featurep 'xterm)
+            (define-key xterm-function-map "\e[32;2u"  [33554464])
+            (define-key xterm-function-map "\e[127;2u" [S-backspace])
+            (define-key xterm-function-map "\e[127;5u" [C-backspace])
+            (define-key xterm-function-map "\e[127;6u" [C-S-backspace])
+            (define-key xterm-function-map "\e[13;2u"  [S-return])
+            (define-key xterm-function-map "\e[13;8u"  [C-M-S-return])
+            (define-key xterm-function-map "\eOB"      [down])
+            (define-key xterm-function-map "\eOA"      [up])
+            (define-key xterm-function-map "\eOD"      [left])
+            (define-key xterm-function-map "\eOC"      [right])
+            (define-key xterm-function-map "\e[1;2B"   [S-down])
+            (define-key xterm-function-map "\e[1;2A"   [S-up])
+            (define-key xterm-function-map "\e[1;2D"   [S-left])
+            (define-key xterm-function-map "\e[1;2C"   [S-right])
+            (define-key xterm-function-map "\e[32;3u"  [134217760])
+            (define-key xterm-function-map "\e[58;4u"  [134217786])                         ; M-:
+            (define-key xterm-function-map "\e[58;6u"  [67108922])                          ; C-:
+            (define-key xterm-function-map "\e[124;6u" [67108988])                          ; C-|
+            (define-key xterm-function-map "\e[124;8u" [201326716])                         ; C-M-|
+            (define-key xterm-function-map "\e[62;6u"  [67108926])                          ; C->
+            (define-key xterm-function-map "\e[60;6u"  [67108924])                          ; C->
+            (define-key xterm-function-map "\e[105;7u" [134217737])                         ; C-M-i
+            (define-key xterm-function-map "\e[27;3u"  [134217755])                         ; M-ESC
+            (define-key xterm-function-map "\e[27;5u"  [67108891])                          ; C-ESC
+
+            ;; define xterm codes for ctrl+shift alphabet keys
+            (cl-loop for (i . char) in (-zip (number-sequence 65 90)
+                                             (append (number-sequence 97 105)
+                                                     '(107 106)                               ; for some reason, J & K are switched
+                                                     (number-sequence 108 122)))
+                     do (define-key xterm-function-map
+                          (concat "\e[" (number-to-string i) ";6u")
+                          (kbd (concat "C-S-" (string char))))))
+
+          ;; NOTE: reclaimed key combinations, see source [[https://emacs.stackexchange.com/questions/220/how-to-bind-c-i-as-different-from-tab/20290#20290][here]].
+          (define-key input-decode-map "\e[105;5u" [C-i])
+          (define-key input-decode-map "\e[109;5u" [C-m])
+          (define-key input-decode-map "\e[91;5u"  [C-\[])))
+
+      (add-hook 'after-make-frame-functions #'mohkale/setup-frame-bindings)
+
+      ;; initial setup for current frame, shouldn't be neeeded in newly created
+      ;; frames, or emacs daemon frames.
+      (unless (daemonp)
+        (add-hook 'emacs-startup-hook
+                  (lambda (&rest _)
+                    (mohkale/setup-frame-bindings))))
+    #+END_SRC
+
 *** Config Variables
     #+BEGIN_SRC emacs-lisp
       (defvar load-me-now-duration 120
@@ -457,6 +568,43 @@
                               ,(var! "pdf-tools/")))
         (mkdir ensured-path t))
 
+    #+END_SRC
+
+    source bookmarks from my aliases directory, see [[https://github.com/mohkale/.dotfiles/tree/master/core/aliases][dotfiles]].
+    TODO finish bookmarks setup
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (defvar mohkale-aliases-dir
+        (join-path
+         (or (getenv "XDG_CONFIG_HOME")
+             (join-path (getenv "HOME") ".config"))
+         "aliases")
+        "directory containing alias files (including fsmaps).")
+
+      (when (file-directory-p mohkale-aliases-dir)
+        (let ((files
+               (cl-loop for f in
+                        (delq nil
+                              (list "global" "emacs"
+                                    (cond
+                                     ((unix-p)    "linux")
+                                     ((macos-p)   "macos")
+                                     ((windows-p) "windows"))))
+                        do (setq f (join-path mohkale-aliases-dir f))
+                        when (and (file-readable-p f)
+                                  (file-newer-than-file-p f bookmark-file))
+                          collect f)))
+          (when (and files
+                     (cl-loop for f in files
+                              when (file-newer-than-file-p f bookmark-file)
+                              return t))
+            (with-temp-buffer
+              (dolist (f files)
+                (insert-file f)
+                      )
+              )
+            )
+          ))
     #+END_SRC
 
 *** package-initialise
@@ -740,6 +888,17 @@
 
 ** Global Bindings
    #+BEGIN_SRC emacs-lisp
+      ;; defaults for reclaimed bindings
+      (general-define-key
+       [C-i] 'indent-for-tab-command
+       [C-m] 'newline-and-indent)
+
+      (general-define-key
+       :states 'motion
+       ;; evil doesn't seem to have a default for tab.
+       ;; [C-i] 'indent-for-tab-command
+       [C-m] 'evil-ret)
+
      (general-unbind
        "M-h" ;; was backward-kill-sentence
        "C-M-\\" ;; was indent-region
@@ -812,7 +971,7 @@
        :keymaps 'mohkale-window-map
        "m"   'window-zen
        "RET" 'window-zen
-       ; "C-m" 'window-zen
+       [C-m] 'window-zen
        "M"   'window-zen-restore
        "M-m" 'window-zen-restore)
 
@@ -4088,7 +4247,7 @@
           "f"   (general-simulate-key "u" :state 'emacs)
           "C-v" (general-simulate-key "j" :state 'emacs)
           "C-n" (general-simulate-key "k" :state 'emacs)
-          ;; "C-m" (general-simulate-key "v" :state 'emacs)
+          ;; [C-m] (general-simulate-key "v" :state 'emacs)
           )
 
         (leader/set-keys-for-major-mode 'calc-mode
@@ -6859,6 +7018,7 @@
 
            "C-v"      'quoted-insert ;; was ivy-scroll-up-command
            "<return>" 'ivy-alt-done ;; also supports tramp expansion
+           "RET"      'ivy-alt-done
 
            ;;; misc
            "C-?" 'describe-mode
@@ -6914,7 +7074,7 @@
            ;;; insertion/deletion
            ;; complete current selection into minibuffer
            ;; leave prompt active to build on it.
-           "C-i" 'ivy-insert-current
+           [C-i] 'ivy-insert-current
            "C-DEL" 'evil-delete-backward-word
            ;; pull word in from point at buffer
            "M-y" 'ivy-yank-word
@@ -10804,7 +10964,7 @@
 
          (general-define-key
            :states 'insert
-           "C-i" 'yas-expand
+           [C-i] 'yas-expand
            "M-I" 'yas-expand)
 
          :config
@@ -12082,7 +12242,7 @@
                "|" 'ruby-electric-bar
                (kbd "RET") 'ruby-electric-return
                ;; (kbd "C-j") 'ruby-electric-return
-               ;; (kbd "C-m") 'ruby-electric-return
+               ;; [C-m] 'ruby-electric-return
                "}" 'ruby-electric-close-matching-char
                ")" 'ruby-electric-close-matching-char
                "]" 'ruby-electric-close-matching-char))))
