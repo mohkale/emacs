@@ -8025,10 +8025,16 @@
           "ils" 'Lorem-ipsum-insert-sentences))
     #+END_SRC
 
-*** language-server
+*** lsp
+    #+BEGIN_SRC emacs-lisp
+      (defvar mohkale-lsp-command 'eglot
+        "command to start an lsp server")
+    #+END_SRC
+
 **** lsp-mode
      #+BEGIN_SRC emacs-lisp
        (use-package lsp-mode
+         :if (eq mohkale-lsp-command 'lsp)
          :ensure t
          :defer  t
          ;; never use lsp-mode, use lsp.
@@ -8036,9 +8042,14 @@
          (setq lsp-prefer-flymake             nil
                lsp-enable-snippet             nil
                lsp-enable-symbol-highlighting nil
+               lsp-auto-guess-root            t
                mohkale-lsp-map (make-sparse-keymap)
                lsp-session-file (var! "lsp/session")
                lsp-server-install-dir (var! "lsp/servers"))
+
+         (leader/set-keys-for-mode 'lsp-mode
+           "jy" 'lsp-goto-type-definition
+           "jY" 'lsp-goto-implementation)
 
          (leader/with-prefix mohkale--server-leader-key
            (leader/set-keys-for-mode 'lsp-mode
@@ -8079,6 +8090,7 @@
       #+BEGIN_SRC emacs-lisp
         (with-eval-after-load 'lsp-mode
           (use-package lsp-ui
+            :if (eq mohkale-lsp-command 'lsp)
             :ensure t
             :defer  t
             ;; :hook (lsp-mode-hook . lsp-ui-mode)
@@ -8101,6 +8113,7 @@
       #+BEGIN_SRC emacs-lisp
         (with-eval-after-load 'lsp-mode
           (use-package company-lsp
+            :if (eq mohkale-lsp-command 'lsp)
             :ensure t
             :defer  t
             :commands company-lsp
@@ -8113,69 +8126,115 @@
       #+END_SRC
 
 **** eglot
-     seems cool, but the lack of good documentation and support for flycheck is off putting.
-     Also doesn't seem to highlight errors using eldoc when possible, which is a feature I
-     quite like from lsp-mode. Give it some time, check back again.
-
-     #+BEGIN_SRC emacs-lisp :tangle no
+     #+BEGIN_SRC emacs-lisp
        (use-package eglot
+         :if (eq mohkale-lsp-command 'eglot)
          :ensure t
          :defer  t
-         :init
-         (defalias 'eglot-rename-symbol 'eglot-rename)
+         :hook (eglot-managed-mode . flycheck-mode)
          :config
+         (require 'eglot-flycheck)
+
+         ;; I'll set my backends myself, thank you.
+         (setq eglot-stay-out-of '(company))
+
+         ;; prevent eglot highlighting the symbol at point
          (setq eglot-ignored-server-capabilites
                '(:documentHighlightProvider))
 
-         ;; ;; add flycheck support: https://github.com/joaotavora/eglot/issues/195
-         ;; (defvar-local eglot-flycheck--fc-callback nil)
+         (company/configure-mode (eglot--managed-mode)
+           ;; eglot doesn't have it's own company backend
+           ;; it just extends capf with lsp completions :smile:.
+           company-capf)
 
-         ;; (defun eglot-flycheck--point->line-col (buffer beg)
-         ;;   (with-current-buffer buffer
-         ;;     (save-excursion
-         ;;       (goto-char beg)
-         ;;       (cons (line-number-at-pos)
-         ;;             (- (point)
-         ;;                (line-beginning-position))))))
+         (leader/set-keys-for-mode 'eglot--managed-mode
+           ;; aliases for gg and gG
+           "jy" 'eglot-find-implementation
+           "jY" 'eglot-find-typeDefinition)
 
-         ;; (defun eglot-flycheck--fm-error->fc-error (err)
-         ;;   (pcase-let* ((msg (flymake--diag-text err))
-         ;;                (beg (flymake--diag-beg err))
-         ;;                (buffer (flymake--diag-buffer err))
-         ;;                (`(,line . ,col) (eglot-flycheck--point->line-col buffer beg)))
-         ;;     (flycheck-error-new-at
-         ;;      line nil ;; TODO: use column and region
-         ;;      (pcase (flymake--diag-type err)
-         ;;        (':error 'error)
-         ;;        (':warning 'warning)
-         ;;        (':note 'info))
-         ;;      msg
-         ;;      :id "eglot-flycheck"
-         ;;      ;; :checker
-         ;;      :buffer buffer
-         ;;      :filename (buffer-file-name buffer))))
+         (leader/with-prefix mohkale--server-leader-key
+           (leader/set-keys-for-mode 'eglot--managed-mode
+             ;; unbound 'eglot-clear-status
+             "" "server"
+             "x" 'eglot-code-actions
+             "e" 'eglot-events-buffer
+             "k" 'eglot-shutdown
+             "h" 'eglot-help-at-point
+             "2" 'eglot-stderr-buffer
+             "r" 'eglot-rename
+             "f" 'eglot-format
+             "F" 'eglot-format-buffer
+             "o" 'eglot-reconnect
 
-         ;; (cl-defun eglot-flycheck--flymake-handle-result (flymake-errors &key region)
-         ;;   (funcall eglot-flycheck--fc-callback
-         ;;            'finished
-         ;;            (mapcar #'eglot-flycheck--fm-error->fc-error flymake-errors)))
+             "g" "goto"
+             "gg" 'eglot-find-implementation
+             "gG" 'eglot-find-typeDefinition
+             "gd" 'eglot-find-declaration
 
-         ;; (cl-defun eglot-flycheck-checker (checker callback)
-         ;;   (setq eglot-flycheck--fc-callback callback)
-         ;;   (eglot-flymake-backend #'eglot-flycheck--flymake-handle-result))
-
-         ;; (flycheck-define-generic-checker
-         ;;  'eglot-checker
-         ;;  "eglot flycheck checker"
-         ;;  :start #'eglot-flycheck-checker
-         ;;  :modes (eglot--all-major-modes))
-         )
+             "w"  "workspace"
+             "wf" 'eglot-forget-pending-continuations
+             "wc" 'eglot-signal-didChangeConfiguration)))
      #+END_SRC
+
+***** flycheck
+      #+BEGIN_SRC emacs-lisp :tangle bin/mohkale/eglot-flycheck.el
+        (require 'eglot)
+        (require 'flycheck)
+
+        ;; add flycheck support, source [[https://github.com/joaotavora/eglot/issues/195][here]].
+        (defvar-local eglot-flycheck--fc-callback nil)
+
+        (defun eglot-flycheck--point->line-col (buffer beg)
+          (with-current-buffer buffer
+            (save-excursion
+              (goto-char beg)
+              (cons (line-number-at-pos)
+                    (- (point)
+                       (line-beginning-position))))))
+
+        (defun eglot-flycheck--fm-error->fc-error (err)
+          (pcase-let* ((msg (flymake--diag-text err))
+                       (beg (flymake--diag-beg err))
+                       (buffer (flymake--diag-buffer err))
+                       (`(,line . ,col) (eglot-flycheck--point->line-col buffer beg)))
+            (flycheck-error-new-at
+             line nil ;; TODO: use column and region
+             (pcase (flymake--diag-type err)
+               (':error 'error)
+               (':warning 'warning)
+               (':note 'info))
+             msg
+             :id "eglot-flycheck"
+             ;; :checker
+             :buffer buffer
+             :filename (buffer-file-name buffer))))
+
+        (cl-defun eglot-flycheck--flymake-handle-result (flymake-errors &key region)
+          (funcall eglot-flycheck--fc-callback
+                   'finished
+                   (mapcar #'eglot-flycheck--fm-error->fc-error flymake-errors)))
+
+        (cl-defun eglot-flycheck-checker (checker callback)
+          (setq eglot-flycheck--fc-callback callback)
+          (eglot-flymake-backend #'eglot-flycheck--flymake-handle-result))
+
+        (flycheck-define-generic-checker
+         'eglot-checker
+         "eglot flycheck checker"
+         :start #'eglot-flycheck-checker
+         :modes (eglot--all-major-modes))
+
+        (provide 'eglot-flycheck)
+      #+END_SRC
 
 *** macro/kmacro/edmacro
     #+BEGIN_SRC emacs-lisp
       (leader/set-keys
         "k"  "macros/lisp")
+
+      (with-eval-after-load 'bindings
+        ;; remove mode-line-indicator for macros
+        (setq mode-line-defining-kbd-macro nil))
 
       (use-package kmacro
         :init
@@ -11909,7 +11968,7 @@
                  (defun ruby-enable-lsp-in-projects (&rest args)
                    (when (eq mohkale-ruby-use-lsp 'projectile)
                      (when-project-has-file-p "Gemfile"
-                       (call-interactively 'lsp)))))
+                       (call-interactively mohkale-lsp-command)))))
      #+END_SRC
 
 **** robe
@@ -12161,7 +12220,7 @@
          (general-define-key
            :states 'insert
            :keymaps 'emmet-mode-keymap
-           "C-i" 'emmet-expand-line
+           [C-i] 'emmet-expand-line
            ;; "TAB" 'emmet-expand-line
            "<tab>"   'emmet-next-edit-point
            "<S-tab>" 'emmet-prev-edit-point)
@@ -14073,7 +14132,7 @@
 **** lsp-kotlin
      #+BEGIN_SRC emacs-lisp
        (with-eval-after-load 'kotlin-mode
-         (add-hook 'kotlin-mode-hook 'lsp))
+         (add-hook 'kotlin-mode-hook mohkale-lsp-command))
      #+END_SRC
 
 *** java
@@ -14198,7 +14257,7 @@
          (defun javascript-enable-lsp-in-projects (&rest _)
            (when (project-has-file-p "package.json"
                                      "yarn.lock")
-             (call-interactively 'lsp)))
+             (call-interactively mohkale-lsp-command)))
 
          :config
          (setq js2-mode-show-parse-errors      nil
@@ -14600,17 +14659,18 @@
 **** lsp-haskell
      #+BEGIN_SRC emacs-lisp
        (with-eval-after-load 'haskell-mode
-         (with-eval-after-load 'lsp-mode
-           (use-package lsp-haskell
-             :ensure t
-             :defer  t
-             :hook ((haskell-mode . lsp) ;; order of evaluation matters
-                    (haskell-mode . (lambda ()
-                                      (require 'lsp-haskell)
-                                      ;; until there's actually any useful info
-                                      (setq-local lsp-eldoc-enable-hover nil))))
-             :config
-             (setq lsp-haskell-process-args-hie (list "-d" "-l" (make-temp-file "hie." nil ".log"))))))
+         (if (eq mohkale-lsp-command 'lsp)
+             (use-package lsp-haskell
+               :ensure t
+               :defer  t
+               :hook ((haskell-mode . lsp) ;; order of evaluation matters
+                      (haskell-mode . (lambda ()
+                                        (require 'lsp-haskell)
+                                        ;; until there's actually any useful info
+                                        (setq-local lsp-eldoc-enable-hover nil))))
+               :config
+               (setq lsp-haskell-process-args-hie (list "-d" "-l" (make-temp-file "hie." nil ".log"))))
+           (add-hook 'haskell-mode-hook mohkale-lsp-command)))
      #+END_SRC
 
 *** git
