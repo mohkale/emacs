@@ -219,7 +219,9 @@ end
 
 def tangle_targets(file)
   tangle_targets = []
-  default_target = File.join(File.dirname(file), File.basename(file, '.*') + '.el')
+  default_dir = File.dirname(file)
+  default_target = File.basename(file, '.*') + '.el'
+  # default_target = File.join(default_dir, File.basename(file, '.*') + '.el')
   tangle_regexp = '.*:tangle "?([^ "]+)"?'
 
   ignore_files = %w[yes no]
@@ -229,14 +231,15 @@ def tangle_targets(file)
       line = line.strip.chomp
 
       if line =~ /^#\+PROPERTY: #{tangle_regexp}/i
-        default_target = $1 unless ignore_files.include?($1)
+        default_target = $1
       elsif line =~ /^#\+BEGIN_SRC #{tangle_regexp}/i || line =~ /:header-args\+: #{tangle_regexp}/i
         tangle_targets << $1 unless ignore_files.include?($1)
       end
     end
   end
 
-  (tangle_targets << default_target).uniq
+  tangle_targets << default_target unless default_target == 'no'
+  tangle_targets.uniq.map { |tar| File.join(default_dir, tar) }
 end
 
 def targets_uptodate(source, targets)
@@ -247,6 +250,7 @@ def targets_uptodate(source, targets)
     unless FileUtils.uptodate?(target, [source])
       logger.info("file #{target} is out of date")
       uptodate = false
+      # break
     end
   end
 

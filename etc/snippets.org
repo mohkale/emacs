@@ -1,0 +1,2305 @@
+#+TITLE snippets
+#+PROPERTY: header-args :tangle-mode (identity #o644) :mkdirp yes :noweb yes :hlines no :shebang "# -*- mode: snippet -*-" :tangle no
+
+* snippet-mode
+** elisp
+   #+BEGIN_SRC snippet :tangle snippets/snippet-mode/elisp
+      # name: elisp
+      # key: `
+      # --
+      \`$0\`
+   #+END_SRC
+
+** group
+   #+BEGIN_SRC snippet :tangle snippets/snippet-mode/group
+      # name: group
+      # key: group
+      # --
+      # group : ${1:group}
+   #+END_SRC
+
+** field
+   #+BEGIN_SRC snippet :tangle snippets/snippet-mode/field
+      # name: ${ ...  } field
+      # contributor : joaotavora
+      # key: $f
+      # key: field
+      # --
+      \${${1:${2:n}:}$3${4:\$(${5:lisp-fn})}\}$0
+   #+END_SRC
+
+** cont
+   #+BEGIN_SRC snippet :tangle snippets/snippet-mode/cont
+      # name: cont
+      # key: cont
+      # --
+      # contributor: `user-full-name`
+   #+END_SRC
+
+** mirror
+   #+BEGIN_SRC snippet :tangle snippets/snippet-mode/mirror
+      # name: ${n:$(...)} mirror
+      # key: $m
+      # contributor : joaotavora
+      # key: mirror
+      # --
+      \${${2:n}:${4:\$(${5:reflection-fn})}\}$0
+   #+END_SRC
+
+** vars
+   #+BEGIN_SRC snippet :tangle snippets/snippet-mode/vars
+      # name: Snippet header
+      # contributor : joaotavora
+      # key: vars
+      # --
+      # name: $1${2:
+      # key: ${3:trigger-key}}${4:
+      # keybinding : ${5:keybinding}}${6:
+      # expand-env : (${7:})}
+      # contributor : $6
+      # key: vars
+      # --
+      $0
+   #+END_SRC
+
+* text-mode
+  #+BEGIN_SRC text :tangle snippets/text-mode/.yas-parents :shebang
+    fundamental-mode
+  #+END_SRC
+
+** box
+   #+BEGIN_SRC snippet :tangle snippets/text-mode/box
+      # name: box
+      # key: box
+      # --
+      ┌─${1:$(make-string (string-width yas-text) ?─)}─┐
+      │ $1 │
+      └─${1:$(make-string (string-width yas-text) ?─)}─┘
+      $0
+   #+END_SRC
+
+* prog-mode
+  #+BEGIN_SRC text :tangle snippets/prog-mode/.yas-parents :shebang
+    text-mode
+  #+END_SRC
+
+  #+BEGIN_SRC elisp :tangle snippets/prog-mode/.yas-setup.el :shebang ";; -*- lexical-binding: t -*-"
+    (require 'yasnippet)
+
+    ;; whitespace removing functions from Magnar Sveen ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    (defun yas-s-trim-left (s)
+      "Remove whitespace at the beginning of S."
+      (if (string-match "\\`[ \t\n\r]+" s)
+          (replace-match "" t t s)
+        s))
+
+    (defun yas-s-trim-right (s)
+      "Remove whitespace at the end of S."
+      (if (string-match "[ \t\n\r]+\\'" s)
+          (replace-match "" t t s)
+        s))
+
+    (defun yas-s-trim (s)
+      "Remove whitespace at the beginning and end of S."
+      (yas-s-trim-left (yas-s-trim-right s)))
+
+
+    (defun yas-string-reverse (str)
+      "Reverse a string STR manually to be compatible with emacs versions < 25."
+      (apply #'string
+             (reverse
+              (string-to-list str))))
+
+    (defun yas-trimmed-comment-start ()
+      "This function returns `comment-start' trimmed by whitespaces."
+      (yas-s-trim comment-start))
+
+    (defun yas-trimmed-comment-end ()
+      "This function returns `comment-end' trimmed by whitespaces if `comment-end' is not empty.
+    Otherwise the reversed output of function `yas-trimmed-comment-start' is returned."
+      (if (eq (length comment-end) 0)
+          (yas-string-reverse (yas-trimmed-comment-start))
+        (yas-s-trim comment-end)))
+  #+END_SRC
+
+** comment
+   #+BEGIN_SRC snippet :tangle snippets/prog-mode/comment
+      # contributor: sh-ow <sh-ow@users.noreply.github.com>
+      # name: comment
+      # key: co
+      # --
+      `(yas-trimmed-comment-start)` ${1:comment}`(unless (eq (length comment-end) 0) (concat " " (yas-trimmed-comment-end)))`$0
+   #+END_SRC
+
+** commentline
+   #+BEGIN_SRC snippet :tangle snippets/prog-mode/commentline
+      # contributor: sh-ow <sh-ow@users.noreply.github.com>
+      # name: commentline
+      # key: col
+      # --
+      `(yas-trimmed-comment-start)` ${1:comment} ${1:$(let* ((start (yas-trimmed-comment-start))
+                                                             (lastcom (aref start (1- (length start))))
+                                                             (end (yas-trimmed-comment-end))
+                                                             (endpadlen (- 79 (+ (current-column) (length end)))))
+                                                    (concat (make-string (max endpadlen 0) lastcom)
+                                                            end))}$0
+   #+END_SRC
+
+** commentblock
+   #+BEGIN_SRC snippet :tangle snippets/prog-mode/commentblock
+      # contributor: sh-ow <sh-ow@users.noreply.github.com>
+      # name: commentblock
+      # key: cob
+      # --
+      ${1:$(let* ((col (current-column))
+                 (str "")
+                 (lastcom (substring (yas-trimmed-comment-start) -1))
+                 (start (yas-trimmed-comment-start))
+                 (end (yas-trimmed-comment-end))
+                 (over (- (+ (string-width yas-text) (length start) (length end) col) 77)))
+               (while (< (length str) (+ (- 79 (length start) (length end) col) (if (> over 0) over 0)))
+                      (setq str (concat str lastcom)))
+             (concat start str end))}
+      ${1:$(let* ((col (current-column))
+                 (str "")
+                 (start (yas-trimmed-comment-start))
+                 (end (yas-trimmed-comment-end)))
+               (while (< (length str) (ffloor (/ (- 78.0 (+ col (length start) (string-width yas-text) (length end))) 2.0)))
+                      (setq str (concat str " ")))
+              (concat start str))} ${1:comment} ${1:$(let* ((col (current-column))
+                                                           (str "")
+                                                           (start (yas-trimmed-comment-start))
+                                                           (end (yas-trimmed-comment-end)))
+                                                         (while (< (length str) (- 79.0 (if (eq (mod (string-width yas-text) 2) 1) (- col 1) col) (length end)))
+                                                                (setq str (concat str " ")))
+                                                       (concat str end))}
+      ${1:$(let* ((col (current-column))
+                 (str "")
+                 (lastcom (substring (yas-trimmed-comment-start) -1))
+                 (start (yas-trimmed-comment-start))
+                 (end (yas-trimmed-comment-end))
+                 (over (- (+ (string-width yas-text) (length start) (length end) col) 77)))
+               (while (< (length str) (+ (- 79 (length start) (length end) col) (if (> over 0) over 0)))
+                      (setq str (concat str lastcom)))
+             (concat start str end))}$0
+   #+END_SRC
+
+* org-mode
+** quote
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/quote
+      # name: quote
+      # key: <q
+      # --
+      #+begin_quote
+      $0
+      #+end_quote
+   #+END_SRC
+
+** embedded
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/embedded
+      # name: embedded
+      # key: emb_
+      # --
+      src_${1:lang}${2:[${3:where}]}{${4:code}}
+   #+END_SRC
+
+** exampleblock
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/exampleblock
+      # name: example
+      # key: <E
+      # --
+      #+begin_example
+      $0
+      #+end_example
+   #+END_SRC
+
+** language
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/language
+      # name: language
+      # key: <lan
+      # --
+      #+language: ${1:en}
+   #+END_SRC
+
+** img
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/img
+      # name: img
+      # key: img_
+      # --
+      <img src="$1" alt="$2" align="${3:left}" title="${4:image title}" class="img" $5/>$0
+   #+END_SRC
+
+** date
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/date
+      # name: date
+      # key: <da
+      # --
+      #+date: ${1:year}:${2:month}:${3:day}
+   #+END_SRC
+
+** center
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/center
+      # name: center
+      # key: <c
+      # --
+      #+begin_center
+      $0
+      #+end_center
+   #+END_SRC
+
+** verse
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/verse
+      # name: verse
+      # key: <v
+      # --
+      #+begin_verse
+      $0
+      #+end_verse
+   #+END_SRC
+
+** keywords
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/keywords
+      # name: keywords
+      # key: <ke
+      # --
+      #+keywords: $0
+   #+END_SRC
+
+** style
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/style
+      # name: style
+      # key: <st
+      # --
+      #+style: <link rel="stylesheet" type="text/css" href="$1" />
+   #+END_SRC
+
+** include
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/include
+      # name: include
+      # key: <i
+      # --
+      #+include: $0
+   #+END_SRC
+
+** elisp
+   #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/elisp
+     # name: elisp
+     # key: <e
+     # --
+     ,#+BEGIN_SRC emacs-lisp
+     $0
+     ,#+END_SRC
+   #+END_SRC
+
+** src
+   #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/src
+     # name: src
+     # key: <<
+     # --
+     ,#+BEGIN_SRC $1
+     $0
+     ,#+END_SRC
+   #+END_SRC
+
+** python
+   #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/python
+     # name: python
+     # key: <p
+     # --
+     ,#+BEGIN_SRC python
+     $0
+     ,#+END_SRC
+   #+END_SRC
+
+* web-mode
+  #+BEGIN_SRC text :tangle snippets/web-mode/.yas-parents :shebang
+    html-mode
+  #+END_SRC
+
+* ruby-mode
+** pry
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/pry
+      # name: binding.pry
+      # key: pry
+      # --
+      require 'pry'; binding.pry
+   #+END_SRC
+
+** rel
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/rel
+      # name: require_relative
+      # group : general
+      # --
+      require_relative '$0'
+   #+END_SRC
+
+** mod
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/mod
+      # name: module ... end
+      # contributor: hitesh <hitesh.jasani@gmail.com>, jimeh <contact@jimeh.me>
+      # key: mod
+      # --
+      module ${1:`(let ((fn (capitalize (file-name-nondirectory
+                                       (file-name-sans-extension
+               (or (buffer-file-name)
+                   (buffer-name (current-buffer))))))))
+                 (while (string-match "_" fn)
+                   (setq fn (replace-match "" nil nil fn)))
+                 fn)`}
+        $0
+      end
+   #+END_SRC
+
+** Comp
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/Comp
+      # name: include Comparable; def <=> ... end
+      # group : definitions
+      # --
+      include Comparable
+
+      def <=> other
+        $0
+      end
+   #+END_SRC
+
+** test class
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/test_class
+      # name: test class
+      # key: tc
+      # --
+      class TC_${1:Class} < Test::Unit::TestCase
+            $0
+      end
+   #+END_SRC
+
+** when
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/when
+      # name: when ... end
+      # group : control structure
+      # --
+      when ${condition}
+        $0
+      end
+   #+END_SRC
+
+** def
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/def
+      # name: def ... end
+      # key: def
+      # --
+      def ${1:method}${2:(${3:args})}
+          $0
+      end
+   #+END_SRC
+
+** until
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/until
+      # name: until ... end
+      # group: control structure
+      # --
+      until ${condition}
+        $0
+      end
+   #+END_SRC
+
+** red
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/red
+      # name: reduce(...) { |...| ... }
+      # group : collections
+      # --
+      reduce(${1:0}) { |${2:accumulator}, ${3:element}| $0 }
+   #+END_SRC
+
+** ea
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/ea
+      # name: each { |...| ... }
+      # group : collections
+      # --
+      each { |${e}| $0 }
+   #+END_SRC
+
+** dow
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/dow
+      # name: downto(...) { |n| ... }
+      # group : control structure
+      # --
+      downto(${0}) { |${n}|
+        $0
+      }
+   #+END_SRC
+
+** eawi
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/eawi
+      # name: each_with_index { |e, i| ... }
+      # group : collections
+      # --
+      each_with_index { |${e}, ${i}| $0 }
+   #+END_SRC
+
+** any
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/any
+      # name: any? { |...| ... }
+      # group : collections
+      # --
+      any? { |${e}| $0 }
+   #+END_SRC
+
+** while
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/while
+      # name: while ... end
+      # group : control structure
+      # --
+      while ${condition}
+        $0
+      end
+   #+END_SRC
+
+** eai
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/eai
+      # name: each_index { |i| ... }
+      # group : collections
+      # --
+      each_index { |${i}| $0 }
+   #+END_SRC
+
+** tim
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/tim
+      # name: times { |n| ... }
+      # group : control structure
+      # --
+      times { |${n}| $0 }
+   #+END_SRC
+
+** eac
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/eac
+      # name: each_cons(...) { |...| ... }
+      # group : collections
+      # --
+      each_cons(${1:2}) { |${group}| $0 }
+   #+END_SRC
+
+** ife
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/ife
+      # name: if ... else ... end
+      # group : control structure
+      # --
+      if ${1:condition}
+        $2
+      else
+        $3
+      end
+   #+END_SRC
+
+** rpry
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/rpry
+      # name: binding.pry_remote
+      # key: rpry
+      # --
+      require 'pry-remote'; binding.remote_pry
+   #+END_SRC
+
+** select
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/select
+      # name: select { |...| ... }
+      # group : collections
+      # --
+      select { |${1:element}| $0 }
+   #+END_SRC
+
+** tu
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/tu
+      # name: tu
+      # key: tu
+      # --
+      require 'test/unit'
+   #+END_SRC
+
+** collect
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/collect
+      # name: collect { |...| ... }
+      # group : collections
+      # --
+      collect { |${e}| $0 }
+   #+END_SRC
+
+** str
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/str
+      # name: str
+      # key: s
+      # --
+      #{$0}
+   #+END_SRC
+
+** cls
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/cls
+      # name: class ... end
+      # contributor : hitesh <hitesh.jasani@gmail.com>
+      # group : definitions
+      # --
+      class ${1:`(let ((fn (capitalize (file-name-nondirectory
+                                       (file-name-sans-extension
+      				 (or (buffer-file-name)
+      				     (buffer-name (current-buffer))))))))
+                   (replace-regexp-in-string "_" "" fn t t))`}
+        $0
+      end
+   #+END_SRC
+
+** inc
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/inc
+      # name: include Module
+      # key: inc
+      # group: general
+      # --
+      include ${1:Module}
+      $0
+   #+END_SRC
+
+** y
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/y
+      # name: :yields: arguments (rdoc)
+      # group : general
+      # --
+      :yields: $0
+   #+END_SRC
+
+** eav
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/eav
+      # name: each_value { |val| ... }
+      # group : collections
+      # --
+      each_value { |${val}| $0 }
+   #+END_SRC
+
+** bench
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/bench
+      # name: bench
+      # key: bench
+      # --
+      require "benchmark"
+
+      TESTS = ${1:1_000}
+      Benchmark.bmbm do |x|
+        x.report("${2:var}") {}
+      end
+   #+END_SRC
+
+** init
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/init
+      # name: init
+      # key: init
+      # --
+      def initialize(${1:args})
+          $0
+      end
+   #+END_SRC
+
+** case
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/case
+      # name: case ... end
+      # group : general
+      # --
+      case ${1:object}
+      when ${2:condition}
+        $0
+      end
+   #+END_SRC
+
+** to_
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/to_
+      # name: to_
+      # key: to_
+      # --
+      def to_s
+          "${1:string}"
+      end
+      $0
+   #+END_SRC
+
+** cla
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/cla
+      # name: class << self ... end
+      # group : definitions
+      # --
+      class << ${self}
+        $0
+      end
+   #+END_SRC
+
+** attribute
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/attribute
+      # name: attribute
+      # key: @
+      # --
+      @${1:attr} = $0
+   #+END_SRC
+
+** rw
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/rw
+      # name: attr_accessor ...
+      # group : definitions
+      # --
+      attr_accessor :
+   #+END_SRC
+
+** if
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/if
+      # name: if ... end
+      # group : control structure
+      # --
+      if ${1:condition}
+        $0
+      end
+   #+END_SRC
+
+** am
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/am
+      # name: alias_method new, old
+      # group : definitions
+      # --
+      alias_method :${new_name}, :${old_name}
+   #+END_SRC
+
+** upt
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/upt
+      # name: upto(...) { |n| ... }
+      # group : control structure
+      # --
+      upto(${n}) { |${i}|
+        $0
+      }
+   #+END_SRC
+
+** reject
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/reject
+      # name: reject { |...| ... }
+      # group : collections
+      # --
+      reject { |${1:element}| $0 }
+   #+END_SRC
+
+** formula
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/formula
+      # name: formula
+      # key: form
+      # --
+      require 'formula'
+
+      class ${1:Name} <Formula
+        url '${2:url}'
+        homepage '${3:home}'
+        md5 '${4:md5}'
+
+        def install
+          ${5:system "./configure"}
+          $0
+        end
+      end
+   #+END_SRC
+
+** Enum
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/Enum
+      # name: include Enumerable
+      # key: Enum
+      # group: collections
+      # --
+      include Enumerable
+
+      def each${1:(&block)}
+        $0
+      end
+   #+END_SRC
+
+** app
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/app
+      # name: if __FILE__ == $PROGRAM_NAME ... end
+      # group : general
+      # --
+      if __FILE__ == $PROGRAM_NAME
+        $0
+      end
+   #+END_SRC
+
+** map
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/map
+      # name: map { |...| ... }
+      # group : collections
+      # --
+      map { |${e}| $0 }
+   #+END_SRC
+
+** #
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/#
+      # name: # =>
+      # group : general
+      # --
+      # =>
+   #+END_SRC
+
+** dee
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/dee
+      # name: deep_copy(...)
+      # group : general
+      # --
+      Marshal.load(Marshal.dump($0))
+   #+END_SRC
+
+** bm
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/bm
+      # name: Benchmark.bmbm(...) do ... end
+      # group : general
+      # --
+      Benchmark.bmbm(${1:10}) do |x|
+        $0
+      end
+   #+END_SRC
+
+** req
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/req
+      # name: require "..."
+      # group : general
+      # --
+      require '$0'
+   #+END_SRC
+
+** =b
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/=b
+      # name: =begin rdoc ... =end
+      # group : general
+      # --
+      =begin rdoc
+        $0
+      =end
+   #+END_SRC
+
+** det
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/det
+      # name: detect { |...| ... }
+      # group : collections
+      # --
+      detect { |${e}| $0 }
+   #+END_SRC
+
+** deli
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/deli
+      # name: delete_if { |...| ... }
+      # group : collections
+      # --
+      delete_if { |${e}| $0 }
+   #+END_SRC
+
+** for
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/for
+      # name: for
+      # key: for
+      # --
+      for ${1:el} in ${2:collection}
+          $0
+      end
+   #+END_SRC
+
+** rb
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/rb
+      # name: /usr/bin/ruby -wU
+      # group : general
+      # --
+      #!/usr/bin/ruby -wU
+   #+END_SRC
+
+** GLOB
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/GLOB
+      # name: GLOB
+      # key: $
+      # --
+      $${1:GLOBAL} = $0
+   #+END_SRC
+
+** w
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/w
+      # name: attr_writer ...
+      # group : definitions
+      # --
+      attr_writer :
+   #+END_SRC
+
+** all
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/all
+      # name: all? { |...| ... }
+      # group : collections
+      # --
+      all? { |${e}| $0 }
+   #+END_SRC
+
+** mm
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/mm
+      # name: def method_missing ... end
+      # group : definitions
+      # --
+      def method_missing(method, *args)
+        $0
+      end
+   #+END_SRC
+
+** zip
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/zip
+      # name: zip(...) { |...| ... }
+      # group : collections
+      # --
+      zip(${enums}) { |${row}| $0 }
+   #+END_SRC
+
+** r
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/r
+      # name: attr_reader ...
+      # group : definitions
+      # --
+      attr_reader :
+   #+END_SRC
+
+** forin
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/forin
+      # name: for ... in ...; ... end
+      # group : control structure
+      # --
+      for ${1:element} in ${2:collection}
+        $0
+      end
+   #+END_SRC
+
+** inject
+   #+BEGIN_SRC snippet :tangle snippets/ruby-mode/inject
+      # name: inject(...) { |...| ... }
+      # group : collections
+      # --
+      inject(${1:0}) { |${2:injection}, ${3:element}| $0 }
+   #+END_SRC
+
+* enh-ruby-mode
+  #+BEGIN_SRC text :tangle snippets/enh-ruby-mode/.yas-parents :shebang
+    ruby-mode
+  #+END_SRC
+
+* js-mode
+** bnd
+   #+BEGIN_SRC snippet :tangle snippets/js-mode/bnd
+      # uuid: 6788dcb5-8d8e-4e30-a97b-83029ecaf89b
+      # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+      # name: bindThis
+      # key: bnd
+      # --
+
+      this.${1:methodName} = this.${1:methodName}.bind(this)$0
+   #+END_SRC
+
+** debugger
+   #+BEGIN_SRC snippet :tangle snippets/js-mode/debugger
+      # name: debugger
+      # key: dbg
+      # --
+      debugger;
+   #+END_SRC
+
+** imd
+   #+BEGIN_SRC snippet :tangle snippets/js-mode/imd
+      # uuid: 851254b3-d70e-4024-a557-2629d3d73507
+      # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+      # name: importDestructing
+      # key: imd
+      # --
+
+      import { $2 } from '${1:module}'$0
+   #+END_SRC
+
+** console
+   #+BEGIN_SRC snippet :tangle snippets/js-mode/console/.yas-make-group :shebang
+   #+END_SRC
+
+*** cin
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/cin
+       # uuid: 006ec5e1-f229-4989-b8b2-fe1da1aab907
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.info
+       # key: cin
+       # group: console
+       # --
+
+       console.info(${1:object})
+    #+END_SRC
+
+*** cco
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/cco
+       # uuid: dcbcd0f7-7827-4f81-9777-809540ef5c10
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.count
+       # key: cco
+       # group: console
+       # --
+
+       console.count(${1:label})
+    #+END_SRC
+
+*** cas
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/cas
+       # uuid: b845ab40-1e04-4d11-bb0c-14266e733945
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.assert
+       # key: cas
+       # group: console
+       # --
+
+       console.assert(${1:expression}, ${2:object})
+    #+END_SRC
+
+*** cge
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/cge
+       # uuid: b3954656-b9c0-4061-b436-e7412ce008ad
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.groupEnd
+       # key: cge
+       # group: console
+       # --
+
+       console.groupEnd()
+    #+END_SRC
+
+*** cte
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/cte
+       # uuid: 9dd0d1c8-f4e8-4d16-8ca1-4ce72e7936cb
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.timeEnd
+       # key: cte
+       # group: console
+       # --
+
+       console.timeEnd('${1:object}')
+    #+END_SRC
+
+*** cdi
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/cdi
+       # uuid: d2272fe8-85d4-44f5-b74c-39a88bb50487
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.dir
+       # key: cdi
+       # group: console
+       # --
+
+       console.dir(${1:object})
+    #+END_SRC
+
+*** cer
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/cer
+       # uuid: 54ad9659-8b18-40a0-9096-48131f9577da
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.error
+       # key: cer
+       # group: console
+       # --
+
+       console.error(${1:object})
+    #+END_SRC
+
+*** clo
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/clo
+       # uuid: 3d2ddcac-d8c0-4b56-81a7-523eb6621442
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.log (formatted)
+       # key: clo
+       # group: console
+       # --
+
+       console.log('${1:object}', ${1:object})
+    #+END_SRC
+
+*** cgr
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/cgr
+       # uuid: afebe290-f0e6-403a-9c4f-da33451115cb
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.group
+       # key: cgr
+       # group: console
+       # --
+
+       console.group("${1:label}")
+    #+END_SRC
+
+*** cwa
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/cwa
+       # uuid: 3d8fde97-df25-4515-a8e9-5096db21cfb7
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.warn
+       # key: cwa
+       # group: console
+       # --
+
+       console.warn(${1:object})
+    #+END_SRC
+
+*** ccl
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/ccl
+       # uuid: 9619a671-e44a-4b59-b343-b55b3b1dbbcc
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.clear
+       # key: ccl
+       # group: console
+       # --
+
+       console.clear()
+    #+END_SRC
+
+*** clg
+    #+BEGIN_SRC snippet :tangle snippets/js-mode/console/clg
+       # uuid: 0a1a6d75-a8e0-43fe-b049-1e96c2e04b51
+       # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+       # name: console.log
+       # key: clg
+       # group: console
+       # --
+
+       console.log(${1:object})
+    #+END_SRC
+
+** ima
+   #+BEGIN_SRC snippet :tangle snippets/js-mode/ima
+      # uuid: 7c3ddd59-68e7-456c-a906-4241cdaeaf9e
+      # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+      # name: importAs
+      # key: ima
+      # --
+
+      import { ${2:originalName} as ${3:alias} } from '${1:module}'$0
+   #+END_SRC
+
+** imn
+   #+BEGIN_SRC snippet :tangle snippets/js-mode/imn
+      # uuid: 39b0065c-1dd5-4214-a612-1fead18dd677
+      # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+      # name: importNoModuleName
+      # key: imn
+      # --
+
+      import '${1:module}'$0
+   #+END_SRC
+
+** imp
+   #+BEGIN_SRC snippet :tangle snippets/js-mode/imp
+      # uuid: fb07fe1d-4cf7-47e9-bca8-51a6438c5d6f
+      # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+      # name: import
+      # key: imp
+      # --
+
+      import ${2:moduleName} from '${1:module}'$0
+   #+END_SRC
+
+** ime
+   #+BEGIN_SRC snippet :tangle snippets/js-mode/ime
+      # uuid: 13efbfa8-12d3-4570-9602-6d64717d75e3
+      # contributor: Jimmy Yuen Ho Wong <wyuenho@gmail.com>
+      # name: importEverything
+      # key: ime
+      # --
+
+      import * as ${2:alias} from '${1:module}'$0
+   #+END_SRC
+
+* js2-mode
+  #+BEGIN_SRC text :tangle snippets/js2-mode/.yas-parent :shebang
+    js-mode
+  #+END_SRC
+
+* typescript-mode
+  #+BEGIN_SRC text :tangle snippets/typescript-mode/.yas-parents :shebang
+    js-mode
+  #+END_SRC
+
+* python-mode
+   #+BEGIN_SRC text :tangle snippets/python-mode/.yas-parents :shebang ";; -*- lexical-binding: t -*-"
+      prog-mode
+   #+END_SRC
+
+   #+BEGIN_SRC emacs-lisp :tangle snippets/python-mode/.yas-setup.el :shebang
+     (require 'yasnippet)
+     (defvar yas-text)
+
+     (defun python-split-args (arg-string)
+       "Split a python argument string into ((name, default)..) tuples"
+       (mapcar (lambda (x)
+                  (split-string x "[[:blank:]]*=[[:blank:]]*" t))
+               (split-string arg-string "[[:blank:]]*,[[:blank:]]*" t)))
+
+     (defun python-args-to-docstring ()
+       "return docstring format for the python arguments in yas-text"
+       (let* ((indent (concat "\n" (make-string (current-column) 32)))
+              (args (python-split-args yas-text))
+              (max-len (if args (apply 'max (mapcar (lambda (x) (length (nth 0 x))) args)) 0))
+              (formatted-args (mapconcat
+                     (lambda (x)
+                        (concat (nth 0 x) (make-string (- max-len (length (nth 0 x))) ? ) " -- "
+                                (if (nth 1 x) (concat "\(default " (nth 1 x) "\)"))))
+                     args
+                     indent)))
+         (unless (string= formatted-args "")
+           (mapconcat 'identity (list "Keyword Arguments:" formatted-args) indent))))
+
+     (defun python-args-to-docstring-numpy ()
+       "return docstring format for the python arguments in yas-text"
+       (let* ((args (python-split-args yas-text))
+              (format-arg (lambda(arg)
+                            (concat (nth 0 arg) " : " (if (nth 1 arg) ", optional") "\n")))
+              (formatted-params (mapconcat format-arg args "\n"))
+              (formatted-ret (mapconcat format-arg (list (list "out")) "\n")))
+         (unless (string= formatted-params "")
+           (mapconcat 'identity
+                      (list "\nParameters\n----------" formatted-params
+                            "\nReturns\n-------" formatted-ret)
+                      "\n"))))
+   #+END_SRC
+
+** from
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/from
+      # name: from
+      # key: from
+      # group : general
+      # --
+      from ${1:lib} import ${2:funs}
+   #+END_SRC
+
+** bang
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/bang
+      # name: #!
+      # key: #!
+      # contributor : @avelino
+      # --
+      #!/usr/bin/env python
+   #+END_SRC
+
+** test_class
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/test_class
+      # name: test_class
+      # key: tcs
+      # group : testing
+      # --
+      class Test${1:toTest}(${2:unittest.TestCase}):
+          $0
+   #+END_SRC
+
+** setup
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/setup
+      # name: setup
+      # key: setup
+      # group: distribute
+      # --
+      from setuptools import setup
+
+      package = '${1:name}'
+      version = '${2:0.1}'
+
+      setup(name=package,
+            version=version,
+            description="${3:description}",
+            url='${4:url}'$0)
+   #+END_SRC
+
+** method
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/method
+      # name: method
+      # key: m
+      # group: object oriented
+      # --
+      def ${1:method}(self${2:, $3}):
+          $0
+   #+END_SRC
+
+** selfassign
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/selfassign
+      # name: selfassign
+      # key: sn
+      # group: object oriented
+      # --
+      self.$1 = $1
+   #+END_SRC
+
+** metaclass
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/metaclass
+      # name: metaclass
+      # key: mt
+      # group: object oriented
+      # --
+      __metaclass__ = ${1:type}
+   #+END_SRC
+
+** import
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/import
+      # name: import
+      # key: imp
+      # group : general
+      # --
+      import ${1:lib}${2: as ${3:alias}}
+      $0
+   #+END_SRC
+
+** pl
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/pl
+      # name: Import pyplot
+      # key: plt
+      # group : general
+      # --
+      import matplotlib.pyplot as plt
+      $0
+   #+END_SRC
+
+** script
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/script
+      # name: script
+      # key: script
+      # --
+      #!/usr/bin/env python
+
+      def main():
+          pass
+
+      if __name__ == '__main__':
+          main()
+   #+END_SRC
+
+** __len__
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/__len__
+      # name: __len__
+      # key: len
+      # group: dunder methods
+      # --
+      def __len__(self):
+          $0
+   #+END_SRC
+
+** super
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/super
+      # name: super
+      # key: super
+      # group: object oriented
+      # --
+      super(`(replace-regexp-in-string "\\([.]\\)[^.]+$" ", self)." (python-info-current-defun) nil nil 1)`($1)
+      $0
+   #+END_SRC
+
+** embed
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/embed
+      # name: embed
+      # key: embed
+      # --
+      from IPython import embed; embed()
+   #+END_SRC
+
+** __enter__
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/__enter__
+      # name: __enter__
+      # key: ent
+      # group: dunder methods
+      # --
+      def __enter__(self):
+          $0
+
+          return self
+   #+END_SRC
+
+** celery_pdb
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/celery_pdb
+      # name: celery pdb
+      # key: cdb
+      # group: debug
+      # --
+      from celery.contrib import rdb; rdb.set_trace()
+   #+END_SRC
+
+** while
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/while
+      # name: while
+      # key: wh
+      # group: control structure
+      # --
+      while ${1:True}:
+          $0
+   #+END_SRC
+
+** main
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/main
+      # name: main
+      # key: main
+      # --
+      def main():
+          $0
+   #+END_SRC
+
+** arg
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/arg
+      # name: arg
+      # key: arg
+      # group: argparser
+      # --
+      parser.add_argument('-$1', '--$2',
+                          $0)
+   #+END_SRC
+
+** deftest
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/deftest
+      # name: deftest
+      # key: dt
+      # group: testing
+      # --
+      def test_${1:long_name}(self):
+          $0
+   #+END_SRC
+
+** doc
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/doc
+      # name: doc
+      # key: d
+      # --
+      """$0
+      """
+   #+END_SRC
+
+** utf8
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/utf8
+      # name: utf-8 encoding
+      # key: utf8
+      # --
+      # -*- coding: utf-8 -*-
+   #+END_SRC
+
+** with_statement
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/with_statement
+      # name: with_statement
+      # key: fw
+      # group: future
+      # --
+      from __future__ import with_statement
+   #+END_SRC
+
+** lambda
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/lambda
+      # name: lambda
+      # key: lam
+      # --
+      lambda ${1:x}: $0
+   #+END_SRC
+
+** pass
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/pass
+      # name: pass
+      # key: ps
+      # --
+      pass
+   #+END_SRC
+
+** __setitem__
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/__setitem__
+      # name: __setitem__
+      # key: setit
+      # group: dunder methods
+      # --
+      def __setitem__(self, ${1:key}, ${2:val}):
+          $0
+   #+END_SRC
+
+** print
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/print
+      # name: print
+      # key: p
+      # --
+      print($0)
+   #+END_SRC
+
+** function_docstring
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/function_docstring
+      # name: function_docstring
+      # key: fd
+      # group: definitions
+      # NOTE: Use minimum indentation, because Emacs 25+ doesn't dedent docstrings.
+      # --
+      def ${1:name}($2):
+       \"\"\"$3
+       ${2:$(python-args-to-docstring)}
+       \"\"\"
+       $0
+   #+END_SRC
+
+** assertNotIn
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/assertNotIn
+      # name: assetNotIn
+      # key: an
+      # group: testing
+      # --
+      self.assertNotIn(${1:member}, ${2:container})
+   #+END_SRC
+
+** static
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/static
+      # name: static
+      # key: sm
+      # --
+      @staticmethod
+      def ${1:func}($0):
+   #+END_SRC
+
+** repr
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/repr
+      # name: __repr__
+      # key: repr
+      # group: dunder methods
+      # --
+      def __repr__(self):
+          $0
+   #+END_SRC
+
+** self_without_dot
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/self_without_dot
+      # name: self_without_dot
+      # key: s
+      # group: object oriented
+      # --
+      self
+   #+END_SRC
+
+** assertFalse
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/assertFalse
+      # name: assertFalse
+      # key: af
+      # group: testing
+      # --
+      self.assertFalse($0)
+   #+END_SRC
+
+** ife
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/ife
+      # name: ife
+      # key: ife
+      # group : control structure
+      # --
+      if $1:
+          $2
+      else:
+          $0
+   #+END_SRC
+
+** function
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/function
+      # name: function
+      # key: f
+      # group: definitions
+      # --
+      def ${1:fun}(${2:args}):
+          $0
+   #+END_SRC
+
+** dataclass
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/dataclass
+      # name: dataclass
+      # key: dc
+      # group: object oriented
+      # --
+      @dataclass
+      class ${1:class}:
+          $0
+   #+END_SRC
+
+** assertIn
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/assertIn
+      # name: assertIn
+      # key: ai
+      # group: testing
+      # --
+      self.assertIn(${1:member}, ${2:container})
+   #+END_SRC
+
+** logger_name
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/logger_name
+      # name: logger_name
+      # key: ln
+      # --
+      logger = logging.getLogger(${1:__name__})
+   #+END_SRC
+
+** try
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/try
+      # name: try
+      # key: try
+      # --
+      try:
+          $0
+      except ${1:Exception}:
+          $2
+   #+END_SRC
+
+** str
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/str
+      # name: __str__
+      # key: str
+      # group: dunder methods
+      # --
+      def __str__(self):
+          $0
+   #+END_SRC
+
+** cls
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/cls
+      # name: class
+      # key: cls
+      # group: object oriented
+      # --
+      class ${1:class}:
+          $0
+   #+END_SRC
+
+** unicode_literals
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/unicode_literals
+      # name: unicode_literals
+      # key: fu
+      # group: future
+      # --
+      from __future__ import unicode_literals
+   #+END_SRC
+
+** __getitem__
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/__getitem__
+      # name: __getitem__
+      # key: getit
+      # group: dunder methods
+      # --
+      def __getitem__(self, ${1:key}):
+          $0
+   #+END_SRC
+
+** doctest
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/doctest
+      # name: doctest
+      # key: doc
+      # group: testing
+      # --
+      >>> ${1:function calls}
+      ${2:desired output}
+      $0
+   #+END_SRC
+
+** assertTrue
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/assertTrue
+      # name: assertTrue
+      # key: at
+      # group: testing
+      # --
+      self.assertTrue($0)
+   #+END_SRC
+
+** method_docstring_numpy
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/method_docstring_numpy
+      # contributor: quazgar
+      # name: method_docstring_numpy
+      # key: mdn
+      # group: object oriented
+      # --
+      def ${1:name}(self$2):
+          \"\"\"$3
+          ${2:$(python-args-to-docstring-numpy)}
+          \"\"\"
+          $0
+   #+END_SRC
+
+** tryelse
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/tryelse
+      # name: tryelse
+      # key: try
+      # --
+      try:
+          $0
+      except $1:
+          $2
+      else:
+          $3
+   #+END_SRC
+
+** init
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/init
+      # name: init
+      # key: init
+      # group : definitions
+      # --
+      def __init__(self${1:, args}):
+          ${2:"${3:docstring}"
+          }$0
+   #+END_SRC
+
+** not_impl
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/not_impl
+      # name: not_impl
+      # key: not_impl
+      # --
+      raise NotImplementedError
+   #+END_SRC
+
+** enum
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/enum
+      # name: enum
+      # key: en
+      # group: object oriented
+      # --
+      class ${1:class}(Enum):
+          $0
+   #+END_SRC
+
+** iter
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/iter
+      # name: __iter__
+      # key: iter
+      # group: dunder methods
+      # --
+      def __iter__(self):
+          return ${1:iter($2)}
+   #+END_SRC
+
+** reg
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/reg
+      # name: reg
+      # key: reg
+      # group : general
+      # --
+      ${1:regexp} = re.compile(r"${2:expr}")
+      $0
+   #+END_SRC
+
+** django_test_class
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/django_test_class
+      # name: django_test_class
+      # key: tcs
+      # group: testing
+      # --
+      class ${1:Model}Test(TestCase):
+          $0
+   #+END_SRC
+
+** setdef
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/setdef
+      # name: setdef
+      # key: setdef
+      # --
+      ${1:var}.setdefault(${2:key}, []).append(${3:value})
+   #+END_SRC
+
+** with
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/with
+      # name: with
+      # key: with
+      # group : control structure
+      # --
+      with ${1:expr}${2: as ${3:alias}}:
+          $0
+   #+END_SRC
+
+** eq
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/eq
+      # name: __eq__
+      # key: eq
+      # group: dunder methods
+      # --
+      def __eq__(self, other):
+          return self.$1 == other.$1
+   #+END_SRC
+
+** parser
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/parser
+      # name: parser
+      # key: pars
+      # group: argparser
+      # --
+      parser = argparse.ArgumentParser(description='$1')
+      $0
+   #+END_SRC
+
+** return
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/return
+      # name: return
+      # key: r
+      # --
+      return $0
+   #+END_SRC
+
+** ifmain
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/ifmain
+      # name: ifmain
+      # key: ifm
+      # --
+      if __name__ == '__main__':
+          ${1:main()}
+   #+END_SRC
+
+** arg_positional
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/arg_positional
+      # name: arg_positional
+      # key: arg
+      # group: argparser
+      # --
+      parser.add_argument('${1:varname}', $0)
+   #+END_SRC
+
+** scls
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/scls
+      # name: subclass
+      # key: scls
+      # group: object oriented
+      # --
+      class ${1:class}(${2:super-class}):
+          $0
+   #+END_SRC
+
+** if
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/if
+      # name: if
+      # key: if
+      # group : control structure
+      # --
+      if ${1:cond}:
+          $0
+   #+END_SRC
+
+** list
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/list
+      # name: list
+      # key: li
+      # group : definitions
+      # --
+      [${1:el} for $1 in ${2:list}]
+      $0
+   #+END_SRC
+
+** test_file
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/test_file
+      # name: test_file
+      # key: tf
+      # group : testing
+      # --
+      import unittest
+      ${1:from ${2:test_file} import *}
+
+      $0
+
+      if __name__ == '__main__':
+          unittest.main()
+   #+END_SRC
+
+** ipdb
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/ipdb
+      # name: ipdb trace
+      # key: ipdb
+      # group: debug
+      # --
+      import ipdb; ipdb.set_trace()
+   #+END_SRC
+
+** assertRaises
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/assertRaises
+      # name: assertRaises
+      # key: ar
+      # group: testing
+      # --
+      self.assertRaises(${1:Exception}, ${2:fun})
+   #+END_SRC
+
+** dec
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/dec
+      # name: dec
+      # key: dec
+      # group : definitions
+      # --
+      def ${1:decorator}(func):
+          $2
+          def _$1(*args, **kwargs):
+              $3
+              ret = func(*args, **kwargs)
+              $4
+              return ret
+
+          return _$1
+   #+END_SRC
+
+** unicode
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/unicode
+      # name: __unicode__
+      # key: un
+      # group: dunder methods
+      # --
+      def __unicode__(self):
+          $0
+   #+END_SRC
+
+** logging
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/logging
+      # name: logging
+      # key: log
+      # --
+      logger = logging.getLogger("${1:name}")
+      logger.setLevel(logging.${2:level})
+   #+END_SRC
+
+** assertNotEqual
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/assertNotEqual
+      # name: assertNotEqual
+      # key: ane
+      # group: testing
+      # --
+      self.assertNotEqual($1, $2)
+   #+END_SRC
+
+** __contains__
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/__contains__
+      # name: __contains__
+      # key: cont
+      # group: dunder methods
+      # --
+      def __contains__(self, el):
+          $0
+   #+END_SRC
+
+** np
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/np
+      # name: np
+      # key: np
+      # group : general
+      # --
+      import numpy as np
+      $0
+   #+END_SRC
+
+** assertEqual
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/assertEqual
+      # name: assertEqual
+      # key: ae
+      # group: testing
+      # --
+      self.assertEqual($1, $2)
+   #+END_SRC
+
+** init_docstring
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/init_docstring
+      # name: init_docstring
+      # key: id
+      # group : definitions
+      # --
+      def __init__(self$1):
+          \"\"\"$2
+          ${1:$(python-args-to-docstring)}
+          \"\"\"
+          $0
+   #+END_SRC
+
+** prop
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/prop
+      # contributor: Mads D. Kristensen <madsdk@gmail.com>
+      # name: prop
+      # --
+      def ${1:foo}():
+          doc = """${2:Doc string}"""
+          def fget(self):
+              return self._$1
+
+          def fset(self, value):
+              self._$1 = value
+
+          def fdel(self):
+              del self._$1
+          return locals()
+      $1 = property(**$1())
+
+      $0
+   #+END_SRC
+
+** parse_args
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/parse_args
+      # name: parse_args
+      # key: pargs
+      # group: argparser
+      # --
+      def parse_arguments():
+          parser = argparse.ArgumentParser(description='$1')
+          $0
+          return parser.parse_args()
+   #+END_SRC
+
+** class_doxygen_doc
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/class_doxygen_doc
+      # contributor: Dan Pitic <dpitic@gmail.com>
+      # name: Class Doxygen Doc
+      # key: doxy_class
+      # group: doxygen
+      # --
+      """
+      @brief      ${1:class description}
+
+      @details    ${2:detailed description}
+      """
+   #+END_SRC
+
+** assert
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/assert
+      # name: assert
+      # key: ass
+      # group: testing
+      # --
+      assert $0
+   #+END_SRC
+
+** __exit__
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/__exit__
+      # name: __exit__
+      # key: ex
+      # group: dunder methods
+      # --
+      def __exit__(self, type, value, traceback):
+          $0
+   #+END_SRC
+
+** interact
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/interact
+      # name: interact
+      # key: int
+      # --
+      import code; code.interact(local=locals())
+   #+END_SRC
+
+** classmethod
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/classmethod
+      # name: classmethod
+      # key: cm
+      # group: object oriented
+      # --
+      @classmethod
+      def ${1:meth}(cls, $2):
+          $0
+   #+END_SRC
+
+** for
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/for
+      # name: for ... in ... : ...
+      # key: for
+      # group : control structure
+      # --
+      for ${var} in ${collection}:
+          $0
+   #+END_SRC
+
+** size
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/size
+      # name: size
+      # key: size
+      # --
+      sys.getsizeof($0)
+   #+END_SRC
+
+** __new__
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/__new__
+      # name: __new__
+      # key: new
+      # group: dunder methods
+      # --
+      def __new__(mcs, name, bases, dct):
+          $0
+          return type.__new__(mcs, name, bases, dct)
+   #+END_SRC
+
+** debug
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/debug
+      # name: debug
+      # key: debug
+      # --
+      breakpoint()
+   #+END_SRC
+
+** self
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/self
+      # name: self
+      # key: .
+      # group: object oriented
+      # --
+      self.$0
+   #+END_SRC
+
+** all
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/all
+      # name: all
+      # key: all
+      # --
+      __all__ = [
+          $0
+      ]
+   #+END_SRC
+
+** pdb
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/pdb
+      # name: pdb trace
+      # key: pdb
+      # group: debug
+      # --
+      import pdb; pdb.set_trace()
+   #+END_SRC
+
+** pudb
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/pudb
+      # name: pudb trace
+      # key: pudb
+      # group: debug
+      # --
+      import pudb; pudb.set_trace()
+   #+END_SRC
+
+** method_docstring
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/method_docstring
+      # name: method_docstring
+      # key: md
+      # group: object oriented
+      # --
+      def ${1:name}(self$2):
+          \"\"\"$3
+          ${2:$(python-args-to-docstring)}
+          \"\"\"
+          $0
+   #+END_SRC
+
+** function_docstring_numpy
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/function_docstring_numpy
+      # contributor: Egor Panfilov <egor.v.panfilov[at]gmail[dot]com>
+      # name: function_docstring_numpy
+      # key: fdn
+      # group: definitions
+      # --
+      def ${1:name}($2):
+       \"\"\"$3
+       ${2:$(python-args-to-docstring-numpy)}
+       \"\"\"
+       $0
+   #+END_SRC
+
+** assertRaises.with
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/assertRaises.with
+      # name: assertRaises
+      # key: ar
+      # --
+      with self.assertRaises(${1:Exception}):
+          $0
+   #+END_SRC
+
+** init_docstring_numpy
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/init_docstring_numpy
+      # contributor: quazgar
+      # name: init_docstring_numpy
+      # key: idn
+      # group : definitions
+      # --
+      def __init__(self$1):
+          \"\"\"$2
+          ${1:$(python-args-to-docstring-numpy)}
+          \"\"\"
+          $0
+   #+END_SRC
+
+** function_doxygen_doc
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/function_doxygen_doc
+      # contributor: Dan Pitic <dpitic@gmail.com>
+      # name: Function Doxygen Doc
+      # key: doxy_func
+      # group: doxygen
+      # --
+      """
+      @brief      ${1:function description}
+
+      @details    ${2:detailed description}
+
+      @param      ${3:param}
+
+      @return     ${4:return type}
+      """
+   #+END_SRC
+
+* sh-mode
+** bang
+   #+BEGIN_SRC snippet :tangle snippets/sh-mode/bang
+      # name: bang
+      # key: !
+      # --
+      #!/usr/bin/env bash
+      $0
+   #+END_SRC
+
+** while
+   #+BEGIN_SRC snippet :tangle snippets/sh-mode/while
+      # name: while loop
+      # key: while
+      # --
+      while ${1:cond}; do
+          $0
+      done
+   #+END_SRC
+
+** function
+   #+BEGIN_SRC snippet :tangle snippets/sh-mode/function
+      # name: function
+      # key: f
+      # --
+      function ${1:name} {
+               $0
+      }
+   #+END_SRC
+
+** case
+   #+BEGIN_SRC snippet :tangle snippets/sh-mode/case
+      # name : case
+      # key: case
+      # --
+      case ${1:cond} in
+          ${2:pattern} )
+              ${3:stuff}
+              ;;
+          $0
+      esac
+   #+END_SRC
+
+** if
+   #+BEGIN_SRC snippet :tangle snippets/sh-mode/if
+      # name: if
+      # key: if
+      # --
+      if ${1:[ -f file]}
+         then ${2:do}
+      fi
+      $0
+   #+END_SRC
+
+** for loop
+   #+BEGIN_SRC snippet :tangle snippets/sh-mode/for_loop
+      # name: for loop
+      # key: for
+      # --
+      for ${1:var} in ${2:stuff}; do
+          $0
+      done
+   #+END_SRC
+
+* emacs-lisp-mode
+** setq
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/setq
+      # contributor: Xah Lee (XahLee.org)
+      # name: setq
+      # key: setq
+      # key: s
+      # --
+      (setq $0)
+   #+END_SRC
+
+** let
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/let
+      # contributor: Xah Lee (XahLee.org)
+      # name: let
+      # key: let
+      # key: l
+      # --
+      (let${1:*} (${2:args})
+        $0)
+   #+END_SRC
+
+** lambda
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/lambda
+      # contributor: Xah Lee (XahLee.org)
+      # name: lambda
+      # key: lam
+      # --
+      (lambda ($1) ${2:(interactive${3: "$4"}) }$0)
+   #+END_SRC
+
+** defalias
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/defalias
+      # contributor: Xah Lee (XahLee.org)
+      # name: defalias
+      # key: defalias
+      # --
+      (defalias '${1:symbol} '${2:alias}${3: "docstring"})
+   #+END_SRC
+
+** defun
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/defun
+      # name: defun
+      # key: def
+      # --
+      (defun ${1:fun} (${2:args})
+        "${3:docstring}"
+        ${4:(interactive${5: "${6:P}"})}
+        $0)
+   #+END_SRC
+
+** defcustom
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/defcustom
+      # contributor: Xah Lee (XahLee.org)
+      # name: defcustom
+      # key: defcustom
+      # --
+      (defcustom ${1:symbol} ${2:standard} "${3:docstring}"${4: args})
+   #+END_SRC
+
+** defvar
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/defvar
+      # name: defvar
+      # key: defvar
+      # --
+      (defvar ${1:symbol} ${2:initvalue} "${3:docstring}")
+   #+END_SRC
+
+** add-hook
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/add-hook
+      # contributor: Xah Lee (XahLee.org)
+      # name: add-hook
+      # key: add-hook
+      # key: ah
+      # --
+      (add-hook '${1:name}-hook ${2:'${3:function}})$0
+   #+END_SRC
+
+** save-excursion
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/save-excursion
+      # contributor: Xah Lee (XahLee.org)
+      # name: save-excursion
+      # key: save-excursion
+      # key: se
+      # --
+      (save-excursion $0)
+   #+END_SRC
+
+** autoload
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/autoload
+      # contributor: Xah Lee (XahLee.org)
+      # name: autoload
+      # key: autoload
+      # --
+      (autoload ${1:function} "${2:filename}"${3: "docstring"}${4: interactive}${5: type})
+   #+END_SRC
+
+** use-package
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/use-package
+      # contributor: Daniel Hitzel
+      # name: use-package
+      # key: up
+      # --
+      (use-package ${1:package-name}
+      :ensure t$0)
+   #+END_SRC
+
+** with-current-buffer
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/with-current-buffer
+      # contributor: Xah Lee (XahLee.org)
+      # name: with-current-buffer
+      # key: with-current-buffer
+      # key: wcb
+      # --
+      (with-current-buffer $0)
+   #+END_SRC
+
+* lisp-interaction-mode
+  #+BEGIN_SRC text :tangle snippets/lisp-interaction-mode/.yas-parents :shebang
+    emacs-lisp-mode
+  #+END_SRC
+
