@@ -35,6 +35,7 @@
         dashboard                                                         ; a feature full emacs dashboard
         ;; ebuku                                                          ; interface to the, ebuku, bookmark manager
         ebib                                                              ; nice emacs based interface for editing bibtex files
+        ;; deft                                                           ; note management system based on multiple org files
         ;; expand-region                                                  ; expand visual mode by semantic units
         ;; frog-jump-buffer                                               ; posframe to jump to a buffer
         imenu                                                             ; interactively jump to points of interest in this buffer
@@ -6370,6 +6371,76 @@
        (leader/set-keys
          "hdW" 'define-word
          "hdw" 'define-word-at-point))
+   #+END_SRC
+
+** deft
+   note taking management solution for emacs.
+
+   #+BEGIN_SRC emacs-lisp :tangle bin/lisp/+init-deft.el
+     (use-package deft
+       :ensure t
+       :defer  t
+       :init
+       (leader/set-keys
+         "od" 'deft)
+
+       :config
+       (setq deft-directory (org! "notes"))
+       (push 'deft-mode whitespace-exempt-modes)
+
+       (advice-add 'deft-open-file :around 'restore-default-display-buffer-actions)
+
+       (defun deft-find-file-other-window+ ()
+         "preview file at point in another window and then select it."
+         (interactive)
+         (let ((file (deft-filename-at-point)))
+           (when file
+             (deft-open-file file t t))))
+
+       ;; unbind most of the deft insert bindings.
+       (cl-loop for i from ?\s to 256
+                do (define-key deft-mode-map (vector i) nil)
+                do (define-key deft-mode-map (vector 'insert-state i) 'deft-filter-increment))
+
+       (general-define-key
+        :keymaps 'deft-mode-map
+         [remap revert-buffer] 'deft-refresh)
+
+       (general-define-key
+         :states 'motion
+         :keymaps 'deft-mode-map
+         "o" 'deft-find-file-other-window+
+         "gj" 'widget-forward
+         "gk" 'widget-backward
+
+         "i" 'evil-insert-state
+         "a" 'evil-insert-state
+         "p" 'deft-filter-yank
+         "P" 'deft-filter-yank)
+
+       (general-define-key
+         :states 'insert
+         :keymaps 'deft-mode-map
+         [escape] 'evil-change-to-initial-state
+         "C-w" 'deft-filter-decrement-word)
+
+       (general-define-key
+         :states '(insert motion)
+         :keymaps 'deft-mode-map
+         "M-DEL" 'deft-filter-clear
+         "M-RET" 'deft-open-file-other-window)
+
+       (leader/set-keys-for-major-mode 'deft-mode
+         "n" 'deft-new-file
+         "a" 'deft-archive-file
+         "d" 'deft-delete-file
+         "f" 'deft-find-file
+         "i" 'deft-toggle-incremental-search
+         "r" 'deft-rename-file
+         "s" 'deft-toggle-sort-method
+         "l" 'deft-filter))
+
+     (provide '+init-deft)
    #+END_SRC
 
 ** dired
