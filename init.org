@@ -1,4 +1,4 @@
-# -*- mode: org; coding: utf-8-unix -*-
+;; -*- mode: org; coding: utf-8-unix -*-
 
 #+TITLE: init.org
 #+STARTUP: content
@@ -7,10 +7,10 @@
 
 * Config
   :PROPERTIES:
-  :header-args+: :tangle  bin/lisp/config.el
+  :header-args+: :tangle bin/lisp/+config.el
   :END:
 
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/+config.el
+  #+BEGIN_SRC
     (defvar +packages
       '(ivy                                                               ; simple and elegent completion for emacs
         magit                                                             ; it's git... but magical ,
@@ -34,6 +34,7 @@
         ;; command-log-mode                                               ; echo commands as you enter them
         dashboard                                                         ; a feature full emacs dashboard
         ;; ebuku                                                          ; interface to the, ebuku, bookmark manager
+        ebib                                                              ; nice emacs based interface for editing bibtex files
         ;; expand-region                                                  ; expand visual mode by semantic units
         ;; frog-jump-buffer                                               ; posframe to jump to a buffer
         imenu                                                             ; interactively jump to points of interest in this buffer
@@ -64,6 +65,7 @@
         ;; ycmd                                                           ; a language-server for most languages. written in python.
 
         ;;; Languages
+        bibtex
         c
         ;; cmake
         css
@@ -9051,6 +9053,72 @@
       (provide '+init-ivy-xref)
     #+END_SRC
 
+*** ivy-bibtex
+    Also installs bibtex-completion.
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package ivy-bibtex
+        :ensure t
+        :defer  t
+        :if (member 'bibtex +packages)
+        :init
+        (leader/set-keys
+          "ob" 'ivy-bibtex)
+
+        (with-eval-after-load 'org
+          (leader/set-keys-for-major-mode 'org-mode
+            "[" 'ivy-bibtex))
+
+        (with-eval-after-load '+init-bibtex
+          (setq
+           bibtex-completion-bibliography bibtex-files
+           bibtex-completion-library-path (join-path +bibliography-directory "doc/")
+           bibtex-completion-notes-path (join-path +bibliography-directory "notes"))
+
+          (mkdir bibtex-completion-notes-path t))
+
+        :config
+        (setq bibtex-completion-pdf-extension '(".pdf" ".epub")
+             ;; bind to find-file to open with emacs/pdf-tools.
+              bibtex-completion-pdf-open-function 'browse-url)
+
+        (defun bibtex-completion-format-citation-org-mode-cite+ (keys)
+          "Format cite references for keys in KEYS for `org-mode'."
+          (s-join ", "
+                  (--map (format "cite:%s" it) keys)))
+
+        (setq bibtex-completion-format-citation-functions
+              '((org-mode      . bibtex-completion-format-citation-org-mode-cite+)
+                (latex-mode    . bibtex-completion-format-citation-cite)
+                (markdown-mode . bibtex-completion-format-citation-pandoc-citeproc)
+                (default       . bibtex-completion-format-citation-default)))
+
+        (with-eval-after-load 'org-pdftools
+          (defun ivy-bibtex-insert-pdftools-link (cand)
+            (let* ((default-directory (or org-pdf-tools-pdf-directory
+                                          default-directory))
+                   (key (cdr (assoc "=key=" (cdr cand))))
+                   (pdf (car (bibtex-completion-find-pdf key bibtex-completion-find-additional-pdfs))))
+              (unless pdf
+                (user-error "bib entry with key %s doesn't have an associated pdf file" key))
+
+              (setq pdf (abbreviate-file-name (expand-file-name pdf)))
+
+              (insert (concat
+                       "[["
+                       (concat org-pdftools-link-prefix ":")
+                       pdf
+                       "::"
+                       (read-from-minibuffer
+                        "Page:"
+                        "1")
+                       "]["
+                       (read-string "Description: " nil nil pdf)
+                       "]]"))))
+
+          (ivy-add-actions 'ivy-bibtex '(("j" ivy-bibtex-insert-pdftools-link "Insert pdftool link")))))
+    #+END_SRC
+
 *** ivy-yasnippet
     use ivy to select a snippet candidate.
 
@@ -15995,6 +16063,335 @@
 *** eof
     #+BEGIN_SRC emacs-lisp
       (provide '+init-latex)
+    #+END_SRC
+
+** bibtex
+   :PROPERTIES:
+   :header-args+: :tangle bin/lisp/+init-bibtex.el
+   :END:
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package bibtex
+       :defer t
+       :hook (bibtex-mode . display-line-numbers-mode)
+       :init
+       (defvar +bibliography-directory (org! "bibliography")
+         "root directory for bibliography related content")
+
+       (setq bibtex-files (list (join-path +bibliography-directory "index.bib")))
+
+       :config
+       (setq bibtex-align-at-equal-sign t
+             bibtex-include-OPTkey t
+             ;; use all available words and be as long as needed
+             bibtex-autokey-titleword-length nil
+             bibtex-autokey-titlewords nil
+             ;; what I can I say, this just makes sense
+             bibtex-field-delimiters 'double-quotes)
+
+       ;; configure bibtex autokey structure: YEARauthor-paper-name
+       (defvar bibtex-autokey-year-name-separator+ bibtex-autokey-name-year-separator
+         "String to be put between year part and name part of key.
+     See ‘bibtex-generate-autokey’ for details.")
+
+       (defvar bibtex-autokey-name-title-separator+ bibtex-autokey-year-title-separator
+         "String to be put between year part and name part of key.
+     See ‘bibtex-generate-autokey’ for details.")
+
+       (setq bibtex-autokey-year-name-separator+ ""
+             bibtex-autokey-name-title-separator+ "-"
+             bibtex-autokey-titleword-separator "-")
+
+       (advice-add #'bibtex-generate-autokey :override
+                   (defun bibtex-generate-autokey+ ()
+                     (let* ((names (bibtex-autokey-get-names))
+                            (year (bibtex-autokey-get-year))
+                            (title (bibtex-autokey-get-title))
+                            (autokey (concat bibtex-autokey-prefix-string
+                                             year
+                                             (unless (or (equal names "")
+                                                         (equal year ""))
+                                               bibtex-autokey-year-name-separator+)
+                                             names
+                                             (unless (or (and (equal names "")
+                                                              (equal year ""))
+                                                         (equal title ""))
+                                               bibtex-autokey-name-title-separator+)
+                                             title)))
+                       (if bibtex-autokey-before-presentation-function
+                           (funcall bibtex-autokey-before-presentation-function autokey)
+                         autokey))))
+
+       (evil-set-initial-state 'bibtex-mode 'normal)
+
+       (add-hook 'bibtex-mode-hook
+                 (defun bibtex-mode-setup+ ()
+                   ;; 18 space indent... no thank you.
+                   (setq-local fill-prefix nil)))
+
+       (advice-add 'bibtex-clean-entry :around
+                   (defun bibtex-reset-fill-prefix+ (func &rest args)
+                     (let ((fill-prefix (make-string (1+ bibtex-text-indentation) ? )))
+                       (apply func args))))
+
+       ;; unused bindings
+       ;; C-c C-y         bibtex-yank
+       ;; C-c M-y         bibtex-yank-pop
+       ;; TAB             bibtex-find-text
+       ;; C-j             bibtex-next-field
+
+       (general-unbind
+        :keymaps 'bibtex-mode-map
+        "TAB" "C-j")
+
+       (general-define-key
+        :keymaps 'bibtex-mode-map
+        :states 'normal
+        "gh" 'bibtex-beginning-of-entry
+        "gk" 'bibtex-previous-entry
+        "gj" 'bibtex-next-entry
+        "gl" 'bibtex-end-of-entry)
+
+       (leader/set-keys-for-major-mode 'bibtex-mode
+         "," 'bibtex-clean-entry
+         "r" 'bibtex-entry-update                                ; fill-out templates for missing fields in the current entry.
+         "g" 'bibtex-search-entry
+         "n" 'bibtex-narrow-to-entry
+         "w" 'widen
+         "m" 'bibtex-mark-entry
+         "?" 'bibtex-print-help-message
+         "u" 'bibtex-url                                         ; opens the url for the current entry (if there is one).
+         "-" 'bibtex-fill-entry
+         "x" 'bibtex-kill-entry
+         "s" 'bibtex-search-crossref
+         "j" 'bibtex-pop-next                                    ; fill out current field with similair value from next entry.
+         "k" 'bibtex-pop-previous                                ; same as above but the previous entry.
+         "o"   'bibtex-remove-OPT-or-ALT
+         "C-o" 'bibtex-remove-OPT-or-ALT
+
+         "y" "yank"
+         "ys" 'bibtex-copy-summary-as-kill
+         "yf" 'bibtex-copy-field-as-kill
+         "yy" 'bibtex-copy-entry-as-kill
+
+         "DEL" 'bibtex-empty-field
+         "f" 'bibtex-make-field
+         "d" 'bibtex-kill-field
+
+         "i"    "insert"
+         "ii"   'bibtex-entry
+         "ip"   'bibtex-Preamble
+         "ia"   'bibtex-Article
+         "im"   'bibtex-Misc
+         "ic"   'bibtex-InCollection
+         "is"   'bibtex-String
+         "ir"   'bibtex-TechReport
+         "iu"   'bibtex-Unpublished
+         "ib"   'bibtex-Book
+         "iB"   'bibtex-InBook
+         "il"   'bibtex-Booklet
+         "ip"   'bibtex-Proceedings
+         "iP"   'bibtex-InProceedings
+         "i RET" 'bibtex-Manual
+
+         "it"    "thesis"
+         "itP"   'bibtex-PhdThesis
+         "itm"   'bibtex-MastersThesis))
+   #+END_SRC
+
+*** company-bibtex
+    #+BEGIN_SRC emacs-lisp
+      (use-package company-bibtex
+        :ensure t
+        :defer  t
+        :after (company bibtex)
+        :init
+        (add-to-list 'company-backends 'company-bibtex)
+        (setq company-bibtex-bibliography bibtex-files))
+    #+END_SRC
+
+*** ebib
+    biblatex/bibtex database management interface for emacs. TODO read [[https://joostkremers.github.io/ebib/ebib-manual.html][manual]].
+
+    #+BEGIN_SRC emacs-lisp :tangle bin/lisp/+init-ebib.el
+      (use-package ebib
+        :ensure t
+        :defer  t
+        :init
+        (leader/set-keys
+          "ox" 'ebib)
+
+        :config
+        (mkdir (var! "ebib") t)
+
+        (setq ebib-keywords-file (var! "ebib/keywords")
+              ebib-reading-list-file (org! "ebib/reading-list.org"))
+
+        ;; make ebib index use evil-motion-state
+        (evil-set-initial-state 'ebib-index-mode 'motion)
+        (evil-make-overriding-map ebib-index-mode-map 'motion)
+        (push 'ebib-index-mode whitespace-exempt-modes)
+
+        (general-unbind
+          :keymaps 'ebib-index-mode-map
+          "C-n" ; was ebib-next-entry
+          "C-p" ; was ebib-prev-entry
+          "n"
+          "p"
+          "?"   ; was ebib-search-next
+          "SPC" ; was ebib-index-scroll-up
+          "|"   ; was ebib-filters-logical-or
+          "~"   ; was ebib-filters-logical-not
+          "&"   ; was ebib-filters-logical-and
+          "g"   ; was ebib-goto-first-entry
+          "1" "2" "3" "4" "5" "6" "7" "8" "9" ; was ebib-switch-to-database-key
+          "o"   ; was ebib-open-bibtex-file
+          "J"   ; was ebib-switch-to-database-nth
+          "H"   ; was ebib-toggle-hidden
+          "i"   ; was ebib-push-citation
+          "h"   ; was ebib-index-help
+          "Z"   ; was ebib-lower
+          "b"   ; was ebib-index-scroll-down
+          "f"   ; was ebib-view-file
+          "X"   ; was ebib-export-preamble
+          "I"   ; was ebib-browse-doi
+          )
+
+        (general-define-key
+          :keymaps 'ebib-index-mode-map
+          :states  'motion
+          ;; setup exit and reset commands
+          [remap quit-window] 'ebib-leave-ebib-windows            ; leaves buffers alive, just hides windows.
+          "gq"                'ebib-quit                          ; kills buffers and windows.
+          [remap revert-buffer]  'ebib-reload-current-database
+          "gR"                   'ebib-reload-all-databases
+
+          ;; allow using ex commands for evil stuff.
+          [remap evil-write]     'ebib-save-current-database
+          [remap evil-write-all] 'ebib-save-all-databases
+
+          ;; evil-like motions
+          "C-u" 'ebib-index-scroll-down
+          "C-d" 'ebib-index-scroll-up
+          "C-b" 'ebib-index-scroll-down
+          "C-f" 'ebib-index-scroll-up
+          "gg"  'ebib-goto-first-entry
+          "G"   'ebib-goto-last-entry
+          "j"   'ebib-next-entry
+          "k"   'ebib-prev-entry
+          "gj"  'ebib-next-database
+          "gk"  'ebib-prev-database
+          "n"   'ebib-search-next
+
+          ;; evil like yank, delete, paste
+          "y" 'ebib-kill-entry
+          "x" 'ebib-delete-entry                                  ; also bound to d
+          "p" 'ebib-yank-entry                                    ; paste yanked entry
+
+          "e" 'ebib-open-bibtex-file                              ; edit-file
+          "h" 'ebib-show-log
+          "l" 'ebib-edit-entry
+          "o" 'ebib-edit-entry
+          "RET" 'ebib-edit-entry
+
+          "ss" 'ebib-export-entries                               ; save-as
+          "sp" 'ebib-export-preamble                              ; save-preamble-as
+          ;; configure sorting
+          "sa" 'ebib-index-sort-ascending
+          "sd" 'ebib-index-default-sort
+          "sd" 'ebib-index-sort-descending
+          )
+
+        (leader/set-keys-for-major-mode 'ebib-index-mode
+          "i" 'ebib-add-entry                                     ; also just bound to a
+          "u" 'ebib-browse-url                                    ; also just bound to u
+          "s" 'ebib-switch-to-database-nth
+          "a" 'ebib-show-annotation
+          "n" 'ebib-open-note
+          "g" 'ebib-jump-to-entry
+          "." 'ebib-toggle-hidden
+          "b" 'ebib-browse-doi
+          "F" 'ebib-view-file                                     ; open file referenced by current entry
+          "!" 'ebib-generate-autokey
+
+          "e" "edit"
+          "ee" 'ebib-edit-keyname
+          "ep" 'ebib-edit-preamble
+          "es" 'ebib-edit-strings
+
+          "f" "filters"
+          "f" ebib-filters-map
+
+          "k" "keywords"
+          "k" ebib-keywords-map
+
+          "d" "dependent"
+          "d" ebib-dependent-map
+          )
+
+        ;;; ebib-log-mode
+        (push 'ebib-entry-mode whitespace-exempt-modes)
+        (evil-set-initial-state 'ebib-entry-mode 'motion)
+        (evil-make-overriding-map ebib-entry-mode-map 'motion)
+
+        (general-define-key
+         :keymaps 'ebib-log-mode-map
+         :states 'motion
+         [remap quit-window] 'ebib-quit-log-buffer)
+
+        (general-unbind
+          :keymaps 'ebib-entry-mode-map
+          "g"   ; ebib-goto-first-field
+          "n"   ; ebib-next-field
+          "p"   ; ebib-prev-field
+          "v"   ; ebib-view-field-as-help
+          "c"   ; ebib-copy-field-contents
+          "SPC" ; ebib-goto-next-set
+          "b"   ; ebib-goto-prev-set
+          "h"   ; ebib-entry-help
+          "k"   ; ebib-kill-field-contents
+          ;; r               ebib-toggle-raw
+          ;; s               ebib-insert-abbreviation
+          )
+
+        (general-define-key
+         :keymaps 'ebib-entry-mode-map
+         ;; allow using ex commands for evil stuff.
+         [remap evil-write]     'ebib-save-current-database
+         [remap evil-write-all] 'ebib-save-all-databases
+
+         "C-u" 'ebib-goto-prev-set
+         "C-d" 'ebib-goto-next-set
+         "C-b" 'ebib-goto-prev-state
+         "C-f" 'ebib-goto-next-set
+         "gg" 'ebib-goto-first-field
+         "G"  'ebib-goto-last-field
+         "gj" 'ebib-next-field
+         "gk" 'ebib-prev-field
+
+         "e" 'ebib-edit-field
+         "i" 'ebib-edit-field
+         ;; "m" 'ebib-edit-multiline-field
+         ;; "x" 'ebib-delete-field-contents
+         "d" 'ebib-kill-field-contents
+         "x" 'ebib-kill-field-contents
+
+         "y" 'ebib-copy-field-contents
+         "p" 'ebib-yank-field-contents
+
+         "q" 'ebib-quit-entry-buffer)
+
+        (leader/set-keys-for-major-mode 'ebib-entry-mode
+          "f" 'ebib-view-file-in-field                            ; TODO find out what this does
+          "h" 'ebib-view-field-as-help
+          "u" 'ebib-browse-url))
+
+      (provide '+init-ebib)
+    #+END_SRC
+
+*** eof
+    #+BEGIN_SRC emacs-lisp
+      (provide '+init-bibtex)
     #+END_SRC
 
 ** eof
