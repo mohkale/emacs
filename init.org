@@ -101,7 +101,7 @@
 * Setup
 ** early-init
    :PROPERTIES:
-   :header-args+: :tangle  early-init.el
+   :header-args+: :tangle early-init.el
    :END:
 
    [[https://git.savannah.gnu.org/cgit/emacs.git/commit/?id=24acb31c04b4048b85311d794e600ecd7ce60d3b][early-init]] is automatically sourced by emacs since 27 forward, before any other
@@ -272,6 +272,8 @@
         org-publish-timestamp-directory                    (var! "org/timestamps/")
         org-registry-file                                  (var! "org/registry.el")
         org-default-notes-file                             (org! "notes.org")
+        org-projectile-projects-directory                  (org! "projects/")
+        org-projectile-projects-file                       (org! "projects/global.org")
         org-preview-latex-image-directory                  (var! "org/latex")
         package-quickstart-file                            (var! "package-qs.el")
         recentf-save-file                                  (var! "recentf.el")
@@ -330,6 +332,41 @@
       (member system-type '(gnu gnu/linux gnu/kfreebsd)))
   #+END_SRC
 
+  [[https://github.com/hlissner/doom-emacs/blob/develop/core/core-lib.el#L458][doom just keeps providing]], a transient-hook is a hook that's run
+  only once and then promptly erases itself. can be bound to either
+  a function or a hook variable.
+
+  #+BEGIN_SRC emacs-lisp
+    (defvar +transient-hook-counter 0
+      "used to generate a unique function-name for a transient hook.")
+
+    (defmacro add-transient-hook! (hook-or-function &rest forms)
+      "Attaches a self-removing function to HOOK-OR-FUNCTION.
+    FORMS are evaluated once, when that function/hook is first invoked, then never
+    again.
+    HOOK-OR-FUNCTION can be a quoted hook or a sharp-quoted function (which will be
+    advised)."
+      (declare (indent 1))
+      (let ((append (if (eq (car forms) :after) (pop forms)))
+            ;; Avoid `make-symbol' and `gensym' here because an interned symbol is
+            ;; easier to debug in backtraces (and is visible to `describe-function')
+            (fn (intern (format "emacs--transient-hook-%d-h"
+                                (cl-incf +transient-hook-counter)))))
+        `(let ((sym ,hook-or-function))
+           (defun ,fn (&rest _)
+             ,(format "Transient hook for %S" hook-or-function)
+             ,@forms
+             (let ((sym ,hook-or-function))
+               (cond ((functionp sym) (advice-remove sym #',fn))
+                     ((symbolp sym)   (remove-hook sym #',fn))))
+             (unintern ',fn nil))
+           (cond ((functionp sym)
+                  (advice-add ,hook-or-function ,(if append :after :before) #',fn))
+                 ((symbolp sym)
+                  (put ',fn 'permanent-local-hook t)
+                  (add-hook sym #',fn ,append))))))
+  #+END_SRC
+
   #+BEGIN_SRC emacs-lisp
     (provide '+init-lib)
   #+END_SRC
@@ -350,6 +387,8 @@
    - general
    - delight
    - diminish
+   - dash
+   - bind-map
 
    TODO choose delight or diminish, not both.
 
@@ -389,14 +428,14 @@
    are installed without initializing.
 
    #+BEGIN_SRC emacs-lisp
-    (package-initialize)
+     (package-initialize)
    #+END_SRC
 
-   That said, we can avoid ~package-refresh-contents~ until it's needed (using some
-   advice from doom). TODO copy ~add-transient-hook~ from doom.
+   That said, we can avoid ~package-refresh-contents~ until it's needed.
 
    #+BEGIN_SRC emacs-lisp
-     ;; (add-transient-hook! 'package-install 'package-refresh-contents)
+     (add-transient-hook! #'package-install
+      (package-refresh-contents))
    #+END_SRC
 
    finally, install base packages +took you long enough :tongue:+.
@@ -552,7 +591,7 @@
 
 ** editor
     :PROPERTIES:
-    :header-args+: :tangle  bin/lisp/+init-editor.el
+    :header-args+: :tangle bin/lisp/+init-editor.el
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle init.el
@@ -599,6 +638,7 @@
              enable-recursive-minibuffers t                                         ; allow entering minibuffer, when already in minibuffer
              find-file-suppress-same-file-warnings t                                ; don't warn when finding a file that's already open.
              recentf-max-saved-items 2048                                           ; keep this many files in the recentf history.
+             completion-ignore-case t                                               ; make completion case insensitive, holding down shift is annoying.
              recenter-positions '(top middle bottom))
      #+END_SRC
 
@@ -649,8 +689,8 @@
             ;; include variables anywhere in the string, including sublists, but no functions.
             ;;
             ;; See the format guide here: https://www.emacswiki.org/emacs/FrameTitle
-            `(,(user-login-name)
-              "@"
+            `(;;,(user-login-name)
+              "emacs@"
               ,(system-name)
               " [%*] %m"
               (:eval (when (derived-mode-p 'pdf-view-mode)
@@ -948,10 +988,9 @@
         "bK" 'kill-this-buffer
         "bk" 'kill-this-buffer-and-window-maybe
         "bM" 'switch-to-messages-buffer
-        "by" 'copy-whole-buffer-to-clipboard)
+        "by" 'yank-whole-buffer-as-kill)
 
       (leader/set-keys
-        "cd" 'close-compilation-window ;; WARN not yet implemented
         "cb" 'display-compilation-buffer
         "cy" 'yank-and-comment
         "cc" 'compile)
@@ -967,7 +1006,7 @@
       )
 
       (leader/set-keys
-        "hdl" 'describe-last-keys ;; WARN not yet implemented
+        ;; "hdl" 'describe-last-keys ;; WARN not yet implemented
         )
 
       (leader/set-keys
@@ -1024,6 +1063,13 @@
        ;; evil doesn't seem to have a default for tab.
        ;; [C-i] 'indent-for-tab-command
        [C-m] 'evil-ret)
+    #+END_SRC
+
+    Let's also make some terminal exclusive bindings have the same affect in GUI emacs.
+
+    #+BEGIN_SRC emacs-lisp
+      (general-define-key
+       "C-S-v" 'yank)
     #+END_SRC
 
     now let's unbind some undesired emacs global keys
@@ -1263,21 +1309,17 @@
               (window-height . 0.5))
             display-buffer-alist)
 
-      (push '("*compilation*"
-              (display-buffer-reuse-window-and-focus
-               display-buffer--maybe-pop-up-frame-or-window-and-focus
-               display-buffer-in-side-window-and-focus)
-              (side          . bottom)
-              (window-height . 0.5))
+      (push `(,(rx
+                (or "*image-dired-display-image*"
+                    "*Anaconda*"
+                    "magit-diff: "
+                    "*Flycheck error messages*"
+                    "*HTTP Response*"
+                    (and "*eglot-help for "
+                         (one-or-more any)
+                         "*")))
+              ,@default-display-buffer-action)
             display-buffer-alist)
-
-      (dolist (buffer-name '("*image-dired-display-image*"
-                             "*Anaconda*"
-                             "magit-diff: "
-                             "*Flycheck error messages*"
-                             "*HTTP Response*"))
-        (push `(,buffer-name ,@default-display-buffer-action)
-              display-buffer-alist))
 
       (provide '+display-buffer-focus)
     #+END_SRC
@@ -1361,6 +1403,16 @@
           (setq match-found (string-match-p regexp string)
                 regexps (cdr regexps)))
         (not (not match-found))))
+
+    (defmacro assoc-pop! (key alist)
+      `(let ((result (assoc ,key ,alist)))
+         (setq ,alist (delete result ,alist))
+         result))
+
+    ;; see [[https://ftp.gnu.org/old-gnu/Manuals/elisp-manual-20-2.5/html_node/elisp_408.html][here]].
+    (defun buffer-killed-p (buffer)
+      "Return t if BUFFER is killed."
+      (not (buffer-name buffer)))
   #+END_SRC
 
 ** plist-bind
@@ -1650,7 +1702,7 @@
                    (set-trailing-whitespace--mode-based))))
    #+END_SRC
 
-   #+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp :tangle bin/lisp/misc/+core-whitespace.el
      (defun set-trailing-whitespace--mode-based (&optional dont-set)
        "check the mode of the current buffer, to see whether trailing
      whitespace should be shown. with the optional parameter `dont-set'
@@ -1777,6 +1829,8 @@
 
            ;; major mode dependent configurations
            (cl-case major-mode
+            ('sh-mode
+             (setq-local sh-basic-offset indent))
             ('kotlin-mode
              (setq-local kotlin-tab-width indent))
             ('python-mode
@@ -1789,12 +1843,16 @@
              (setq-local enh-ruby-indent-level indent))
             ('c-mode
              (setq-local c-basic-offset indent))
+            ('awk-mode
+             (setq-local c-basic-offset indent))
             ('plantum-mode
              (setq-local plantuml-indent-level indent))
             ('yaml-mode
              (setq-local yaml-indent-offset indent))
             ('latex-mode
              (setq-local LaTeX-indent-level indent))
+            ('typescript-mode
+             (setq-local typescript-indent-level indent))
             ('web-mode
              (setq-local css-indent-offset indent)
              (setq-local web-mode-markup-indent-offset indent)
@@ -2048,14 +2106,15 @@
       (defvar-local header-line-actual-format nil
         "value of `header-line-format' before being modified by `toggle-buffer-header'.")
 
-      (defun toggle-buffer-header (&optional arg)
+      (defun toggle-buffer-header (&optional arg no-error)
         (interactive "P")
         (let ((showing (if arg
                            (not (zerop (prefix-numeric-value arg)))
                          header-line-actual-format)))
           (if showing
-              (if (not  header-line-actual-format)
-                  (user-error "tried to restore header-line: nil")
+              (if (not header-line-actual-format)
+                  (unless no-error
+                    (user-error "tried to restore header-line: nil"))
                 (setq header-line-format  header-line-actual-format
                       header-line-actual-format nil))
             (setq header-line-actual-format header-line-format
@@ -2458,7 +2517,7 @@
                     set-window-dedication
                     async-shell-command-on-buffer
                     safe-erase-buffer
-                    copy-whole-buffer-to-clipboard
+                    yank-whole-buffer-as-kill
                     split-window-right-and-focus
                     split-window-below-and-focus)
          :init
@@ -2605,7 +2664,7 @@
         (split-window-vertically)
         (other-window 1))
 
-      (defun copy-whole-buffer-to-clipboard (buffer)
+      (defun yank-whole-buffer-as-kill (buffer)
         (interactive (list (current-buffer)))
         (with-current-buffer buffer
           (copy-region-as-kill (point-min) (point-max))))
@@ -2888,7 +2947,8 @@
             buffer)))
 
       (use-package persistent-scratch
-        :demand t
+        :ensure t
+        :defer  nil
         :init
         (defun multiscratch-scratch-buffer-p (&optional buffer)
           "persist all but the main scratch buffer."
@@ -3075,7 +3135,7 @@
          (cond
           ((and lsp eglot)
            (warn "you've enabled both lsp and eglot, defaulting to eglot.")
-           'eglot)
+           'eglot-ensure)
           (lsp   'lsp)
           (eglot 'eglot-ensure)))
        "command used to start a language server.")
@@ -3083,7 +3143,8 @@
      (defvar essential-packages '(spaceline
                                   evil
                                   org
-                                  company)
+                                  company
+                                  user-packages)
        "packages which are always initialised.")
 
      (dolist (required (append
@@ -3312,7 +3373,7 @@
        :init
        (with-eval-after-load 'evil
          (advice-add 'evil-get-register :before-until
-                     (defun evil-register-*-is-calc (register &optional no-error)
+                     (defun evil-register-*-is-calc (register &optional nil)
                        "make evils * register paste from head of calculator stack."
                        (when (eq register ?*)
                          (condition-case err
@@ -3359,7 +3420,7 @@
            (calc-realign)
 
            (when (evil-visual-state-p)
-             (previous-line)))
+             (forward-line -1)))
 
          (goto-char (+ 4 (line-beginning-position))))
 
@@ -3554,19 +3615,29 @@
         (push 'compilation-mode whitespace-exempt-modes)
 
         (setq compilation-read-command nil
-              compilation-scroll-output t)
+              compilation-scroll-output 'first-error)
 
         (require '+compilation-auto-kill)
 
+        (defvar compilation-last-buffer nil
+          "the last open compilation buffer.")
+
+        (add-hook 'compilation-finish-functions
+                  (lambda (buf &rest _)
+                    (setq compilation-last-buffer buf)))
+
         (defun display-compilation-buffer ()
           (interactive)
-          (let ((buffer-name (if compilation-buffer-name-function
-                                 (funcall compilation-buffer-name-function "compilation")
-                               "*compilation*")))
-            (if (not buffer-name)
-                (message "compilation buffer doesn't exist")
-              (display-buffer buffer-name))))
-
+          (let* ((buffer
+                  (or compilation-last-buffer
+                      (get-buffer
+                       (if compilation-buffer-name-function
+                           (funcall compilation-buffer-name-function "compilation")
+                         "*compilation*"))))
+                 (window (if (not buffer)
+                             (user-error "compilation buffer doesn't exist")
+                           (display-buffer buffer))))
+            (select-window window t)))
 
         (defun +set-compilation-bindings (mode map)
           (leader/set-keys-for-major-mode mode
@@ -3582,9 +3653,11 @@
           (general-define-key
             :keymaps map
             :states  'motion
-            "gr"  'recompile
-            "gj"  'next-error-no-select
-            "gk"  'previous-error-no-select
+            [remap revert-buffer] 'recompile
+            "gj"  'compilation-next-error
+            "gk"  'compilation-previous-error
+            "gn"  'next-error-no-select
+            "gp"  'previous-error-no-select
             "o"   'compilation-display-error
             "j"   'compilation-next-error
             "k"   'compilation-previous-error
@@ -3602,7 +3675,11 @@
         (general-unbind
           :states  'motion
           :keymaps 'compilation-mode-map
-          "j" "k"))
+          "j" "k")
+
+        (general-define-key
+         :keymaps 'emacs-lisp-compilation-mode-map
+          [remap revert-buffer] 'emacs-lisp-compilation-recompile))
     #+END_SRC
 
 *** auto-kill
@@ -3613,6 +3690,9 @@
 
       If set to a numerical value, window will be deleted after that many
       seconds.")
+
+      (defvar compilation-auto-kill-ignore-modes nil
+        "major modes spawned by `compile' for which auto-kill doesn't take place.")
 
       (defvar compilation-dont-auto-kill-window-when '(warnings focus)
         "specify not to kill the window when warning, error or info given.
@@ -3639,12 +3719,12 @@
                                  (get-buffer-window buf)
                                  t)))))
 
-      (defun compilation-safely-close-window+ (compilation-buffer)
-        (when (and compilation-buffer
-                   (not (get-buffer-process compilation-buffer)))
+      (defun compilation-safely-close-window+ (buffer)
+        (when (and buffer
+                   (not (get-buffer-process buffer)))
           ;; don't skip if new compilation began before window
           ;; from previous compilation has been killed.
-          (quit-windows-on compilation-buffer)))
+          (quit-windows-on buffer)))
 
       (defun compilation-cancel-auto-kill-p+ ()
         "whether to cancel compilation window auto-kill due to `compilation-dont-auto-kill-window-when'."
@@ -3662,12 +3742,18 @@
                    (and (member 'focus compilation-dont-auto-kill-window-when)
                         (not compilation-was-open-p))
                    ;; an abnormal exit automatically cancels window kill
-                   (not (string-match-p ".*exited abnormally.*" str)))
+                   (not (string-match-p (rx (zero-or-more any)
+                                            "exited abnormally"
+                                            (zero-or-more any))
+                                        str))
+                   (not (apply 'derived-mode-p
+                               compilation-auto-kill-ignore-modes)))
           (let* ((terminate-window t))
             (let ((notifications (compilation-cancel-auto-kill-p+)))
               (when notifications
-                (message "window kill suspended due to encountering: %s"
-                         (combine-and-quote-strings notifications))
+                (when debug-on-error
+                  (message "window kill suspended due to encountering: %s"
+                           (combine-and-quote-strings notifications)))
                 (setq terminate-window nil)))
 
             (when terminate-window
@@ -4736,7 +4822,7 @@
                      (save-buffer)))
 
        (leader/with-major-mode-prefix
-         (leader/set-keys-for-mode 'server-header-mode
+         (leader/set-keys-for-mode 'server-edit-mode+
            "," 'server-edit
            "q" 'server-abort)))
    #+END_SRC
@@ -4745,38 +4831,47 @@
     #+BEGIN_SRC emacs-lisp
       (use-package +server-commands
         :commands (find-client-buffer
-                   server-kill-clients-for-buffer
-                   server-header-mode--toggle-show-headers
-                   server-header-mode--toggle-show-headers-local
-                   server-header-mode)
+                   server-abort
+                   toggle-client-headers
+                   toggle-client-headers-local
+                   server-edit-mode+)
         :init
         (leader/set-keys
-          "t1" '("toggle-client-headers"       . server-header-mode--toggle-show-headers)
-          "t2" '("toggle-client-headers-local" . server-header-mode--toggle-show-headers-local)
+          "t1" 'toggle-client-headers
+          "t2" 'toggle-client-headers-local
           "fes" 'find-client-buffer)
 
-        (add-hook 'server-switch-hook
-                  (defun server-switch--enable-server-header-mode ()
-                    (when server-buffer-clients
-                      (unless (derived-mode-p major-mode
-                                              'magit-mode 'git-commit-mode 'dired-mode
-                                              'git-rebase-mode)
-                        (server-header-mode)))))
+        (defvar server-edit-ignore-modes+
+          '(with-editor-mode)
+          "modes (minor or major) in which `server-edit-mode+' is disabled.")
 
-        (add-hook 'server-done-hook (lambda () (server-header-mode -1))))
+        (add-hook 'server-switch-hook
+                  (lambda ()
+                    (when server-buffer-clients
+                      (unless (or (apply #'derived-mode-p
+                                         server-edit-ignore-modes+)
+                                  (cl-some (lambda (mode)
+                                             (and (boundp mode)
+                                                  (eval mode)))
+                                           server-edit-ignore-modes+))
+                        (server-edit-mode+ +1)))))
+
+        (add-hook 'server-done-hook
+                  (lambda ()
+                    (server-edit-mode+ -1))))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle bin/lisp/misc/+server-commands.el
       (defun find-client-buffer ()
         (interactive)
         (switch-to-buffer
-         (read-buffer "Client buffers" nil t
+         (read-buffer "Client buffers: " nil t
                       (lambda (b)
                         (with-current-buffer (cdr b)
                           server-buffer-clients)))))
 
       ;; see [[https://superuser.com/questions/295156/how-to-set-the-exit-status-for-emacsclienti][here]].
-      (defun server-kill-clients-for-buffer (&optional prefix)
+      (defun server-abort (&optional prefix)
         "Sends error exit command to every client for the current buffer."
         (interactive "P")
         (if (not server-buffer-clients)
@@ -4785,50 +4880,15 @@
             (server-send-string proc "-error die"))
           (unless prefix (kill-buffer))))
 
-      (defalias 'server-abort #'server-kill-clients-for-buffer)
-
-      (defvar server-header-mode-show-header t
-        "when true, any new buffers in which `server-header-mode' is activated
-      will have the header shown.")
-
-      (defun server-header-mode--toggle-show-headers (&optional arg local)
-        (interactive "P")
-        (let ((value (cond
-                      (arg
-                       (not (zerop (prefix-numeric-value arg))))
-                      (t (not server-header-mode-show-header)))))
-          (if local
-              (setq-local server-header-mode-show-header value)
-            (setq server-header-mode-show-header value))
-
-          (toggle-buffer-header arg)
-
-          (message "%s client headers in %s"
-                   (if server-header-mode-show-header
-                       (propertize "showing" 'face 'compilation-info)
-                     (propertize "hiding" 'face 'compilation-error))
-                   (if local
-                       "the current buffer"
-                     "all buffers"))))
-
-      (defun server-header-mode--toggle-show-headers-local (&optional arg)
-        (interactive "P")
-        (server-header-mode--toggle-show-headers arg t))
-
       ;; add ,, and ,q like bindings in server edit sessions, like org-edit-src-code
-      (define-minor-mode server-header-mode
+      (define-minor-mode server-edit-mode+
         "a dummy minor mode for files being edited by `server'.
       makes it easier to bind keys (& leaders :grinning: for them)."
         nil
         "ServerEdit"
         '(;; ([remap evil-write] . server-edit)
           ([remap evil-save-and-close] . server-edit)
-          ([remap evil-quit-all-with-error-code] . server-abort))
-        (when (and server-header-mode
-                   server-header-mode-show-header)
-          (setq header-line-format
-                (substitute-command-keys
-                 "Editing an emacsclient sesssion.  Exit with '\\[server-edit]' or abort with '\\[server-abort]'"))))
+          ([remap evil-quit-all-with-error-code] . server-abort)))
 
       (provide '+server-commands)
     #+END_SRC
@@ -4840,13 +4900,14 @@
        (leader/set-keys
          "i TAB"       "indent"
          "i TAB TAB" 'indent-region
-         "i TAB RET"   'split-line
-         "i TAB SPC"   'just-one-space
-         "i TAB r"     'indent-relative
-         "i TAB R"     'indent-relative-first-indent-point
-         "i TAB ."     'hydra-indent/body
-         "i TAB n"     'forward-to-indentation
-         "i TAB N"     'back-to-indentation)
+         "i TAB RET" 'split-line
+         "i TAB SPC" 'just-one-space
+         "i TAB c"   'indent-to-column
+         "i TAB r"   'indent-relative
+         "i TAB 0"   'indent-relative-first-indent-point
+         "i TAB ."   'hydra-indent/body
+         "i TAB n"   'forward-to-indentation
+         "i TAB p"   'back-to-indentation)
 
        :config
        (push 'messages-buffer-mode whitespace-exempt-modes)
@@ -5305,6 +5366,7 @@
          "jr" 'xref-find-references
          "js" 'xref-find-apropos
          "jg" 'xref-find-definitions
+         "jo" 'xref-find-definitions-other-window
          ;; "axw" 'xref-find-definitions-other-window
          ;; "axf" 'xref-find-definitions-other-frame
          )
@@ -5356,10 +5418,6 @@
   :PROPERTIES:
   :header-args+: :tangle bin/lisp/+init-user-packages.el
   :END:
-
-  #+BEGIN_SRC emacs-lisp :tangle init.el
-    (require '+init-user-packages)
-  #+END_SRC
 
 ** ace-link
    let's you use an avy like interface to jump to a link in the visible region
@@ -5702,13 +5760,13 @@
              (company--insert-candidate company-common))))
 
        ;; use transient bindings inside the completion menu
-       (defun company-set-bindings+ (&rest args)
+       (defun company-set-bindings+ (&rest _)
          (apply 'general-define-key
                 :keymaps 'override
                 :states  'insert
                 company-menu-bindings+))
 
-       (defun company-unset-bindings+ (&rest args)
+       (defun company-unset-bindings+ (&rest _)
          (apply 'general-define-key
                 :keymaps 'override
                 :states  'insert
@@ -6075,7 +6133,7 @@
                       (dashboard-refresh-buffer))))
 
         (advice-add 'dashboard-refresh-buffer :before
-                    (lambda (&rest args)
+                    (lambda (&rest _)
                       (dashboard-select-random-banner+)))
         (dashboard-select-random-banner+) ;; choose initial banner
 
@@ -6739,7 +6797,13 @@
            (leader/set-keys-for-mode 'edit-server-edit-mode
              "s" 'edit-server-save
              "," 'edit-server-done
-             "q" 'edit-server-abort)))
+             "q" 'edit-server-abort))
+
+         (general-define-key
+          :keymaps 'edit-server-edit-mode-map
+          [remap evil-write] 'server-edit
+          [remap evil-save-and-close] 'server-edit
+          [remap evil-quit-all-with-error-code] 'server-abort))
 
        ;; fixes issues with non conventional input components likes gmails compose box
        (use-package edit-server-htmlize
@@ -6763,7 +6827,12 @@
          (leader/with-major-mode-prefix
            (leader/set-keys-for-mode 'atomic-chrome-edit-mode
              "s" 'atomic-chrome-send-buffer-text
-             "," 'atomic-chrome-close-current-buffer))))
+             "," 'atomic-chrome-close-current-buffer))
+
+         (general-define-key
+          :keymaps 'edit-server-edit-mode-map
+          [remap evil-write] 'atomic-chrome-send-buffer-text
+          [remap evil-save-and-close] 'atomic-chrome-close-current-buffer)))
 
       (+browser-edit-package
        (message "unknown browser extension package: %s"
@@ -6781,8 +6850,9 @@
      (use-package eglot
        :ensure t
        :defer  t
-       :hook (eglot-managed-mode . flycheck-mode)
        :config
+       (require 'yasnippet) ;; needed or else snippet expansion won't happen.
+
        ;; I'll set my backends myself, thank you.
        (setq eglot-stay-out-of '(company))
 
@@ -6800,6 +6870,21 @@
          "jy" 'eglot-find-implementation
          "jY" 'eglot-find-typeDefinition)
 
+       (leader/set-keys-for-mode 'eglot--managed-mode
+         "hy" 'eglot-help-at-point)
+
+       (defun eglot-toggle-help-buffer+ (&optional arg)
+         (interactive "P")
+         (setq eglot-auto-display-help-buffer
+               (if arg
+                   (not (zerop (prefix-numeric-value arg)))
+                 (not eglot-auto-display-help-buffer)))
+
+         (message "%s auto-display of eglot-help buffers"
+                  (if eglot-auto-display-help-buffer
+                      (propertize "enabled" 'face 'compilation-info)
+                    (propertize "disabled" 'face 'compilation-error))))
+
        (leader/with-prefix leader-server-leader-prefix
          (leader/set-keys-for-mode 'eglot--managed-mode
            ;; unbound 'eglot-clear-status
@@ -6813,6 +6898,7 @@
            "f" 'eglot-format
            "F" 'eglot-format-buffer
            "o" 'eglot-reconnect
+           "t" 'eglot-toggle-help-buffer+
 
            "g" "goto"
            "gg" 'eglot-find-implementation
@@ -6994,7 +7080,8 @@
               (yaml-mode             . emojify-mode)
               (shell-mode            . emojify-mode)
               (markdown-mode         . emojify-mode)
-              (lisp-interaction-mode . emojify-mode))
+              (lisp-interaction-mode . emojify-mode)
+              (scss-mode             . emojify-mode))
        :init
        (leader/set-keys
          "xm" 'emojify-insert-emoji)
@@ -7260,6 +7347,8 @@
                  (vc-find-root (eshell/pwd) ".git"))))
 
         (setq eshell-prompt-function #'epe-theme-lambda))
+
+      (provide '+init-eshell-prompt-extras)
     #+END_SRC
 
 ** evil
@@ -7496,7 +7585,7 @@
     #+END_SRC
 
 *** multiedit
-    #+BEGIN_SRC emacs-lisp :tangle
+    #+BEGIN_SRC emacs-lisp
       (use-package iedit
         :ensure t
         :defer  t)
@@ -7673,7 +7762,8 @@
                                ;; :fork (:host github :repo "mohkale/vimish-fold")
                                )
         :hook ((text-mode . vimish-fold-mode)
-               (prog-mode . vimish-fold-mode))
+               (prog-mode . vimish-fold-mode)
+               (conf-mode . vimish-fold-mode))
         :config
         (setq vimish-fold-allow-nested t)
         (setq vimish-fold-dir (var! "vimish-fold/"))
@@ -7776,7 +7866,7 @@
         (evil-set-initial-state 'text-mode 'normal)
         (evil-set-initial-state 'conf-mode 'normal)
 
-        (with-no-warnings
+        (with-suppressed-warnings
           (defvaralias 'evil-ex-search-history 'regexp-search-ring))
 
         ;; from [[https://github.com/hlissner/doom-emacs/blob/develop/modules/editor/evil/config.el#L137][doom]].
@@ -7819,8 +7909,8 @@
          "M-e" 'evil-execute-in-normal-state)
 
         (general-define-key
-          "C->" 'evil-shift-right
-          "C-<" 'evil-shift-left)
+          "C->" 'evil-shift-right-line
+          "C-<" 'evil-shift-left-line)
 
         (general-define-key
           :states 'normal
@@ -7831,7 +7921,9 @@
           "gd" 'evil-downcase
           "g@" 'what-cursor-position
           "ga" 'evil-fill-and-move
-          "g-" 'evil-indent)
+          "g-" 'evil-indent
+          "<C-return>" 'xref-find-definitions
+          "M-RET" 'xref-find-definitions-other-window)
 
         (general-define-key
           :states '(normal motion)
@@ -7880,8 +7972,10 @@
           "zP" 'evil-scroll-left
 
           "gN" nil
-          "gn" 'evil-next-visual-line
-          "gp" 'evil-previous-visual-line
+          "gn" 'evil-next-match
+          "gp" 'evil-previous-match
+          ;; "gn" 'evil-next-visual-line
+          ;; "gp" 'evil-previous-visual-line
           ;; probably always gonna be overidden
           "gj" 'evil-next-visual-line
           "gk" 'evil-previous-visual-line
@@ -8190,17 +8284,15 @@
        :delight "FlyCheck"
        :init
        (leader/set-keys
-         "ej" 'flycheck-next-error
-         "ek" 'flycheck-previous-error
          "e." 'hydra-flycheck/body
-         "ec" 'flycheck-clear
+         "ex" 'flycheck-clear
          "ed" 'flycheck-explain-error-at-point
          "eh" 'flycheck-describe-checker
          "eg" 'flycheck-first-error
          "eL" 'goto-flycheck-error-list
          "el" 'flycheck-list-errors
-         "eS" 'flycheck-set-checker-executable
-         "es" 'flycheck-select-checker
+         "eC" 'flycheck-set-checker-executable
+         "ec" 'flycheck-select-checker
          "ev" 'flycheck-verify-setup)
 
        :config
@@ -8468,7 +8560,8 @@
        :ensure t
        :defer  t
        :hook ((prog-mode . global-hl-todo-mode)
-              (text-mode . global-hl-todo-mode))
+              (text-mode . global-hl-todo-mode)
+              (org-mode  . hl-todo-mode))
        :init
        (leader/set-keys
          "jt" 'hl-todo-next
@@ -8590,6 +8683,7 @@
    :END:
 
    A clean, elegent, completion framework for emacs.
+
 *** ivy
     #+BEGIN_SRC emacs-lisp
       (use-package ivy
@@ -8603,7 +8697,6 @@
           (setq magit-completing-read-function 'ivy-completing-read))
 
         (setq ivy-height 15
-              counsel-evil-registers-height 15
               ivy-use-virtual-buffers t
               projectile-completion-system 'ivy
               ivy-magic-tilde nil)
@@ -8716,7 +8809,6 @@
           "C-j"   nil ;; was ivy-alt-done
           "M-j"   nil ;; was ivy-yank-word
           "M-v"   nil ;; was ivy-scroll-down-command
-          "C-'"   nil ;; was ivy-avy
           "C-M-y" nil ;; was ivy-insert-current-full
 
           "C-r" 'evil-paste-from-register
@@ -8761,7 +8853,6 @@
           "C-l" 'ivy-forward-char-or-partial-or-done
           "C-j" 'next-line
           "C-k" 'previous-line
-          "C-q" 'ivy-avy
           "M-j" 'ivy-next-history-element
           "M-k" 'ivy-previous-history-element
           "M-u" 'ivy-occur
@@ -8833,6 +8924,20 @@
           "q" nil))
     #+END_SRC
 
+*** ivy-avy
+    #+BEGIN_SRC emacs-lisp
+      (use-package ivy-avy
+        :ensure t
+        :defer  t
+        :commands (ivy-avy)
+        :init
+        (general-define-key
+         :keymaps 'ivy-minibuffer-map
+         "C-'"   nil ;; was ivy-avy
+         "C-q" 'ivy-avy
+         "C-c q" 'ivy-avy))
+    #+END_SRC
+
 *** ivy-hydra
     #+BEGIN_SRC emacs-lisp
       (use-package ivy-hydra
@@ -8890,11 +8995,12 @@
 
         (leader/set-keys
           "ae" 'counsel-package
+          "ee" 'counsel-compilation-errors
           "ic" 'counsel-unicode-char
           "ie" 'counsel-org-entity
           "Mm" 'counsel-major
 
-          "ee" 'counsel-flycheck
+          "es" 'counsel-flycheck
           "ry" 'counsel-yank-pop
           "rm" 'counsel-mark-ring
           "rn" 'counsel-evil-marks
@@ -8976,7 +9082,7 @@
           [remap isearch-forward] 'swiper-isearch)
 
         :config
-        (with-no-warnings
+        (with-suppressed-warnings
           (defvaralias 'swiper-history 'regexp-search-ring))
 
         (defvar swiper-persistent-highlight nil
@@ -9294,9 +9400,7 @@
         :defer  t
         ;; :hook (projectile-mode . counsel-projectile-mode)
         :init
-        (setq counsel-projectile-org-capture-templates-first-p nil
-              org-projectile-projects-directory (org! "projects/")
-              org-projectile-projects-file      (org! "projects/global.org"))
+        (setq counsel-projectile-org-capture-templates-first-p nil)
 
         (general-define-key
           [remap counsel-org-capture] 'counsel-projectile-org-capture)
@@ -9875,54 +9979,54 @@
    :END:
 
    #+BEGIN_SRC emacs-lisp
-       (use-package lsp-mode
-         :ensure t
-         :defer  t
-         ;; never use lsp-mode, use lsp.
-         :config
-         (setq lsp-prefer-flymake             nil
-               lsp-enable-snippet             nil
-               lsp-enable-symbol-highlighting nil
-               lsp-auto-guess-root            t
-               lsp-map+ (make-sparse-keymap)
-               lsp-session-file (var! "lsp/session")
-               lsp-server-install-dir (var! "lsp/servers"))
+     (use-package lsp-mode
+       :ensure t
+       :defer  t
+       ;; never use lsp-mode, use lsp.
+       :config
+       (setq lsp-prefer-flymake             nil
+             lsp-enable-snippet             nil
+             lsp-enable-symbol-highlighting nil
+             lsp-auto-guess-root            t
+             lsp-map+ (make-sparse-keymap)
+             lsp-session-file (var! "lsp/session")
+             lsp-server-install-dir (var! "lsp/servers"))
 
+       (leader/set-keys-for-mode 'lsp-mode
+         "jy" 'lsp-goto-type-definition
+         "jY" 'lsp-goto-implementation)
+
+       (leader/with-prefix leader-server-leader-prefix
          (leader/set-keys-for-mode 'lsp-mode
-           "jy" 'lsp-goto-type-definition
-           "jY" 'lsp-goto-implementation)
+           "" "server"
 
-         (leader/with-prefix leader-server-leader-prefix
-           (leader/set-keys-for-mode 'lsp-mode
-             "" "server"
+           "?"   'lsp-describe-session
+           "|"   'lsp-describe-thing-at-point
+           "e"   'lsp-execute-code-action
+           "h"   'lsp-document-highlight
+           "DEL" 'lsp-disconnect
 
-             "?"   'lsp-describe-session
-             "|"   'lsp-describe-thing-at-point
-             "e"   'lsp-execute-code-action
-             "h"   'lsp-document-highlight
-             "DEL" 'lsp-disconnect
+           "w"  "workspace"
+           "wR" 'lsp-restart-workspace
+           "wa" 'lsp-workspace-folders-add
+           "wr" 'lsp-workspace-folders-remove
+           "ws" 'lsp-workspace-folders-switch
 
-             "w"  "workspace"
-             "wR" 'lsp-restart-workspace
-             "wa" 'lsp-workspace-folders-add
-             "wr" 'lsp-workspace-folders-remove
-             "ws" 'lsp-workspace-folders-switch
+           "l"  "lens"
+           "ll" 'lsp-lens-mode
+           "ls" 'lsp-lens-show
+           "lh" 'lsp-lens-hide
 
-             "l"  "lens"
-             "ll" 'lsp-lens-mode
-             "ls" 'lsp-lens-show
-             "lh" 'lsp-lens-hide
+           "r"  "refactor"
+           "rr" 'lsp-format-buffer
+           "ri" 'lsp-organize-imports
+           "rc" 'lsp-rename
 
-             "r"  "refactor"
-             "rr" 'lsp-format-buffer
-             "ri" 'lsp-organize-imports
-             "rc" 'lsp-rename
-
-             "g"  "goto"
-             "gg" 'lsp-goto-type-definition
-             "gG" 'lsp-goto-implementation
-             "gF" 'lsp-find-implementation
-             "gf" 'lsp-find-type-definition)))
+           "g"  "goto"
+           "gg" 'lsp-goto-type-definition
+           "gG" 'lsp-goto-implementation
+           "gF" 'lsp-find-implementation
+           "gf" 'lsp-find-type-definition)))
    #+END_SRC
 
 *** lsp-ui
@@ -9996,6 +10100,8 @@
            "h" 'magit-log-buffer-file))
 
        :config
+       (require 'transient)
+
        (use-package evil-magit
          :ensure t
          :demand t
@@ -10007,6 +10113,11 @@
          :config
           ;; prevent evil-window-map overriding emacs-window-map
          (general-unbind :states `(,evil-magit-state visual) :keymaps 'magit-mode-map "C-w" ))
+
+       (add-hook 'magit-mode-hook
+                 (defun magit-cleanup-defaults+ ()
+                   ;; messes up alignment on rescroll
+                   (setq-local scroll-conservatively 0)))
 
        (leader/set-keys-for-major-mode 'magit-status-mode
          "z" 'magit-jump-to-stashes
@@ -10149,20 +10260,20 @@
 *** transient
     #+BEGIN_SRC emacs-lisp
       (use-package transient
-         :ensure t
-         :defer  t
-         :config
-         (setq transient-history-file (var! "transient/history.el")
-               transient-values-file  (etc! "transient/values.el")
-               transient-levels-file  (etc! "transient/levels.el"))
+        :ensure t
+        :defer  t
+        :config
+        (setq transient-history-file (var! "transient/history.el")
+              transient-values-file  (etc! "transient/values.el")
+              transient-levels-file  (etc! "transient/levels.el"))
 
-         (general-define-key
-           :keymaps 'transient-base-map
+        (general-define-key
+         :keymaps 'transient-base-map
            ;;; escape means quit too
-           "ESC"      'transient-quit-one
-           "<escape>" 'transient-quit-one))
+         "ESC"      'transient-quit-one
+         "<escape>" 'transient-quit-one))
     #+END_SRC
- 
+
 *** eof
     #+BEGIN_SRC emacs-lisp
       (provide '+init-magit)
@@ -10345,13 +10456,14 @@
 
 
    #+BEGIN_SRC emacs-lisp
-      (use-package page-break-lines
-        :defer t
-        :hook ((org-mode     . page-break-lines-mode)
-               (help-mode    . page-break-lines-mode)
-               (outline-mode . page-break-lines-mode))
-        :diminish
-        page-break-lines-mode)
+     (use-package page-break-lines
+       :defer t
+       :hook ((org-mode                    . page-break-lines-mode)
+              (help-mode                   . page-break-lines-mode)
+              (outline-mode                . page-break-lines-mode)
+              (emacs-lisp-compilation-mode . page-break-lines-mode))
+       :diminish
+       page-break-lines-mode)
    #+END_SRC
 
 ** pcre2el
@@ -10399,23 +10511,24 @@
        :ensure t
        :defer  t
        :mode ("\\.pdf$" . pdf-view-mode)
-       :hook (pdf-view-mode . hide-mode-line-mode)
+       ;; see [[https://www.reddit.com/r/emacs/comments/6g15nk/pdftools_latex_freeze/][here]].
+       :hook (pdf-view-mode . (lambda ()
+                                (line-number-mode -1)))
        :config
        (setq-default pdf-view-display-size 'fit-page)
 
        ;; only accepts absolute paths and doesn't automatically append ".exe" when on windows.
-       (let ((epdfinfo-program (expand-file-name (var! "pdf-tools/epdfinfo"))))
-         (when (windows-p)
-           (setq epdfinfo-program (concat epdfinfo-program ".exe")))
-         (setq pdf-info-epdfinfo-program epdfinfo-program))
+       (eval-when-compile
+         (let ((epdfinfo-program (expand-file-name (var! "pdf-tools/epdfinfo"))))
+           (when (windows-p)
+             (setq epdfinfo-program (concat epdfinfo-program ".exe")))
+           (setq pdf-info-epdfinfo-program epdfinfo-program)))
 
        (evil-set-initial-state 'pdf-view-mode 'motion)
 
        ;; (pdf-tools-install)
 
-       (require '+pdf-tools-bindings)
-
-       )
+       (require '+pdf-tools-bindings))
    #+END_SRC
 
 *** bindings
@@ -10423,30 +10536,29 @@
       (general-define-key
        :keymaps 'pdf-view-mode-map
        :states 'motion
-       "RET" 'image-next-line
-       "o" 'pdf-outline
+       ;; "RET" 'image-next-line
+       "TAB" 'pdf-outline
        ;; TODO make interactive ivy-based outline
 
-       "j" 'pdf-view-next-line-or-next-page-with-prefix
-       "k" 'pdf-view-prev-line-or-prev-page-with-prefix
+       "w" 'pdf-view-fit-height-to-window
+       "e" 'pdf-view-fit-width-to-window
+       "E" 'pdf-view-fit-page-to-window
 
-       "J" 'pdf-view-next-page
-       "K" 'pdf-view-previous-page
+       "J" 'pdf-view-next-page-command
+       "K" 'pdf-view-previous-page-command
 
        "gj" 'image-next-line
        "gk" 'image-previous-line
 
-       "h" 'pdf-view-previous-page-command
-       "l" 'pdf-view-next-page-command
-       "C-j" 'pdf-view-next-page-command
-       "C-k" 'pdf-view-previous-page-command
-       "]]" 'pdf-view-next-page-command
-       "[[" 'pdf-view-previous-page-command
+       "h" 'evil-scroll-column-left
+       "l" 'evil-scroll-column-right
 
-       "gg" 'pdf-view-goto-first-page-with-prefix
-       "G"  'pdf-view-goto-page-with-prefix
-       "gh" 'beginning-of-buffer
-       "gl" 'end-of-buffer
+       ;; "C-j" 'pdf-view-next-page-command
+       ;; "C-k" 'pdf-view-previous-page-command
+
+       ;; "]]" 'pdf-view-next-page-command
+       ;; "[[" 'pdf-view-previous-page-command
+
        "H" 'beginning-of-buffer
        "L" 'end-of-buffer
 
@@ -10456,14 +10568,13 @@
 
        "C-d" 'pdf-view-scroll-up-or-next-page
        "C-u" 'pdf-view-scroll-down-or-previous-page
+
        "m" 'pdf-view-position-to-register
        "'" 'pdf-view-jump-to-register
        "`" 'pdf-view-jump-to-register
 
        "q" nil
-       "Q" 'kill-this-buffer
-       "ZQ" 'kill-this-buffer
-       "ZZ" 'quit-window)
+       "Q" 'kill-this-buffer)
 
       (general-define-key
        :keymaps 'pdf-view-mode-map
@@ -10471,21 +10582,20 @@
        "y" 'pdf-view-kill-ring-save)
 
       (leader/set-keys-for-major-mode 'pdf-view-mode
-        ;; "-" 'pdf-view-fit-height-to-window
-        ;; "|" 'pdf-view-fit-width-to-window
-        ;; "|" 'pdf-view-fit-page-to-window
-        "g" 'pdf-view-goto-label
+        "l" 'pdf-view-goto-label
         "o" 'pdf-occur
-        "RET" 'pdf-outline
 
-        "M TAB" 'doc-view-mode
-        "Md" 'pdf-view-dark-minor-mode
-        "Mm" 'pdf-view-midnight-minor-mode
-        "Mp" 'pdf-view-printer-minor-mode
+        ;; modify the display of the PDF.
+        "TAB" 'doc-view-mode
+        "d" 'pdf-view-dark-minor-mode
+        "D" 'pdf-view-midnight-minor-mode
+        "p" 'pdf-view-printer-minor-mode
 
-        "zm" 'pdf-view-set-slice-using-mouse
-        "zz" 'pdf-view-set-slice-from-bounding-box
-        "zr" 'pdf-view-reset-slice)
+        ;; narrow to a subslice of the given page.
+        "s"  "slice"
+        "sm" 'pdf-view-set-slice-using-mouse
+        "ss" 'pdf-view-set-slice-from-bounding-box
+        "sr" 'pdf-view-reset-slice)
 
       (evil-set-initial-state 'pdf-outline-buffer-mode 'motion)
 
@@ -10562,7 +10672,7 @@
        "ZQ" 'tablist-quit
        "ZZ" 'tablist-quit)
 
-      (leader/set-keys-for-major-mode 'pdf-occur-buffer-mode-map
+      (leader/set-keys-for-major-mode 'pdf-occur-buffer-mode
         "/!" 'tablist-negate-filter
         "//" 'tablist-display-filter
         "/=" 'tablist-push-equal-filter
@@ -10578,16 +10688,24 @@
         "/t" 'tablist-toggle-first-filter-logic
         "/z" 'tablist-suspend-filter)
 
+      (require '+pdf-tools-commands)
       (provide '+pdf-tools-bindings)
     #+END_SRC
 
 *** commands
     #+BEGIN_SRC emacs-lisp
       (use-package +pdf-tools-commands
-        :commands (pdf-view-next-line-or-next-page-with-prefix
-                   pdf-view-prev-line-or-prev-page-with-prefix
-                   pdf-view-goto-page-with-prefix
-                   pdf-view-goto-first-page-with-prefix))
+        :config
+        (general-define-key
+         :keymaps 'pdf-view-mode-map
+         :states  'motion
+         "j" 'pdf-view-next-line-or-next-page-with-prefix
+         "k" 'pdf-view-prev-line-or-prev-page-with-prefix
+         "gg" 'pdf-view-goto-first-page-with-prefix
+         "G"  'pdf-view-goto-page-with-prefix)
+
+        (leader/set-keys-for-major-mode 'pdf-view-mode
+          "g" 'counsel-pdf-outline))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle bin/lisp/misc/+pdf-tools-commands.el
@@ -10623,6 +10741,32 @@
             (pdf-view-goto-page page)
           (pdf-view-first-page)
           (image-bob)))
+
+      ;; use counsel to go to an outline entry
+      (defun counsel-pdf-outline-action (entry)
+        (let ((line (cdr entry)))
+          (with-current-buffer (ivy-state-buffer ivy-last)
+            (save-excursion
+              (goto-line (1+ line)) ;; was starting from 0.
+              (call-interactively #'pdf-outline-follow-link)))))
+
+      (defun counsel-pdf-outline ()
+        (interactive)
+        (require 'pdf-outline)
+        (let* ((buffer (pdf-outline-noselect nil))
+               entries)
+          (with-current-buffer buffer
+            (setq entries
+                  (split-string
+                   (buffer-substring-no-properties
+                    (point-min) (point-max))
+                   "\n"))
+
+            (ivy-read "Title: "
+                      (-zip entries
+                            (number-sequence 0 (length entries)))
+                      :action #'counsel-pdf-outline-action
+                      :caller 'counsel-pdf-outline))))
 
       (provide '+pdf-tools-commands)
     #+END_SRC
@@ -11044,7 +11188,7 @@
        :config
        (require '+projectile-project-types)
 
-       (with-no-warnings
+       (with-suppressed-warnings
          (defvaralias 'grep-regexp-history 'regexp-search-ring))
 
        (defun projectile-ensure-no-trailing-slash-in-root (func &rest args)
@@ -11148,7 +11292,7 @@
                    projectile-show-and-copy-project-dir
                    project-has-file-p
                    when-project-has-file-p)
-        :config
+        :init
         (leader/set-keys
           "pl" 'projectile-ivy-persp-switch-project
           "py" 'projectile-show-and-copy-project-dir))
@@ -11271,6 +11415,15 @@
      (use-package powerline
        :straight (powerline :type git :host github :repo "jonathanchu/emacs-powerline"
                             :fork (:host github :repo "milkypostman/powerline")))
+   #+END_SRC
+
+   #+BEGIN_SRC emacs-lisp
+     (add-hook 'after-load-theme-hook
+               (lambda (&rest _)
+                 (set-face-attribute
+                  'mode-line nil
+                  :box
+                  `(:line-width 1 :color ,(face-attribute 'mode-line :background) :style none))))
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
@@ -11721,7 +11874,46 @@
 
        (general-unbind
          :keymaps 'undo-tree-map
-         "C-/" "C-_" "C-?"))
+         "C-/" "C-_" "C-?")
+
+       (leader/set-keys-for-major-mode 'undo-tree-visualizer-mode
+         "RET" 'undo-tree-visualizer-selection-mode
+         "t" 'undo-tree-visualizer-toggle-timestamps
+         "," 'undo-tree-visualizer-quit
+         "q" 'undo-tree-visualizer-abort
+         "d" 'undo-tree-visualizer-toggle-diff)
+
+       (general-define-key
+        :states  'motion
+        :keymaps '(undo-tree-visualizer-mode-map
+                   undo-tree-visualizer-selection-mode-map)
+        "t" 'undo-tree-visualizer-toggle-timestamps
+        "gj" 'undo-tree-visualize-redo-to-x
+        "gk" 'undo-tree-visualize-undo-to-x
+
+        [remap quit-window] 'undo-tree-visualizer-quit
+        [remap evil-scroll-column-right] 'undo-tree-visualizer-scroll-left
+        [remap evil-scroll-column-left] 'undo-tree-visualizer-scroll-right)
+
+       (general-define-key
+        :states  'motion
+        :keymaps 'undo-tree-visualizer-mode-map
+        "h" 'undo-tree-visualize-switch-branch-left
+        "l" 'undo-tree-visualize-switch-branch-right
+        "d" 'undo-tree-visualizer-toggle-diff)
+
+       (defun undo-tree-visualizer-set-and-exit-selection-mode ()
+         (interactive)
+         (funcall-interactively #'undo-tree-visualizer-set)
+         (undo-tree-visualizer-selection-mode -1))
+
+       (general-define-key
+        :states 'motion
+        :keymaps 'undo-tree-visualizer-selection-mode-map
+        "RET" 'undo-tree-visualizer-set-and-exit-selection-mode
+        "h" 'undo-tree-visualizer-select-left
+        "l" 'undo-tree-visualizer-select-right
+        "d" 'undo-tree-visualizer-selection-toggle-diff))
    #+END_SRC
 
 ** uuidgen
@@ -13048,18 +13240,18 @@
          [remap xref-find-references] 'anaconda-mode-find-references)
 
         (defvar anaconda-server-bindings+
-          '("TAB" 'anaconda-mode-complete
-            "hh" 'anaconda-mode-show-doc
+          '("TAB" anaconda-mode-complete
+            "hh" anaconda-mode-show-doc
 
-            "ga" 'anaconda-mode-find-assignments
-            "gr" 'anaconda-mode-find-references
-            "gg" 'anaconda-mode-find-definitions
-            "gA" 'anaconda-mode-find-assignments-other-window
-            "gR" 'anaconda-mode-find-references-other-window
-            "gG" 'anaconda-mode-find-definitions-other-window
-            "g M-a" 'anaconda-mode-find-assignments-other-frame
-            "g M-r" 'anaconda-mode-find-references-other-frame
-            "g M-g" 'anaconda-mode-find-definitions-other-frame)
+            "ga" anaconda-mode-find-assignments
+            "gr" anaconda-mode-find-references
+            "gg" anaconda-mode-find-definitions
+            "gA" anaconda-mode-find-assignments-other-window
+            "gR" anaconda-mode-find-references-other-window
+            "gG" anaconda-mode-find-definitions-other-window
+            "g M-a" anaconda-mode-find-assignments-other-frame
+            "g M-r" anaconda-mode-find-references-other-frame
+            "g M-g" anaconda-mode-find-definitions-other-frame)
           "bindings available under `leader-server-leader-prefix' in leader-map")
 
         (apply #'leader/set-keys-for-major-mode 'python-mode anaconda-server-bindings+)
@@ -13073,7 +13265,7 @@
       (use-package company-anaconda
         :ensure t
         :defer  t
-        :after  anaconda
+        :after  anaconda-mode
         :init
         (company/configure-mode (python-mode :major t)
           company-anaconda))
@@ -13444,9 +13636,10 @@
       (use-package web-mode
         :ensure t
         :defer  t
-        :mode "\\.erb\\|\\.html"
+        :mode (rx "." (or "erb" "html" "vue"))
         :init
         (leader/set-keys "Mh" 'web-mode)
+        (push '(web-mode . 2) +indent-config)
 
         :config
         (add-hook 'hack-local-variables-hook
@@ -13561,7 +13754,8 @@
         :ensure t
         :defer  t
         :hook ((web-mode      . emmet-mode)
-               (markdown-mode . emmet-mode))
+               (markdown-mode . emmet-mode)
+               (js2-jsx-mode  . emmet-mode))
         :config
         (general-unbind :keymaps 'emmet-mode-keymap "C-j")
 
@@ -13779,6 +13973,11 @@
             "q" 'org-capture-kill
             "r" 'org-capture-refile))
 
+        (general-define-key
+         :keymaps 'org-capture-mode-map
+          [remap evil-save-and-close] 'org-capture-finalize
+          [remap evil-quit] 'org-capture-kill)
+
         ;; for some reason, the header for org-capture specifically uses
         ;; the org-capture-mode-map, meaning my leader key shortcuts won't
         ;; show up in it :(. Fix that here.
@@ -13889,15 +14088,9 @@
         :commands (org-outline-smart-up-level
                    org-openable-p
                    org-find-file
-                   org-normal-return
                    org-clever-return)
         :init
         (leader/set-keys "oo" 'org-find-file)
-
-        (general-define-key
-         :keymaps 'org-mode-map
-         :states 'normal
-         "RET" 'org-normal-return)
 
         (general-define-key
          :keymaps 'org-mode-map
@@ -13925,13 +14118,6 @@
            link
            timestamp)
          t))
-
-      (defun org-normal-return ()
-        (interactive)
-        (call-interactively
-         (cond
-          ((org-openable-p) 'org-open-at-point)
-          (t 'evil-ret))))
 
       (defvar org-clever-return--insert-headings nil
         "when true, returning from the end of a heading
@@ -14058,13 +14244,13 @@
     #+BEGIN_SRC emacs-lisp
       (use-package org
         :defer t
-        :hook ((org-mode . display-line-numbers-mode)
-               (org-mode . hl-todo-mode))
+        :hook (org-mode . display-line-numbers-mode)
         :init
         ;;; leader keys outside of org mode
         (leader/set-keys
           "o"  "org"
           "oc" 'org-capture
+          "og" 'org-capture-goto-last-stored
           "oa" 'org-agenda
           "ol" 'org-store-link
           "oi" 'org-insert-link-global
@@ -14078,13 +14264,21 @@
                     (modify-syntax-entry ?< "_" org-mode-syntax-table)
                     (modify-syntax-entry ?> "_" org-mode-syntax-table)))
 
+        (advice-add 'evil-ret-gen :before-until
+                    (defun evil-ret-open-org-links+ (&rest _)
+                      "hitting return in evil-normal-state on an org-link
+      opens the org-link."
+                      (when (and
+                             (evil-normal-state-p)
+                             (or (featurep 'org)
+                                 (bound-and-true-p org-link-minor-mode))
+                             (ignore-errors
+                               (org-openable-p)))
+                        (org-open-at-point)
+                        t)))
+
         :config
         (setq-default org-src-window-setup 'current-window
-                      org-babel-python-command "python3"
-                      org-ditaa-jar-path (var! "org/bin/ditaa.jar")
-                      org-ditaa-eps-jar-path (var! "org/bin/ditaaEps.jar")
-                      org-plantuml-jar-path (var! "org/bin/plantuml.jar")
-
                       org-todo-keywords '((sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED"))
                       org-refile-targets '((nil :maxlevel . 9)
                                            (org-agenda-files :maxlevel . 9))
@@ -14187,14 +14381,15 @@
           "O" (lambda!
                 (let ((org-clever-return--insert-headings t))
                   (org-clever-return t)))
-          "M-u" 'org-metaleft
-          "M-i" 'org-metadown
-          "M-o" 'org-metaup
-          "M-p" 'org-metaright
-          "M-U" 'org-shiftmetaleft
-          "M-I" 'org-shiftmetadown
-          "M-O" 'org-shiftmetaup
-          "M-P" 'org-shiftmetaright)
+          ;; "M-u" 'org-metaleft
+          ;; "M-i" 'org-metadown
+          ;; "M-o" 'org-metaup
+          ;; "M-p" 'org-metaright
+          ;; "M-U" 'org-shiftmetaleft
+          ;; "M-I" 'org-shiftmetadown
+          ;; "M-O" 'org-shiftmetaup
+          ;; "M-P" 'org-shiftmetaright
+          )
 
         (general-define-key
           :keymaps 'org-mode-map
@@ -14635,7 +14830,7 @@
      (use-package json-mode
        :ensure t
        :defer  t
-       :mode "\\.json$"
+       :mode (rx ".json")
        :hook (json-mode . flycheck-mode)
 
        :config
@@ -14653,7 +14848,7 @@
      (use-package vimrc-mode
        :ensure t
        :defer  t
-       :mode "\\.vim"
+       :mode (rx ".vim")
        :hook (vimrc-mode . flycheck-mode)
        :delight (vimrc-mode "vim"))
 
@@ -14740,7 +14935,7 @@
      (use-package yaml-mode
        :ensure t
        :defer  t
-       :mode "\\.yaml"
+       :mode (rx "." (or "yaml" "yml"))
        :hook (yaml-mode . flycheck-mode)
        :config
        (general-define-key
@@ -15219,7 +15414,7 @@
      (use-package cmake-mode
        :ensure t
        :defer  t
-       :mode "CMakeLists\\.txt\\|\\.cmake"
+       :mode (rx (or "CMakeLists.txt" ".cmake"))
        :hook (cmake-mode . flycheck-mode))
    #+END_SRC
 
@@ -15275,17 +15470,7 @@
            "/" 'c-backslash-region
            "\\" 'c-toggle-comment-style
            "DEL" 'c-hungry-delete-forward
-           "M-DEL" 'c-hungry-delete-backwards)
-
-         (let ((mode-map (intern (concat (symbol-name mode)
-                                         "mode"))))
-           (general-define-key
-             :keymaps 'mode-map
-             "C-M-a" 'c-beginning-of-defun
-             ;; "C-M-e" 'c-end-of-defun
-             "M-a"   'c-beginning-of-statement
-             ;; "M-e"   'c-end-of-statement
-             )))
+           "M-DEL" 'c-hungry-delete-backwards))
 
        (cc-mode-set-bindings+ 'c-mode)
        (cc-mode-set-bindings+ 'cc-mode))
@@ -15457,9 +15642,10 @@
       (use-package js2-mode
         :ensure t
         :defer  t
-        :mode "\\.js$"
+        :mode (rx ".js")
         :hook ((js2-mode . flycheck-mode)
-               (js2-mode . javascript-enable-lsp-in-projects))
+               (js2-mode . javascript-enable-lsp-in-projects)
+               (js2-jx-mode . javascript-enable-lsp-in-projects))
         :commands (js-jsdoc-return+)
         :init
         (defun javascript-enable-lsp-in-projects (&rest _)
@@ -15721,12 +15907,27 @@
      (use-package typescript-mode
        :ensure t
        :defer  t
+       :mode ("\\.tsx" . typescript-mode)
        :hook (typescript-mode . javascript-enable-lsp-in-projects)
        :config
        (general-define-key
          :keymaps 'typescript-mode-map
          [remap indent-new-comment-line] 'js-jsdoc-return+))
    #+END_SRC
+
+   #+BEGIN_SRC emacs-lisp
+     (when +lsp-command
+       (add-hook 'typescript-mode-hook  +lsp-command))
+
+     (push '(typescript-mode . 2) +indent-config)
+     (add-hook 'typescript-mode-hook
+               (defun ts-setup-tsx ()
+                 (when (string-suffix-p ".tsx"
+                                        (buffer-file-name))
+                   (emmet-mode +1)
+                   (setq-local emmet-expand-jsx-className? t))))
+   #+END_SRC
+
 
     #+BEGIN_SRC emacs-lisp
       (provide '+init-typescript)
@@ -15748,6 +15949,21 @@
 
         (company/configure-mode (css-mode :major t)
           company-css))
+    #+END_SRC
+
+*** lsp
+    Requires ~npm install --global vscode-css-languageserver-bin~.
+
+    #+BEGIN_SRC emacs-lisp
+      (when +lsp-command
+        (add-hook 'css-mode-hook  +lsp-command)
+        (add-hook 'scss-mode-hook +lsp-command)
+
+        (when (member 'eglot +packages)
+          (with-eval-after-load 'eglot
+             (push '((css-mode scss-mode)
+                     "css-languageserver" "--stdio")
+                   eglot-server-programs))))
     #+END_SRC
 
 *** less-css-mode
