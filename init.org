@@ -5716,6 +5716,16 @@
        (add-hook 'emacs-startup-hook 'animate-birthday-present))
    #+END_SRC
 
+** browse-url
+   gives functions to open URLs/filepaths on your local system using system
+   specific tools.
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package browse-url
+       :ensure t
+       :defer  t)
+   #+END_SRC
+
 ** buffer-move
    Move buffer to windows in other directions. Like the vim C-w <Shift>+{h,j,k,l}
    series of functions.
@@ -6564,12 +6574,12 @@
         "mm" 'dired-toggle-marks
         "mu" 'dired-unmark
         "m DEL" 'dired-unmark-backward
-        "m|" 'dired-mark-symlinks
+        "ml" 'dired-mark-symlinks
         "md" 'dired-mark-directories
-        "m!" 'dired-mark-executeables
+        "m!" 'dired-mark-executables
         "mt" 'dired-mark-subdir-files
         "mg" 'dired-mark-files-containing-regexp ;; grep
-        "m/" 'dired-mark-files-regexp
+        "ms" 'dired-mark-files-regexp
         "m(" 'dired-mark-sexp
 
         ;; emacs related bindings
@@ -9612,6 +9622,17 @@
           "g" 'counsel-css))
     #+END_SRC
 
+*** counsel-jq
+    #+BEGIN_SRC emacs-lisp
+      (use-package counsel-jq
+        :ensure t
+        :defer  t
+        :after json-mode
+        :init
+        (leader/set-keys-for-major-mode 'json-mode
+          "j" 'counsel-jq))
+    #+END_SRC
+
 *** counsel-world-clock
     #+BEGIN_SRC emacs-lisp :tangle bin/lisp/+init-counsel-world-clock.el
       (use-package counsel-word-clock
@@ -12527,6 +12548,16 @@
       (provide '+vterm-commands)
     #+END_SRC
 
+** wakatime
+   #+BEGIN_SRC emacs-lisp
+     (use-package wakatime-mode
+       :ensure t
+       :defer  t
+       :hook (after-init-hook . global-wakatime-mode)
+       ;; TODO move api key to private.
+       (setq wakatime-api-key "0fba4add-c2c4-4950-9528-927a0652d7a1"))
+   #+END_SRC
+
 ** which-key
    show completion candidates for the current key prefix, after a mild delay.
 
@@ -13152,6 +13183,14 @@
   #+BEGIN_SRC emacs-lisp :tangle init.el
     (require '+init-langs)
   #+END_SRC
+
+** clojure
+   #+BEGIN_SRC emacs-lisp
+     (use-package clojure-mode
+       :ensure t
+       :defer  t
+       :mode ((rx ".edn") . clojure-mode))
+   #+END_SRC
 
 ** restclient
    :PROPERTIES:
