@@ -4360,8 +4360,23 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package flymake
-       :diminish
-       flymake-mode)
+       :diminish flymake-mode
+       :init
+       (leader/set-keys
+         "ej" 'flymake-goto-next-error
+         "ek" 'flymake-goto-prev-error)
+
+       :config
+       (general-define-key
+        :keymaps 'flymake-mode-map
+        [remap flycheck-list-errors] 'flymake-show-diagnostics-buffer
+        [remap flycheck-buffer] 'flymake-start)
+
+       (general-define-key
+        :keymaps 'flymake-diagnostics-buffer-mode-map
+        :states 'motion
+        "RET" 'flymake-goto-diagnostic
+        "o" 'flymake-show-diagnostic))
    #+END_SRC
 
 ** flyspell
@@ -7002,6 +7017,10 @@
    #+END_SRC
 
 *** flycheck
+   :PROPERTIES:
+   :header-args+: :tangle no
+   :END:
+
     enable flycheck support with ~eglot~. by default, it only supports flymake.
 
     #+BEGIN_SRC emacs-lisp
@@ -7014,48 +7033,48 @@
       (require 'eglot)
       (require 'flycheck)
 
-      ;; add flycheck support, source [[https://github.com/joaotavora/eglot/issues/195][here]].
-      (defvar-local eglot-flycheck--fc-callback nil)
+      ;; source [[https://gist.github.com/purcell/ca33abbea9a98bb0f8a04d790a0cadcd][here]].
+      (defvar-local flycheck-eglot-current-errors nil)
 
-      (defun eglot-flycheck--point->line-col (buffer beg)
-        (with-current-buffer buffer
-          (save-excursion
-            (goto-char beg)
-            (cons (line-number-at-pos)
-                  (- (point)
-                     (line-beginning-position))))))
+      (defun flycheck-eglot-report-fn (diags &rest _)
+        (setq flycheck-eglot-current-errors
+              (mapcar (lambda (diag)
+                        (save-excursion
+                          (goto-char (flymake--diag-beg diag))
+                          (flycheck-error-new-at (line-number-at-pos)
+                                                 (1+ (- (point) (line-beginning-position)))
+                                                 (pcase (flymake--diag-type diag)
+                                                   ('eglot-error 'error)
+                                                   ('eglot-warning 'warning)
+                                                   ('eglot-note 'info)
+                                                   (_ (error "Unknown diag type, %S" diag)))
+                                                 (flymake--diag-text diag)
+                                                 :checker 'eglot)))
+                      diags))
+        (flycheck-buffer))
 
-      (defun eglot-flycheck--fm-error->fc-error (err)
-        (pcase-let* ((msg (flymake--diag-text err))
-                     (beg (flymake--diag-beg err))
-                     (buffer (flymake--diag-buffer err))
-                     (`(,line . ,col) (eglot-flycheck--point->line-col buffer beg)))
-          (flycheck-error-new-at
-           line nil ;; TODO: use column and region
-           (pcase (flymake--diag-type err)
-             (':error 'error)
-             (':warning 'warning)
-             (':note 'info))
-           msg
-           :id "eglot-flycheck"
-           ;; :checker
-           :buffer buffer
-           :filename (buffer-file-name buffer))))
+      (defun flycheck-eglot--start (checker callback)
+        (funcall callback 'finished flycheck-eglot-current-errors))
 
-      (cl-defun eglot-flycheck--flymake-handle-result (flymake-errors &key region)
-        (funcall eglot-flycheck--fc-callback
-                 'finished
-                 (mapcar #'eglot-flycheck--fm-error->fc-error flymake-errors)))
+      (defun flycheck-eglot--available-p ()
+        (bound-and-true-p eglot--managed-mode))
 
-      (cl-defun eglot-flycheck-checker (checker callback)
-        (setq eglot-flycheck--fc-callback callback)
-        (eglot-flymake-backend #'eglot-flycheck--flymake-handle-result))
+      (flycheck-define-generic-checker 'eglot
+        "Report `eglot' diagnostics using `flycheck'."
+        :start #'flycheck-eglot--start
+        :predicate #'flycheck-eglot--available-p
+        :modes '(prog-mode text-mode))
 
-      (flycheck-define-generic-checker
-       'eglot-checker
-       "eglot flycheck checker"
-       :start #'eglot-flycheck-checker
-       :modes (eglot--all-major-modes))
+      (push 'eglot flycheck-checkers)
+
+      (add-hook 'eglot--managed-mode-hook
+                (defun eglot-prefer-flycheck+ ()
+                  (when eglot--managed-mode
+                    (flycheck-add-mode 'eglot major-mode)
+                    (flycheck-select-checker 'eglot)
+                    (flycheck-mode)
+                    (flymake-mode -1)
+                    (setq eglot--current-flymake-report-fn 'flycheck-eglot-report-fn))))
 
       (provide '+eglot-flycheck)
     #+END_SRC
