@@ -80,6 +80,7 @@
         json
         jupyter
         kotlin
+        latex
         makefile
         markdown
         python
@@ -11548,6 +11549,15 @@
      (provide '+init-rake)
    #+END_SRC
 
+** real-auto-save-mode
+   #+BEGIN_SRC emacs-lisp
+     (use-package real-auto-save
+       :ensure t
+       :defer  t
+       :init
+       (setq real-auto-save-interval 6))
+   #+END_SRC
+
 ** spaceleader
    :PROPERTIES:
    :header-args+: :tangle bin/lisp/+init-spaceleader.el
@@ -14847,6 +14857,47 @@
           ))
     #+END_SRC
 
+*** org-export
+    #+BEGIN_SRC emacs-lisp
+      (with-eval-after-load 'org
+        (require '+org-export-config))
+
+      (setq org-export-async-init-file (bin! "lisp/misc/+org-async-init.el"))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp :tangle bin/lisp/misc/+org-export-config.el
+      (add-to-list 'org-latex-packages-alist '("" "mathdots"))
+      (add-to-list 'org-latex-packages-alist '("" "fourier"))
+      (add-to-list 'org-latex-packages-alist '("" "yfonts"))
+
+      (setq-default
+       org-latex-pdf-process (list "latexmk -shell-escape -bibtex -f -pdf %f")
+       org-babel-python-command "python3"
+       org-ditaa-jar-path (var! "org/bin/ditaa.jar")
+       org-ditaa-eps-jar-path (var! "org/bin/ditaaEps.jar")
+       org-plantuml-jar-path (var! "org/bin/plantuml.jar"))
+
+      (provide '+org-export-config)
+    #+END_SRC
+
+**** async-init
+     :PROPERTIES:
+     :header-args+: :tangle bin/lisp/misc/+org-async-init.el
+     :END:
+
+     init.el file for asynchronous compilation.
+
+     #+BEGIN_SRC emacs-lisp
+       (require 'ox)
+
+       (load (concat user-emacs-directory "bin/lisp/+init-paths"))
+
+       (package-initialize)
+       (require 'org-ref)
+
+       (load (bin! "lisp/misc/+org-export-config.el"))
+     #+END_SRC
+
 *** org-src
     #+BEGIN_SRC emacs-lisp
       (use-package org-src
@@ -14867,6 +14918,70 @@
             "s" 'org-edit-src-save)))
     #+END_SRC
 
+*** org-compile
+    Toggle the ability to automatically compile the current org file to a pdf
+    on write. This would've required a lot less effort in vim :cry:.
+
+    TODO write a macro to automate this painstaking mess.
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package +org-compile
+        :defer t
+        :after org
+        :commands org-toggle-compile-on-save+
+        :init
+        (leader/set-keys-for-major-mode 'org-mode
+          "1" 'org-toggle-compile-on-save+))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp :tangle bin/lisp/misc/+org-compile.el
+      (defvar org-compile-on-save-buffers+ nil
+        "org buffers which when saved will be compiled.")
+
+      (defvar org-compile-on-save-async+ t
+        "whether compilation is asynchronous or concurrent.
+      the async approach spawns a new emacs instance to compile the org-file.
+      depending on your hardware this may be slower then simply waiting for
+      your current emacs instance to finish.")
+
+      (defun org-compile-on-save-command+ ()
+        (when (cl-member (current-buffer) org-compile-on-save-buffers+ :test #'eq)
+          (org-latex-export-to-pdf org-compile-on-save-async+)))
+
+      ;; for some reason I can't make this hook buffer local :(
+      (add-hook 'after-save-hook #'org-compile-on-save-command+)
+
+      (defun org-toggle-compile-on-save+ (&optional arg)
+        (interactive "P")
+        "when the current org buffer is saved, compile and render pdf output through latex."
+        (unless (derived-mode-p 'org-mode)
+          (user-error "this function can only be called from an org-mode buffer."))
+
+        (let* ((buf (if (bound-and-true-p org-capture-mode)
+                        (plist-get org-capture-current-plist :buffer)
+                      (current-buffer)))
+               (member (member buf org-compile-on-save-buffers+))
+               (value (if (not arg)
+                          (not member)
+                        (not (zerop (prefix-numeric-value arg))))))
+          (unless (buffer-file-name buf)
+            (user-error "cannot compile a buffer with no associated filename."))
+
+          (if value
+              (add-to-list 'org-compile-on-save-buffers+ buf nil #'eq)
+            (setq org-compile-on-save-buffers+ (delq buf org-compile-on-save-buffers+)))
+
+          ;; while I'm here, let's also remove any killed buffers.
+          (setq org-compile-on-save-buffers+
+                (cl-remove-if #'buffer-killed-p org-compile-on-save-buffers+))
+
+          ;; notify the user about what's happened.
+          (when (called-interactively-p)
+            (message "compile-on-save: %s" (if value
+                                               (propertize "enabled" 'face 'compilation-info)
+                                             (propertize "disabled" 'face 'compilation-error))))))
+    #+END_SRC
+
 *** org-fragtog
     automatically render latex fragments in org mode.
 
@@ -14876,10 +14991,6 @@
         :defer  t
         :after org
         :config
-        (add-to-list 'org-latex-packages-alist '("" "mathdots"))
-        (add-to-list 'org-latex-packages-alist '("" "fourier"))
-        (add-to-list 'org-latex-packages-alist '("" "yfonts"))
-
         (when (host! 'desktop)
           (setq org-format-latex-options
                 (plist-put org-format-latex-options :scale 1.5))))
@@ -14983,6 +15094,75 @@
                     (t (insert " ")))))))
     #+END_SRC
 
+*** org-roam
+    note taking system centred around org-mode. you can tag notes using the
+    ~roam_tags~ keyword and you can reference sources using ~roam_key~.
+
+    NOTE: protocol installation requires some manual setup, see [[https://www.orgroam.com/manual/Installation-_00281_0029.html#Installation-_00281_0029][here]].
+    TODO: try out [[https://github.com/org-roam/company-org-roam/][company-org-roam]].
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package org-roam
+        :ensure t
+        ;; :straight (org-roam :type git :host github :repo "org-roam/org-roam"
+        ;;                     :fork (:host github :repo "zaeph/org-roam" :branch "nested-captures"))
+        :defer  t
+        :hook (after-init . org-roam-mode)
+        :init
+        (leader/set-keys
+          "of" 'org-roam-find-file
+          "op" 'org-roam-insert
+          "or" 'org-roam
+          "og" 'org-roam-graph)
+
+        :config
+        (require '+org-capture)
+        (require 'org-roam-protocol)
+
+        (setq org-roam-capture-function #'counsel-org-capture)
+
+        ;; see [[https://github.com/progfolio/doct/issues/16][#16]].
+        (defun doct-org-roam+ (groups)
+          (let (converted)
+            (dolist (group groups)
+              (let* ((props (nthcdr 5 group))
+                     (roam-properties (plist-get (plist-get props :doct) :org-roam)))
+                (push `(,@group ,@roam-properties) converted)))
+            (setq doct-templates (nreverse converted))))
+
+        (setq org-roam-directory (org! "brain")
+              org-roam-completion-system 'ivy
+              ;; org-roam-capture-templates
+              ;; (let ((doct-after-conversion-functions '(doct-org-roam+)))
+              ;;   (doct `((:group "roam"
+              ;;                   :type plain
+              ;;                   :unnarowed t
+              ;;                   :function org-roam-capture--get-point
+              ;;                   :org-roam (:file-name "%<%Y%m%d%H%M%S>-${slug}"
+              ;;                                         :head "#+title: ${title}\n")
+              ;;                   :children (("default" :keys "d")
+              ;;                              ("book" :keys "t"
+              ;;                               :template ("#+roam_tags: %^{tags}"
+              ;;                                          "#+roam_key: %?"))
+              ;;                              )
+              ;;                   )))
+              ;;   )
+              ;; `(("d" "default" plain ,#'org-roam-capture--get-point "%?" :file-name
+              ;;    "%<%Y%m%d%H%M%S>-${slug}" :head "#+title: ${title}\n" :unnarrowed t))
+              )
+        )
+
+      (use-package org-roam-server
+        :ensure t
+        :defer  t
+        :init
+        ;; global minor mode to enable the org-roam graph server
+        (leader/set-keys "oG" 'org-roam-server-mode)
+
+        :config
+        (setq org-roam-server-port 8967))
+    #+END_SRC
+
 *** org-pdftools
     #+BEGIN_SRC emacs-lisp
       (use-package org-pdftools
@@ -14992,13 +15172,23 @@
         :straight (org-pdftools :type git :host github
                                 :repo "fuxialexander/org-pdftools")
         :init
-        (setq org-pdftools-link-prefix "pdftools"
-              org-pdftools-root-dir "~/multimedia/pdfs")
+        (defvar org-pdf-tools-pdf-directory nil
+          "default directory for `org-pdftools-complete-link'.")
 
-        (org-pdftools-setup-link))
+        (setq org-pdftools-link-prefix "pdftools")
+        (org-pdftools-setup-link)
+
+        :config
+        (advice-add 'org-pdftools-complete-link :around
+                    (defun org-pdftools-complete-link-set-directory+ (func &rest args)
+                      (let ((default-directory (or org-pdf-tools-pdf-directory
+                                                   default-directory)))
+                        (apply func args)))))
     #+END_SRC
 
 *** org-man
+    lets you link manual entries from org-mode.
+
     #+BEGIN_SRC emacs-lisp
       (use-package org-man
         :defer nil
@@ -15007,9 +15197,51 @@
         (setq org-man-command +man-command))
     #+END_SRC
 
+*** org-ref
+    Support citations, references and links in org mode documents.
+
+    WARN for bibliographies to show up you have to specify a
+    biliographystyle (use unsrt when unsure).
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package org-ref
+        :ensure t
+        :defer  t
+        :if (member 'bibtex +packages)
+        :init
+        (setq org-ref-completion-library 'org-ref-ivy-cite)
+
+        (add-hook 'org-mode-hook
+                  (defun org-ref-load-with-org-mode+ ()
+                    (require 'org-ref)))
+
+        :config
+        (setq reftex-default-bibliography bibtex-files
+              org-ref-latex-bibliography-absolute-p t
+              org-ref-default-bibliography bibtex-files
+              org-ref-bibliography-notes bibtex-completion-notes-path
+              org-ref-pdf-directory (let ((path bibtex-completion-library-path))
+                                      (if (listp path) (car path) path))
+              org-ref-latex-bib-resolve-func #'expand-file-name)
+
+        (leader/set-keys-for-major-mode 'org-mode
+          "]" 'org-ref-insert-link)
+
+        (general-unbind
+         :keymaps 'org-ref-ivy-cite-keymap
+         "C-j" "C-k" "C-y" "C-M-y" "C-<return>" "C-.")
+
+        (set-keymap-parent org-ref-ivy-cite-keymap ivy-minibuffer-map)
+        (general-define-key
+         :keymaps 'org-ref-ivy-cite-keymap
+         "C-c C-a" 'org-ref-ivy-show-all
+         "C-c C-y" 'org-ref-ivy-sort-year-ascending
+         "C-c M-y" 'org-ref-ivy-sort-year-descending))
+    #+END_SRC
+
 *** eof
     #+BEGIN_SRC emacs-lisp
-      (provide '+init-org)
+    (provide '+init-org)
     #+END_SRC
 
 ** JSON
