@@ -17638,312 +17638,321 @@
 *** Faces
     #+HEADER: :var desc=an-old-hope-theme-description colors=color-assoc-to-rgb-strings() cls=(eval t)
     #+BEGIN_SRC emacs-lisp :results silent
-     (deftheme an-old-hope
-       desc)
+      (deftheme an-old-hope
+        desc)
 
-     (defun aoh-replace-color-syms (list)
-       "replace occurences of color symbols in list, with colors.
-     does so recursively, in a depth first manner."
-       (cl-loop
-        with pair = nil
-        for var in list
-        if (and (symbolp var)
-                (not (keywordp var))
-                (setq pair (assoc var colors)))
-        collect (car (cdr pair))
-        else if (listp var)
-        collect (aoh-replace-color-syms var)
-        else
-        collect var
-        end))
+      (defun aoh-replace-color-syms (list)
+        "replace occurences of color symbols in list, with colors.
+      does so recursively, in a depth first manner."
+        (cl-loop
+         with pair = nil
+         for var in list
+         if (and (symbolp var)
+                 (not (keywordp var))
+                 (setq pair (assoc var colors)))
+         collect (car (cdr pair))
+         else if (listp var)
+         collect (aoh-replace-color-syms var)
+         else
+         collect var
+         end))
 
-     (defmacro aoh-create-spec (face &rest spec)
-       `(quote (,face ((,cls ,(aoh-replace-color-syms spec))))))
-     (put 'aoh-create-spec 'lisp-indent-function 'defun)
+      (defmacro aoh-create-spec (face &rest spec)
+        `(quote (,face ((,cls ,(aoh-replace-color-syms spec))))))
+      (put 'aoh-create-spec 'lisp-indent-function 'defun)
 
-     (with-eval-after-load 'ivy
-       (defface ivy-actual-highlight-face '((t (:inherit highlight)))
-         "face actually used by ivy to highlight some candidates.
-     see an-old-hope-theme.el for why this is necessary."))
+      (with-eval-after-load 'ivy
+        (defface ivy-actual-highlight-face '((t (:inherit highlight)))
+          "face actually used by ivy to highlight some candidates.
+      see an-old-hope-theme.el for why this is necessary."))
 
-     (custom-theme-set-faces 'an-old-hope
-      ;; defaults
-      (aoh-create-spec default :background very-dark-grey :foreground very-light-grey)
-      (aoh-create-spec italic :italic t :inherit default)
-      (aoh-create-spec underline :inherit default)
-      (aoh-create-spec shadow :foreground light-grey)
-      (aoh-create-spec hl-line :background line-highlight-bg)
+      (custom-theme-set-faces 'an-old-hope
+       ;; defaults
+       (aoh-create-spec default :background very-dark-grey :foreground very-light-grey)
+       (aoh-create-spec italic :italic t :inherit default)
+       (aoh-create-spec underline :inherit default)
+       (aoh-create-spec shadow :foreground light-grey)
+       (aoh-create-spec hl-line :background line-highlight-bg)
 
-      (aoh-create-spec font-lock-builtin-face :foreground blue)
-      (aoh-create-spec font-lock-comment-face :foreground grey)
-      (aoh-create-spec font-lock-keyword-face :foreground green)
-      (aoh-create-spec font-lock-constant-face :foreground red :inherit bold)
-      (aoh-create-spec font-lock-function-name-face :foreground yellow-int)
-      (aoh-create-spec font-lock-negation-char-face :foreground red)
-      (aoh-create-spec font-lock-preprocessor-face :foreground green-dim)
-      (aoh-create-spec font-lock-string-face :foreground blue)
-      (aoh-create-spec font-lock-doc-face :foreground blue) ; TODO optional bg
-      (aoh-create-spec font-lock-type-face :foreground red)
-      (aoh-create-spec font-lock-variable-name-face :foreground yellow-int)
-      (aoh-create-spec font-lock-warning-face
-        :background yellow-int :distant-foreground yellow-int
-        :foreground very-dark-grey :underline nil :inherit bold)
+       (aoh-create-spec font-lock-builtin-face :foreground blue)
+       (aoh-create-spec font-lock-comment-face :foreground grey)
+       (aoh-create-spec font-lock-keyword-face :foreground green)
+       (aoh-create-spec font-lock-constant-face :foreground red :inherit bold)
+       (aoh-create-spec font-lock-function-name-face :foreground yellow-int)
+       (aoh-create-spec font-lock-negation-char-face :foreground red)
+       (aoh-create-spec font-lock-preprocessor-face :foreground green-dim)
+       (aoh-create-spec font-lock-string-face :foreground blue)
+       (aoh-create-spec font-lock-doc-face :foreground blue) ; TODO optional bg
+       (aoh-create-spec font-lock-type-face :foreground red)
+       (aoh-create-spec font-lock-variable-name-face :foreground yellow-int)
+       (aoh-create-spec font-lock-warning-face
+         :background yellow-int :distant-foreground yellow-int
+         :foreground very-dark-grey :underline nil :inherit bold)
 
-      (aoh-create-spec error   :background red    :distant-foreground red    :foreground very-dark-grey  :inherit bold)
-      (aoh-create-spec success :background green  :distant-foreground green  :foreground very-dark-grey  :inherit bold)
-      (aoh-create-spec warning :background yellow :distant-foreground yellow :foreground very-dark-grey  :inherit bold)
+       (aoh-create-spec error   :background red    :distant-foreground red    :foreground very-dark-grey  :inherit bold)
+       (aoh-create-spec success :background green  :distant-foreground green  :foreground very-dark-grey  :inherit bold)
+       (aoh-create-spec warning :background yellow :distant-foreground yellow :foreground very-dark-grey  :inherit bold)
 
-      (aoh-create-spec cursor :background red)
-      (aoh-create-spec custom-button
-        :background very-dark-grey
-        :foreground very-light-grey
-        :box (:line-width 2 :style released-button))
+       (aoh-create-spec cursor :background red)
+       (aoh-create-spec custom-button
+         :background very-dark-grey
+         :foreground very-light-grey
+         :box (:line-width 2 :style released-button))
 
-      (aoh-create-spec fringe :background black)
-      (aoh-create-spec header-line :background very-dark-grey :foreground blue)
-      (aoh-create-spec line-number :background black :foreground very-light-grey)
-      (aoh-create-spec line-number-current-line :foreground blue :inherit line-number)
-      (aoh-create-spec vertical-border :foreground very-light-grey)
-      (aoh-create-spec internal-border :foreground white :background white)
-      (aoh-create-spec minibuffer-prompt :foreground yellow :weight bold)
+       (aoh-create-spec fringe :background black)
+       (aoh-create-spec header-line :background very-dark-grey :foreground blue)
+       (aoh-create-spec line-number :background black :foreground very-light-grey)
+       (aoh-create-spec line-number-current-line :foreground blue :inherit line-number)
+       (aoh-create-spec vertical-border :foreground very-light-grey)
+       (aoh-create-spec internal-border :foreground white :background white)
+       (aoh-create-spec minibuffer-prompt :foreground yellow :weight bold)
 
-      (aoh-create-spec highlight :foreground very-dark-grey :background blue :distant-foreground blue :inherit bold)
+       (aoh-create-spec highlight :foreground very-dark-grey :background blue :distant-foreground blue :inherit bold)
 
-      (aoh-create-spec region :background dark-grey :weight bold)
-      (aoh-create-spec secondary-selection :inherit region)
+       (aoh-create-spec region :background dark-grey :weight bold)
+       (aoh-create-spec secondary-selection :inherit region)
 
-      ;; face for current search match. exiting now takes you to it.
-      (aoh-create-spec isearch :background purple :inherit bold)
-      (aoh-create-spec isearch-fail :inherit compilation-mode-line-fail)
-      (aoh-create-spec match :foreground green-dim)
-      ;; face for matches other than the current match
-      (aoh-create-spec lazy-highlight :background blue-int :foreground black-dim)
+       ;; face for current search match. exiting now takes you to it.
+       (aoh-create-spec isearch :background purple :inherit bold)
+       (aoh-create-spec isearch-fail :inherit compilation-mode-line-fail)
+       (aoh-create-spec match :foreground green-dim)
+       ;; face for matches other than the current match
+       (aoh-create-spec lazy-highlight :background blue-int :foreground black-dim)
 
-      ;; delimeter colors just taken from https://github.com/gastrodia/rainbow-brackets
-      ;; colors 5-8 just recycle 1-4, maybe come up with more.
-      (aoh-create-spec rainbow-delimiters-depth-1-face :foreground "#E6B422")
-      (aoh-create-spec rainbow-delimiters-depth-2-face :foreground "#C70067")
-      (aoh-create-spec rainbow-delimiters-depth-3-face :foreground "#00A960")
-      (aoh-create-spec rainbow-delimiters-depth-4-face :foreground "#FC7482")
-      (aoh-create-spec rainbow-delimiters-depth-5-face :foreground "#E6B422")
-      (aoh-create-spec rainbow-delimiters-depth-6-face :foreground "#C70067")
-      (aoh-create-spec rainbow-delimiters-depth-7-face :foreground "#00A960")
-      (aoh-create-spec rainbow-delimiters-depth-8-face :foreground "#FC7482")
+       ;; delimeter colors just taken from https://github.com/gastrodia/rainbow-brackets
+       ;; colors 5-8 just recycle 1-4, maybe come up with more.
+       (aoh-create-spec rainbow-delimiters-depth-1-face :foreground "#E6B422")
+       (aoh-create-spec rainbow-delimiters-depth-2-face :foreground "#C70067")
+       (aoh-create-spec rainbow-delimiters-depth-3-face :foreground "#00A960")
+       (aoh-create-spec rainbow-delimiters-depth-4-face :foreground "#FC7482")
+       (aoh-create-spec rainbow-delimiters-depth-5-face :foreground "#E6B422")
+       (aoh-create-spec rainbow-delimiters-depth-6-face :foreground "#C70067")
+       (aoh-create-spec rainbow-delimiters-depth-7-face :foreground "#00A960")
+       (aoh-create-spec rainbow-delimiters-depth-8-face :foreground "#FC7482")
 
-      ;; hyperlinks and path links
-      (aoh-create-spec link         :foreground blue)
-      (aoh-create-spec link-visited :foreground turquoise)
+       ;; hyperlinks and path links
+       (aoh-create-spec link         :foreground blue)
+       (aoh-create-spec link-visited :foreground turquoise)
 
-      ;;; modeline/spaceline
-      (aoh-create-spec mode-line
-        :background very-light-grey :foreground very-dark-grey
-        :box (:line-width 1 :color very-light-grey :style none))
+       ;;; modeline/spaceline
+       (aoh-create-spec mode-line
+         :background very-light-grey :foreground very-dark-grey
+         :box (:line-width 1 :color very-light-grey :style none)
+         )
 
-      (aoh-create-spec spaceline-evil-normal  :inherit mode-line :foreground very-dark-grey  :background "DarkGoldenrod2")
-      (aoh-create-spec spaceline-evil-insert  :inherit mode-line :foreground very-dark-grey  :background green-int)
-      (aoh-create-spec spaceline-evil-emacs   :inherit mode-line :foreground very-dark-grey  :background blue)
-      (aoh-create-spec spaceline-evil-replace :inherit mode-line :foreground very-dark-grey  :background turquoise-int)
-      (aoh-create-spec spaceline-evil-visual  :inherit mode-line :foreground very-light-grey :background dark-grey)
-      (aoh-create-spec spaceline-evil-motion  :inherit mode-line :foreground very-dark-grey  :background purple-int)
-      (aoh-create-spec spaceline-minibuffer   :inherit mode-line :foreground very-dark-grey  :background blue)
+       (aoh-create-spec spaceline-evil-normal  :inherit mode-line :foreground very-dark-grey  :background "DarkGoldenrod2")
+       (aoh-create-spec spaceline-evil-insert  :inherit mode-line :foreground very-dark-grey  :background green-int)
+       (aoh-create-spec spaceline-evil-emacs   :inherit mode-line :foreground very-dark-grey  :background blue)
+       (aoh-create-spec spaceline-evil-replace :inherit mode-line :foreground very-dark-grey  :background turquoise-int)
+       (aoh-create-spec spaceline-evil-visual  :inherit mode-line :foreground very-light-grey :background dark-grey)
+       (aoh-create-spec spaceline-evil-motion  :inherit mode-line :foreground very-dark-grey  :background purple-int)
+       (aoh-create-spec spaceline-minibuffer   :inherit mode-line :foreground very-dark-grey  :background blue)
 
-      (aoh-create-spec spaceline-flycheck-error   :inherit bold :foreground red-dim)
-      (aoh-create-spec spaceline-flycheck-warning :inherit bold :foreground orange-dim)
-      (aoh-create-spec spaceline-flycheck-info    :inherit bold :foreground green-dim)
+       (aoh-create-spec spaceline-flycheck-error   :inherit bold :foreground red-dim)
+       (aoh-create-spec spaceline-flycheck-warning :inherit bold :foreground orange-dim)
+       (aoh-create-spec spaceline-flycheck-info    :inherit bold :foreground green-dim)
 
-      ;; major mode indicator
-      (aoh-create-spec powerline-active1
-        :background black :foreground very-light-grey :inherit mode-line)
-      ;; file-format + cursor-pos
-      (aoh-create-spec powerline-active2
-        :background black :foreground very-light-grey :inherit mode-line)
+       ;; major mode indicator
+       (aoh-create-spec powerline-active1
+         :background black :foreground very-light-grey :inherit mode-line)
+       ;; file-format + cursor-pos
+       (aoh-create-spec powerline-active2
+         :background black :foreground very-light-grey :inherit mode-line)
 
-      ;;; evil
-      (aoh-create-spec vimish-fold-overlay :background dark-grey :foreground green)
+       ;;; evil
+       (aoh-create-spec vimish-fold-overlay :background dark-grey :foreground green)
 
-      ;;; flycheck
-      (aoh-create-spec flycheck-info      :underline (:style wave :color green))
-      (aoh-create-spec flycheck-warning   :underline (:style wave :color yellow))
-      (aoh-create-spec flycheck-duplicate :underline (:style wave :color orange))
-      (aoh-create-spec flycheck-incorrect :underline (:style wave :color red))
+       ;;; flycheck
+       (aoh-create-spec flycheck-info      :underline (:style wave :color green))
+       (aoh-create-spec flycheck-warning   :underline (:style wave :color yellow))
+       (aoh-create-spec flycheck-duplicate :underline (:style wave :color orange))
+       (aoh-create-spec flycheck-incorrect :underline (:style wave :color red))
 
-      (aoh-create-spec flycheck-fringe-info    :foreground green-int  :inherit fringe)
-      (aoh-create-spec flycheck-fringe-warning :foreground yellow-int :inherit fringe)
-      (aoh-create-spec flycheck-fringe-error   :foreground red-int    :inherit fringe)
+       (aoh-create-spec flycheck-fringe-info    :foreground green-int  :inherit fringe)
+       (aoh-create-spec flycheck-fringe-warning :foreground yellow-int :inherit fringe)
+       (aoh-create-spec flycheck-fringe-error   :foreground red-int    :inherit fringe)
 
-      ;;; flyspell
-      (aoh-create-spec flyspell-duplicate :foreground orange-dim :underline t)
-      (aoh-create-spec flyspell-incorrect :foreground red-dim :underline t)
+       ;;; flyspell
+       (aoh-create-spec flyspell-duplicate :foreground orange-dim :underline t)
+       (aoh-create-spec flyspell-incorrect :foreground red-dim :underline t)
 
-      ;;; avy
-      (aoh-create-spec avy-background-face :foreground grey)
-      (aoh-create-spec avy-lead-face :background   red-int :foreground "#ffffff")
-      (aoh-create-spec avy-lead-face-0 :background blue-int :foreground "#ffffff")
-      (aoh-create-spec avy-lead-face-1 :background very-light-grey :foreground very-dark-grey)
-      (aoh-create-spec avy-lead-face-2 :background purple-int :foreground "#ffffff")
+       ;;; avy
+       (aoh-create-spec avy-background-face :foreground grey)
+       (aoh-create-spec avy-lead-face :background   red-int :foreground "#ffffff")
+       (aoh-create-spec avy-lead-face-0 :background blue-int :foreground "#ffffff")
+       (aoh-create-spec avy-lead-face-1 :background very-light-grey :foreground very-dark-grey)
+       (aoh-create-spec avy-lead-face-2 :background purple-int :foreground "#ffffff")
 
-      (aoh-create-spec frog-menu-border :background white :foreground white)
-      (aoh-create-spec frog-menu-posframe-background-face :background very-dark-grey)
+       (aoh-create-spec frog-menu-border :background white :foreground white)
+       (aoh-create-spec frog-menu-posframe-background-face :background very-dark-grey)
 
-      ;;; company - intellisense
-      (aoh-create-spec company-tooltip-mouse :foreground turquoise-int)
-      (aoh-create-spec company-template-field :foreground turquoise-int)
+       ;;; company - intellisense
+       (aoh-create-spec company-tooltip-mouse :foreground turquoise-int)
+       (aoh-create-spec company-template-field :foreground turquoise-int)
 
-      ;; scrollbar
-      (aoh-create-spec company-scrollbar-bg :background very-light-grey :foreground very-light-grey)
-      (aoh-create-spec company-scrollbar-fg :background dark-grey       :foreground dark-grey)
+       ;; scrollbar
+       (aoh-create-spec company-scrollbar-bg :background very-light-grey :foreground very-light-grey)
+       (aoh-create-spec company-scrollbar-fg :background dark-grey       :foreground dark-grey)
 
-      (aoh-create-spec company-preview :foreground blue-int :weight bold :inherit hl-line)
-      (aoh-create-spec company-preview-common :inherit company-preview)
-      (aoh-create-spec company-preview-search :foreground orange-int :weight normal :inherit company-preview)
+       (aoh-create-spec company-preview :foreground blue-int :weight bold :inherit hl-line)
+       (aoh-create-spec company-preview-common :inherit company-preview)
+       (aoh-create-spec company-preview-search :foreground orange-int :weight normal :inherit company-preview)
 
-      ;; NOTE tooltip is the drop down menu which shows up when multiple results exist
-      (aoh-create-spec company-tooltip :inherit bold
-        :background very-light-grey :foreground very-dark-grey)
-      (aoh-create-spec company-tooltip-selection :foreground very-light-grey :background blue-int)
-      (aoh-create-spec company-tooltip-common :foreground blue-int :inherit company-tooltip)
-      (aoh-create-spec company-tooltip-common-selection
-        :foreground very-dark-grey :background blue-int
-        :inherit company-tooltip-common)
-      (aoh-create-spec company-tooltip-search :foreground orange :inherit company-tooltip)
-      (aoh-create-spec company-tooltip-search-common :inherit company-tooltip-search)
-      (aoh-create-spec company-tooltip-search-selection :background blue-int :inherit company-tooltip-search)
+       ;; NOTE tooltip is the drop down menu which shows up when multiple results exist
+       (aoh-create-spec company-tooltip :inherit bold
+         :background very-light-grey :foreground very-dark-grey)
+       (aoh-create-spec company-tooltip-selection :foreground very-light-grey :background blue-int)
+       (aoh-create-spec company-tooltip-common :foreground blue-int :inherit company-tooltip)
+       (aoh-create-spec company-tooltip-common-selection
+         :foreground very-dark-grey :background blue-int
+         :inherit company-tooltip-common)
+       (aoh-create-spec company-tooltip-search :foreground orange :inherit company-tooltip)
+       (aoh-create-spec company-tooltip-search-common :inherit company-tooltip-search)
+       (aoh-create-spec company-tooltip-search-selection :background blue-int :inherit company-tooltip-search)
 
-      ;; NOTE annotations are extra information in the tooltip
-      (aoh-create-spec company-tooltip-annotation :weight bold :foreground grey)
-      (aoh-create-spec company-tooltip-annotation-selection
-        :foreground turquoise-int :background blue-int
-        :inherit company-tooltip-annotation)
+       ;; NOTE annotations are extra information in the tooltip
+       (aoh-create-spec company-tooltip-annotation :weight bold :foreground grey)
+       (aoh-create-spec company-tooltip-annotation-selection
+         :foreground turquoise-int :background blue-int
+         :inherit company-tooltip-annotation)
 
-      ;;;; custom mode variants
-      ;;; whitespace-mode
-      ;; `(whitespace-trailing ((,cls (:foreground "yellow" :background ,red))))
-      (aoh-create-spec whitespace-space :foreground dark-grey)
-      (aoh-create-spec trailing-whitespace :background dark-grey)
+       ;;;; custom mode variants
+       ;;; whitespace-mode
+       ;; `(whitespace-trailing ((,cls (:foreground "yellow" :background ,red))))
+       (aoh-create-spec whitespace-space :foreground dark-grey)
+       (aoh-create-spec trailing-whitespace :background dark-grey)
 
-      ;;; auto-highlight-symbol mode
-      ;; Note: distant foreground is meaningless here because the faces are always given priority
-      (aoh-create-spec ahs-definition-face :background blue-dim :distant-foreground blue-dim :foreground dark-grey)
-      (aoh-create-spec ahs-edit-mode-face :background red-dim :distant-foreground red-dim :foreground very-light-grey)
-      (aoh-create-spec ahs-face :background very-light-grey :foreground black :inherit bold)
-      (aoh-create-spec ahs-plugin-whole-buffer-face :background blue :distant-foreground green :foreground black)
-      (aoh-create-spec ahs-plugin-bod-face :background blue-int :distant-foreground blue-int :foreground black)
-      (aoh-create-spec ahs-plugin-defalt-face :background orange-dim :distant-foreground orange-dim :foreground black)
-      (aoh-create-spec ahs-warning-face :foreground red-dim)
+       ;;; auto-highlight-symbol mode
+       ;; Note: distant foreground is meaningless here because the faces are always given priority
+       (aoh-create-spec ahs-definition-face :background blue-dim :distant-foreground blue-dim :foreground dark-grey)
+       (aoh-create-spec ahs-edit-mode-face :background red-dim :distant-foreground red-dim :foreground very-light-grey)
+       (aoh-create-spec ahs-face :background very-light-grey :foreground black :inherit bold)
+       (aoh-create-spec ahs-plugin-whole-buffer-face :background blue :distant-foreground green :foreground black)
+       (aoh-create-spec ahs-plugin-bod-face :background blue-int :distant-foreground blue-int :foreground black)
+       (aoh-create-spec ahs-plugin-defalt-face :background orange-dim :distant-foreground orange-dim :foreground black)
+       (aoh-create-spec ahs-warning-face :foreground red-dim)
 
-      ;;; compilation mode
-      (aoh-create-spec compilation-line-number :foreground yellow)
-      (aoh-create-spec compilation-column-number :inherit font-lock-doc-face)
+       ;;; compilation mode
+       (aoh-create-spec compilation-line-number :foreground yellow)
+       (aoh-create-spec compilation-column-number :inherit font-lock-doc-face)
 
-      ;; NOTE also represents value count in mode line
-      (aoh-create-spec compilation-error :foreground red-int :inherit bold)
-      (aoh-create-spec compilation-info :foreground green-int :inherit bold)
-      (aoh-create-spec compilation-warning :foreground orange-int :inherit bold)
+       ;; NOTE also represents value count in mode line
+       (aoh-create-spec compilation-error :foreground red-int :inherit bold)
+       (aoh-create-spec compilation-info :foreground green-int :inherit bold)
+       (aoh-create-spec compilation-warning :foreground orange-int :inherit bold)
 
-      ;; NOTE these only represent the exit status indicator
-      ;; `(compilation-mode-line-exit ((,cls (:foreground very-dark-grey))))
-      ;; `(compilation-mode-line-fail ((,cls (:foreground ,very-dark-grey))))
-      ;; `(compilation-mode-line-run ((,cls (:foreground ,very-dark-grey))))
+       ;; NOTE these only represent the exit status indicator
+       ;; `(compilation-mode-line-exit ((,cls (:foreground very-dark-grey))))
+       ;; `(compilation-mode-line-fail ((,cls (:foreground ,very-dark-grey))))
+       ;; `(compilation-mode-line-run ((,cls (:foreground ,very-dark-grey))))
 
-      ;;; markdown-mode
-      (aoh-create-spec markdown-code-face :inherit default)
+       ;;; markdown-mode
+       (aoh-create-spec markdown-code-face :inherit default)
 
-      ;;; anzu
-      (aoh-create-spec anzu-mode-line :foreground very-dark-grey :inherit bold)
-      (aoh-create-spec anzu-mode-line-no-match :foreground red-int :inherit bold)
+       ;;; anzu
+       (aoh-create-spec anzu-mode-line :foreground very-dark-grey :inherit bold)
+       (aoh-create-spec anzu-mode-line-no-match :foreground red-int :inherit bold)
 
-      ;;; hydra-posframe
-      ;; for some reason... if hydra-posframe-face inherits default, internal border won't work
-      (aoh-create-spec hydra-posframe-face :background very-dark-grey :foreground very-light-grey)
-      (aoh-create-spec hydra-posframe-border-face :inherit internal-border)
+       ;;; hydra-posframe
+       ;; for some reason... if hydra-posframe-face inherits default, internal border won't work
+       (aoh-create-spec hydra-posframe-face :background very-dark-grey :foreground very-light-grey)
+       (aoh-create-spec hydra-posframe-border-face :inherit internal-border)
 
-      ;;; ivy
-      ;; by default, it seems if ivy-highlight-face has its own spec, it'll interfere
-      ;; with the face of ivy-current-match. Which'll make it harder to tell which
-      ;; candidate is the current candidate.
-      ;;
-      ;; If ivy-highlight-face just inherits another face, then when both it and
-      ;; ivy-current-match are applied to a string, ivy-current-match will override
-      ;; ivy-highlight-face. Thus, this.
-      (aoh-create-spec ivy-actual-highlight-face
-        :foreground very-dark-grey :background turquoise
-        :distant-foreground turquoise :inherit bold)
-      (aoh-create-spec ivy-highlight-face :inherit ivy-actual-highlight-face)
+       ;;; ivy
+       ;; by default, it seems if ivy-highlight-face has its own spec, it'll interfere
+       ;; with the face of ivy-current-match. Which'll make it harder to tell which
+       ;; candidate is the current candidate.
+       ;;
+       ;; If ivy-highlight-face just inherits another face, then when both it and
+       ;; ivy-current-match are applied to a string, ivy-current-match will override
+       ;; ivy-highlight-face. Thus, this.
+       (aoh-create-spec ivy-actual-highlight-face
+         :foreground very-dark-grey :background turquoise
+         :distant-foreground turquoise :inherit bold)
+       (aoh-create-spec ivy-highlight-face :inherit ivy-actual-highlight-face)
+       (aoh-create-spec ivy-current-match :foreground very-dark-grey :font-weight 'normal :inherit highlight)
 
-     ;;; org-mode
-      (aoh-create-spec org-link :foreground blue :inherit bold)
-      (aoh-create-spec org-footnote :foreground blue)
+      ;;; org-mode
+       (aoh-create-spec org-link :foreground blue :inherit bold)
+       (aoh-create-spec org-footnote :foreground blue)
 
-      ;; Overridden by hl-todo-keyword-faces
-      (aoh-create-spec org-todo :foreground purple-int :inherit bold)
-      (aoh-create-spec org-done :foreground green-int :inherit bold)
+       ;; Overridden by hl-todo-keyword-faces
+       (aoh-create-spec org-todo :foreground purple-int :inherit bold)
+       (aoh-create-spec org-done :foreground green-int :inherit bold)
 
-      (aoh-create-spec org-upcoming-deadline :foreground red-dim)
-      (aoh-create-spec org-warning :foreground orange :inherit bold)
-      (aoh-create-spec org-scheduled-today :foreground green-int)
-      (aoh-create-spec org-block-begin-line
-        :background "royalblue4" :distant-foreground "royalblue4"
-        :foreground "steelblue1" :extend t)
-      (aoh-create-spec org-meta-line :inherit (font-lock-comment-face))
+       (aoh-create-spec org-upcoming-deadline :foreground red-dim)
+       (aoh-create-spec org-warning :foreground orange :inherit bold)
+       (aoh-create-spec org-scheduled-today :foreground green-int)
+       (aoh-create-spec org-block-begin-line
+         :background "royalblue4" :distant-foreground "royalblue4"
+         :foreground "steelblue1" :extend t)
+       (aoh-create-spec org-meta-line :inherit (font-lock-comment-face))
 
-      (aoh-create-spec org-block :background extra-dark-grey :extend t)
-      (aoh-create-spec org-document-title :foreground white :height 1.3 :inherit bold)
+       (aoh-create-spec org-block :background extra-dark-grey :extend t)
+       (aoh-create-spec org-document-title :foreground white :height 1.3 :inherit bold)
 
-      ;;; dashboard
-      (aoh-create-spec dashboard-text-banner :foreground orange-int)
+       ;;; rust[ic]-mode
+       (aoh-create-spec rustic-compilation-warning :inherit compilation-warning)
+       (aoh-create-spec rustic-compilation-info :inherit compilation-info)
+       (aoh-create-spec rustic-compilation-error :inherit compilation-error)
+       (aoh-create-spec rustic-compilation-column :inherit compilation-column-number)
+       (aoh-create-spec rustic-compilation-line :inherit compilation-line-number)
 
-      ;;; eshell-prompt-extras
-      (aoh-create-spec epe-remote-face :foreground turquoise)
-      (aoh-create-spec epe-venv-face :foreground purple)
+       ;;; dashboard
+       (aoh-create-spec dashboard-text-banner :foreground orange-int)
 
-      ;;; magit
-      (aoh-create-spec magit-mode-line-process-error
-        :foreground red :background very-light-grey :inherit bold)
+       ;;; eshell-prompt-extras
+       (aoh-create-spec epe-remote-face :foreground turquoise)
+       (aoh-create-spec epe-venv-face :foreground purple)
 
-      ;;; typescript
-      (aoh-create-spec typescript-primitive-face :inherit font-lock-type-face)
+       ;;; magit
+       (aoh-create-spec magit-mode-line-process-error
+         :foreground red :background very-light-grey :inherit bold)
 
-      ;;; latex
-      (aoh-create-spec font-latex-sedate-face       :inherit font-lock-keyword-face)
-      (aoh-create-spec font-latex-sectioning-0-face :inherit font-lock-function-name-face)
-      (aoh-create-spec font-latex-sectioning-1-face :inherit font-lock-function-name-face)
-      (aoh-create-spec font-latex-sectioning-2-face :inherit font-lock-function-name-face)
-      (aoh-create-spec font-latex-sectioning-3-face :inherit font-lock-function-name-face)
-      (aoh-create-spec font-latex-sectioning-4-face :inherit font-lock-function-name-face)
-      (aoh-create-spec font-latex-sectioning-5-face :inherit font-lock-function-name-face)
+       ;;; typescript
+       (aoh-create-spec typescript-primitive-face :inherit font-lock-type-face)
 
-      ;;; man/woman
-      (aoh-create-spec Man-underline :foreground green-int :inherit bold)
-      (aoh-create-spec woman-addition :foreground purple)
-      (aoh-create-spec woman-bold :foreground red :inherit bold)
-      (aoh-create-spec woman-unknown :inherit error)
-      (aoh-create-spec woman-italic :foreground green)
-      )
+       ;;; latex
+       (aoh-create-spec font-latex-sedate-face       :inherit font-lock-keyword-face)
+       (aoh-create-spec font-latex-sectioning-0-face :inherit font-lock-function-name-face)
+       (aoh-create-spec font-latex-sectioning-1-face :inherit font-lock-function-name-face)
+       (aoh-create-spec font-latex-sectioning-2-face :inherit font-lock-function-name-face)
+       (aoh-create-spec font-latex-sectioning-3-face :inherit font-lock-function-name-face)
+       (aoh-create-spec font-latex-sectioning-4-face :inherit font-lock-function-name-face)
+       (aoh-create-spec font-latex-sectioning-5-face :inherit font-lock-function-name-face)
 
-     (custom-theme-set-variables 'an-old-hope
-       `(hl-todo-keyword-faces
-         (quote
-          ,(cl-loop for elem in (aoh-replace-color-syms
-                                 '(("TODO"        red)
-                                   ("NEXT"        red)
-                                   ("RANT"        red)
-                                   ("SEE"         red)
-                                   ("THEM"        purple)
-                                   ("PROG"        blue-int)
-                                   ("OKAY"        blue-int)
-                                   ("DONT"        green-int)
-                                   ("FAIL"        red)
-                                   ("DONE"        green-int)
-                                   ("NOTE"        yellow-int)
-                                   ("KLUDGE"      yellow-int)
-                                   ("HACK"        yellow-int)
-                                   ("TEMP"        yellow-int)
-                                   ("FIXME"       orange)
-                                   ("WARN"        orange)
-                                   ("XXX+"        orange)
-                                   ("\\?\\?\\?+"  orange)))
-                    collect (cons (car elem) (car (cdr elem)))))))
+       ;;; man/woman
+       (aoh-create-spec Man-underline :foreground green-int :inherit bold)
+       (aoh-create-spec woman-addition :foreground purple)
+       (aoh-create-spec woman-bold :foreground red :inherit bold)
+       (aoh-create-spec woman-unknown :inherit error)
+       (aoh-create-spec woman-italic :foreground green)
+       )
 
-     (provide-theme 'an-old-hope)
+      (custom-theme-set-variables 'an-old-hope
+        `(hl-todo-keyword-faces
+          (quote
+           ,(cl-loop for elem in (aoh-replace-color-syms
+                                  '(("TODO"        red)
+                                    ("NEXT"        red)
+                                    ("RANT"        red)
+                                    ("SEE"         red)
+                                    ("THEM"        purple)
+                                    ("PROG"        blue-int)
+                                    ("OKAY"        blue-int)
+                                    ("DONT"        green-int)
+                                    ("FAIL"        red)
+                                    ("DONE"        green-int)
+                                    ("NOTE"        yellow-int)
+                                    ("KLUDGE"      yellow-int)
+                                    ("HACK"        yellow-int)
+                                    ("TEMP"        yellow-int)
+                                    ("FIXME"       orange)
+                                    ("WARN"        orange)
+                                    ("XXX+"        orange)
+                                    ("\\?\\?\\?+"  orange)))
+                     collect (cons (car elem) (car (cdr elem)))))))
+
+      (provide-theme 'an-old-hope)
     #+END_SRC
 
