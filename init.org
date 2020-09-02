@@ -83,6 +83,7 @@
         restclient
         ;; robe
         ruby
+        rust
         sh-script
         ;; sql
         ssh-config
@@ -1203,7 +1204,6 @@
                            (run-hooks 'after-load-theme-hook)))
     #+END_SRC
 
-
 *** display-buffer
     customise display-buffer-alist to prioritise switching focus to displayed
     buffers, instead of showing them and then making me have to switch to them
@@ -1249,7 +1249,11 @@
                display-buffer-use-some-window-and-focus
                display-buffer-pop-up-frame-and-focus)))
 
-      (push '("*Async Shell Command*"
+      (push `(,(rx
+                (or "*Async Shell Command*"
+                    "*compilation*"
+                    "*rustic-compilation*"
+                    "*cargo-test*"))
               (display-buffer-reuse-window
                display-buffer--maybe-pop-up-frame-or-window-and-focus
                display-buffer-in-side-window-and-focus)
@@ -5361,9 +5365,86 @@
      (use-package ace-link
        :ensure t
        :defer  t
+       :commands (ace-link-fallback-function+)
        :init
        (leader/set-keys
-         "j RET" 'ace-link))
+         "j RET" 'ace-link)
+
+       (defvar ace-link-fallback-alist+ nil
+         "major-mode to link function alist")
+
+       (setq ace-link-fallback-function
+             #'ace-link-fallback-function+)
+
+       :config
+       (defun ace-link-fallback-function+ ()
+         (cl-loop for (mode . func) in ace-link-fallback-alist+
+                  when (eq major-mode mode)
+                  return (funcall func))))
+   #+END_SRC
+
+   support [[*org-link-mode][org-link-mode]] as a fallback when no others are available link
+   functions exist for the current major mode.
+
+   #+BEGIN_SRC emacs-lisp
+     (with-eval-after-load 'ace-link
+       (advice-add ace-link-fallback-function :after-until
+                   (defun ace-link-org-link-minor-mode+ (&rest _)
+                     (when (bound-and-true-p org-link-minor-mode)
+                       (ace-link-org)
+                       t))))
+   #+END_SRC
+
+    fix =rustic-compilation-mode= isn't supported by ace-link.
+
+   #+BEGIN_SRC emacs-lisp
+     (when (member 'rust +packages)
+       (with-eval-after-load 'ace-link
+         (with-eval-after-load 'rustic
+           (defun rustic-compilation-error-p+ (str)
+             (string-match-p
+              (rx
+               (or (regexp (car rustic-compilation-error))
+                   (regexp (car rustic-compilation-warning))
+                   (regexp (car rustic-compilation-info))
+                   (regexp (car rustic-compilation-panic))))
+              str))
+
+           (defun ace-link-rustic-compilation-collect-links+ ()
+             "return all error links within the visible region."
+             (save-excursion
+               (let (markers
+                     (min-point (window-start))
+                     (max-point (window-end)))
+                 ;; guarantee you're before the first error
+                 (goto-char (max 0 (- min-point 1)))
+
+                 ;; for the weird edge case where the first line
+                 ;; is an error.
+                 (when (and (>= (point) min-point)
+                            (<= (point) max-point)
+                            (zerop (rustic-compilation-error-p+ (buffer-string))))
+                   (push (point-marker) markers))
+
+                 (condition-case nil
+                     (while t
+                       (compilation-next-error 1)
+                       (cond
+                        ((< (point) min-point)) ;; continue
+                        ((> (point) max-point)
+                         (user-error "break"))
+                        (t (push (point-marker) markers))))
+                   (user-error nil))
+                 markers)))
+
+           (push (cons 'rustic-compilation-mode
+                       (defun ace-link-rustic-compilation-mode+ ()
+                         (let ((pt (avy-with ace-link-compilation
+                                             (avy-process
+                                              (ace-link-rustic-compilation-collect-links+)
+                                              (avy--style-fn avy-style)))))
+                           (ace-link--compilation-action pt))))
+                 ace-link-fallback-alist+))))
    #+END_SRC
 
 ** adaptive-wrap
@@ -15790,6 +15871,87 @@
 *** eof
     #+BEGIN_SRC emacs-lisp
       (provide '+init-haskell)
+    #+END_SRC
+
+** rust
+   :PROPERTIES:
+   :header-args+: :tangle bin/lisp/+init-rust.el
+   :END:
+
+   lsp support requires: ~rustup component add rls rust-analysis rust-src~.
+   or [[https://github.com/rust-analyzer/rust-analyzer][rust-analyzer]].
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package rustic
+       :ensure t
+       :defer  t
+       :config
+       (setq rustic-format-trigget 'on-save
+             rustic-lsp-client (cond
+                                ((member 'eglot +packages) 'eglot)
+                                ((member 'lsp-mode +packages) 'lsp-mode))
+             rustic-lsp-server (if (executable-find "rust-analyzer")
+                                   'rust-analyzer
+                                 'rls))
+
+       (advice-add 'rustic-popup :around
+                   #'restore-default-display-buffer-actions)
+
+       (push 'rustic-popup-mode whitespace-exempt-modes)
+       (evil-set-initial-state 'rustic-popup-mode 'emacs)
+
+       ;; (push 'rustic-compilation-mode compilation-auto-kill-ignore-modes)
+       (push 'rustic-cargo-test-mode compilation-auto-kill-ignore-modes)
+
+       (with-eval-after-load 'projectile
+         (assoc-pop! 'rust-cargo projectile-project-types)
+
+         (projectile-register-project-type 'rust-cargo '("Cargo.toml")
+                                           :compile #'rustic-compile
+                                           :test    #'rustic-cargo-test
+                                           :run     #'rustic-cargo-run))
+
+       (leader/set-keys-for-major-mode 'rustic-mode
+         "," 'rustic-popup
+         "c" 'rustic-compile
+         "C" 'rustic-recompile
+         "p" 'rustic-cargo-run
+         "u" 'rustic-playpen
+         "d" 'rustic-cargo-doc
+
+         "b" "project"
+         "bc" 'rustic-cargo-clean
+         "bo" 'rustic-cargo-outdated
+         "bd" 'rustic-cargo-build-doc
+
+         "t" "test"
+         "tt" 'rustic-cargo-test
+         "tT" 'rustic-cargo-test-rerun
+         "tb" 'rustic-cargo-bench
+         "tc" 'rustic-cargo-check
+
+         "r" "refactor"
+         "rx" 'rustic-rustfix
+         "rf" 'rustic-cargo-fmt
+         "rc" 'rustic-cargo-clippy))
+   #+END_SRC
+
+*** compile
+    fix ~compilation-was-open-p~ isn't assigned when rustic compilation is begun.
+
+    #+BEGIN_SRC emacs-lisp
+      (advice-add 'rustic-compilation :before
+                  (defun rustic-compilation-check-window-was-open-p+ (command &rest args)
+                    ;; copied from `rustic-compilation'.
+                    (let ((buf (get-buffer
+                                (or (plist-get args :buffer) rustic-compilation-buffer-name))))
+                      (setq compilation-was-open-p
+                            (and buf (get-buffer-window buf) t)))))
+    #+END_SRC
+
+*** eof
+    #+BEGIN_SRC emacs-lisp
+      (provide '+init-rust)
     #+END_SRC
 
 ** git
