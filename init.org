@@ -75,6 +75,7 @@
         ;; haskell
         html
         ;; java
+        golang
         json
         jupyter
         makefile
@@ -11127,6 +11128,13 @@
                                         :compile "./gradlew build"
                                         :test    "./gradlew test"
                                         :test-suffix "Spec")
+
+      (projectile-register-project-type 'golang '("go.mod")
+                                        :run     "go run"
+                                        :compile "go build"
+                                        :test    "go test"
+                                        :test-suffix "_test")
+
       (provide '+projectile-project-types)
     #+END_SRC
 
@@ -15871,6 +15879,93 @@
 *** eof
     #+BEGIN_SRC emacs-lisp
       (provide '+init-haskell)
+    #+END_SRC
+
+** golang
+   :PROPERTIES:
+   :header-args+: :tangle bin/lisp/+init-golang.el
+   :END:
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package go-mode
+       :ensure t
+       :defer  t
+       :config
+       ;; only run when current buffer is in go-mode
+       (add-hook 'before-save-hook 'gofmt-before-save)
+
+       (add-hook 'go-mode-hook
+                 (defun go-mode-setup+ ()
+                   ;; recommended by the official style guide for golang.
+                   (setq indent-tabs-mode t)))
+
+       (push '(go-mode . 4) +indent-config)
+
+       (leader/set-keys-for-major-mode 'go-mode
+         ;; requires: go get github.com/rogpeppe/godef
+         "h" "help/guru"
+         "hh" 'godoc-at-point
+         "hH" 'godoc
+
+         "g" "goto"
+         "gi" 'go-goto-imports
+         "gc" 'go-coverage
+
+         "i" "imports"
+         "ia" 'go-import-add
+         "ig" 'go-goto-imports
+         "ir" 'go-remove-unused-imports
+
+         "e" "playground"
+         "eb" 'go-play-buffer
+         "er" 'go-play-region
+         "ed" 'go-download-play))
+   #+END_SRC
+
+*** go-guru
+    requires: ~go get golang.org/s/using-guru~
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package go-guru
+        ;; only use when lsp based language support is available
+        :when (not +lsp-command)
+        :ensure t
+        :defer  t
+        :after  'go-mode
+        :init
+        (add-hook 'go-guru-output-mode-hook
+                  (defun go-guru-preserve-compilation-window+ ()
+                    "prevent my compilation-hook settings interfering with go-guru."
+                    (setq-local compilation-auto-kill-window nil)))
+
+        (leader/set-keys-for-major-mode 'go-mode
+          "hd" 'go-guru-describe
+          "hi" 'go-guru-implements
+          "hc" 'go-guru-peers
+          "hp" 'go-guru-pointsto
+          "hs" 'go-guru-callstack
+          "he" 'go-guru-whicherrs
+
+          "gr" 'go-guru-referrers
+          "g<" 'go-guru-callers
+          "g>" 'go-guru-callees
+          "go" 'go-guru-set-scope
+          "gg" 'go-guru-definition
+          "gf" 'go-guru-freevars))
+    #+END_SRC
+
+*** gopls
+    The golang language server.
+    requires: ~GO111MODULE=on  go get -u golang.org/x/tools/gopls@latest~.
+
+    #+BEGIN_SRC emacs-lisp
+      (when +lsp-command
+        (add-hook 'go-mode-hook +lsp-command))
+    #+END_SRC
+
+*** eof
+    #+BEGIN_SRC emacs-lisp
+      (provide '+init-golang)
     #+END_SRC
 
 ** rust
