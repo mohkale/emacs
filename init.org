@@ -5453,6 +5453,10 @@
   :END:
 
 ** ace-link
+   :PROPERTIES:
+   :header-args+: :tangle no
+   :END:
+
    let's you use an avy like interface to jump to a link in the visible region
    of the buffer.
 
@@ -9989,6 +9993,27 @@
       (provide '+init-imenu)
     #+END_SRC
 
+** link-hint
+   An alternative to [[*ace-link][ace-link]] with support for more flexible link sources.
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package link-hint
+       :ensure t
+       :defer  t
+       :init
+       (leader/set-keys
+         "j RET" 'link-hint-open-link
+         "j y" 'link-hint-copy-link)
+
+       :config
+       ;; support rustic compilation related modes.
+       (link-hint-define-type 'compilation-link
+         :vars (append
+                (get 'link-hint-compilation-link :vars)
+                '(rustic-compilation-mode
+                  rustic-cargo-test-mode))))
+   #+END_SRC
+
 ** lorem-ipsum
    insert placeholder text in the lorem-ipsum-dolor format.
 
@@ -10460,28 +10485,15 @@
               (prog-mode . enable-org-link-minor-mode)
               (conf-mode . enable-org-link-minor-mode))
        :diminish org-link-minor-mode
-       :commands ace-link-org-link-minor-mode+
        :init
-       (with-eval-after-load 'ace-link
-         (advice-add 'ace-link :around #'ace-link-org-link-minor-mode+))
-
        (defun enable-org-link-minor-mode (&rest _)
          (unless (derived-mode-p 'major-mode 'org-mode)
            (org-link-minor-mode +1)))
 
        :config
        ;; deprecated in org 9.3, not yet updated upstream.
-       (defvaralias 'org-any-re 'org-link-any-re)
-
-       (defun ace-link-org-link-minor-mode+ (func &rest args)
-         (condition-case err
-             (apply func args)
-           (error
-            (if (bound-and-true-p org-link-minor-mode)
-                (ace-link-org)
-              (signal (car err) (cdr err)))))))
+       (defvaralias 'org-any-re 'org-link-any-re))
    #+END_SRC
-
 
 ** page-break-lines
    display ^L lines as horizontal-rules. Like so:
