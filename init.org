@@ -519,6 +519,7 @@
     | ibuffer-persp       | 6395294e2dd368866d79a81d37c27961e0f871937ccd82cff317e5ad67c52652 | https://raw.githubusercontent.com/rakshasa/ibuffer-persp/master/ibuffer-persp.el          |
     | org-link-edit       | ac84061d951ef9ef82794ba7f4416afb6da4283a182490a11ae455077321814c | https://raw.githubusercontent.com/kyleam/org-link-edit/master/org-link-edit.el            |
     | org-man             | 9a98ad950304cc2f195298d8a62a668365b8aedb98cfb45b2bfdb475f51239b9 | https://raw.githubusercontent.com/aspiers/orgmode/master/contrib/lisp/org-man.el          |
+    | xterm-title         | a532c1254e9ec9642e4435faec950c4e882e59ba51b091d12d00078e6dc50b74 | http://www.splode.com/~friedman/software/emacs-lisp/src/xterm-title.el                    |
 
     #+BEGIN_SRC emacs-lisp :var package-list=external-packages
       (defun external-packages/download-external-package (url dest-path)
@@ -830,6 +831,17 @@
       (advice-add 'terminal-init-tmux  :after #'enable-xterm-mouse-mode+)
     #+END_SRC
 
+    make sure emacs updates the frame title.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (defun enable-xterm-frame-title+ ()
+        (require 'xterm-title)
+        (xterm-title-mode +1))
+
+      (advice-add 'terminal-init-xterm :after #'enable-xterm-frame-title+)
+      (advice-add 'terminal-init-tmux  :after #'enable-xterm-frame-title+)
+    #+END_SRC
+
     because of XTerms extended keycodes, you can reclaim some of the keycodes
     which've been taken by emacs. I've defined a function which adds some more
     keycodes to the XTerm keymap and reclaims some bindings that conventional
@@ -927,6 +939,27 @@
       (unless (daemonp)
         (add-hook 'emacs-startup-hook
                   (lambda (&rest _) (term-setup-frame-bindings+))))
+    #+END_SRC
+
+    try to enable clipboard support, these settings should do something... but to
+    they don't seem to work for me :cry:.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (setq x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING)
+            x-select-enable-clipboard t
+            x-select-enable-primary   t
+            x-stretch-cursor          t)
+    #+END_SRC
+
+    as a last resort, let's defer to an excellent external package which takes care
+    of this for you automatically... assuming you have the right tools on your
+    device.
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package xclip
+        :ensure t
+        :init
+        (xclip-mode +1))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
