@@ -78,6 +78,7 @@
         golang
         json
         jupyter
+        kotlin
         makefile
         markdown
         python
@@ -1776,6 +1777,8 @@
 
            ;; major mode dependent configurations
            (cl-case major-mode
+            ('kotlin-mode
+             (setq-local kotlin-tab-width indent))
             ('python-mode
              (setq-local python-indent-offset indent))
             ('js-mode
@@ -15314,6 +15317,10 @@
     #+END_SRC
 
 ** kotlin
+   :PROPERTIES:
+   :header-args+: :tangle bin/lisp/+init-kotlin.el
+   :END:
+
    #+BEGIN_SRC emacs-lisp
      (use-package kotlin-mode
        :ensure t
@@ -15323,7 +15330,7 @@
          (add-hook 'kotlin-mode-hook +lsp-command))
 
        :config
-       (setq kotlin-tab-width 4)
+       (push (cons 'kotlin-mode 4) +indent-config)
 
        (leader/set-keys-for-major-mode 'kotlin-mode
          "r" 'kotlin-repl
@@ -15337,6 +15344,8 @@
          "e S-|" 'kotlin-send-block-and-focus
          "eR"    'kotlin-send-region-and-focus
          "eB"    'kotlin-send-buffer-and-focus))
+
+     (provide '+init-kotlin)
    #+END_SRC
 
 ** java
