@@ -1,4 +1,4 @@
-;; -*- mode: org; coding: utf-8-unix -*-
+# -*- mode: org; coding: utf-8-unix -*-
 
 #+TITLE: init.org
 #+STARTUP: content
@@ -10,7 +10,7 @@
   :header-args+: :tangle bin/lisp/+config.el
   :END:
 
-  #+BEGIN_SRC
+  #+BEGIN_SRC emacs-lisp
     (defvar +packages
       '(ivy                                                               ; simple and elegent completion for emacs
         magit                                                             ; it's git... but magical ,
@@ -84,6 +84,7 @@
         makefile
         markdown
         python
+        powershell
         restclient
         ;; robe
         ruby
@@ -508,7 +509,7 @@
     |                     | <15>                                                             |                                                                                           |
     | hide-comnt          | 9668645eab1fd8d223967ab90d3d34fe6e98aa3af47516f45e18f094137d7c6c | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/hide-comnt.el          |
     | imenu-tree          | c4b3ae0d8b5c3e5a50c9c4b3f96fd48e309c2fae9a8902a1d649063c7b3b611c | https://www.emacswiki.org/emacs/download/imenu-tree.el                                    |
-    | help-fns+           | a7d5bc93bf9cdfa7377ad632224dad1013fafc94dd8e4c1f9ce3b878f8af0d51 | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/help-fns%2B.el         |
+    | help-fns+           | bde8e532f51309b93413378a305a3b4c733251b4872b07e0a8c2d285881d0099 | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/help-fns%2B.el         |
     | lorem-ipsum         | 54cb139d6c88632aaef6364a2a6c6cadbb9a5082eb5032e69b5139dcc7074d88 | https://www.emacswiki.org/emacs/download/lorem-ipsum.el                                   |
     | profile-dotemacs    | 26d98fd26c75281c6a7934479ed9df54ca8c6259df4b3ef435097800aaf6dca5 | http://www.randomsample.de/profile-dotemacs.el                                            |
     | open-junk-file      | c0b835b329758dced4ccae6c2f3fd5af16af929437110ddde00ea55dc7d47be3 | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/open-junk-file.el      |
@@ -522,6 +523,7 @@
     | org-link-edit       | ac84061d951ef9ef82794ba7f4416afb6da4283a182490a11ae455077321814c | https://raw.githubusercontent.com/kyleam/org-link-edit/master/org-link-edit.el            |
     | org-man             | 9a98ad950304cc2f195298d8a62a668365b8aedb98cfb45b2bfdb475f51239b9 | https://raw.githubusercontent.com/aspiers/orgmode/master/contrib/lisp/org-man.el          |
     | xterm-title         | a532c1254e9ec9642e4435faec950c4e882e59ba51b091d12d00078e6dc50b74 | http://www.splode.com/~friedman/software/emacs-lisp/src/xterm-title.el                    |
+    | vline               | d2be35d52bbfddf10367e8bc2326630ae5f85e6720ec4714d715cde7904846fb | https://raw.githubusercontent.com/emacsmirror/vline/master/vline.el                       |
 
     #+BEGIN_SRC emacs-lisp :var package-list=external-packages
       (defun external-packages/download-external-package (url dest-path)
@@ -627,7 +629,6 @@
              vc-follow-symlinks t                                                   ; no confirmation when opening symlinks
              ring-bell-function 'ignore                                             ; NO ANNOYING RINGS!!!
              sentence-end-double-space nil                                          ; sentence SHOULD end with only a fullstop
-             default-fill-column 150                                                ; toggle wrapping text at given character
              delete-by-moving-to-trash t                                            ; don't rm, trash my garbage please :)
              search-whitespace-regexp nil                                           ; SPC means SPC, not any amount of spaces
              enable-local-variables t                                               ; allow safe variables, even alongside unsafe ones
@@ -635,7 +636,6 @@
              auto-save-interval 50                                                  ; auto-save as frequently as possible
              backup-by-copying t                                                    ; don't clobber symlinks
              which-key-enable-extended-define-key t                                 ; let's you pass a cons to define-key
-             fill-column 85                                                         ; the default line length allowed by auto-fill-mode
              kill-whole-line t                                                      ; kill-line includes eol
              help-window-select t                                                   ; always select the help window when it pops up
              enable-recursive-minibuffers t                                         ; allow entering minibuffer, when already in minibuffer
@@ -643,6 +643,15 @@
              recentf-max-saved-items 2048                                           ; keep this many files in the recentf history.
              completion-ignore-case t                                               ; make completion case insensitive, holding down shift is annoying.
              recenter-positions '(top middle bottom))
+     #+END_SRC
+
+     Set the default fill column for ~auto-fill-mode~.
+
+     #+BEGIN_SRC emacs-lisp
+       (setq-default
+        ;; default-fill-column 150                                                ; toggle wrapping text at given character
+        fill-column 85                                                         ; the default line length allowed by auto-fill-mode
+        )
      #+END_SRC
 
     backup behaviour of emacs. NOTE ~kept-new-versions~ and ~kept-old-versions~ are
@@ -905,6 +914,7 @@
             (define-key xterm-function-map "\e[1;2A"   [S-up])
             (define-key xterm-function-map "\e[1;2D"   [S-left])
             (define-key xterm-function-map "\e[1;2C"   [S-right])
+            (define-key xterm-function-map "\e[1;5Z"   [C-S-tab])
             (define-key xterm-function-map "\e[32;3u"  [134217760])
             (define-key xterm-function-map "\e[58;4u"  [134217786])                         ; M-:
             (define-key xterm-function-map "\e[58;6u"  [67108922])                          ; C-:
@@ -1053,6 +1063,7 @@
 
       (leader/set-keys
         "Md" "dired"
+        "MF" 'flyspell-prog-mode
         ;; TODO bind in dired
         "Mdd" 'toggle-editable-dired
         "Mde" 'invoke-editable-dired
@@ -1165,7 +1176,7 @@
        "M-j"             'custom-insert-line-below
        "M-k"             'custom-insert-line-above
        "M-r"             'revert-buffer
-       "C-q"             'quit-window
+       ;; "C-q"             'quit-window
        "C-v"             'quoted-insert
        "C-j"             'newline-and-indent
        "C-<tab>"         'next-buffer
@@ -1193,6 +1204,15 @@
        [C-m] 'window-zen
        "M"   'window-zen-restore
        "M-m" 'window-zen-restore)
+
+      ;; tmux leader compatability
+      (general-define-key
+       :states 'insert
+       "C-q" (general-simulate-keys "C-w" 'normal))
+
+      (general-define-key
+       :states '(normal motion emacs)
+       "C-q" (general-simulate-keys "C-w"))
     #+END_SRC
 
     A command that inserts a character without moving point.
@@ -3206,6 +3226,103 @@
       (provide 'unpackaged)
     #+END_SRC
 
+*** configure-presym
+    :PROPERTIES:
+    :header-args+: :tangle bin/lisp/misc/+configure-presym.el
+    :END:
+
+    Utility macro to make [[*prettify-symbols][prettify-symbols]] mode easier to setup for individual modes.
+
+    #+BEGIN_SRC emacs-lisp :tangle bin/lisp/+init-core.el
+      (use-package +configure-presym
+        :commands 'configure-presym!)
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
+      (defvar prettify-symbols-pretty-symbols-alist+ nil
+        "alist of mode to pretty symbols ")
+
+      ;; inspired by: [[https://emacs.stackexchange.com/questions/34808/using-prettify-symbols-with-strings-instead-of-characters][this post]].
+      (defun prettify-symbols-string+ (to)
+        "get a prettify symbols entry to map a string to a string."
+        (let ((length (length to)))
+          (cl-loop for i from 0 to length
+                   for char in (string-to-list to)
+                   unless (eq i (- length 1))
+                   do (setq char (list char '(Br . Bl)))
+                   else
+                   do (setq char (list char))
+                   end
+                   append char)))
+
+      (defun configure-presym--prepare-args (args)
+        "convert ARGS to partitioned 2 length cons cells.
+      ARGS should simply be a flat sequence of string to pretty-symbol.
+
+      The pretty-symbol part can be a given as a string, to automatically
+      pass through `prettify-symbols-string+'.
+      "
+        (cl-loop for (src . dest) in (-partition 2 args)
+                 collect (cons src
+                               (if (stringp dest)
+                                   (prettify-symbols-string+ dest)
+                                 dest))))
+
+      ;; TODO add duplicate remove check.
+      (defmacro configure-presym! (modes &rest args)
+        "Configure prettify-symbols for modes MODES.
+      This function adds/modifies an entry for mode in the
+      `prettify-symbols-pretty-symbols-alist+' alist and binds a hook in MODES
+      mode-hook to enable `prettify-symbols-mode'.
+
+      MODES can be given as a quoted list, or a single quoted mode name or a
+      variable pointing to either of these types (and discoverable at macro
+      expansion time).
+
+      ARGS should be a form acceptable by `configure-presym--prepare-args'.
+
+      eg.
+
+      > (configure-presym! 'org-mode \"lambda\" ?λ)
+      "
+        (plist-bind! (args :remove-duplicates)
+          (setq modes (eval modes))
+
+          (when modes
+            (unless (listp modes)
+              (setq modes `(,modes))))
+
+          (let (res ; aggregate forms into here
+                (tuples (configure-presym--prepare-args args)))
+            (dolist (mode modes)
+              (let ((mode-name (symbol-name mode)))
+                (push
+                 `(let ((config (assoc (quote ,mode) prettify-symbols-pretty-symbols-alist+)))
+                    (if config
+                        ; add to existing config, while preventing cyclic loops
+                        (nconc-safe (car (cdr config)) tuples)
+                      (push (cons (quote ,mode) (list tuples))
+                            prettify-symbols-pretty-symbols-alist+)
+
+                      (add-hook (quote ,(intern (concat mode-name "-hook")))
+                                (defun ,(intern (concat "configure-presym-" mode-name)) (&rest _)
+                                  ,(concat "sets up pretty symbols for " mode-name)
+                                  (let ((config (assoc (quote ,mode)
+                                                       prettify-symbols-pretty-symbols-alist+)))
+                                    (when (and config
+                                               (setq config (car (cdr config))))
+                                      (setq prettify-symbols-alist
+                                            (append prettify-symbols-alist
+                                                    (copy-sequence config)))
+
+                                      (prettify-symbols-mode +1)))))))
+                 res)))
+            `(let ((tuples (quote ,tuples))) ,@res))))
+      (put 'configure-presym! 'lisp-indent-function 'defun)
+
+      (provide '+configure-presym)
+    #+END_SRC
+
 ** config
    load my configuration, then load any associated (and required) packages.
 
@@ -3269,95 +3386,6 @@
              ;; don't need to keep symbolifying it whilst I'm on it
              prettify-symbols-unprettify-at-point t))
    #+END_SRC
-
-*** configure-presym
-    #+BEGIN_SRC emacs-lisp :tangle bin/lisp/misc/+configure-presym.el
-      (defvar prettify-symbols-pretty-symbols-alist+ nil
-        "alist of mode to pretty symbols ")
-
-      ;; inspired by: [[https://emacs.stackexchange.com/questions/34808/using-prettify-symbols-with-strings-instead-of-characters][this post]].
-      (defun prettify-symbols-string+ (to)
-        "get a prettify symbols entry to map a string to a string."
-        (let ((length (length to)))
-          (cl-loop for i from 0 to length
-                   for char in (string-to-list to)
-                   unless (eq i (- length 1))
-                   do (setq char (list char '(Br . Bl)))
-                   else
-                   do (setq char (list char))
-                   end
-                   append char)))
-
-      (defun configure-presym--prepare-args (args)
-        "convert ARGS to partitioned 2 length cons cells.
-      ARGS should simply be a flat sequence of string to pretty-symbol.
-
-      The pretty-symbol part can be a given as a string, to automatically
-      pass through `prettify-symbols-string+'.
-      "
-        (cl-loop for it in (-partition 2 args)
-                 do (setq it
-                          (cons (car it)
-                                (let ((to (car (cdr it))))
-                                  (if (stringp to)
-                                      (prettify-symbols-string+ to)
-                                    to))))
-                 collect it))
-
-      ;; TODO add duplicate remove check.
-      (defmacro configure-presym! (modes &rest args)
-        "Configure prettify-symbols for modes MODES.
-      This function adds/modifies an entry for mode in the
-      `prettify-symbols-pretty-symbols-alist+' alist and binds a hook in MODES
-      mode-hook to enable `prettify-symbols-mode'.
-
-      MODES can be given as a quoted list, or a single quoted mode name or a
-      variable pointing to either of these types (and discoverable at macro
-      expansion time).
-
-      ARGS should be a form acceptable by `configure-presym--prepare-args'.
-
-      eg.
-
-      > (configure-presym! 'org-mode \"lambda\" ?λ)
-      "
-        (plist-bind! (args :remove-duplicates)
-          (setq modes (eval modes))
-
-          (when modes
-            (unless (listp modes)
-              (setq modes `(,modes))))
-
-          (let (res ; aggregate forms into here
-                (tuples (configure-presym--prepare-args args)))
-            (dolist (mode modes)
-              (let ((mode-name (symbol-name mode)))
-                (push
-                 `(let ((config (assoc (quote ,mode) prettify-symbols-pretty-symbols-alist+)))
-                    (if config
-                                              ; add to existing config, while prevent cyclic loops
-                        (nconc-safe (car (cdr config)) tuples)
-                      (push (cons (quote ,mode) (list tuples))
-                            prettify-symbols-pretty-symbols-alist+)
-
-                      (add-hook (quote ,(intern (concat mode-name "-hook")))
-                                (defun ,(intern (concat "configure-presym-" mode-name)) (&rest _)
-                                  ,(concat "sets up pretty symbols for " mode-name)
-                                  (let ((config (assoc (quote ,mode)
-                                                       prettify-symbols-pretty-symbols-alist+)))
-                                    (when (and config
-                                               (setq config (car (cdr config))))
-                                      (setq prettify-symbols-alist
-                                            (append prettify-symbols-alist
-                                                    (copy-sequence config)))
-
-                                      (prettify-symbols-mode +1)))))))
-                 res)))
-            `(let ((tuples (quote ,tuples))) ,@res))))
-      (put 'configure-presym! 'lisp-indent-function 'defun)
-
-      (provide '+configure-presym)
-    #+END_SRC
 
 ** auto-fill-mode
    #+BEGIN_SRC emacs-lisp
@@ -4916,7 +4944,9 @@
        :demand t
        :config
        ;; see [[http://emacshorrors.com/posts/determining-if-the-server-is-started-or-the-wonders-of-server-running-p.html][emacs-horrors]] for why this is sometimes useless :(
-       (or (server-running-p) (server-start))
+       (when (windows-p)
+         (or (server-running-p)
+             (server-start)))
 
        (advice-add 'server-edit :before
                    (defun server-edit--auto-save-on-exit (&rest args)
@@ -5431,6 +5461,15 @@
          "M-u" 'View-scroll-page-backward))
    #+END_SRC
 
+** vline
+   #+BEGIN_SRC emacs-lisp
+     (use-package vline
+       :defer t
+       :commands (vline-mode)
+       :init
+       (leader/set-keys "t'" 'vline-mode))
+   #+END_SRC
+
 ** whitespace
    #+BEGIN_SRC emacs-lisp
      (use-package whitespace
@@ -5723,7 +5762,23 @@
    #+BEGIN_SRC emacs-lisp
      (use-package browse-url
        :ensure t
-       :defer  t)
+       :defer  t
+       :commands xopen-url+
+       :config
+       (defun xopen-url+ (url &optional arg)
+         "Open visited file in default external program.
+     When in dired mode, open file under the cursor.
+     With a prefix ARG always prompt for command to use."
+         (interactive "fOpen file: \nP")
+         (unless url
+           (setq url (if (eq major-mode 'dired-mode)
+                         (dired-get-file-for-visit)
+                       buffer-file-name)))
+
+         (let ((program (if arg
+                            (read-shell-command "Open current file with: ")
+                          "xopen")))
+           (call-process program nil 0 nil url))))
    #+END_SRC
 
 ** buffer-move
@@ -8478,7 +8533,7 @@
          "ex" 'flycheck-clear
          "ed" 'flycheck-explain-error-at-point
          "eh" 'flycheck-describe-checker
-         "eg" 'flycheck-first-error
+         "e1" 'flycheck-first-error
          "eL" 'goto-flycheck-error-list
          "el" 'flycheck-list-errors
          "eC" 'flycheck-set-checker-executable
@@ -8536,8 +8591,9 @@
                    flycheck-error-list-follow-mode)
         :init
         (leader/set-keys
-          "eG" 'flycheck-last-error
+          "e$" 'flycheck-last-error
           "te" 'toggle-flycheck-messages)
+
         :config
         (general-define-key
          :keymaps 'flycheck-error-list-mode-map
@@ -9185,12 +9241,13 @@
 
         (leader/set-keys
           "ae" 'counsel-package
+          "af" 'counsel-faces
           "ee" 'counsel-compilation-errors
           "ic" 'counsel-unicode-char
           "ie" 'counsel-org-entity
           "Mm" 'counsel-major
 
-          "es" 'counsel-flycheck
+          "eg" 'counsel-flycheck
           "ry" 'counsel-yank-pop
           "rm" 'counsel-mark-ring
           "rn" 'counsel-evil-marks
@@ -9453,15 +9510,23 @@
         (with-eval-after-load '+init-bibtex
           (setq
            bibtex-completion-bibliography bibtex-files
-           bibtex-completion-library-path (join-path +bibliography-directory "doc/")
+           bibtex-completion-library-path (list
+                                           (join-path +bibliography-directory "docs/")
+                                           (join-path +bibliography-directory "unidocs/"))
            bibtex-completion-notes-path (join-path +bibliography-directory "notes"))
 
           (mkdir bibtex-completion-notes-path t))
 
+        (with-eval-after-load '+init-ebib
+          (setq
+           ebib-notes-directory (join-path +bibliography-directory "notes")))
+
         :config
-        (setq bibtex-completion-pdf-extension '(".pdf" ".epub")
-             ;; bind to find-file to open with emacs/pdf-tools.
-              bibtex-completion-pdf-open-function 'browse-url)
+        (setq ;; ivy-bibtex-default-action #'ivy-bibtex-edit-notes
+              ivy-bibtex-default-action 'ivy-bibtex-insert-pdftools-link
+              bibtex-completion-pdf-extension '(".pdf" ".epub" ".pptx" ".doc" ".docx")
+              ;; bind to find-file to open with emacs/pdf-tools.
+              bibtex-completion-pdf-open-function 'xopen-url+)
 
         (defun bibtex-completion-format-citation-org-mode-cite+ (keys)
           "Format cite references for keys in KEYS for `org-mode'."
@@ -9830,6 +9895,7 @@
           "sa" 'ibuffer-do-sort-by-alphabetic
           "sf" 'ibuffer-do-sort-by-filename/process
           "si" 'ibuffer-invert-sorting
+          "s SPC" 'ibuffer-invert-sorting
           "sm" 'ibuffer-do-sort-by-major-mode
           "ss" 'ibuffer-do-sort-by-size
           "sr" 'ibuffer-do-sort-by-recency
@@ -11472,6 +11538,12 @@
       (projectile-register-project-type 'pipenv '("Pipfile")
                                         :test "pipenv py -m pytest")
 
+      (projectile-register-project-type 'make '("Makefile")
+                                        :compile "make"
+                                        :install "make install"
+                                        :run     "make run"
+                                        :test    "make test")
+
       ;; see: https://github.com/bbatsov/projectile/blob/master/projectile.el#L2636
       (projectile-register-project-type 'gradle '("build.gradle.kts")
                                         :run     "gradle run"
@@ -12554,6 +12626,7 @@
        :ensure t
        :defer  t
        :hook (after-init-hook . global-wakatime-mode)
+       :config
        ;; TODO move api key to private.
        (setq wakatime-api-key "0fba4add-c2c4-4950-9528-927a0652d7a1"))
    #+END_SRC
@@ -13294,8 +13367,6 @@
             ")" 'eval-replace-last-sexp))
 
         :config
-        (require '+configure-presym)
-
         ;; show lambda as an actual lambda symbol... pretty cool, if I do say
         ;; so myself.
         (configure-presym! '(lisp-interaction-mode emacs-lisp-mode org-mode)
@@ -13567,8 +13638,6 @@
         (defalias 'python-repl 'run-python)
 
         :config
-        (require '+configure-presym)
-
         (evil-set-initial-state 'inferior-python-mode 'emacs)
         (setq python--prettify-symbols-alist nil)
 
@@ -13861,6 +13930,21 @@
     #+BEGIN_SRC emacs-lisp
       (provide '+init-ruby)
     #+END_SRC
+
+** powershell
+   :PROPERTIES:
+   :header-args+: :tangle bin/lisp/+init-powershell.el
+   :END:
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package powershell
+       :ensure t
+       :defer  t)
+   #+END_SRC
+
+   #+BEGIN_SRC emacs-lisp
+     (provide '+init-powershell)
+   #+END_SRC
 
 ** HTML
    :PROPERTIES:
@@ -14712,7 +14796,9 @@
           :states '(normal insert visual)
           :predicate '(org-at-heading-p)
           [remap evil-shift-right] 'org-demote-subtree
-          [remap evil-shift-left]  'org-promote-subtree)
+          [remap evil-shift-left]  'org-promote-subtree
+          [remap evil-shift-right-line] 'org-demote-subtree
+          [remap evil-shift-left-line]  'org-promote-subtree)
 
         (defmacro org-read-date-command (name &rest body)
           "define a function for use in the calendar buffer for `calendar-read-date'."
@@ -15149,6 +15235,9 @@
         :hook (after-init . org-roam-mode)
         :init
         (leader/set-keys
+          "od" 'org-roam-capture
+          ;; same as `org-roam-capture' except if the candidate already exists
+          ;; open it instead of creating a capture session.
           "of" 'org-roam-find-file
           "op" 'org-roam-insert
           "or" 'org-roam
@@ -15157,6 +15246,13 @@
         :config
         (require '+org-capture)
         (require 'org-roam-protocol)
+
+        (add-hook 'org-roam-file-setup-hook
+                  (defun +org-roam-setup-hook ()
+                    (when (featurep 'flyspell)
+                      (flyspell-mode +1))
+
+                    (auto-fill-mode +1)))
 
         (setq org-roam-capture-function #'counsel-org-capture)
 
@@ -15844,6 +15940,19 @@
         "tdc" 'markdown-table-delete-column)
 
       (provide '+markdown-bindings)
+    #+END_SRC
+
+*** markdown-toc
+    #+BEGIN_SRC emacs-lisp
+      (use-package markdown-toc
+        :ensure t
+        :defer  t
+        :config
+        (leader/set-keys-for-major-mode 'markdown-mode
+          "bx" 'markdown-toc-delete-toc
+          "br" 'markdown-toc-refresh-toc
+          "bb" 'markdown-toc-generate-or-refresh-toc
+          "bi" 'markdown-toc-generate-toc))
     #+END_SRC
 
 *** gh-md
@@ -16848,7 +16957,8 @@
                (latex-mode . TeX-PDF-mode)
                (latex-mode . TeX-source-correlate-mode))
         :init
-        (defvaralias 'LaTeX-mode-hook 'latex-mode-hook)
+        (with-suppressed-warnings
+          (defvaralias 'LaTeX-mode-hook 'latex-mode-hook))
 
         (defvar TeX-view-in-emacs+ nil
           "when true, view latex documents in emacs PDFTools.
@@ -17015,14 +17125,17 @@
        :defer t
        :hook (bibtex-mode . display-line-numbers-mode)
        :init
-       (defvar +bibliography-directory (org! "bibliography")
+       (defvar +bibliography-directory (org! "bib")
          "root directory for bibliography related content")
 
-       (setq bibtex-files (list (join-path +bibliography-directory "index.bib")))
+       (setq bibtex-files (list
+                           (join-path +bibliography-directory "index.bib")
+                           (join-path +bibliography-directory "university.bib")))
 
        :config
        (setq bibtex-align-at-equal-sign t
              bibtex-include-OPTkey t
+             orhc-bibtex-cache-file (var! "orhc-bibtex-cache")
              ;; use all available words and be as long as needed
              bibtex-autokey-titleword-length nil
              bibtex-autokey-titlewords nil
@@ -17154,6 +17267,8 @@
     biblatex/bibtex database management interface for emacs. TODO read [[https://joostkremers.github.io/ebib/ebib-manual.html][manual]].
 
     #+BEGIN_SRC emacs-lisp :tangle bin/lisp/+init-ebib.el
+      (require '+init-bibtex)
+
       (use-package ebib
         :ensure t
         :defer  t
@@ -17164,7 +17279,8 @@
         :config
         (mkdir (var! "ebib") t)
 
-        (setq ebib-keywords-file (var! "ebib/keywords")
+        (setq ebib-preload-bib-files bibtex-files
+              ebib-keywords-file (var! "ebib/keywords")
               ebib-reading-list-file (org! "ebib/reading-list.org"))
 
         ;; make ebib index use evil-motion-state
@@ -17309,6 +17425,7 @@
          "gj" 'ebib-next-field
          "gk" 'ebib-prev-field
 
+         "c" 'ebib-edit-field
          "e" 'ebib-edit-field
          "i" 'ebib-edit-field
          ;; "m" 'ebib-edit-multiline-field
@@ -17319,6 +17436,7 @@
          "y" 'ebib-copy-field-contents
          "p" 'ebib-yank-field-contents
 
+         "o" 'ebib-quit-entry-buffer
          "q" 'ebib-quit-entry-buffer)
 
         (leader/set-keys-for-major-mode 'ebib-entry-mode

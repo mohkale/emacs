@@ -240,7 +240,7 @@
 ** center
    #+BEGIN_SRC snippet :tangle snippets/org-mode/center
       # name: center
-      # key: <c
+      # key: <C
       # --
       #+begin_center
       $0
@@ -282,7 +282,7 @@
    #+END_SRC
 
 ** elisp
-   #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/elisp
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/elisp
      # name: elisp
      # key: <e
      # --
@@ -301,6 +301,16 @@
      ,#+END_SRC
    #+END_SRC
 
+** C
+   #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/C
+     # name: C
+     # key: <c
+     # --
+     ,#+BEGIN_SRC C
+     $0
+     ,#+END_SRC
+   #+END_SRC
+
 ** python
    #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/python
      # name: python
@@ -309,6 +319,22 @@
      ,#+BEGIN_SRC python
      $0
      ,#+END_SRC
+   #+END_SRC
+
+** roam_tags
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/roam_tags
+     # name: roam_tags
+     # key: rt
+     # --
+     ,#+roam_tags: $0
+   #+END_SRC
+
+** roam_key
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/roam_key
+     # name: roam_key
+     # key: rk
+     # --
+     ,#+roam_key: $0
    #+END_SRC
 
 * web-mode
@@ -1248,20 +1274,6 @@
       $0
    #+END_SRC
 
-** script
-   #+BEGIN_SRC snippet :tangle snippets/python-mode/script
-      # name: script
-      # key: script
-      # --
-      #!/usr/bin/env python
-
-      def main():
-          pass
-
-      if __name__ == '__main__':
-          main()
-   #+END_SRC
-
 ** __len__
    #+BEGIN_SRC snippet :tangle snippets/python-mode/__len__
       # name: __len__
@@ -2012,6 +2024,25 @@
       breakpoint()
    #+END_SRC
 
+** script
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/script
+     # name: script
+     # key: script
+     # --
+     if __name__ == '__main__':
+         import argparse
+
+         def parse_args():
+             parser = argparse.ArgumentParser()
+
+             args  = parser.parse_args()
+             vargs = vars(args)
+
+             return args, vargs, parser
+
+         args, vargs, parser = parse_args()
+   #+END_SRC
+
 ** self
    #+BEGIN_SRC snippet :tangle snippets/python-mode/self
       # name: self
@@ -2320,3 +2351,21 @@
     emacs-lisp-mode
   #+END_SRC
 
+* vue-mode
+** init
+   #+BEGIN_SRC snippet :tangle snippets/vue-mode/init
+     # name: init
+     # key: init
+     # --
+     <template>
+       $0
+     </template>
+
+     <script lang="ts">
+      import Vue from 'vue';
+
+      export default Vue.extend({
+
+      })
+     </script>
+   #+END_SRC
