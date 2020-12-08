@@ -276,8 +276,8 @@
         org-publish-timestamp-directory                    (var! "org/timestamps/")
         org-registry-file                                  (var! "org/registry.el")
         org-default-notes-file                             (org! "notes.org")
-        org-projectile-projects-directory                  (org! "projects/")
-        org-projectile-projects-file                       (org! "projects/global.org")
+        org-projectile-projects-directory                  (org! "notes/projects/")
+        org-projectile-projects-file                       (org! "notes/projects/global.org")
         org-preview-latex-image-directory                  (var! "org/latex")
         package-quickstart-file                            (var! "package-qs.el")
         recentf-save-file                                  (var! "recentf.el")
@@ -1209,11 +1209,11 @@
       ;; tmux leader compatability
       (general-define-key
        :states 'insert
-       "C-q" (general-simulate-keys "C-w" 'normal))
+       "C-q" (general-simulate-key "C-w" :state 'normal))
 
       (general-define-key
        :states '(normal motion emacs)
-       "C-q" (general-simulate-keys "C-w"))
+       "C-q" (general-simulate-key "C-w"))
     #+END_SRC
 
     A command that inserts a character without moving point.
@@ -1945,6 +1945,8 @@
              (setq-local python-indent-offset indent))
             ('js-mode
              (setq-local js-indent-level indent))
+             ('js2-mode
+             (setq-local js2-basic-offset indent))
             ('ruby-mode
              (setq-local ruby-indent-level indent))
             ('enh-ruby-mode
@@ -1961,6 +1963,8 @@
              (setq-local LaTeX-indent-level indent))
             ('typescript-mode
              (setq-local typescript-indent-level indent))
+            ('java-mode
+             (setq-local c-basic-offset indent))
             ('web-mode
              (setq-local css-indent-offset indent)
              (setq-local web-mode-markup-indent-offset indent)
@@ -4110,6 +4114,13 @@
 
          ;; quit
          [remap quit-window] 'Custom-buffer-done))
+   #+END_SRC
+
+** dabbrev
+   #+BEGIN_SRC emacs-lisp
+     (general-define-key
+      :prefix "C-x"
+      [C-i] 'dabbrev-expand)
    #+END_SRC
 
 ** debugger
@@ -6279,6 +6290,8 @@
               dashboard-show-shortcuts t
               dashboard-set-heading-icons nil)
 
+        (dashboard-setup-startup-hook)
+
         ;; determine the appropriate banner to display on the dashboard
         (defun dashboard-image-banner-p ()
           "whether to use text graphics, or image graphics."
@@ -7324,6 +7337,7 @@
               (emacs-lisp            . emojify-mode)
               (lisp-interaction-mode . emojify-mode)
               (yaml-mode             . emojify-mode)
+              (bibtex-mode           . emojify-mode)
               (shell-mode            . emojify-mode)
               (markdown-mode         . emojify-mode)
               (lisp-interaction-mode . emojify-mode)
@@ -7610,7 +7624,10 @@
    #+BEGIN_SRC emacs-lisp
      (use-package evil
        :ensure t
-       :defer  t)
+       :defer  t
+       :init
+       ;; needs to be in init, or else doesn't work.
+       (setq evil-undo-system 'undo-tree))
    #+END_SRC
 
 *** matchit
@@ -9215,7 +9232,15 @@
         (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
         (fset 'describe-bindings (symbol-function 'counsel-descbinds))
 
-        (setq counsel-find-file-ignore-regexp "\\.#.+")
+        (setq counsel-find-file-ignore-regexp
+              (rx (or (and ".#" (one-or-more any))
+                      (and bol "flycheck_")
+                      (and ".class" eol)
+                      (and ".o" eol)
+                      (and "node_modules")
+                      (and ".git" (zero-or-one "/") eol)
+                      (and ".bundle/")
+                      (and (any ?. ?-) "lock" (zero-or-one ".json") eol))))
 
         (leader/set-keys
           "r"  "register/rings/resume"
@@ -9286,6 +9311,8 @@
           "C-M-y" 'counsel-yank-pop)
 
         :config
+        (advice-add 'counsel-locate-action-extern :override #'xopen-url+)
+
         (setq ivy-initial-inputs-alist ivy-default-initial-inputs-alist+
               counsel-find-file-occur-use-find t
               counsel-evil-registers-height ivy-height)
@@ -9512,15 +9539,14 @@
           (setq
            bibtex-completion-bibliography bibtex-files
            bibtex-completion-library-path (list
-                                           (join-path +bibliography-directory "docs/")
-                                           (join-path +bibliography-directory "unidocs/"))
-           bibtex-completion-notes-path (join-path +bibliography-directory "notes"))
+                                           (org! "docs/")
+                                           (org! "docs/unidocs/"))
+           bibtex-completion-notes-path (org! "notes"))
 
           (mkdir bibtex-completion-notes-path t))
 
         (with-eval-after-load '+init-ebib
-          (setq
-           ebib-notes-directory (join-path +bibliography-directory "notes")))
+          (setq ebib-notes-directory (org! "notes")))
 
         :config
         (setq ;; ivy-bibtex-default-action #'ivy-bibtex-edit-notes
@@ -11429,6 +11455,7 @@
        :init
        (leader/set-keys
          "p"  "projectile"
+         "p TAB" 'projectile-find-other-file
          "p!" 'projectile-run-shell-command-in-root
          "p%" 'projectile-replace-regexp
          "p&" 'projectile-run-async-shell-command-in-root
@@ -11477,7 +11504,9 @@
                                              (apply 'true-projectile-project-root args)))))
            (apply func args)))
 
-       (setq projectile-project-search-path '("~/programming/repos/")
+       (setq projectile-project-search-path (cl-loop for fp in '("~/prog/repos/")
+                                                     if (file-directory-p fp)
+                                                     collect fp)
              projectile-tags-backend 'xref ;; opt into gtags
              projectile-indexing-method 'alien ;; never use native
              projectile-tags-command "ctags -Re -f \"%s\" %s \"%s\""
@@ -11728,12 +11757,12 @@
              powerline-default-separator 'slant
 
              spaceline-window-number-p t
-             spaceline-window-numbers-unicode t
+             spaceline-window-numbers-unicode nil
 
-             ;; having two unicode numbers next to each other
-             ;; is IMO ugly, so disable the workspace one :(.
+             ;; unicode numbers on the terminal aren't the right
+             ;; width and I'm too lazy to find a better font.
              spaceline-workspace-number-p nil
-             spaceline-workspace-numbers-unicode t)
+             spaceline-workspace-numbers-unicode nil)
 
        (setq-default mode-line-format (spaceline-spacemacs-theme))
 
@@ -12116,6 +12145,9 @@
        :ensure t
        :defer  t
        :diminish
+       :init
+       (global-undo-tree-mode +1)
+
        :config
        (push 'undo-tree-visualizer-mode
               whitespace-exempt-modes)
@@ -15234,6 +15266,7 @@
         ;;                     :fork (:host github :repo "zaeph/org-roam" :branch "nested-captures"))
         :defer  t
         :hook (after-init . org-roam-mode)
+        :commands (counsel-rg-roam)
         :init
         (leader/set-keys
           "od" 'org-roam-capture
@@ -15242,7 +15275,14 @@
           "of" 'org-roam-find-file
           "op" 'org-roam-insert
           "or" 'org-roam
-          "og" 'org-roam-graph)
+          ;; "og" 'org-roam-graph
+          "os" 'counsel-rg-roam)
+
+        (setq org-roam-update-db-idle-seconds 2
+              org-roam-db-location (var! "org-roam.db")
+              ;; org-roam-dailies-directory
+              ;; org-roam-db-update-method 'immediate
+              )
 
         :config
         (require '+org-capture)
@@ -15265,6 +15305,11 @@
                      (roam-properties (plist-get (plist-get props :doct) :org-roam)))
                 (push `(,@group ,@roam-properties) converted)))
             (setq doct-templates (nreverse converted))))
+
+        (defun counsel-rg-roam ()
+          "Run a rg session in your org roam directory"
+          (interactive)
+          (counsel-rg nil org-roam-directory))
 
         (setq org-roam-directory (org! "brain")
               org-roam-completion-system 'ivy
@@ -15315,6 +15360,15 @@
         (org-pdftools-setup-link)
 
         :config
+        (setq org-pdftools-open-custom-open
+              (lambda (link)
+                (message "%s" link)
+                (save-match-data
+                  (let* ((path (when (string-match
+                                      "\\(.+\\)::.+" link)
+                                 (match-string 1 link))))
+                    (xopen-url+ (expand-file-name path))))))
+
         (advice-add 'org-pdftools-complete-link :around
                     (defun org-pdftools-complete-link-set-directory+ (func &rest args)
                       (let ((default-directory (or org-pdf-tools-pdf-directory
@@ -16019,15 +16073,17 @@
      (use-package cc-mode
        :straight (cc-mode :type built-in)
        :defer t
-       :mode ("\\.h$" . c-mode)
+       :mode ("\\.h$" . c++-mode)
        :commands (cc-mode-set-bindings+)
-       :hook (
-              ;; use global-ycmd-mode manually
-              ;; (c-mode   . ycmd-mode)
-              ;; (c++-mode . ycmd-mode)
-              (c-mode   . flycheck-mode)
+       :hook ((c-mode   . flycheck-mode)
               (c++-mode . flycheck-mode))
        :config
+       (add-hook 'eglot-managed-mode-hook
+                 (defun cc-mode-disable-flycheck-with-eglot+ ()
+                   (when (and (member major-mode '(c-mode c++-mode))
+                              (featurep 'flycheck))
+                     (flycheck-mode (if (eglot-managed-p) -1 +1)))))
+
        (c-toggle-auto-newline  +1)
        ;; WARN never do this, it breaks commenting in
        ;;      weird places.
@@ -16053,10 +16109,17 @@
        (cc-mode-set-bindings+ 'cc-mode))
    #+END_SRC
 
-*** ccls
+*** lsp
     LSP implementation for C++/C.
 
     #+BEGIN_SRC emacs-lisp
+      ;; prefer clang to ccls (when available).
+      (when (and (member 'eglot +packages)
+                 (executable-find "clang"))
+        (with-eval-after-load 'eglot
+          (add-to-list 'eglot-server-programs
+                       '((c++-mode c-mode) "clangd"))))
+
       (when +lsp-command
         (add-hook 'c-mode-hook   +lsp-command)
         (add-hook 'c++-mode-hook +lsp-command))
@@ -16122,7 +16185,11 @@
        :defer t
        :init
        :config
-       (cc-mode-set-bindings+ 'java-mode))
+       (cc-mode-set-bindings+ 'java-mode)
+
+       (add-hook 'java-mode-hook
+                 (defun +java-mode-fix-indentation ()
+                   (c-set-offset 'inexpr-class 0))))
    #+END_SRC
 
 *** meghanada
@@ -17135,12 +17202,8 @@
        :defer t
        :hook (bibtex-mode . display-line-numbers-mode)
        :init
-       (defvar +bibliography-directory (org! "bib")
-         "root directory for bibliography related content")
-
-       (setq bibtex-files (list
-                           (join-path +bibliography-directory "index.bib")
-                           (join-path +bibliography-directory "university.bib")))
+       (let ((bib-dir (org! "bib")))
+         (setq bibtex-files (directory-files bib-dir t ".bib")))
 
        :config
        (setq bibtex-align-at-equal-sign t
