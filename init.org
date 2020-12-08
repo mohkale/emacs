@@ -9394,6 +9394,26 @@
                                      (apply actual-message message-args)))))
                         (apply func args))))
 
+        (defun swiper-isearch-next-line ()
+          (interactive)
+          (let ((shift 1))
+            (with-ivy-window
+              (let ((ln (line-number-at-pos (ivy-state-current ivy-last))))
+                (while (and (< (+ ivy--index shift) ivy--length)
+                            (= ln (line-number-at-pos (nth (+ ivy--index shift) ivy--all-candidates))))
+                  (cl-incf shift))))
+            (ivy-next-line shift)))
+
+        (defun swiper-isearch-prev-line ()
+          (interactive)
+          (let ((shift 1))
+            (with-ivy-window
+              (let ((ln (line-number-at-pos (ivy-state-current ivy-last))))
+                (while (and (>= (- ivy--index shift) 0)
+                            (= ln (line-number-at-pos (nth (- ivy--index shift) ivy--all-candidates))))
+                  (cl-incf shift))))
+            (ivy-previous-line shift)))
+
         (defvar swiper-norm-action--macro-history nil
           "history variable for macros invoked through `swiper-norm-action'.")
 
@@ -9456,7 +9476,12 @@
           "M-l" 'swiper-recenter-top-bottom
           "C-l" 'ivy-forward-char-or-partial-or-done
           "C-q" 'swiper-avy
-          "C-s" 'swiper-query-replace))
+          "C-s" 'swiper-query-replace)
+
+        (general-define-key
+         :keymaps 'swiper-isearch-map
+         "C-n" #'swiper-isearch-next-line
+         "C-p" #'swiper-isearch-prev-line))
     #+END_SRC
 
 *** ivy-xref
@@ -17895,10 +17920,11 @@
        `(secondary-selection ((,class (:inherit region))))
 
        ;; face for current search match. exiting now takes you to it.
-       `(isearch ((,class (:background ,purple :inherit bold))))
+       `(isearch ((,class (:background ,blue-int :inherit bold))))
        `(isearch-fail ((,class (:inherit compilation-mode-line-fail))))
        `(match ((,class (:foreground ,green-dim))))
        ;; face for matches other than the current match
+       `(evil-ex-search ((,class (:background ,purple :inherit bold))))
        `(lazy-highlight ((,class (:background ,blue-int :foreground ,black-dim))))
 
        ;; delimeter colors just taken from https://github.com/gastrodia/rainbow-brackets
