@@ -7,41 +7,43 @@
 
 * Config
   :PROPERTIES:
-  :header-args+: :tangle bin/lisp/+config.el
+  :header-args+: :tangle bin/lisp/+config-default.el
   :END:
+
+  Default configuration parameters for my emacs distribution. This configuration is
+  only used when there's an error loading the actual config at =bin/lisp/+config.el=.
 
   #+BEGIN_SRC emacs-lisp
     (defvar +packages
       '(ivy                                                               ; simple and elegent completion for emacs
-        magit                                                             ; it's git... but magical ,
+        magit                                                             ; it's git... but magical  ,
 
-        ;;; Buffer Menus
+    ;;; Buffer Menus
         ;; buffer-menu                                                    ; the (default) builtin buffer menu
         ibuffer                                                           ; an improved buffer menu
 
-        ;;; LSP Clients
+    ;;; LSP Clients
         eglot                                                             ; a light weight and clean LSP client
         ;; lsp-mode                                                       ; a comprehensive and feature full client
 
-        ;;; interactive diffs
+    ;;; interactive diffs
         ;; ediff                                                          ; the builtin alternative, it has decades worth of bloat.
         vdiff                                                             ; a diff tool inspired by [[https://github.com/justbur/emacs-vdiff][vimdiff]]
 
-        ;;; misc
+    ;;; misc
         ;; adaptive-wrap                                                  ; visually wrap long lines. doesn't alter what you write.
         ;; auto-highlight-symbol                                          ; automatically highlight the symbol at point
         browser-edit                                                      ; interface emacs with [[https://www.chromium.org/][chromium]]
         ;; command-log-mode                                               ; echo commands as you enter them
         dashboard                                                         ; a feature full emacs dashboard
         ;; ebuku                                                          ; interface to the, ebuku, bookmark manager
-        ebib                                                              ; nice emacs based interface for editing bibtex files
         ;; deft                                                           ; note management system based on multiple org files
         ;; expand-region                                                  ; expand visual mode by semantic units
         ;; frog-jump-buffer                                               ; posframe to jump to a buffer
         imenu                                                             ; interactively jump to points of interest in this buffer
-        olivetti                                                          ; a nice writing environment for emacs
+        ;; olivetti                                                       ; a nice writing environment for emacs
         ;; pdf-tools                                                      ; use emacs as quick and dirty pdf viewer
-        piper                                                             ; interactive shell pipelines with emacs
+        ;; piper                                                          ; interactive shell pipelines with emacs
         ;; rainbow-mode                                                   ; highlight #HEX color strings
         ;; rake                                                           ; run rake tasks
         ;; vi-tilde-fringe                                                ; show tildes at the end of the buffer
@@ -49,8 +51,7 @@
         vterm                                                             ; a virtual terminal emulator... interfaced with emacs
         ;; ztree                                                          ; directory tree viewer, think NERDTree
 
-
-        ;;; package enhancements
+    ;;; package enhancements
         ;; counsel-world-clock                                            ; inspect the current time from ivy
         ;; diredfl                                                        ; make dired /extra/ colorful
         ;; edit-indirect                                                  ; edit regions of a buffer in another mode.
@@ -60,12 +61,14 @@
         ;; ibuffer-tramp                                                  ; filter ibuffer candidates by remote hosts
         ;; ibuffer-vc                                                     ; filter ibuffer candidates by version-control
         ;; tern                                                           ; a static code analysis engine for javascript
+        ebib                                                              ; nice emacs based interface for editing bibtex files
 
-        ;;; language-support
+    ;;; language-support
         ;; ggtags                                                         ; GNU Global source code tagging system
         ;; ycmd                                                           ; a language-server for most languages. written in python.
+        ;; robe                                                           ; code navigation, doc-lookup and completion for Ruby
 
-        ;;; Languages
+    ;;; Languages
         bibtex
         c
         ;; cmake
@@ -78,28 +81,30 @@
         ;; java
         golang
         json
-        jupyter
+        ;; jupyter
         kotlin
         glsl
         latex
         makefile
         markdown
         python
-        powershell
-        restclient
-        ;; robe
+        ;; powershell
+        ;; restclient
         ruby
-        rust
+        ;; rust
         sh-script
         ;; sql
         ssh-config
         typescript
         vimscript
         yaml
-        yarn)
-      "packages I want setup on startup.")
+        yarn
+        )
+      "Packages I want setup on startup.")
+  #+END_SRC
 
-    (provide '+config)
+  #+BEGIN_SRC emacs-lisp
+    (provide '+config-default)
   #+END_SRC
 
 * Setup
@@ -3397,7 +3402,9 @@
    load my configuration, then load any associated (and required) packages.
 
    #+BEGIN_SRC emacs-lisp
-     (require '+config nil t)
+     ;; Load local configuration or the default config.
+     (unless (require '+config nil t)
+       (require '+config-default nil t))
 
      (defvar +man-command
        (if (windows-p) 'woman 'man)
