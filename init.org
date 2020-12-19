@@ -528,7 +528,6 @@
     | ibuffer-persp       | 6395294e2dd368866d79a81d37c27961e0f871937ccd82cff317e5ad67c52652 | https://raw.githubusercontent.com/rakshasa/ibuffer-persp/master/ibuffer-persp.el          |
     | org-link-edit       | ac84061d951ef9ef82794ba7f4416afb6da4283a182490a11ae455077321814c | https://raw.githubusercontent.com/kyleam/org-link-edit/master/org-link-edit.el            |
     | org-man             | 9a98ad950304cc2f195298d8a62a668365b8aedb98cfb45b2bfdb475f51239b9 | https://raw.githubusercontent.com/aspiers/orgmode/master/contrib/lisp/org-man.el          |
-    | xterm-title         | a532c1254e9ec9642e4435faec950c4e882e59ba51b091d12d00078e6dc50b74 | http://www.splode.com/~friedman/software/emacs-lisp/src/xterm-title.el                    |
     | vline               | d2be35d52bbfddf10367e8bc2326630ae5f85e6720ec4714d715cde7904846fb | https://raw.githubusercontent.com/emacsmirror/vline/master/vline.el                       |
     | org-eldoc           | c79cba0929a6886449d39a32ef629653759d0041fe8d97f9727d8004f89b0592 | https://github.com/msnoigrs/org-mode/raw/master/contrib/lisp/org-eldoc.el                 |
 
@@ -4859,12 +4858,12 @@
            "X" 'pp-eval-expression))
 
        (with-eval-after-load 'elisp-mode
-         (leader/set-keys-for-major-mode '(emacs-lisp-mode lisp-interaction-mode)
+         (leader/set-keys-for-major-mode '(emacs-lisp-mode
+                                           lisp-interaction-mode)
            "eM" 'pp-macroexpand-expression
            "em" 'pp-macroexpand-last-sexp
            "ex" 'pp-eval-last-sexp
            "eX" 'pp-eval-expression)))
-
    #+END_SRC
 
 ** proced
@@ -16935,7 +16934,7 @@
         :when (not +lsp-command)
         :ensure t
         :defer  t
-        :after  'go-mode
+        :after  go-mode
         :init
         (add-hook 'go-guru-output-mode-hook
                   (defun go-guru-preserve-compilation-window+ ()
