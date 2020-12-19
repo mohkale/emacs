@@ -40,7 +40,7 @@
         ;; frog-jump-buffer                                               ; posframe to jump to a buffer
         imenu                                                             ; interactively jump to points of interest in this buffer
         olivetti                                                          ; a nice writing environment for emacs
-        pdf-tools                                                         ; use emacs as quick and dirty pdf viewer
+        ;; pdf-tools                                                      ; use emacs as quick and dirty pdf viewer
         piper                                                             ; interactive shell pipelines with emacs
         ;; rainbow-mode                                                   ; highlight #HEX color strings
         ;; rake                                                           ; run rake tasks
@@ -293,6 +293,11 @@
         ;;; third party
         request-storage-directory                          (var! "requests")
         ))
+   #+END_SRC
+
+   #+BEGIN_SRC emacs-lisp
+     (defvar +org-pdf-directory nil
+       "default directory for `org-pdftools-complete-link', see [[*org-pdftools][org-pdftools]].")
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
@@ -9592,30 +9597,25 @@
                 (markdown-mode . bibtex-completion-format-citation-pandoc-citeproc)
                 (default       . bibtex-completion-format-citation-default)))
 
-        (with-eval-after-load 'org-pdftools
-          (defun ivy-bibtex-insert-pdftools-link (cand)
-            (let* ((default-directory (or org-pdf-tools-pdf-directory
-                                          default-directory))
-                   (key (cdr (assoc "=key=" (cdr cand))))
-                   (pdf (car (bibtex-completion-find-pdf key bibtex-completion-find-additional-pdfs))))
-              (unless pdf
-                (user-error "bib entry with key %s doesn't have an associated pdf file" key))
+        (defun ivy-bibtex-insert-pdftools-link (cand)
+          (let* ((default-directory (or +org-pdf-directory default-directory))
+                  (key (cdr (assoc "=key=" (cdr cand))))
+                  (pdf (car (bibtex-completion-find-pdf key bibtex-completion-find-additional-pdfs))))
+            (unless pdf
+              (user-error "bib entry with key %s doesn't have an associated pdf file" key))
 
-              (setq pdf (abbreviate-file-name (expand-file-name pdf)))
+            (setq pdf (abbreviate-file-name (expand-file-name pdf)))
 
-              (insert (concat
-                       "[["
-                       (concat org-pdftools-link-prefix ":")
-                       pdf
-                       "::"
-                       (read-from-minibuffer
-                        "Page:"
-                        "1")
-                       "]["
-                       (read-string "Description: " nil nil pdf)
-                       "]]"))))
+            (insert (concat
+                      "[[pdftools:"
+                      pdf
+                      "::"
+                      (read-from-minibuffer "Page:" "1")
+                      "]["
+                      (read-string "Description: " nil nil pdf)
+                      "]]"))))
 
-          (ivy-add-actions 'ivy-bibtex '(("j" ivy-bibtex-insert-pdftools-link "Insert pdftool link")))))
+        (ivy-add-actions 'ivy-bibtex '(("j" ivy-bibtex-insert-pdftools-link "Insert pdftool link"))))
     #+END_SRC
 
 *** ivy-yasnippet
@@ -15385,36 +15385,70 @@
         (setq org-roam-server-port 8967))
     #+END_SRC
 
-*** org-pdftools
+*** org-pdf
+    Adapted from [[https://github.com/fuxialexander/org-pdftools][org-pdftools]] this adds a link type to org mode which lets you link
+    to and open PDFs. I've removed all the pdftools specific stuff so this is just a
+    generic configuration section for pdf related actions in org mode.
+
     #+BEGIN_SRC emacs-lisp
-      (use-package org-pdftools
-        :if (member 'pdf-tools +packages)
-        :defer t
-        :after org
-        :straight (org-pdftools :type git :host github
-                                :repo "fuxialexander/org-pdftools")
-        :init
-        (defvar org-pdf-tools-pdf-directory nil
-          "default directory for `org-pdftools-complete-link'.")
+      (with-eval-after-load 'org
+        (defun +org-pdf-complete-link (&optional arg)
+          "Use the existing file name completion for file.
+      Links to get the file name, then ask the user for the page number
+      and append it. ARG is passed to `org-link-complete-file'."
+          (let ((default-directory (or +org-pdf-directory default-directory)))
+            (concat
+             (replace-regexp-in-string
+              "^file:"
+              (concat "pdftools" ":")
+              (org-link-complete-file arg))
+             "::"
+             (read-from-minibuffer
+              "Page:"
+              "1"))))
 
-        (setq org-pdftools-link-prefix "pdftools")
-        (org-pdftools-setup-link)
+        (defun +org-pdf-open (link)
+          (message "%s" link)
+          (save-match-data
+            (let* ((path (when (string-match
+                                "\\(.+\\)::.+" link)
+                           (match-string 1 link))))
+              (xopen-url+ (expand-file-name path)))))
 
-        :config
-        (setq org-pdftools-open-custom-open
-              (lambda (link)
-                (message "%s" link)
-                (save-match-data
-                  (let* ((path (when (string-match
-                                      "\\(.+\\)::.+" link)
-                                 (match-string 1 link))))
-                    (xopen-url+ (expand-file-name path))))))
+        (defun +org-pdf-export (link description format)
+          "Export the pdfview LINK with DESCRIPTION for FORMAT from Org files."
+          (let* (path loc page)
+            (if (string-match "\\(.+\\)::\\(.*\\)" link)
+                (progn
+                  (setq path (match-string 1 link))
+                  (setq loc (match-string 2 link))
+                  (if (string-match "\\([0-9]+\\)++\\(.*\\)" loc)
+                      (setq page (match-string 1 loc))
+                    (setq page loc)))
+              (setq path link))
 
-        (advice-add 'org-pdftools-complete-link :around
-                    (defun org-pdftools-complete-link-set-directory+ (func &rest args)
-                      (let ((default-directory (or org-pdf-tools-pdf-directory
-                                                   default-directory)))
-                        (apply func args)))))
+            ;; `org-export-file-uri` expands the filename correctly
+            (setq path (org-export-file-uri (org-link-escape path)))
+
+            (cond ((eq format 'html)
+                   (format
+                    "<a href=\"%s#page=%s\">%s</a>"
+                    path
+                    page
+                    description))
+                  ((eq format 'latex)
+                   (format
+                    "\\href{%s}{%s}"
+                    path
+                    description))
+                  ((eq format 'ascii)
+                   (format "%s (%s)" description path))
+                  (t path))))
+
+        (org-link-set-parameters "pdftools"
+                                 :follow   #'+org-pdf-open
+                                 :complete #'+org-pdf-complete-link
+                                 :export   #'+org-pdf-export))
     #+END_SRC
 
 *** org-man
