@@ -1869,19 +1869,13 @@
    and a command ~set-indent-offset~ which automatically (or manually sets the desired
    indent).
 
-   TODO no way to set indent in a directory local way.
-
    #+BEGIN_SRC emacs-lisp
-     (use-package +core-buffers
-       :defer 5
-       :commands (set-indent-offset)
-       :init
-       (defvar +indent-config '((t . 4))
-         "alist configuring preferred indentation for buffers.
-     the car of an entry is used to match which buffer it's applied to
-     and cdr is used to determine the value of it.
+     (defvar +indent-config '((t . 4))
+       "alist configuring preferred indentation for buffers.
+     the `car' of an entry is used to match which buffer it's applied to
+     and `cdr' is used to determine the value of it.
 
-     the car can be a symbol, a string, a function or some expression
+     the `car' can be a symbol, a string, a function or some expression
      which evaluates to t. if it's a symbol, the major mode of the
      buffer is compared against it. if it's a string the name of the
      buffer is matched against it.
@@ -1893,7 +1887,73 @@
            occurs, changing the buffer name doesn't alter the indent.
      ")
 
-       (add-hook 'after-change-major-mode-hook #'set-indent-offset))
+     (defun +indent-offset (&optional buffer)
+       "Use `+indent-config' to find the preffered indent for BUFFER."
+       (with-current-buffer (or buffer (current-buffer))
+         (cl-loop with matcher = nil
+                  with indent  = nil
+                  for cfg in +indent-config
+                  do (setq matcher (car cfg))
+                  if (cond
+                      ((eq matcher t) t)
+                      ((symbolp matcher) (eq matcher major-mode))
+                      ((stringp matcher) (string-match-p matcher buffer-name))
+                      ((functionp matcher) (funcall matcher))
+                      (t (eval matcher)))
+                  do (setq indent (cdr cfg))
+                  and return (if (functionp indent)
+                                 (funcall indent)
+                               indent))))
+
+     ;; A package that lets you configure project parameters (indent size,
+     ;; line endings etc.) in a [[https://editorconfig.org/][single configuration]] file.
+     ;;
+     ;; I really only need the parsing fascilities so that I can extract the
+     ;; indent-offset but editorconfig also has a mapping of common indent
+     ;; variables defined in an alist that's bound to come in very useful
+     ;; ヽ(*´з｀*)ﾉ.
+     (use-package editorconfig
+       :ensure t
+       :config
+       (push '(plantuml-mode plantuml-indent-level) editorconfig-indentation-alist))
+
+     (defvar-local +indent nil
+       "Override the local indent for the current file.")
+
+     (defun set-indent-offset (&optional indent)
+       "set the indentation level of the current buffer.
+     this method uses `+indent-config' to determine what
+     the indentation of the current buffer should be and then sets
+     it. Also setting any mode dependent, specific indent bindings,
+     alongside it.
+
+     You can pass a specific value for the indent as an argument and
+     the current buffers indentation will be set to that."
+       ;; TODO: only use this when editorconfig-mode is disabled.
+       (interactive "Nindent: ")
+       (let* ((buffer (current-buffer))
+              (buffer-name (buffer-name buffer)))
+         (setq indent (or indent
+                          +indent
+                          ;; Extract value from editorconfig file
+                          (condition-case err
+                              (let ((num (gethash 'indent_size
+                                           (funcall editorconfig-get-properties-function))))
+                                (if (stringp num)
+                                    (string-to-number num)
+                                  num))
+                            (error nil))
+                          ;; Use the values from `+indent-config'
+                          (+indent-offset)))
+
+         (if (not indent)
+             (message "set-indent-offset: unable to determine indent for current buffer.")
+           (editorconfig-set-indentation
+             (if indent-tabs-mode "tab" "space")
+             (number-to-string indent)
+             (number-to-string indent)))))
+
+     (add-hook 'after-change-major-mode-hook #'set-indent-offset)
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp :tangle bin/lisp/core/+core-buffers.el
