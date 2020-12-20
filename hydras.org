@@ -23,7 +23,7 @@ standalone org file containing hydra definitions.
                    hydra-vlc-rc
                    hydra-winman))
     (let ((hydra-func (intern (concat (symbol-name hydra) "/body")))
-          (hydra-file (bin! "lisp/hydras"  (concat (symbol-name hydra) ".el"))))
+          (hydra-file (lisp! "hydras"  (concat (symbol-name hydra) ".el"))))
       (autoload hydra-func hydra-file nil t)))
 
   (general-define-key
@@ -53,7 +53,7 @@ standalone org file containing hydra definitions.
 #+END_SRC
 
 * text-zoom
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-text-zoom.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-text-zoom.el
 
     ;;  _            _
     ;; | |_ _____  _| |_     _______   ___  _ __ ___
@@ -75,7 +75,7 @@ standalone org file containing hydra definitions.
   #+END_SRC
 
 * window-management
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-winman.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-winman.el
 
     ;;           _           _
     ;; __      _(_)_ __   __| | _____      __     _ __ ___   __ _ _ __   __ _  __ _  ___ _ __
@@ -156,7 +156,7 @@ standalone org file containing hydra definitions.
   #+END_SRC
 
 * eyebrowse
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-eyebrowse.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-eyebrowse.el
 
     (require 'eyebrowse)
 
@@ -291,7 +291,7 @@ standalone org file containing hydra definitions.
 * emacs-ipython-notebook
   sourced from [[https://github.com/syl20bnr/spacemacs/blob/master/layers/%252Blang/ipython-notebook/packages.el][here]].
 
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-ein.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-ein.el
     (defhydra hydra-ein (:hint nil)
             "
      Operations on Cells^^^^^^            On Worksheets^^^^              Other
@@ -348,7 +348,7 @@ standalone org file containing hydra definitions.
   #+END_SRC
 
 * persp-mode
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-persp.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-persp.el
     (require 'persp-mode)
 
     (defhydra hydra-persp (:hint nil)
@@ -475,7 +475,7 @@ standalone org file containing hydra definitions.
   #+END_SRC
 
 * flycheck
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-flycheck.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-flycheck.el
     ;; source https://github.com/abo-abo/hydra/wiki/Flycheck
 
     (defhydra hydra-flycheck
@@ -494,7 +494,7 @@ standalone org file containing hydra definitions.
   #+END_SRC
 
 * ibuffer
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-ibuffer.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-ibuffer.el
     ;; source: https://github.com/abo-abo/hydra/wiki/Ibuffer
 
     (defhydra hydra-ibuffer-main (:color pink :hint nil)
@@ -599,7 +599,7 @@ standalone org file containing hydra definitions.
 * ivy
   the actual ivy hydra has trailing whitespace and is inseperably tied to C-o for both entry and exit, despite me not liking the former and changing the latter. This is my variant, much of the same functionality, just different display.
 
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-ivy-custom.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-ivy-custom.el
     (require 'ivy-hydra)
 
     (defhydra hydra-ivy (:foreign-keys run :hint nil)
@@ -696,7 +696,7 @@ standalone org file containing hydra definitions.
 ** agenda
    sourced from [[https://github.com/abo-abo/hydra/wiki/Org-agenda][here]]
 
-   #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-org-agenda.el
+   #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-org-agenda.el
     (defhydra hydra-org-agenda (:pre  (setq which-key-inhibit t)
                                 :post (setq which-key-inhibit nil)
                                 :hint none
@@ -781,7 +781,7 @@ standalone org file containing hydra definitions.
 ** clock & timers
    sourced from [[https://github.com/abo-abo/hydra/wiki/Org-clock-and-timers][here]].
 
-   #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-org-clock.el
+   #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-org-clock.el
     (defhydra hydra-org-clock (:color blue :hint nil)
       "
     ^Clock:^ ^In/out^     ^Edit^   ^Summary^    | ^Timers:^ ^Run^           ^Insert
@@ -816,7 +816,7 @@ standalone org file containing hydra definitions.
 ** links
    sourced from [[https://github.com/abo-abo/hydra/wiki/Org-mode-links][here]].
 
-   #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-org-link.el
+   #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-org-link.el
      (require 'org-link-edit)
 
      (defun org-link-unlinkify ()
@@ -848,7 +848,7 @@ standalone org file containing hydra definitions.
    #+END_SRC
 
 ** navigation
-   #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-org-navigate.el
+   #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-org-navigate.el
     (defun hydra-org-navigate--end-of-current-branch ()
       (interactive)
       (let ((last-point (point))
@@ -941,10 +941,8 @@ standalone org file containing hydra definitions.
    #+END_SRC
 
 * vlc-rc
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-vlc-rc.el
-    (require 'vlc-rc)
-
-    ;; NOTE comments with @ means add current value indicator
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-vlc-rc.el
+    ;; NOTE: comments with @ means add current value indicator
 
     (defhydra hydra-vlc-rc (:hint nil)
       "
@@ -1003,7 +1001,7 @@ standalone org file containing hydra definitions.
 
 
 * visual-move
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-visual-move.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-visual-move.el
     (defhydra hydra-visual-move (:foreign-keys run)
       ("gj" evil-next-line "next-line")
       ("gk" evil-previous-line "prev-line")
@@ -1013,7 +1011,7 @@ standalone org file containing hydra definitions.
   #+END_SRC
 
 * indentation
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-indent.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-indent.el
     (defmacro hydra-indent--keep-visual-state-active (&rest body)
       "when body is invoked with evil-visual, restore the state after body"
       `(let ((visual-active (evil-visual-state-p)))
@@ -1121,13 +1119,13 @@ standalone org file containing hydra definitions.
     (general-define-key
       :keymaps 'hydra-indent/keymap
       ;; that's scroll-up silly?
-      ("C-u" . nil)
-      (">" . hydra-indent/lambda-L)
-      ("<" . hydra-indent/lambda-H))
+      "C-u" nil
+      ">" 'hydra-indent/lambda-L
+      "<" 'hydra-indent/lambda-H)
   #+END_SRC
 
 * vdiff
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-vdiff.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-vdiff.el
     (defhydra vdiff-toggle-hydra (nil nil :hint nil)
       "
     Toggles
@@ -1174,7 +1172,7 @@ standalone org file containing hydra definitions.
   #+END_SRC
 
 * iedit
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-evil-multiedit.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-evil-multiedit.el
     (defhydra hydra-evil-multiedit ()
       ("k" evil-multiedit-next "next")
       ("j" evil-multiedit-prev "prev")
@@ -1187,7 +1185,7 @@ standalone org file containing hydra definitions.
   #+END_SRC
 
 * flyspell
-  #+BEGIN_SRC emacs-lisp :tangle bin/lisp/hydras/hydra-flyspell.el
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-flyspell.el
     (defhydra hydra-flyspell (nil nil :hint nil :foreign-keys run)
       "
     | ^M^ove       | ^R^echeck   | ^C^orrect      |

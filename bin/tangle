@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+# TODO: Minimise file system lookups.
 
 require 'rake'
 require 'logger'
@@ -43,17 +44,19 @@ end
 
 options = {
   file: 'init.org',
+  init_file: Dir.pwd + '/init.el',
+  compile: true,
 }
 
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: tangle [options]"
 
-  opts.on('-f', '--file=FILE', 'tangle FILE')
-  opts.on('-l', '--logfile=FILE', 'log to FILE. defaults to null or STDERR') do |file|
+  opts.on('-f', '--file=FILE', 'Tangle FILE')
+  opts.on('-l', '--logfile=FILE', 'Log to FILE, defaults to null or STDERR') do |file|
     file == '-' ? STDERR : File.open(file, 'a')
   end
 
-  opts.on('-d', '--dependency=FILE', 'add FILE as a tangle dependency') do |file|
+  opts.on('-d', '--dependency=FILE', 'Add FILE as a tangle dependency') do |file|
     if options[:dependency]
       [*options[:dependency], File.expand_path(file)]
     else
@@ -61,10 +64,11 @@ parser = OptionParser.new do |opts|
     end
   end
 
-  opts.on('-i', '--[no-]interactive', 'force treatment of STDOUT as terminal or not.')
+  opts.on('-i', '--[no-]interactive', 'Force treatment of STDOUT as terminal or not')
+  opts.on('-c', '--[no-]compile', 'Force byte-compilation of tangled elisp files')
 
-  opts.on('-v', '--[no-]verbose', 'raise verbosity of program output')
-  opts.on("-h", "--help", "print this help message") { puts opts; exit 0 }
+  opts.on('-v', '--[no-]verbose', 'Raise verbosity of program output')
+  opts.on("-h", "--help", "Print this help message") { puts opts; exit 0 }
 end.parse!(into: options)
 
 # force interactive execution
@@ -242,19 +246,29 @@ def tangle_targets(file)
   tangle_targets.uniq.map { |tar| File.join(default_dir, tar) }
 end
 
-def targets_uptodate(source, targets)
-  uptodate = true
+TargetDateStatus = Struct.new(:tangled, :compiled)
 
-  targets.each do |target|
-    logger.debug("found tangle target: #{target}")
-    unless FileUtils.uptodate?(target, [source])
-      logger.info("file #{target} is out of date")
-      uptodate = false
-      # break
+def compile_uptodate(file)
+  file.end_with?('.el') &&
+    !File.basename(file).start_with?('.') &&
+    !FileUtils.uptodate?(file[...-3]+'.elc', [file])
+end
+
+def targets_uptodate(source, targets, check_compiled=false)
+  TargetDateStatus.new(true, true).tap do |res|
+    targets.each do |target|
+      logger.debug("Found tangle target: #{target}")
+      logger.info "Comparing #{target} with #{source}"
+      if !FileUtils.uptodate?(target, [source]) &&
+        logger.info("File #{target} is out of date")
+        res.tangled = false
+        res.compiled = false
+      elsif compile_uptodate(target)
+        logger.info("File #{target[...-3]+'.elc'} is out of date")
+        res.compiled = false
+      end
     end
   end
-
-  uptodate
 end
 
 def _tangle_args(file)
@@ -265,10 +279,8 @@ def _tangle_args(file)
 
     "bash", "-c", [
       "yes", "yes", "|", "emacs", "--batch",
-      "--eval", "'(require (quote ob-tangle))'",
-      "--eval", "'(org-babel-tangle-file \"%s\")'" % [
-        Shellwords.escape(file)
-      ],
+      "--eval", Shellwords.escape("(require (quote ob-tangle))"),
+      "--eval", Shellwords.escape("(org-babel-tangle-file \"#{file}\")"),
       "2>&1"
     ].join(" ")
   ]
@@ -283,43 +295,116 @@ def tangle_file(file, opts={})
   $?.success?
 end
 
+def _compile_args(init_file, files)
+  [
+    "bash", "-c", [
+      "yes", "yes", "|", "emacs", "--batch",
+      "--eval", Shellwords.escape("(load \"#{init_file}\")"),
+      # I've tried literally everything I can think of but I can't figure out a way
+      # to make emacs fail when a compilation has an error :/.
+      # "--eval", Shellwords.escape("(progn (defvar tangle-byte-compile-failed nil)
+      #                                     (advice-add #'byte-compile-file :after
+      #                                                 (defun +finish (&rest _)
+      #                                                   (with-current-buffer \"*Compile-Log*\"
+      #                                                     (when (> compilation-num-errors-found 0)
+      #                                                       (setq tangle-byte-compile-failed t))))))"),
+      files.reduce("") do |sum, file|
+        sum + '--eval ' + Shellwords.escape("(byte-compile-file \"#{file}\")") + " "
+      end,
+      # # make sure emacs has a non-0 exit code when ANY of the compiled files weren't compiled'
+      # '--eval ' + Shellwords.escape("(and tangle-byte-compile-failed (kill-emacs 1))"),
+      "2>&1"
+    ].join(" ")
+  ]
+end
+
+def compile_files(init_file, files, opts={})
+  stream = opts[:indicator] ? devnull : STDOUT
+  cmd = _compile_args(init_file, files)
+  IO.popen(cmd, "w+", :external_encoding=>"utf-8") do |io|
+    io.each_line { |line| stream.puts line }
+  end
+
+  $?.success?
+end
+
 exit_code = 0
 
 Indicator.new(options).wrap do |i|
-  i.message = "checking source file: #{display_file}"
+  i.message = "Checking source file: #{display_file}"
 
   unless File.exist? options[:file]
     i.state = Indicator::FAILED
-    i.message = "failed to find source file: #{display_file}"
+    i.message = "Failed to find source file: #{display_file}"
     exit_code = 1
     return
   end
 
   Dir.chdir File.dirname(options[:file])
 
-  i.message = "checking tangle targets"
-  all_uptodate = options[:files].reduce(true) do |acc, file|
-    acc && targets_uptodate(file, tangle_targets(file))
+  i.state = Indicator::DOING
+  i.message = "Checking tangle targets"
+  targets = []
+  all_uptodate = options[:files].reduce(TargetDateStatus.new(true, true)) do |acc, file|
+    file_targets = tangle_targets(file)
+    targets += file_targets
+    current = targets_uptodate(file, file_targets, options[:compile])
+    acc.compiled &&= current.compiled
+    acc.tangled &&= current.tangled
+    acc
   end
 
-  if all_uptodate
+  if all_uptodate.tangled && all_uptodate.compiled
     i.state = Indicator::OK
-    i.message = "all tangle targets are up to date"
+    i.message = "Everything up to date"
     return
+  end
+
+  if !all_uptodate.tangled
+    i.state = Indicator::DOING
+    i.message = "Tangling file: #{display_file}"
+
+    if !tangle_file(options[:file], options)
+      i.state = Indicator::FAILED
+      i.message = "Failed to tangle file: #{display_file}"
+      exit_code = 1
+      return
+    end
+  end
+
+  if !all_uptodate.compiled && options[:compile]
+    i.state = Indicator::DOING
+    i.message = "Byte-compiling files"
+    lisp_targets = targets.filter { |path| path.end_with? '.el' }
+                     .filter(&(method :compile_uptodate))
+    if lisp_targets.length > 0 &&
+       !compile_files(options[:init_file], lisp_targets, options)
+      i.state = Indicator::FAILED
+      i.message = "Failed to byte-compile files"
+      exit_code = 1
+      return
+    end
   end
 
   i.state = Indicator::DOING
-  i.message = "tangling file: #{display_file}"
-
-  if !tangle_file(options[:file], options)
-    i.state = Indicator::FAILED
-    i.message = "failed to tangle file: #{display_file}"
-    exit_code = 1
-    return
+  i.message = "Double checking everything is upto date"
+  all_uptodate = options[:files].each do |file|
+    current = targets_uptodate(file, tangle_targets(file), options[:compile])
+    if !current.tangled
+      i.state = Indicator::FAILED
+      i.message = "Tangle targets missing"
+      exit_code = 1
+      return
+    elsif options[:compile] && !current.compiled
+      i.state = Indicator::FAILED
+      i.message = "Compile targets missing"
+      exit_code = 1
+      return
+    end
   end
 
   i.state = Indicator::DONE
-  i.message = "tangled #{display_file}"
+  i.message = "Tangled " + (options[:compile] ? "and compiled " : '') + display_file
 end
 
 logger.close
