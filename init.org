@@ -763,6 +763,7 @@
                                               ".sub"
                                               ".srt"
                                               ".ass"
+                                              ".elc"
                                               (and "tmp." (+ (not (any "/" "\\")))))
                                           eol)))))
    #+END_SRC
@@ -1785,42 +1786,35 @@
             ((derived-mode-p 'dired-mode)
              (string-trim-right (dired-current-directory) "/")))))
 
-     (defun show-and-copy-buffer-file-basename (&optional prefix)
-       (interactive "P")
-       (let ((bufname (file-name-nondirectory (or (smart-buffer-file-name) ""))))
-         (when (consp prefix)
-           (if (eq (car prefix) 4)
-               (insert bufname)
-             (save-excursion
-               (insert bufname))))
-         (message bufname)
-         (kill-new bufname)))
+     (defmacro defun-show-and-copy-command (name &rest body)
+       "Define a function which uses BODY to generate a string which is then shown and copied.
+     The prefix behaviour of the passed function can be used insert the output of BODY or
+     to save the current point and then do so.
+     "
+       `(defun ,(intern (concat "show-and-copy-" (symbol-name name))) (&optional arg)
+          (interactive "P")
+          (let ((msg ,@body))
+            (when msg
+              (or (stringp msg)
+                  (setq msg (format "%s" msg)))                                      ; Force msg to be a string
+              ;; perform insertion behaviour
+              (when (consp arg)
+                (if (eq (car prefix) 4)
+                    (insert msg)
+                  (save-excursion
+                    (insert msg))))
+              ;; show and then copy msg
+              (message msg)
+              (kill-new msg)))))
 
-     (defun show-and-copy-buffer-file-name (&optional prefix)
-       "Displays the current buffers name in the echo area & yanks it
-     when a prefix arg is given, the buffer name is also inserted into
-     the buffer. When a double prefix arg is given, the filename is
-     inserted but the point is not moved. With a positive numerical
-     prefix greater than 0, that many parent directories will be
-     navigated to before yanking."
-       (interactive "P")
-       (let ((bufname (or (smart-buffer-file-name) "")))
-         (cond
-          ((consp prefix)
-           (if (eq (car prefix) 4)
-               (insert bufname)
-             (save-excursion
-               (insert bufname))))
-          (prefix
-           (while (and (> prefix 0)
-                       bufname)
-             (setq bufname (string-trim-right (file-name-directory bufname) "/")
-                   prefix  (- prefix 1)))
+     (defun-show-and-copy-command buffer-file-basename
+       (file-name-nondirectory (or (smart-buffer-file-name) "")))
 
-           (or bufname (setq bufname ""))))
+     (defun-show-and-copy-command buffer-file-name
+       (smart-buffer-file-name))
 
-         (message bufname)
-         (kill-new bufname)))
+     (defun-show-and-copy-command directory
+       (file-name-directory (or (smart-buffer-file-name) default-directory)))
 
      (cl-defun write-backup (&optional prefix (silent t))
        "manually force emacs to backup the current buffer.
@@ -1869,6 +1863,7 @@
      (leader/set-keys
        "f~" 'write-backup
        "fa" 'write-autosave
+       "fd" 'show-and-copy-directory
        "fD" 'delete-buffer-file
        "fR" 'rename-buffer-file
        "fy" 'show-and-copy-buffer-file-name
@@ -3713,11 +3708,12 @@
                       (and ".o" eol)
                       (and "node_modules")
                       (and ".git" (zero-or-one "/") eol)
+                      (and ".elc" eol)
                       (and ".bundle/")
                       (and (any ?. ?-) "lock" (zero-or-one ".json") eol))))
 
         (leader/set-keys
-          "r"  "register/rings/resume"
+          "r"  "register/rings"
           "fs" "recursive-find")
 
         (leader/set-keys-for-major-mode 'org-mode
@@ -3756,7 +3752,7 @@
           "rf" 'counsel-file-registers
           "ar" 'counsel-load-library
           "al" 'counsel-find-library
-          "bO" 'counsel-outline
+          "jO" 'counsel-outline
 
           "ff" 'counsel-find-file
           "fb" 'counsel-bookmark
@@ -4112,6 +4108,7 @@
         :after counsel
         :init
         (leader/set-keys
+          "T" "tags"
           "Tg" 'counsel-gtags-find-definition
           "TG" 'counsel-gtags-find-reference
           "Ts" 'counsel-gtags-find-symbol
@@ -14109,6 +14106,7 @@
         :init
         (add-hook 'emacs-lisp-mode-hook #'electric-pair-mode)
 
+        (leader/set-keys "fk" 'emacs-lisp-byte-compile)
         (leader/with-prefix "k"
           (leader/set-keys
             "e" 'eval-last-sexp
