@@ -117,6 +117,9 @@
     (defvar +c-prefer-clangd t
       "When true lsp and c will use clangd over ccls")
 
+    (defvar +icons-available t
+      "When true `all-the-icons' will be available even in terminal emacs.")
+
     (provide '+config-default)
   #+END_SRC
 
@@ -1615,6 +1618,7 @@
      (defvar +sh-use-lsp)
      (defvar +man-command)
      (defvar +c-prefer-clangd)
+     (defvar +icons-available)
 
      ;; Load local configuration or the default config.
      (unless (require '+config nil t)
@@ -3235,7 +3239,7 @@
                    (prog1 icon
                      ;; see https://github.com/domtronn/all-the-icons.el/issues/131
                      (add-face-text-property 0 (length icon) :inherit t icon))
-                 (propertize icon
+                 (propertize (concat icon (unless (display-graphic-p)  " "))
                              ;; 'display '(raise 0.1)
                              'mouse-face 'mode-line-highlight
                              'face (list :family (or
@@ -3291,50 +3295,47 @@
         :enabled t)
 
       ;; see for eg segments: [[https://github.com/domtronn/all-the-icons.el/wiki/Spaceline]]
-      (defalias 'all-the-icons-available-p #'display-graphic-p
-        "whether your current frame has access to emacs icons.")
-
       (spaceline-define-segment minibuffer-active
         "show a stop symbol if minibuffer is active"
-        (spaceline-icon faicon "minus-circle" :v-adjust 0.00)
-        :when (and (all-the-icons-available-p)
+        (spaceline-icon faicon "dot-circle-o" :v-adjust 0.00)
+        :when (and +icons-available
                    (active-minibuffer-window)))
 
-      (defvar spaceline-major-mode-icon--skip-modes nil
+      (defvar spaceline-major-mode-icon-modes '(org-mode
+                                                lisp-interaction-mode
+                                                emacs-lisp-mode
+                                                magit-diff-mode
+                                                powershell-mode
+                                                kotlin-mode
+                                                makefile-mode)
         "don't show the icon for modes in this list")
 
       (spaceline-define-segment buffer-mode-icon
         "an `all-the-icons' segment to show the mode of the current buffer"
-        (unless (member major-mode spaceline-major-mode-icon--skip-modes)
-          (spaceline-prepared-icon #'all-the-icons-icon-for-mode major-mode
-            :v-adjust -0.15))
-        :enabled (all-the-icons-available-p))
+        (spaceline-prepared-icon #'all-the-icons-icon-for-mode major-mode
+          :v-adjust -0.15)
+        :when (or (display-graphic-p)
+                  (member major-mode spaceline-major-mode-icon-modes))
+        :enabled +icons-available)
 
       (spaceline-define-segment version-control-type-icon
         (let (func icon)
           (cond ((string-match "Git[:-]" vc-mode)
-                 (setq func #'all-the-icons-alltheicon
-                       icon "git"))
+                 (setq func #'all-the-icons-faicon
+                       icon "github-alt"))
                 ((string-match "SVN-" vc-mode)
-                 (setq func #'all-the-icons-material
-                       icon "cloud_download")))
+                 (setq func #'all-the-icons-faicon
+                       icon "svn")))
           (when (and func icon)
             (spaceline-prepared-icon func icon)))
-        :when (and vc-mode (all-the-icons-available-p)))
+        :when (and vc-mode +icons-available))
 
       (defun spaceline-vc-git-status+ ()
         "Get the formatted GIT Version Control Icon based on variable `vc-mode'."
         (let* ((branch (cadr (split-string vc-mode "Git[:-]")))
-               (git-branch (spaceline-icon octicon
-                                            (if (string= branch "master")
-                                                "git-merge"
-                                              "git-branch")))
                (local-map (get-text-property 1 'local-map branch)))
           (propertize
            (concat
-            (when git-branch
-              (propertize git-branch 'display '(raise 0.1)))
-            " "
             (propertize branch 'display '(raise 0.1) 'face `(:inherit)))
            'mouse-face 'mode-line-highlight
            'local-map local-map)))
@@ -3354,7 +3355,7 @@
                (spaceline-vc-git-status+))
               ((string-match "SVN-" vc-mode)
                (spaceline-vc-svn-status+)))
-        :when (and active vc-mode (all-the-icons-available-p)))
+        :when (and active vc-mode +icons-available))
     #+END_SRC
 
 *** format
@@ -3390,7 +3391,7 @@
           ;; (mu4e-alert-segment :when active)
           ;; (erc-track :when active)
           ((version-control-type-icon
-            ;; version-control-status
+            version-control-status
             )
            :fallback version-control
            :priority 78)
@@ -3398,7 +3399,8 @@
           (org-clock :when active))
 
         ;; Right
-        '(which-function
+        '(projectile-root
+          which-function
           (python-pyvenv
            :fallback python-pyenv)
           (purpose :priority 94)
@@ -10290,7 +10292,7 @@
         ;; :hook (ibuffer-mode . ibuffer-projectile-mode)
         :config
         (setq ibuffer-projectile-prefix
-              (if (all-the-icons-available-p)
+              (if +icons-available
                   (concat
                    (all-the-icons-octicon "file-directory"
                                           :face ibuffer-filter-group-name-face
