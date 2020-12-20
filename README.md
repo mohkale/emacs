@@ -57,4 +57,11 @@ Some **cool** features include:
     </a>
     <p align="center"><b>ivy</b></p>
   </div>
+
+  <div>
+    <a href="./.github/rust.png" target="_blank">
+      <img alt="rust" src="./.github/rust.png" title="rust" />
+    </a>
+    <p align="center"><b>rust</b></p>
+  </div>
 </div>
