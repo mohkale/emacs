@@ -3858,7 +3858,25 @@
         (general-define-key
           :keymaps 'counsel-describe-map
           "C-."   'hydra-ivy/body
-          "C-S-." 'counsel-find-symbol))
+          "C-S-." 'counsel-find-symbol)
+
+        (advice-add 'counsel-ag :filter-args
+          (defun +counsel-ag--avoid-git-root (args)
+            "By default `counsel-ag' and it's variants (eg. `counsel-rg') uses in order:
+      - the passed in directory
+      - the current git root
+      - the cwd
+       as the `default-directory' for the subcommand. This makes things
+      confusing when you're cwd is in .gitignore and trying to search for
+      files in there never comes up with any results.
+
+      I'd prefer if rg worked the same in emacs as it would in the terminal
+      (within reason) so here we check if a directory is passed and if not
+      replace it with the cwd. "
+            (unless (or (>= (prefix-numeric-value current-prefix-arg) 4)
+                        (nth 2 args))
+              (setcar (nthcdr 1 args) default-directory))
+            args)))
     #+END_SRC
 
 *** swiper
