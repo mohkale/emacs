@@ -3582,11 +3582,11 @@
     #+BEGIN_SRC emacs-lisp
       (use-package ivy
         :straight t
-        :defer    nil
+        :defer    t
+        :diminish ivy-mode
         :commands (ivy-toggle-mark)
+        :hook (emacs-startup . ivy-mode)
         :config
-        (ivy-mode +1)
-
         (with-eval-after-load 'magit
           (setq magit-completing-read-function 'ivy-completing-read))
 
@@ -3818,13 +3818,32 @@
           "q" nil))
     #+END_SRC
 
+**** flx
+     optimizes ivy search ordering for fuzzy searches.
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package flx
+         :ensure t
+         :defer  t)
+     #+END_SRC
+
+**** smex
+     show recently accessed commands at the top of M-x.
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package smex
+         :ensure t
+         :defer  t
+         :config
+         (setq smex-save-file (var! "smex-save.el")))
+     #+END_SRC
+
 *** ivy-avy
     #+BEGIN_SRC emacs-lisp
       (use-package ivy-avy
         :ensure t
         :defer  t
         :after  ivy
-        :commands (ivy-avy)
         :init
         (general-define-key
          :keymaps 'ivy-minibuffer-map
@@ -3838,7 +3857,6 @@
       (use-package ivy-hydra
         :ensure t
         :defer  t
-        :after  ivy
         :commands hydra-ivy/body
         :init
         (general-define-key
@@ -3850,144 +3868,168 @@
           (autoload-do-load (symbol-function 'hydra-ivy-custom/body))))
     #+END_SRC
 
-*** counsel
-    a bunch of really useful functions to go alongside ivy.
-
+*** ivy-xref
     #+BEGIN_SRC emacs-lisp
-      (use-package counsel
+      (use-package ivy-xref
         :ensure t
         :defer  t
-        :after  ivy
-        :diminish
+        :after  (ivy xref)
         :init
-        (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
-        (fset 'describe-bindings (symbol-function 'counsel-descbinds))
-
-        (setq counsel-find-file-ignore-regexp
-              (rx (or (and ".#" (one-or-more any))
-                      (and bol "flycheck_")
-                      (and ".class" eol)
-                      (and ".o" eol)
-                      (and "node_modules")
-                      (and ".git" (zero-or-one "/") eol)
-                      (and ".elc" eol)
-                      (and ".bundle/")
-                      (and (any ?. ?-) "lock" (zero-or-one ".json") eol))))
-
-        (leader/set-keys
-          "r"  "register/rings"
-          "fs" "recursive-find")
-
-        (leader/set-keys-for-major-mode 'org-mode
-          "g" 'counsel-org-goto
-          "G" 'counsel-org-goto-all)
-
-        (general-define-key
-          :keymaps 'emacs-window-map
-          "x" 'counsel-wmctrl
-          "C-x" 'counsel-wmctrl)
-
-        (general-define-key
-          :keymaps 'ivy-mode-map
-          [remap org-capture] 'counsel-org-capture)
-
-        (with-eval-after-load 'org
-          (leader/set-keys
-            "oh" '("org-headlines" . counsel-org-agenda-headlines)))
-
-        (with-eval-after-load 'company
-          (setq company-menu-bindings+
-                (append company-menu-bindings+
-                        '("C-:" counsel-company))))
-
-        (leader/set-keys
-          "ae" 'counsel-package
-          "af" 'counsel-faces
-          "ee" 'counsel-compilation-errors
-          "ic" 'counsel-unicode-char
-          "ie" 'counsel-org-entity
-          "Mm" 'counsel-major
-
-          "eg" 'counsel-flycheck
-          "ry" 'counsel-yank-pop
-          "rm" 'counsel-mark-ring
-          "r'" 'counsel-evil-marks
-          "rr" 'counsel-register
-          "re" 'counsel-evil-registers
-          "rf" 'counsel-file-registers
-          "ar" 'counsel-load-library
-          "al" 'counsel-find-library
-          "jO" 'counsel-outline
-
-          "ff" 'counsel-find-file
-          "fb" 'counsel-bookmark
-          "fr" 'counsel-recentf
-          "fsf" 'counsel-file-jump
-          "fsd" 'counsel-dired-jump
-          "fsz" 'counsel-fzf
-
-          "ci" 'counsel-compile
-
-          "sb" 'counsel-grep
-          ;; recursive searches
-          "sv" 'counsel-git-grep
-          "sp" 'counsel-pt
-          "sa" 'counsel-ag
-          "sr" 'counsel-rg
-
-          ;; "bb" 'counsel-buffer-or-recentf ;; WARN only file buffers
-          "bb" 'counsel-switch-buffer
-          "hdf" 'counsel-describe-function
-          "hdx" 'counsel-fonts
-          "hdv" 'counsel-describe-variable
-          "hdB" 'describe-bindings-buffer)
-
-        (general-define-key
-          "C-M-y" 'counsel-yank-pop)
+        (when (emacs>= "27")
+          (setq xref-show-definitions-function #'ivy-xref-show-defs))
+        (setq xref-show-xrefs-function #'ivy-xref-show-xrefs)
 
         :config
-        (advice-add 'counsel-locate-action-extern :override #'xopen-url+)
+        (remove-hook 'xref-after-jump-hook 'recenter)
 
-        (setq ivy-initial-inputs-alist ivy-default-initial-inputs-alist+
-              counsel-find-file-occur-use-find t
-              counsel-evil-registers-height ivy-height)
+        (defun ivy-xref-call-or-done ()
+          (interactive)
+          (let (orig-point orig-buffer
+                           new-point new-buffer)
+            (with-ivy-window
+              (setq orig-point  (point)
+                    orig-buffer (current-buffer)))
 
-        (when (windows-p)
-          (setq counsel-rg-base-command "rg --with-filename --no-heading --line-number --path-separator // --color never %s ."))
+            (ivy-call)
 
-        (counsel-mode +1)
+            (with-ivy-window
+              (setq new-point  (point)
+                    new-buffer (current-buffer)))
 
-        (ivy-set-actions 'counsel-fonts
-                         '(("o" describe-font "describe")))
+            (when (and (eq new-point  orig-point)
+                       (eq new-buffer orig-buffer))
+              (ivy-done))))
 
-        (ivy-configure 'counsel-evil-registers :height ivy-height)
+        (defun ivy-xref-forward-char-or-call-or-done ()
+          (interactive)
+          (call-interactively (if (eolp)
+                                  'ivy-xref-call-or-done
+                                'forward-char)))
 
-        (general-unbind
-          :keymaps 'counsel-find-file-map
-          "C-DEL" "<C-backspace>")
+        (defvar ivy-xref-map
+          (let ((map (make-sparse-keymap)))
+            (set-keymap-parent map ivy-minibuffer-map)
+            map)
+          "map for use with ivy-xref.")
+
+        (general-def ivy-xref-map
+          "C-l" #'ivy-xref-forward-char-or-call-or-done
+          "M-l" #'ivy-call-and-recenter)
+
+        (advice-add 'ivy-xref-show-xrefs :around
+                    (defun ivy-xref-use-xref-map (func &rest args)
+                      (let ((ivy-minibuffer-map ivy-xref-map))
+                        (apply func args)))))
+    #+END_SRC
+
+*** ivy-bibtex
+    Also installs bibtex-completion.
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package ivy-bibtex
+        :ensure t
+        :defer  t
+        :only (package! bibtex)
+        :init
+        (leader/set-keys
+          "ob" 'ivy-bibtex)
+
+        (with-eval-after-load 'org
+          (leader/set-keys-for-major-mode 'org-mode "[" 'ivy-bibtex))
+
+        (with-eval-after-load 'bibtex
+          (setq
+           bibtex-completion-bibliography bibtex-files
+           bibtex-completion-library-path (list
+                                           (org! "docs/")
+                                           (org! "docs/unidocs/"))
+           bibtex-completion-notes-path (org! "notes"))
+
+          (mkdir bibtex-completion-notes-path t))
+
+        (when (package! ebib)
+          (with-eval-after-load 'ebib
+            (setq ebib-notes-directory (org! "notes"))))
+
+        :config
+        (setq bibtex-completion-pdf-extension '(".pdf" ".epub" ".pptx" ".doc" ".docx")
+              bibtex-completion-pdf-open-function 'xopen-url+)
+
+        (defun bibtex-completion-format-citation-org-mode-cite+ (keys)
+          "Format cite references for keys in KEYS for `org-mode'."
+          (s-join ", " (--map (format "cite:%s" it) keys)))
+
+        (setq bibtex-completion-format-citation-functions
+              '((org-mode      . bibtex-completion-format-citation-org-mode-cite+)
+                (latex-mode    . bibtex-completion-format-citation-cite)
+                (markdown-mode . bibtex-completion-format-citation-pandoc-citeproc)
+                (default       . bibtex-completion-format-citation-default)))
+
+        (defun ivy-bibtex-insert-pdftools-link (cand)
+          (let* ((default-directory (or +org-pdf-directory default-directory))
+                  (key (cdr (assoc "=key=" (cdr cand))))
+                  (pdf (car (bibtex-completion-find-pdf key bibtex-completion-find-additional-pdfs))))
+            (unless pdf
+              (user-error "bib entry with key %s doesn't have an associated pdf file" key))
+
+            (setq pdf (abbreviate-file-name (expand-file-name pdf)))
+
+            (insert (concat
+                      "[[pdftools:"
+                      pdf
+                      "::"
+                      (read-from-minibuffer "Page:" "1")
+                      "]["
+                      (read-string "Description: " nil nil pdf)
+                      "]]"))))
+        (setq ivy-bibtex-default-action #'ivy-bibtex-insert-pdftools-link)
+        (ivy-add-actions 'ivy-bibtex '(("j" ivy-bibtex-insert-pdftools-link "Insert pdftool link"))))
+    #+END_SRC
+
+*** ivy-yasnippet
+    Use ivy to select a snippet candidate.
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package ivy-yasnippet
+        :ensure t
+        :defer  t
+        :init
+        (leader/set-keys
+          "is" 'ivy-yasnippet)
 
         (general-define-key
-          :keymaps 'counsel-describe-map
-          "C-."   'hydra-ivy/body
-          "C-S-." 'counsel-find-symbol)
+          :states 'insert
+          "C-M-i" 'ivy-yasnippet))
+    #+END_SRC
 
-        (advice-add 'counsel-ag :filter-args
-          (defun +counsel-ag--avoid-git-root (args)
-            "By default `counsel-ag' and it's variants (eg. `counsel-rg') uses in order:
-      - the passed in directory
-      - the current git root
-      - the cwd
-       as the `default-directory' for the subcommand. This makes things
-      confusing when you're cwd is in .gitignore and trying to search for
-      files in there never comes up with any results.
+*** ivy-lsp
+    #+BEGIN_SRC emacs-lisp
+      (use-package lsp-ivy
+        :ensure t
+        :defer  t
+        :after (:any eglot lsp-mode)
+        :init
+        (leader/set-keys-for-mode '(lsp-mode eglot--managed-mode)
+          "jy" 'lsp-ivy-workspace-symbol
+          "jY" 'lsp-ivy-global-workspace-symbol))
+    #+END_SRC
 
-      I'd prefer if rg worked the same in emacs as it would in the terminal
-      (within reason) so here we check if a directory is passed and if not
-      replace it with the cwd. "
-            (unless (or (>= (prefix-numeric-value current-prefix-arg) 4)
-                        (nth 2 args))
-              (setcar (nthcdr 1 args) default-directory))
-            args)))
+*** ivy-flyspell
+    use ivy to correct mispelled words (through flyspell).
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package flyspell-correct-ivy
+        :ensure t
+        :defer  t
+        :after  flyspell
+        :init
+        ;; NOTE wrapper works backwards through the buffer by default.
+        ;;      pass a two prefix args to check forward.
+        (setq flyspell-correct-interface #'flyspell-correct-ivy)
+
+        (leader/with-prefix leader-minor-mode-leader-prefix
+          (leader/set-keys-for-mode 'flyspell-mode
+            leader-minor-mode-leader-prefix 'flyspell-correct-wrapper)))
     #+END_SRC
 
 *** swiper
@@ -3997,7 +4039,6 @@
       (use-package swiper
         :ensure t
         :defer  t
-        :after  ivy
         :init
         (leader/set-keys
           "ss" 'swiper
@@ -4137,138 +4178,144 @@
          "C-p" #'swiper-isearch-prev-line))
     #+END_SRC
 
-*** ivy-xref
-    #+BEGIN_SRC emacs-lisp
-      (use-package ivy-xref
-        :ensure t
-        :defer  t
-        :after  (ivy xref)
-        :init
-        (when (emacs>= "27")
-          (setq xref-show-definitions-function #'ivy-xref-show-defs))
-        (setq xref-show-xrefs-function #'ivy-xref-show-xrefs)
-
-        :config
-        (remove-hook 'xref-after-jump-hook 'recenter)
-
-        (defun ivy-xref-call-or-done ()
-          (interactive)
-          (let (orig-point orig-buffer
-                           new-point new-buffer)
-            (with-ivy-window
-              (setq orig-point  (point)
-                    orig-buffer (current-buffer)))
-
-            (ivy-call)
-
-            (with-ivy-window
-              (setq new-point  (point)
-                    new-buffer (current-buffer)))
-
-            (when (and (eq new-point  orig-point)
-                       (eq new-buffer orig-buffer))
-              (ivy-done))))
-
-        (defun ivy-xref-forward-char-or-call-or-done ()
-          (interactive)
-          (call-interactively (if (eolp)
-                                  'ivy-xref-call-or-done
-                                'forward-char)))
-
-        (defvar ivy-xref-map
-          (let ((map (make-sparse-keymap)))
-            (set-keymap-parent map ivy-minibuffer-map)
-            map)
-          "map for use with ivy-xref.")
-
-        (general-def ivy-xref-map
-          "C-l" #'ivy-xref-forward-char-or-call-or-done
-          "M-l" #'ivy-call-and-recenter)
-
-        (advice-add 'ivy-xref-show-xrefs :around
-                    (defun ivy-xref-use-xref-map (func &rest args)
-                      (let ((ivy-minibuffer-map ivy-xref-map))
-                        (apply func args)))))
-    #+END_SRC
-
-*** ivy-bibtex
-    Also installs bibtex-completion.
+*** counsel
+    a bunch of really useful functions to go alongside ivy.
 
     #+BEGIN_SRC emacs-lisp
-      (use-package ivy-bibtex
+      (use-package counsel
         :ensure t
         :defer  t
-        :only (package! bibtex)
+        :hook (ivy-mode . counsel-mode)
+        :diminish counsel-mode
         :init
+        (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
+        (fset 'describe-bindings (symbol-function 'counsel-descbinds))
+
+        (setq counsel-find-file-ignore-regexp
+              (rx (or (and ".#" (one-or-more any))
+                      (and bol "flycheck_")
+                      (and ".class" eol)
+                      (and ".o" eol)
+                      (and "node_modules")
+                      (and ".git" (zero-or-one "/") eol)
+                      (and ".elc" eol)
+                      (and ".bundle/")
+                      (and (any ?. ?-) "lock" (zero-or-one ".json") eol))))
+
         (leader/set-keys
-          "ob" 'ivy-bibtex)
+          "r"  "register/rings"
+          "fs" "recursive-find")
 
-        (with-eval-after-load 'org
-          (leader/set-keys-for-major-mode 'org-mode "[" 'ivy-bibtex))
-
-        (with-eval-after-load 'bibtex
-          (setq
-           bibtex-completion-bibliography bibtex-files
-           bibtex-completion-library-path (list
-                                           (org! "docs/")
-                                           (org! "docs/unidocs/"))
-           bibtex-completion-notes-path (org! "notes"))
-
-          (mkdir bibtex-completion-notes-path t))
-
-        (when (package! ebib)
-          (with-eval-after-load 'ebib
-            (setq ebib-notes-directory (org! "notes"))))
-
-        :config
-        (setq bibtex-completion-pdf-extension '(".pdf" ".epub" ".pptx" ".doc" ".docx")
-              bibtex-completion-pdf-open-function 'xopen-url+)
-
-        (defun bibtex-completion-format-citation-org-mode-cite+ (keys)
-          "Format cite references for keys in KEYS for `org-mode'."
-          (s-join ", " (--map (format "cite:%s" it) keys)))
-
-        (setq bibtex-completion-format-citation-functions
-              '((org-mode      . bibtex-completion-format-citation-org-mode-cite+)
-                (latex-mode    . bibtex-completion-format-citation-cite)
-                (markdown-mode . bibtex-completion-format-citation-pandoc-citeproc)
-                (default       . bibtex-completion-format-citation-default)))
-
-        (defun ivy-bibtex-insert-pdftools-link (cand)
-          (let* ((default-directory (or +org-pdf-directory default-directory))
-                  (key (cdr (assoc "=key=" (cdr cand))))
-                  (pdf (car (bibtex-completion-find-pdf key bibtex-completion-find-additional-pdfs))))
-            (unless pdf
-              (user-error "bib entry with key %s doesn't have an associated pdf file" key))
-
-            (setq pdf (abbreviate-file-name (expand-file-name pdf)))
-
-            (insert (concat
-                      "[[pdftools:"
-                      pdf
-                      "::"
-                      (read-from-minibuffer "Page:" "1")
-                      "]["
-                      (read-string "Description: " nil nil pdf)
-                      "]]"))))
-        (setq ivy-bibtex-default-action #'ivy-bibtex-insert-pdftools-link)
-        (ivy-add-actions 'ivy-bibtex '(("j" ivy-bibtex-insert-pdftools-link "Insert pdftool link"))))
-    #+END_SRC
-
-*** ivy-yasnippet
-    Use ivy to select a snippet candidate.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package ivy-yasnippet
-        :ensure t
-        :defer  t
-        :init
-        (leader/set-keys
-          "is" 'ivy-yasnippet)
+        (leader/set-keys-for-major-mode 'org-mode
+          "g" 'counsel-org-goto
+          "G" 'counsel-org-goto-all)
 
         (general-define-key
-          :states 'insert
-          "C-M-i" 'ivy-yasnippet))
+          :keymaps 'emacs-window-map
+          "x" 'counsel-wmctrl
+          "C-x" 'counsel-wmctrl)
+
+        (general-define-key
+          :keymaps 'ivy-mode-map
+          [remap org-capture] 'counsel-org-capture)
+
+        (with-eval-after-load 'org
+          (leader/set-keys
+            "oh" '("org-headlines" . counsel-org-agenda-headlines)))
+
+        (with-eval-after-load 'company
+          (setq company-menu-bindings+
+                (append company-menu-bindings+
+                        '("C-:" counsel-company))))
+
+        (leader/set-keys
+          "ae" 'counsel-package
+          "af" 'counsel-faces
+          "ee" 'counsel-compilation-errors
+          "ic" 'counsel-unicode-char
+          "ie" 'counsel-org-entity
+          "Mm" 'counsel-major
+
+          "eg" 'counsel-flycheck
+          "ry" 'counsel-yank-pop
+          "rm" 'counsel-mark-ring
+          "r'" 'counsel-evil-marks
+          "rr" 'counsel-register
+          "re" 'counsel-evil-registers
+          "rf" 'counsel-file-registers
+          "ar" 'counsel-load-library
+          "al" 'counsel-find-library
+          "jO" 'counsel-outline
+
+          "ff" 'counsel-find-file
+          "fb" 'counsel-bookmark
+          "fr" 'counsel-recentf
+          "fsf" 'counsel-file-jump
+          "fsd" 'counsel-dired-jump
+          "fsz" 'counsel-fzf
+
+          "ci" 'counsel-compile
+
+          "sb" 'counsel-grep
+          ;; recursive searches
+          "sv" 'counsel-git-grep
+          "sp" 'counsel-pt
+          "sa" 'counsel-ag
+          "sr" 'counsel-rg
+
+          ;; "bb" 'counsel-buffer-or-recentf ;; WARN only file buffers
+          "bb" 'counsel-switch-buffer
+          "hdf" 'counsel-describe-function
+          "hdx" 'counsel-fonts
+          "hdv" 'counsel-describe-variable
+          "hdB" 'describe-bindings-buffer)
+
+        (general-define-key
+          "C-M-y" 'counsel-yank-pop)
+
+        :config
+        (advice-add 'counsel-locate-action-extern :override #'xopen-url+)
+
+        (setq ivy-initial-inputs-alist ivy-default-initial-inputs-alist+
+              counsel-find-file-occur-use-find t
+              counsel-evil-registers-height ivy-height)
+
+        (when (windows-p)
+          (setq counsel-rg-base-command "rg --with-filename --no-heading --line-number --path-separator // --color never %s ."))
+
+        (counsel-mode +1)
+
+        (ivy-set-actions 'counsel-fonts
+                         '(("o" describe-font "describe")))
+
+        (ivy-configure 'counsel-evil-registers :height ivy-height)
+
+        (general-unbind
+          :keymaps 'counsel-find-file-map
+          "C-DEL" "<C-backspace>")
+
+        (general-define-key
+          :keymaps 'counsel-describe-map
+          "C-."   'hydra-ivy/body
+          "C-S-." 'counsel-find-symbol)
+
+        (advice-add 'counsel-ag :filter-args
+          (defun +counsel-ag--avoid-git-root (args)
+            "By default `counsel-ag' and it's variants (eg. `counsel-rg') uses in order:
+      - the passed in directory
+      - the current git root
+      - the cwd
+       as the `default-directory' for the subcommand. This makes things
+      confusing when you're cwd is in .gitignore and trying to search for
+      files in there never comes up with any results.
+
+      I'd prefer if rg worked the same in emacs as it would in the terminal
+      (within reason) so here we check if a directory is passed and if not
+      replace it with the cwd. "
+            (unless (or (>= (prefix-numeric-value current-prefix-arg) 4)
+                        (nth 2 args))
+              (setcar (nthcdr 1 args) default-directory))
+            args)))
     #+END_SRC
 
 *** counsel-evil-jumps
@@ -4473,7 +4520,7 @@
         :defer t)
    #+END_SRC
 
-*** helm-make
+*** counsel-make
     Don't be fooled, helm make works with both helm and ivy.
 
     #+BEGIN_SRC emacs-lisp
@@ -4488,55 +4535,7 @@
           "cm"    'helm-make))
     #+END_SRC
 
-*** ivy-lsp
-    #+BEGIN_SRC emacs-lisp
-      (use-package lsp-ivy
-        :ensure t
-        :defer  t
-        :after (:any eglot lsp-mode)
-        :init
-        (leader/set-keys-for-mode '(lsp-mode eglot--managed-mode)
-          "jy" 'lsp-ivy-workspace-symbol
-          "jY" 'lsp-ivy-global-workspace-symbol))
-    #+END_SRC
 
-*** flyspell-correct
-    use ivy to correct mispelled words (through flyspell).
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package flyspell-correct-ivy
-        :ensure t
-        :defer  t
-        :after  flyspell
-        :init
-        ;; NOTE wrapper works backwards through the buffer by default.
-        ;;      pass a two prefix args to check forward.
-        (setq flyspell-correct-interface #'flyspell-correct-ivy)
-
-        (leader/with-prefix leader-minor-mode-leader-prefix
-          (leader/set-keys-for-mode 'flyspell-mode
-            leader-minor-mode-leader-prefix 'flyspell-correct-wrapper)))
-    #+END_SRC
-
-*** flx
-    optimizes ivy search ordering for fuzzy searches.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package flx
-        :ensure t
-        :defer  t)
-    #+END_SRC
-
-*** smex
-    show recently accessed commands at the top of M-x.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package smex
-        :ensure t
-        :defer  t
-        :config
-        (setq smex-save-file (var! "smex-save.el")))
-    #+END_SRC
 
 ** evil
    The quintessential [[https://github.com/emacs-evil/evil][vi emulation]] package for emacs :speak_no_evil:.
