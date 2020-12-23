@@ -3439,6 +3439,74 @@
       (spaceline-flymake-segment+ warning spaceline-flycheck-warning (flymake--severity :warning)) ; flymake-warning
       (spaceline-flymake-segment+ note    spaceline-flycheck-info    (flymake--severity :note))    ; flymake-note
 
+      ;; Each of these language-server helpers assert whether their to be used
+      ;; and then returns a tuple of the face to attach to the segment and
+      ;; what message to show alongside it.
+      ;;
+      ;; Some of these were adapted from [[https://github.com/seagle0128/doom-modeline/blob/af5f61888e7eb0aa521d2d29b42221302b717915/doom-modeline-segments.el#L1871][doom-modeline]].
+
+      (defun spaceline-lsp-mode+ ()
+        (when (bound-and-true-p lsp-mode)
+          (let ((workspaces (lsp-workspaces)))
+            (cons (if workspace
+                      'spaceline-flycheck-info
+                    'spaceline-flycheck-error)
+                  (if workspaces
+                      (concat "OK"
+                              (mapcar (lambda (w)
+                                        (concat "[" (lsp--workspace-print w) "]"))
+                                      workspaces))
+                    "Broken")))))
+
+      (defun spaceline-eglot+ ()
+        (when (bound-and-true-p eglot--managed-mode)
+          (pcase-let* ((server (eglot-current-server))
+                       (server-name (and server
+                                         (plist-get (eglot--server-info server) :name)))
+                       (pending (and server (hash-table-count
+                                             (jsonrpc--request-continuations server))))
+                       (name )
+                       (`(,_id ,doing ,done-p ,detail) (and server (eglot--spinner server)))
+                       (last-error (and server (jsonrpc-last-error server)))
+                       (face (cond (last-error 'spaceline-flycheck-error)
+                                   ((and doing (not done-p)) 'spaceline-flycheck-warning)
+                                   ((and pending (cl-plusp pending)) ''spaceline-flycheck-warning)
+                                   (server 'spaceline-flycheck-info)
+                                   (t 'spaceline-flycheck-warning))))
+            (cons face
+                  (cond
+                   (last-error ":error")
+                   ((or (and doing (not done-p))
+                        (and pending (cl-plusp pending)))
+                    ":wait")
+                   (server-name server-name)
+                   (t ":broken") ; Interrupted
+                   )))))
+
+      (defun spaceline-anaconda+ ()
+        (when (bound-and-true-p anaconda-mode)
+          (if (anaconda-mode-running-p)
+              `(spaceline-flycheck-info .
+                ,(concat "Anaconda"
+                         (let ((port (process-get anaconda-mode-process 'port)))
+                           (when port
+                             (format ":%d" port)))))
+            '(spaceline-flycheck-error . ":broken"))))
+
+      ;; Icon indicating the variety and status of the current language server.
+      ;; Will support: Anaconda, LSP, Eglot
+      (spaceline-define-segment language-server
+        (let ((status (or (spaceline-anaconda+)
+                          (spaceline-lsp-mode+)
+                          (spaceline-eglot+))))
+          ;; (plist-get (eglot--server-info (eglot-current-server)) :name)
+          (when status
+            (concat (propertize (spaceline-icon faicon "rocket")
+                                'face (car status))
+                    (when (cdr status)
+                      (concat "["
+                              (propertize (cdr status) 'face 'mode-line-emphasis)
+                              "]"))))))
     #+END_SRC
 
 *** format
@@ -3480,9 +3548,10 @@
           ;; (erc-track :when active)
           ((version-control-type-icon
             version-control-status
-            )
-           :fallback version-control
+            :fallback version-control)
            :priority 78)
+          (language-server
+           :when active)
           ;; (org-pomodoro :when active)
           (org-clock :when active))
 
