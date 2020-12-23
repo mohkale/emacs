@@ -3838,6 +3838,17 @@
          (setq smex-save-file (var! "smex-save.el")))
      #+END_SRC
 
+**** prescient
+     #+BEGIN_SRC emacs-lisp
+       (use-package ivy-prescient
+         :ensure t
+         :defer  t
+         :after  prescient
+         :hook (ivy-mode . ivy-prescient-mode)
+         :config
+         (add-to-list 'ivy-prescient-sort-commands 'counsel-find-file t))
+     #+END_SRC
+
 *** ivy-avy
     #+BEGIN_SRC emacs-lisp
       (use-package ivy-avy
@@ -4535,7 +4546,18 @@
           "cm"    'helm-make))
     #+END_SRC
 
+** prescient
+   #+BEGIN_SRC emacs-lisp
+     (use-package prescient
+       :ensure t
+       :demand t
+       :init
+       (setq prescient-save-file (var! "prescient-history.el"))
 
+       :config
+       (prescient-persist-mode +1)                                         ; persist statistics between emacs sessions
+       )
+   #+END_SRC
 
 ** evil
    The quintessential [[https://github.com/emacs-evil/evil][vi emulation]] package for emacs :speak_no_evil:.
@@ -6905,6 +6927,15 @@
         :ensure t
         :defer  t
         :hook (company-quickhelp-mode . company-quickhelp-terminal-mode))
+    #+END_SRC
+
+*** prescient
+    #+BEGIN_SRC emacs-lisp
+      (use-package company-prescient
+        :ensure t
+        :defer  t
+        :after prescient
+        :hook (company-mode . company-prescient-mode))
     #+END_SRC
 
 ** all-the-icons
