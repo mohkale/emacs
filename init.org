@@ -3779,9 +3779,12 @@
           "x" 'counsel-wmctrl
           "C-x" 'counsel-wmctrl)
 
+        (general-define-key
+          :keymaps 'ivy-mode-map
+          [remap org-capture] 'counsel-org-capture)
+
         (with-eval-after-load 'org
           (leader/set-keys
-            "oc" '("org-capture" . counsel-org-capture)
             "oh" '("org-headlines" . counsel-org-agenda-headlines)))
 
         (with-eval-after-load 'company
@@ -4958,6 +4961,8 @@
 
         (general-define-key
           :states 'motion
+          "C-o" 'evil-jump-backward
+          "M-o" 'evil-jump-forward
           "C-b" 'evil-scroll-line-up
           "C-f" 'evil-scroll-line-down
           "\"" 'evil-use-register
@@ -6543,12 +6548,13 @@
            "C-d"     company-next-page
            "C-u"     company-previous-page
            "C-l"     company-complete-selection
-           ;; "C-M-h"   company-show-doc-buffer
+           "C-h"     company-show-doc-buffer
+           "C-m"     company-complete-common
            "<C-tab>" company-complete-common-or-cycle
            "<tab>"   company-complete-selection
-           ;; "C-h"     company-quickhelp-manual-begin
            "C-/"     company-filter-candidates
            "C-s"     company-filter-candidates
+           "C-f"     company-filter-candidates
            "C-o"     company-last-candidate+
            "M-o"     company-first-candidate+)
          "bindings which override any local bindings while the company popup is active.
@@ -6756,13 +6762,18 @@
       (use-package company-quickhelp
         :ensure t
         :defer  t
-        :hook (company-mode . company-quickhelp-mode)
+        ;; :hook (company-mode . company-quickhelp-mode)
         :config
-        (setq company-quickhelp-delay nil)
+        (setq company-quickhelp-delay 0.5)
 
         (general-define-key
          :keymaps 'company-active-map
-         "C-h" 'company-quickhelp-manual-begin))
+         "C-M-h" 'company-quickhelp-manual-begin))
+
+      (use-package company-quickhelp-terminal
+        :ensure t
+        :defer  t
+        :hook (company-quickhelp-mode . company-quickhelp-terminal-mode))
     #+END_SRC
 
 ** all-the-icons
@@ -9419,6 +9430,7 @@
 
        (advice-add 'diff-kill-applied-hunks :around #'diff-kill-applied-hunks--ensure-all-hunks-killed))
    #+END_SRC
+
 ** dired
    The built in (file-manager like) program for emacs. Think ls, but interactive and
    100 times better.
@@ -12074,44 +12086,46 @@
             (switch-to-buffer buffer)))
 
         ;; set the navigator button
-        (let ((prefered-icon-height 0.75))
+        (let ((height 0.75)
+              (suffix (when (and +icons-available
+                                 (not (display-graphic-p)))
+                        " ")))
           (setq dashboard-navigator-buttons
                 `((;; line 01
-                   (,(all-the-icons-octicon "mark-github" :height prefered-icon-height :v-adjust 0.0)
+                   (,(concat (all-the-icons-faicon "github" :height height :v-adjust 0.0) suffix)
                     "Homepage"
                     "Browse Homepage"
                     (lambda (&rest _)
                       (browse-url "https://github.com/MoHKale")))
-                   (,(all-the-icons-faicon "google" :height prefered-icon-height :v-adjust 0.0)
+                   (,(concat (all-the-icons-faicon "google" :height height :v-adjust 0.0) suffix)
                     "Google"
                     "Browse Google"
                     (lambda (&rest _)
                       (browse-url "https://www.google.co.uk")))
-                   (,(all-the-icons-fileicon "org" :height prefered-icon-height :v-adjust 0.0)
+                   (,(concat (all-the-icons-fileicon "org" :height height :v-adjust 0.0) suffix)
                     "Manual"
                     "Browse Emacs Manual"
                     (lambda (&rest _)
                       (browse-url "https://www.gnu.org/software/emacs/manual/html_node/emacs/index.html")))
-                   (,(all-the-icons-faicon "cogs" :height prefered-icon-height :v-adjust 0.0)
+                   (,(concat (all-the-icons-faicon "cog" :height height :v-adjust 0.0) suffix)
                     "Update Packages"
                     "Update Packages"
                     #'update-installed-packages)
                    (,(propertize "?" 'face '(:inherit default)) ;; needs a face attribute
-                    "" "emacs FAQ" #'view-emacs-faq font-lock-builtin-face)))))
+                    "" "emacs FAQ" #'view-emacs-faq font-lock-builtin-face))))
 
-        ;; determine appropriate footer icon to display alongside quote.
-        (let* ((footer-count (length dashboard-footer-icon-associations))
-               (footer-index (random footer-count))
-               (footer-item (nth footer-index dashboard-footer-icon-associations))
+          ;; determine appropriate footer icon to display alongside quote.
+          (let* ((footer-count (length dashboard-footer-icon-associations))
+                  (footer-index (random footer-count))
+                  (footer-item (nth footer-index dashboard-footer-icon-associations))
 
                  ;;; extract items from table row
-               (icon-source (nth 0 footer-item))
-               (icon-name   (nth 1 footer-item)))
-          (setq dashboard-footer-icon (funcall (intern (concat "all-the-icons-" icon-source))
-                                               icon-name
-                                               :height 1.1
-                                               :v-adjust -0.05
-                                               :face 'font-lock-keyword-face)))
+                  (icon-source (nth 0 footer-item))
+                  (icon-name   (nth 1 footer-item)))
+            (setq dashboard-footer-icon (propertize
+                                          (concat (funcall (intern (concat "all-the-icons-" icon-source)) icon-name :height height :v-adjust -0.05)
+                                                  suffix)
+                                          'face 'font-lock-keyword-face))))
 
         (setq dashboard-footer (car (nth (random (1- (1+ (length dashboard-quotes))))
                                          dashboard-quotes)))
@@ -13083,6 +13097,10 @@
                  (defun magit-cleanup-defaults+ ()
                    ;; messes up alignment on rescroll
                    (setq-local scroll-conservatively 0)))
+
+       (add-hook 'git-commit-mode-hook
+                 (defun magit-initialise-commit+ ()
+                   (setq fill-column 72)))
 
        (leader/set-keys-for-major-mode 'magit-status-mode
          "z" 'magit-jump-to-stashes
@@ -14443,7 +14461,7 @@
         :defer  t
         :after  anaconda-mode
         :init
-        (company/configure-mode (python-mode :major t)
+        (company/configure-mode (anaconda-mode)
           company-anaconda))
     #+END_SRC
 
@@ -17254,6 +17272,8 @@
        ;; NOTE annotations are extra information in the tooltip
        `(company-tooltip-annotation ((,class (:weight bold :foreground ,grey))))
        `(company-tooltip-annotation-selection ((,class (:foreground ,turquoise-int :background ,blue-int :inherit company-tooltip-annotation))))
+
+       `(popup ((,class (:inherit popup-face))))
 
       ;;;; custom mode variants
       ;;; whitespace-mode
