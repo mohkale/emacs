@@ -3405,6 +3405,40 @@
               ((string-match "SVN-" vc-mode)
                (spaceline-vc-svn-status+)))
         :when (and active vc-mode +icons-available))
+
+      (spaceline-define-segment flymake-status
+        ;; See [[https://www.gnu.org/software/emacs/manual/html_node/flymake/Syntax-check-statuses.html#Syntax-check-statuses][here]], flymake shows different indicators depending on the linting status.
+        ;; Status format adapted from `flymake--mode-line-format'.
+        (let ((known (and flymake--backend-state
+                          (hash-table-keys flymake--backend-state)))
+              (running (flymake-running-backends))
+              (disabled (flymake-disabled-backends))
+              (reported (flymake-reporting-backends)))
+          (cond
+           ((null known) (concat "[" (propertize "?" 'face 'spaceline-flycheck-warning) "]"))
+           ((cl-set-difference running reported)
+            "[ ]" nil) ; Wait waiting
+           ((and disabled (null running)) (concat "[" (propertize "!" 'face 'spaceline-flycheck-error) "]"))))
+        :when (bound-and-true-p flymake-mode))
+
+      ;; Addapted from [[https://github.com/TheBB/spaceline/issues/181][here]].
+
+      (defmacro spaceline-flymake-segment+ (state face severity)
+        `(spaceline-define-segment ,(intern (format "flymake-%S" state))
+           (let ((count (length
+                         (seq-filter
+                          (lambda (diag)
+                            (= ,severity
+                               (flymake--severity (flymake-diagnostic-type diag))))
+                          (flymake-diagnostics)))))
+             (when (not (zerop count))
+               (powerline-raw (s-trim (format spaceline-flycheck-bullet count)) ',face)))
+           :when (bound-and-true-p flymake-mode)))
+
+      (spaceline-flymake-segment+ error   spaceline-flycheck-error   (flymake--severity :error))   ; flymake-error
+      (spaceline-flymake-segment+ warning spaceline-flycheck-warning (flymake--severity :warning)) ; flymake-warning
+      (spaceline-flymake-segment+ note    spaceline-flycheck-info    (flymake--severity :note))    ; flymake-note
+
     #+END_SRC
 
 *** format
@@ -3429,11 +3463,16 @@
            :priority 98)
           (major-mode :priority 79)
           (process :when active)
-          ((flycheck-error
+          ;; assumes flymake and flycheck won't be used simulataneously
+          ((flymake-status
+            flymake-error
+            flymake-warning
+            flymake-info
+            flycheck-error
             flycheck-warning
             flycheck-info)
-           :when active
-           :priority 89)
+           :priority 89
+           :when active)
           (minor-modes
            :when active
            :priority 9)
@@ -4216,6 +4255,30 @@
 
     #+BEGIN_SRC emacs-lisp
       (leader/set-keys "rn" 'counsel-evil-jumps)
+    #+END_SRC
+
+*** counsel-flymake
+    #+BEGIN_SRC emacs-lisp
+      (defun counsel-flymake ()
+        (interactive)
+        (let* ((flymake--diagnostics-buffer-source (current-buffer))
+               (file (let ((file (buffer-file-name flymake--diagnostics-buffer-source)))
+                       (when file (file-name-base (file-name-sans-extension file)))))
+               (errors (flymake--diagnostics-buffer-entries))
+               (cands (cl-loop with diag     = nil
+                               with vec      = nil                                    ; a vector containing already propertized attributes
+                               with line     = nil
+                               with message  = nil
+                               for err in errors                                      ; for structure of err see:`flymake--diagnostics-buffer-entries'
+                               do (setq diag    (plist-get (car err) :diagnostic)
+                                        vec     (nth 1 err)
+                                        line    (aref vec 0)
+                                        message (concat (aref vec 2) " " (car (aref vec 3))))
+                               collect (propertize (concat (when file (concat file ":"))
+                                                           line ":"
+                                                           message)
+                                                   'point (flymake--diag-beg diag)))))
+          (counsel-mark--ivy-read cands 'counsel-flymake)))
     #+END_SRC
 
 *** counsel-pydoc
@@ -9989,16 +10052,54 @@
    #+BEGIN_SRC emacs-lisp
      (use-package flymake
        :diminish flymake-mode
-       :init
-       (leader/set-keys
-         "ej" 'flymake-goto-next-error
-         "ek" 'flymake-goto-prev-error)
-
+       ;; force flymake to not try and cooperate with flycheck (for now).
+       :hook (flymake-mode . (lambda ()
+                               (when (bound-and-true-p flycheck-mode)
+                                 (flycheck-mode -1))))
+       :commands (flymake-first-error+
+                  flymake-last-error+)
        :config
+       (advice-add #'flymake--handle-report :around #'restore-default-display-buffer-actions)
+       (advice-add #'flymake-show-diagnostic :around #'restore-default-display-buffer-actions)
+
+       (defun flymake-first-error+ ()
+         (interactive)
+         (let* ((ovs (flymake--overlays :compare #'< :key #'overlay-start))
+                (ov (car ovs)))
+           (cond
+            (ov (goto-char (overlay-start ov)))
+            (t (user-error "No flymake errors in the current buffer")))))
+
+       (defun flymake-last-error+ ()
+         (interactive)
+         (let* ((ovs (flymake--overlays :compare #'< :key #'overlay-start))
+                (ov (car (last ovs))))
+           (cond
+            (ov (goto-char (overlay-start ov)))
+            (t (user-error "No flymake errors in the current buffer")))))
+
+       (defmacro flymake-unsupported-command+ (name)
+         `(lambda ()
+            (interactive)
+            (message "Flymake doesn't have a parallel for: %s" (quote ,name))))
+
        (general-define-key
         :keymaps 'flymake-mode-map
+        ; TODO implement
+        [remap hydra-flycheck/body] (flymake-unsupported-command+ hydra-flymake/body)
+        [remap flycheck-select-checker] (flymake-unsupported-command+ flycheck-select-checker)
+        [remap flycheck-describe-checker] (flymake-unsupported-command+ flycheck-describe-checker)
+        [remap flycheck-explain-error-at-point] (flymake-unsupported-command+ flycheck-explain-error-at-point)
+        [remap toggle-flycheck-messages] (flymake-unsupported-command+ toggle-flycheck-messages)
+
+        [remap counsel-flycheck] 'counsel-flymake
+        [remap flycheck-clear] 'flymake-proc-stop-all-syntax-checks
+        [remap flycheck-first-error] 'flymake-first-error+
+        [remap flycheck-last-error] 'flymake-last-error+
+        [remap flycheck-buffer] 'flymake-start
         [remap flycheck-list-errors] 'flymake-show-diagnostics-buffer
-        [remap flycheck-buffer] 'flymake-start)
+        [remap flycheck-next-error] 'flymake-goto-next-error
+        [remap flycheck-previous-error] 'flymake-goto-prev-error)
 
        (general-define-key
         :keymaps 'flymake-diagnostics-buffer-mode-map
@@ -12715,15 +12816,18 @@
        :init
        (leader/set-keys
          "e." 'hydra-flycheck/body
+         "ej" 'flycheck-next-error
+         "ek" 'flycheck-previous-error
          "ex" 'flycheck-clear
          "ed" 'flycheck-explain-error-at-point
+         "er" 'flycheck-buffer
          "eh" 'flycheck-describe-checker
-         "e1" 'flycheck-first-error
-         "eL" 'goto-flycheck-error-list
+         "ea" 'flycheck-first-error
          "el" 'flycheck-list-errors
-         "eC" 'flycheck-set-checker-executable
+         ;; "eC" 'flycheck-set-checker-executable
          "ec" 'flycheck-select-checker
-         "ev" 'flycheck-verify-setup)
+         ;; "ev" 'flycheck-verify-setup
+         )
 
        :config
        (setq flycheck-python-pycompile-executable "python3")
@@ -12776,7 +12880,7 @@
                    flycheck-error-list-follow-mode)
         :init
         (leader/set-keys
-          "e$" 'flycheck-last-error
+          "es" 'flycheck-last-error
           "te" 'toggle-flycheck-messages)
 
         :config
