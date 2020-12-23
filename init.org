@@ -12649,38 +12649,60 @@
 *** flycheck
     Enable flycheck support with ~eglot~. by default, it only supports flymake.
 
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package +eglot-flycheck
         :only (package! eglot)
-        :after eglot :demand t)
+        :after eglot
+        :init
+        ;; See [[https://github.com/gagbo/doom-emacs/commit/8e25bdc61eec078d86560d8492b187ca44a14279][here]].
+        (advice-add 'eglot-handle-notification :around
+                    (defun +eglot-flycheck-mock-flymake-mode (func &rest args)
+                      (let ((flymake-mode t))
+                        (apply func args))))
+
+        (defun eglot-prefer-flycheck+ ()
+          (when eglot--managed-mode
+            (when-let ((current-checker (flycheck-get-checker-for-buffer)))
+              (unless (equal current-checker 'eglot)
+                (flycheck-add-next-checker 'eglot current-checker)))
+            (flycheck-add-mode 'eglot major-mode)
+            (flycheck-mode 1)
+            (flymake-mode -1)))
+
+        (add-hook 'eglot--managed-mode-hook #'eglot-prefer-flycheck+))
     #+END_SRC
 
+    Checker implementation adapted from [[https://github.com/flycheck/flycheck/issues/1592][here]].
+
     #+BEGIN_SRC emacs-lisp :tangle lisp/+eglot-flycheck.el
-      (require 'eglot)
       (require 'flycheck)
 
-      ;; source [[https://gist.github.com/purcell/ca33abbea9a98bb0f8a04d790a0cadcd][here]].
-      (defvar-local flycheck-eglot-current-errors nil)
-
-      (defun flycheck-eglot-report-fn (diags &rest _)
-        (setq flycheck-eglot-current-errors
-              (mapcar (lambda (diag)
-                        (save-excursion
-                          (goto-char (flymake--diag-beg diag))
-                          (flycheck-error-new-at (line-number-at-pos)
-                                                 (1+ (- (point) (line-beginning-position)))
-                                                 (pcase (flymake--diag-type diag)
-                                                   ('eglot-error 'error)
-                                                   ('eglot-warning 'warning)
-                                                   ('eglot-note 'info)
-                                                   (_ (error "Unknown diag type, %S" diag)))
-                                                 (flymake--diag-text diag)
-                                                 :checker 'eglot)))
-                      diags))
-        (flycheck-buffer))
-
+      ;;; Code:
       (defun flycheck-eglot--start (checker callback)
-        (funcall callback 'finished flycheck-eglot-current-errors))
+        "Clean up errors when done.
+      CHECKER is the checker (eglot).
+      CALLBACK is the function that we need to call when we are done, on all the errors."
+        (cl-labels
+            ((flymake-diag->flycheck-err
+              (diag)
+              (with-current-buffer (flymake--diag-buffer diag)
+                (flycheck-error-new-at-pos
+                 (flymake--diag-beg diag)
+                 (pcase (flymake--diag-type diag)
+                   ('eglot-note 'info)
+                   ('eglot-warning 'warning)
+                   ('eglot-error 'error)
+                   (_ (error "Unknown diagnostic type, %S" diag)))
+                 (flymake--diag-text diag)
+                 :end-pos (flymake--diag-end diag)
+                 :checker checker
+                 :buffer (current-buffer)
+                 :filename (buffer-file-name)))))
+          ;; NOTE: Setting up eglot to automatically create flycheck errors for the buffer.
+          (eglot-flymake-backend (lambda (flymake-diags &rest _)
+                                   (funcall callback
+                                            'finished
+                                            (mapcar #'flymake-diag->flycheck-err flymake-diags))))))
 
       (defun flycheck-eglot--available-p ()
         (bound-and-true-p eglot--managed-mode))
@@ -12692,15 +12714,6 @@
         :modes '(prog-mode text-mode))
 
       (push 'eglot flycheck-checkers)
-
-      (add-hook 'eglot--managed-mode-hook
-                (defun eglot-prefer-flycheck+ ()
-                  (when eglot--managed-mode
-                    (flycheck-add-mode 'eglot major-mode)
-                    (flycheck-select-checker 'eglot)
-                    (flycheck-mode)
-                    (flymake-mode -1)
-                    (setq eglot--current-flymake-report-fn 'flycheck-eglot-report-fn))))
 
       (provide '+eglot-flycheck)
     #+END_SRC
