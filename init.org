@@ -6474,6 +6474,8 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package org-roam
+        :diminish
+        org-roam-mode
         :ensure t
         ;; :straight (org-roam :type git :host github :repo "org-roam/org-roam"
         ;;                     :fork (:host github :repo "zaeph/org-roam" :branch "nested-captures"))
@@ -6696,15 +6698,15 @@
            "C-7"     company-complete-number
            "C-8"     company-complete-number
            "M-l"     company-complete-common-or-next-char+
+           "<C-i>"   company-complete-common
            "C-j"     company-select-next
            "C-k"     company-select-previous
            "C-d"     company-next-page
            "C-u"     company-previous-page
            "C-l"     company-complete-selection
            "C-h"     company-show-doc-buffer
-           "C-m"     company-complete-common
-           "<C-tab>" company-complete-common-or-cycle
-           "<tab>"   company-complete-selection
+           "<tab>"   company-complete-common-or-cycle
+           "RET"     company-complete-selection
            "C-/"     company-filter-candidates
            "C-s"     company-filter-candidates
            "C-f"     company-filter-candidates
@@ -8338,7 +8340,8 @@
       (use-package yasnippet
         :ensure t
         :defer  load-me-now-duration
-        :delight (yas-minor-mode "YAS")
+        :diminish
+        yas-minor-mode
         :commands (yas-expand
                    yas-new-snippet
                    yas-visit-snippet-file)
@@ -8839,6 +8842,14 @@
              (or active
                  (auto-fill-mode +1))
              (setq fill-column arg)))))
+   #+END_SRC
+
+** auto-revert-mode
+   #+BEGIN_SRC emacs-lisp
+     (use-package auto-revert-mode
+       :straight (auto-revert-mode :type built-in)
+       :defer t
+       :diminish auto-revert-mode)
    #+END_SRC
 
 ** bookmarks
@@ -12625,7 +12636,7 @@
          (leader/set-keys-for-mode 'eglot--managed-mode
            ;; unbound 'eglot-clear-status
            "" "server"
-           "x" 'eglot-code-actions
+           "a" 'eglot-code-actions
            "e" 'eglot-events-buffer
            "k" 'eglot-shutdown
            "h" 'eglot-help-at-point
@@ -13203,7 +13214,7 @@
 
            "?"   'lsp-describe-session
            "|"   'lsp-describe-thing-at-point
-           "e"   'lsp-execute-code-action
+           "a"   'lsp-execute-code-action
            "h"   'lsp-document-highlight
            "DEL" 'lsp-disconnect
 
@@ -14525,28 +14536,28 @@
         (push '(emacs-lisp-mode . 2) +indent-config)
         (push '(lisp-interaction-mode . 2) +indent-config)
 
-        (let ((lisp-modes '(emacs-lisp-mode lisp-interaction-mode)))
-          (leader/set-keys-for-major-mode lisp-modes
-            "'" 'ielm
-            "c" 'emacs-lisp-byte-compile
-            "i" 'indent-sexp
+        (leader/set-keys-for-major-mode '(emacs-lisp-mode lisp-interaction-mode)
+          "'" 'ielm
+          "c" 'emacs-lisp-byte-compile
+          "i" 'indent-sexp
+          "p" 'pp-buffer
 
-            ;; eval
-            "e"  "eval"
-            "eb" 'eval-buffer
-            "ee" 'eval-last-sexp
-            "eE" 'eval-replace-last-sexp
-            "ef" 'eval-defun
-            "er" 'eval-region
-            ;; "et" 'elisp-transcript
+          ;; eval
+          "e"  "eval"
+          "eb" 'eval-buffer
+          "ee" 'eval-last-sexp
+          "eE" 'eval-replace-last-sexp
+          "ef" 'eval-defun
+          "er" 'eval-region
+          ;; "et" 'elisp-transcript
 
-            ;; jump
-            "g" '("goto-definition" . xref-find-definitions)
-            "G" '("goto-definition-other-window" . xref-find-definitions-other-window)
+          ;; jump
+          "g" '("goto-definition" . xref-find-definitions)
+          "G" '("goto-definition-other-window" . xref-find-definitions-other-window)
 
-            ;; tests
-            "t" 'ert
-            "T" 'ert-run-tests-interactively))
+          ;; tests
+          "t" 'ert
+          "T" 'ert-run-tests-interactively)
 
         (general-define-key
           :keymaps 'lisp-interaction-mode-map
@@ -14562,6 +14573,7 @@
         :only (package! elisp)
         :ensure t
         :defer  t
+        :diminish paredit-mode
         :hook (emacs-lisp-mode . paredit-mode)
         :config
         (general-unbind
@@ -14629,6 +14641,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package anaconda-mode
         :only (package! python)
+        :diminish anaconda-mode
         :ensure t
         :defer  t
         :hook ((python-mode . enable-anaconda-mode+)
@@ -15825,12 +15838,6 @@
        :hook ((c-mode   . flycheck-mode)
               (c++-mode . flycheck-mode))
        :config
-       (add-hook 'eglot-managed-mode-hook
-                 (defun cc-mode-disable-flycheck-with-eglot+ ()
-                   (when (and (member major-mode '(c-mode c++-mode))
-                              (featurep 'flycheck))
-                     (flycheck-mode (if (eglot-managed-p) -1 +1)))))
-
        (c-toggle-auto-newline  +1)
        ;; WARN never do this, it breaks commenting in
        ;;      weird places.
