@@ -43,7 +43,8 @@
         ;; ztree                                                          ; Directory tree viewer, think NERDTree
 
     ;;; Mode lines
-        spaceline                                                         ; The same mode-line package as [[https://github.com/syl20bnr/spacemacs][spacemacs]].
+        doom-modeline                                                     ; A fast and feature-full mode-line package based on [[https://github.com/hlissner/doom-emacs][doom]]!
+        ;; spaceline                                                      ; The same mode-line package as [[https://github.com/syl20bnr/spacemacs][spacemacs]].
 
     ;;; Buffer Menus
         ;; buffer-menu                                                    ; The (default) builtin buffer menu
@@ -1614,6 +1615,26 @@
     (defun buffer-killed-p (buffer)
       "Return t if BUFFER is killed."
       (not (buffer-name buffer)))
+
+    (defmacro string-truncate-left! (str count)
+      `(and ,str
+            (if (> (length ,str) ,count)
+                (substring ,str ,count)
+              "")))
+
+    (defmacro string-truncate-right! (str count)
+      `(and ,str
+            (let ((len (length ,str)))
+              (if (> len ,count)
+                  (substring ,str 0 (- len ,count))
+                ""))))
+
+    (defmacro string-truncate! (str left right)
+      `(and ,str
+            (let ((len (length ,str)))
+              (if (> len (+ ,left ,right))
+                  (substring ,str ,left (- len ,right))
+                ""))))
   #+END_SRC
 
 ** config
@@ -11024,6 +11045,299 @@
      (provide '+spaceline)
      #+END_SRC
 
+*** doom-modeline
+    :PROPERTIES:
+    :header-args+: :tangle lisp/+doom-modeline.el
+    :END:
+
+    #+BEGIN_SRC emacs-lisp :tangle init.el
+      (use-package +doom-modeline :only (package! doom-modeline) :demand t)
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package doom-modeline
+        :only (package! doom-modeline)
+        :ensure t
+        :hook ((after-init         . doom-modeline-mode)
+               (doom-modeline-mode . size-indication-mode)
+               (doom-modeline-mode . column-number-mode))
+        :init
+        (setq doom-modeline-project-detection 'projectile
+              doom-modeline-buffer-file-name-style 'buffer-name
+              doom-modeline-icon (or (display-graphic-p)
+                                     +icons-available)
+              doom-modeline-major-mode-color-icon nil
+              doom-modeline-minor-modes t
+              doom-modeline-enable-word-count nil
+              doom-modeline-checker-simple-format t
+              doom-modeline-number-limit 99
+              doom-modeline-modal-icon nil
+              doom-modeline-env-version nil
+              doom-modeline-buffer-state-icon nil)
+
+        (defvar doom-modeline-lsp-show-in-inactive-buffers+ nil
+          "When true and `doom-modeline-lsp' is also true the current server indicator
+      can be seen even in inactive buffers.")
+
+        :config
+        (setq find-file-visit-truename
+              (or find-file-visit-truename                                 ; if already enabled, don't alter it
+                  ;; These are a single file/name so we don't need to follow
+                  ;; symlinks when displaying them.
+                  (not (member doom-modeline-buffer-file-name-style
+                               '(file-name buffer-name)))))
+
+        (defun doom-modeline-truncate-right+ (val)
+          (string-truncate-left! val 1))
+
+        (defun doom-modeline-truncate-left+ (val)
+          (string-truncate-right! val 1))
+
+        (defun doom-modeline-truncate+ (val)
+          (string-truncate! val 1 1))
+
+        (defun doom-modeline-limited-width-hide+ (func &rest args)
+          (unless doom-modeline--limited-width-p
+            (apply func args)))
+
+        (advice-add 'doom-modeline-segment--buffer-position :filter-return
+                    #'doom-modeline-truncate+)
+
+        (advice-add 'doom-modeline-icon :filter-return
+                    (defun doom-modeline--pad-icon-on-terminal+ (value)
+                      (if (and (not (display-graphic-p))
+                               doom-modeline-icon)
+                          (let ((props (text-properties-at 0 value)))
+                            (apply 'propertize
+                                   (concat (substring-no-properties value)
+                                           " ")
+                                   props))
+                        value)))
+
+        (advice-add #'doom-modeline--buffer-name :filter-return
+                    (defun doom-modeline-buffer-name-truncate+ (val)
+                      (when val
+                        (let ((name (format-mode-line val)))
+                          (if (and (eval-when-compile
+                                     (and +modeline-buffer-id-max-length
+                                          (< (length +modeline-buffer-id-ellipses)
+                                             +modeline-buffer-id-max-length)))
+                                   (> (length name) +modeline-buffer-id-max-length))
+                              (apply #'propertize
+                                     (concat
+                                      (substring-no-properties name 0
+                                                               (eval-when-compile
+                                                                 (- +modeline-buffer-id-max-length
+                                                                    (length +modeline-buffer-id-ellipses))))
+                                      +modeline-buffer-id-ellipses)
+                                     (text-properties-at 0 val))
+                            name)))))
+
+        (doom-modeline-def-segment buffer-info+
+          "Custom variant of buffer-info with buffer-state shown without icons."
+          (concat
+           "[%*]"
+           (doom-modeline-spc)
+           (doom-modeline--buffer-mode-icon)
+           (doom-modeline-spc)
+           (doom-modeline--buffer-name)
+           (doom-modeline-spc)))
+
+        (advice-add #'doom-modeline--anzu             :filter-return #'doom-modeline-truncate+)
+        (advice-add #'doom-modeline--iedit            :filter-return #'doom-modeline-truncate+)
+        (advice-add #'doom-modeline--symbol-overlay   :filter-return #'doom-modeline-truncate+)
+        (advice-add #'doom-modeline--evil-substitute  :filter-return #'doom-modeline-truncate+)
+        (advice-add #'doom-modeline--multiple-cursors :filter-return #'doom-modeline-truncate+)
+
+        (doom-modeline-def-segment matches+
+          (let ((meta (string-join
+                       (delq nil
+                             `(,(and (doom-modeline--active)
+                                     (+modeline-evil-macro-and-register))
+                               ,(doom-modeline--anzu)
+                               ,(doom-modeline--phi-search)
+                               ,(doom-modeline--evil-substitute)
+                               ,(doom-modeline--iedit)
+                               ,(doom-modeline--symbol-overlay)
+                               ,(doom-modeline--multiple-cursors)))
+                       (doom-modeline-spc))))
+            (or (and (not (string-empty-p meta))
+                     (concat (doom-modeline-spc)
+                             meta
+                             (doom-modeline-spc)))
+                (doom-modeline--buffer-size))))
+
+        (defsubst doom-modeline--evil-face+ ()
+          (if (active-minibuffer-window)
+              'doom-modeline-minibuffer-face
+            (if (bound-and-true-p evil-local-mode)
+                (cond
+                 ((evil-normal-state-p)   'doom-modeline-evil-normal-state)
+                 ((evil-emacs-state-p)    'doom-modeline-evil-emacs-state)
+                 ((evil-insert-state-p)   'doom-modeline-evil-insert-state)
+                 ((evil-motion-state-p)   'doom-modeline-evil-motion-state)
+                 ((evil-visual-state-p)   'doom-modeline-evil-visual-state)
+                 ((evil-operator-state-p) 'doom-modeline-evil-operator-state)
+                 ((evil-replace-state-p)  'doom-modeline-evil-replace-state)
+                 (t                       'doom-modeline-evil-normal-state))
+              'doom-modeline-evil-normal-state)))
+
+        (doom-modeline-def-segment evil-state-and-winum+
+          (propertize
+           (concat " "
+                   (cond
+                    ((active-minibuffer-window)
+                     (doom-modeline-icon 'faicon "dot-circle-o" ?M ?M))
+                    ((bound-and-true-p winum-mode)
+                     (substring-no-properties (winum-get-number-string)))
+                    ((bound-and-true-p ace-window-display-mode)
+                     (aw-update)
+                     (window-parameter (selected-window) 'ace-window-path))
+                    ((bound-and-true-p window-numbering-mode)
+                     (window-numbering-get-number-string))
+                    (t " "))
+                   " ")
+           'face (doom-modeline--evil-face+)))
+
+        (doom-modeline-def-segment vc-status+
+          (when (and vc-mode
+                     (doom-modeline--active)
+                     (not doom-modeline--limited-width-p))
+            (let ((stat (+modeline-vc-status))
+                  (icon (+modeline-vc-icon)))
+              (when (or stat icon)
+                (concat (when icon
+                          (concat (doom-modeline-propertize-icon
+                                   (doom-modeline-icon (car icon) (cdr icon) ?v ?v))
+                                  (doom-modeline-spc)))
+                        (when stat
+                          stat))))))
+
+        (defsubst doom-modeline--build-server-section+ (stat-func fallback-str)
+          (when-let ((stat (funcall stat-func
+                                    'doom-modeline-lsp-success
+                                    'doom-modeline-lsp-warning
+                                    'doom-modeline-lsp-error
+                                    'mode-line-emphasis)))
+            (concat
+             (doom-modeline-lsp-icon fallback-str (plist-get stat :face))
+             ;; (+modeline-format-language-server-status stat)
+             )))
+
+        (advice-add #'doom-modeline-update-lsp :override
+                    (defun doom-modeline-update-lsp+ ()
+                      (setq doom-modeline--lsp
+                            (doom-modeline--build-server-section+ #'+modeline-lsp-status "LSP"))))
+
+        (advice-add #'doom-modeline-update-eglot :override
+                    (defun doom-modeline-update-eglot+ ()
+                      (setq doom-modeline--eglot
+                            (doom-modeline--build-server-section+ #'+modeline-eglot-status "EGLOT"))))
+
+        (defun doom-modeline--anaconda-server ()
+          (when (bound-and-true-p anaconda-mode)
+            (doom-modeline--build-server-section+ #'+modeline-anaconda-status "Anaconda")))
+
+        (doom-modeline-def-segment lsp+
+          "The LSP server state."
+          (when doom-modeline-lsp
+            (let ((body (cond ((bound-and-true-p lsp-mode)
+                               doom-modeline--lsp)
+                              ((bound-and-true-p eglot--managed-mode)
+                               doom-modeline--eglot)
+                              ((bound-and-true-p anaconda-mode)
+                               (doom-modeline--anaconda-server)))))
+              (when body
+                (concat
+                 (if (doom-modeline--active)
+                     body
+                   (and doom-modeline-lsp-show-in-inactive-buffers+
+                        (doom-modeline-propertize-icon body 'mode-line-inactive))))))))
+
+        (defsubst doom-modeline--build-flychecker-section+ (stat-func)
+          (when-let* ((stat (funcall stat-func
+                                     'doom-modeline-info
+                                     'doom-modeline-debug
+                                     'doom-modeline-urgent
+                                     'doom-modeline-lsp-running))
+                      (body (+modeline-format-checker-status stat)))
+            (unless (string-empty-p body)
+              (concat
+               (propertize "<" 'face 'mode-line-emphasis)
+               body
+               (propertize ">" 'face 'mode-line-emphasis)))))
+
+        (advice-add #'doom-modeline-update-flycheck-icon :override
+                    (defun doom-modeline-update-flycheck-icon+ (&optional status)
+                      (setq doom-modeline--flycheck-icon
+                            (doom-modeline--build-flychecker-section+ #'+modeline-flycheck))))
+        (advice-add #'doom-modeline-update-flycheck-text :override #'ignore)
+
+        (advice-add #'doom-modeline-update-flymake-icon :override
+                    (defun doom-modeline-update-flymake-icon+ (&rest _)
+                      (setq doom-modeline--flymake-icon
+                            (doom-modeline--build-flychecker-section+ #'+modeline-flymake))))
+        (advice-add #'doom-modeline-update-flymake-text :override #'ignore)
+
+        (doom-modeline-def-segment checker+
+          (when-let ((icon (cond ((and (bound-and-true-p flymake-mode)
+                                       (bound-and-true-p flymake--backend-state)) ; only support 26+
+                                  doom-modeline--flymake-icon)
+                                 ((bound-and-true-p flycheck-mode)
+                                  doom-modeline--flycheck-icon))))
+            (concat
+             (doom-modeline-spc)
+             (if (doom-modeline--active)
+                 icon
+               (doom-modeline-propertize-icon icon 'mode-line-inactive)))))
+
+        (doom-modeline-def-segment space+
+          (doom-modeline-spc))
+
+        (advice-add #'doom-modeline-segment--buffer-encoding :around
+                    #'doom-modeline-limited-width-hide+)
+
+        (doom-modeline-def-modeline 'mohkale
+          ;; Left hand side
+          '(bar                                                            ; Forces the mode-line to take up a given height (in GUI
+            evil-state-and-winum+
+            matches+                                                       ; Search results, macro state, multiple-cursors etc.
+            buffer-info+
+            remote-host
+            process
+            parrot
+            selection-info
+            vc-status+
+            checker+)
+
+          ;; Right hand side
+          '(misc-info
+            minor-modes
+            lsp+
+            input-method
+            buffer-encoding
+            buffer-position
+            major-mode))
+
+        ;; prevent doom-modeline from restoring mode-line defaults for certain modes
+        ;; see the init for `doom-modeline-mode' which modes get updated mode-lines.
+        (dolist (it '(doom-modeline-format--main
+                      doom-modeline-format--dashboard
+                      doom-modeline-format--project
+                      doom-modeline-format--message
+                      doom-modeline-format--org-src
+                      doom-modeline-format--special
+                      doom-modeline-format--pdf
+                      doom-modeline-format--vcs
+                      doom-modeline-format--info))
+          (when (symbol-function it)
+            (defalias it (symbol-function 'doom-modeline-format--mohkale))))
+
+        (dolist (buf (buffer-list))
+          (with-current-buffer buf
+            (doom-modeline-set-main-modeline))))
+    #+END_SRC
+
 ** occur
    See all occurences of a search query in the current buffer, with support to jumping
    to the next or previous query and even editing them on the fly.
@@ -17393,6 +17707,11 @@
    Define some extra faces for use in a few different places.
 
    #+BEGIN_SRC emacs-lisp
+     (with-eval-after-load 'doom-modeline
+       (defface doom-modeline-minibuffer-face
+         `((t (:inherit doom-modeline-evil-emacs-state)))
+         "highlight face for doom-modeline when minibuffer is active"
+         :group 'doom-modeline))
 
      (with-eval-after-load 'spaceline
       (defface spaceline-minibuffer
@@ -17664,6 +17983,25 @@
       `(spaceline-flycheck-error   ((,cls (:inherit compilation-mode-line-fail))))
       `(spaceline-flycheck-warning ((,cls (:inherit compilation-mode-line-run))))
       `(spaceline-flycheck-info    ((,cls (:inherit compilation-mode-line-exit))))
+
+     ;;; doom-modeline
+      `(doom-modeline-evil-normal-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background "DarkGoldenrod2"))))
+      `(doom-modeline-evil-insert-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,green-int-256))))
+      `(doom-modeline-evil-emacs-state   ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,blue))))
+      `(doom-modeline-evil-replace-state ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,turquoise-int))))
+      `(doom-modeline-evil-visual-state  ((,cls (:inherit mode-line :foreground ,very-light-grey :background ,dark-grey))))
+      `(doom-modeline-evil-motion-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,purple-int))))
+      `(doom-modeline-evil-operator-state ((,cls (:inherit spaceline-evil-operator))))
+
+      `(doom-modeline-buffer-modified ((,cls (:inherit doom-modeline-buffer-file))))
+      `(doom-modeline-lsp-error ((,cls (:inherit compilation-mode-line-fail))))
+      `(doom-modeline-lsp-warning ((,cls (:inherit compilation-mode-line-run))))
+      `(doom-modeline-lsp-success ((,cls (:inherit compilation-mode-line-exit))))
+      `(doom-modeline-lsp-running ((,cls (:foreground ,blue-int :inherit compilation-mode-line-run))))
+
+      `(doom-modeline-urgent ((,cls (:inherit compilation-mode-line-fail))))
+      `(doom-modeline-debug ((,cls (:inherit compilation-mode-line-run))))
+      `(doom-modeline-info ((,cls (:inherit compilation-mode-line-exit))))
 
      ;;; evil
       `(vimish-fold-overlay ((,cls (:background ,dark-grey :foreground ,green))))
