@@ -179,7 +179,7 @@
        (tool-bar-mode -1)     ; short mini menu shown below the menu bar
        )
 
-     (scroll-bar-mode -1)   ; scrol bar shown on frames right side
+     (scroll-bar-mode -1)   ; scroll bar shown on frames right side
    #+END_SRC
 
    Also erase ~file-name-handler-alist~ for startup.
@@ -549,7 +549,7 @@
     | miniedit            | c632c33c099362b084d965c51ec4b933be1278c7064096ce3b97cc830436055b | https://raw.githubusercontent.com/emacsmirror/miniedit/master/miniedit.el                 |
     | ibuffer-persp       | 6395294e2dd368866d79a81d37c27961e0f871937ccd82cff317e5ad67c52652 | https://raw.githubusercontent.com/rakshasa/ibuffer-persp/master/ibuffer-persp.el          |
     | org-link-edit       | ac84061d951ef9ef82794ba7f4416afb6da4283a182490a11ae455077321814c | https://raw.githubusercontent.com/kyleam/org-link-edit/master/org-link-edit.el            |
-    | org-man             | d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed | https://raw.githubusercontent.com/aspiers/orgmode/master/contrib/lisp/org-man.el          |
+    | org-man             | 71008c37977474b4d25d4610925db199bbd7e2548d3427d8e44ab59aa6b12a47 | https://raw.githubusercontent.com/abo-abo/org-mode/mirror/contrib/lisp/org-man.el         |
     | vline               | d2be35d52bbfddf10367e8bc2326630ae5f85e6720ec4714d715cde7904846fb | https://raw.githubusercontent.com/emacsmirror/vline/master/vline.el                       |
     | org-eldoc           | c79cba0929a6886449d39a32ef629653759d0041fe8d97f9727d8004f89b0592 | https://github.com/msnoigrs/org-mode/raw/master/contrib/lisp/org-eldoc.el                 |
 
@@ -3187,7 +3187,7 @@
         :defer    t
         :diminish ivy-mode
         :commands (ivy-toggle-mark)
-        :hook (emacs-startup . ivy-mode)
+        :hook (after-init . ivy-mode)
         :config
         (with-eval-after-load 'magit
           (setq magit-completing-read-function 'ivy-completing-read))
@@ -4007,7 +4007,7 @@
                                                            line ":"
                                                            message)
                                                    'point (flymake--diag-beg diag)))))
-          (counsel-mark--ivy-read cands 'counsel-flymake)))
+          (counsel-mark--ivy-read "flymake errors" cands 'counsel-flymake)))
     #+END_SRC
 
 *** counsel-pydoc
@@ -5478,7 +5478,8 @@
 
         ;; Initialised here to prevent org from defining a bunch of keys I won't
         ;; end up using :P
-        (setq org-read-date-minibuffer-local-map (make-sparse-keymap))
+        (setq org-read-date-minibuffer-local-map (make-sparse-keymap)
+              org-confirm-babel-evaluate nil)
         (set-keymap-parent org-read-date-minibuffer-local-map minibuffer-local-map)
 
         ;; switch to insert state when capturing org templates
@@ -6329,7 +6330,7 @@
        (advice-add 'company-show-location   :around 'restore-default-display-buffer-actions)
        (advice-add 'company-show-doc-buffer :around 'restore-default-display-buffer-actions)
 
-       (global-company-mode)
+       (global-company-mode +1)
 
        (defun company-first-candidate+ ()
          (interactive)
@@ -6559,6 +6560,7 @@
 
        :config
        (setq inhibit-compacting-font-caches t)
+       (push '(rustic-mode all-the-icons-alltheicon "rust") all-the-icons-mode-icon-alist)
 
        (defun all-the-icons-insert-all-icons ()
          (interactive)
@@ -9865,13 +9867,15 @@
    #+BEGIN_SRC emacs-lisp
      (use-package flymake
        :diminish flymake-mode
-       ;; force flymake to not try and cooperate with flycheck (for now).
-       :hook (flymake-mode . (lambda ()
-                               (when (bound-and-true-p flycheck-mode)
-                                 (flycheck-mode -1))))
        :commands (flymake-first-error+
                   flymake-last-error+)
        :config
+       ;; force flymake to not try and cooperate with flycheck (for now).
+       (add-hook 'flymake-mode-hook
+                 (defun flymake-disable-flycheck+ ()
+                   (when (bound-and-true-p flycheck-mode)
+                     (flycheck-mode -1))))
+
        (advice-add #'flymake--handle-report :around #'restore-default-display-buffer-actions)
        (advice-add #'flymake-show-diagnostic :around #'restore-default-display-buffer-actions)
 
@@ -12377,6 +12381,17 @@
        (winner-mode +1))
    #+END_SRC
 
+** window
+   Make the window seperator a [[https://www.reddit.com/r/emacs/comments/3u0d0u/how_do_i_make_the_vertical_window_divider_more/][straight-line]], like tmux.
+
+   #+BEGIN_SRC emacs-lisp
+     (add-hook 'window-configuration-change-hook
+               (defun +change-window-divider ()
+                 (let ((display-table (or buffer-display-table standard-display-table)))
+                   (set-display-table-slot display-table 5 ?│)
+                   (set-window-display-table (selected-window) display-table))))
+   #+END_SRC
+
 ** xref
    cross reference keywords across a number of different backends.
 
@@ -13442,8 +13457,7 @@
        :only (package! flycheck)
        :ensure t
        :defer  t
-       ;; :delight " ⓢ"
-       :delight "FlyCheck"
+       :diminish flycheck-mode
        :init
        (leader/set-keys
          "e." 'hydra-flycheck/body
