@@ -11050,18 +11050,10 @@
      #+END_SRC
 
 *** doom-modeline
-    :PROPERTIES:
-    :header-args+: :tangle lisp/+doom-modeline.el
-    :END:
-
-    #+BEGIN_SRC emacs-lisp :tangle init.el
-      (use-package +doom-modeline :only (package! doom-modeline) :demand t)
-    #+END_SRC
-
     #+BEGIN_SRC emacs-lisp
       (use-package doom-modeline
+        :straight (doom-modeline :fork (:host github :repo "mohkale/doom-modeline" :branch "emacs-dotfiles"))
         :only (package! doom-modeline)
-        :ensure t
         :hook ((after-init         . doom-modeline-mode)
                (doom-modeline-mode . size-indication-mode)
                (doom-modeline-mode . column-number-mode))
@@ -11077,11 +11069,8 @@
               doom-modeline-number-limit 99
               doom-modeline-modal-icon nil
               doom-modeline-env-version nil
-              doom-modeline-buffer-state-icon nil)
-
-        (defvar doom-modeline-lsp-show-in-inactive-buffers+ nil
-          "When true and `doom-modeline-lsp' is also true the current server indicator
-      can be seen even in inactive buffers.")
+              doom-modeline-buffer-state-icon nil
+              doom-modeline-height 1)
 
         :config
         (setq find-file-visit-truename
@@ -11211,11 +11200,12 @@
                   (icon (+modeline-vc-icon)))
               (when (or stat icon)
                 (concat (when icon
-                          (concat (doom-modeline-propertize-icon
-                                   (doom-modeline-icon (car icon) (cdr icon) ?v ?v))
-                                  (doom-modeline-spc)))
+                          (concat (doom-modeline-spc)
+                                  (doom-modeline-propertize-icon
+                                   (doom-modeline-icon (car icon) (cdr icon) ?v ?v))))
                         (when stat
-                          stat))))))
+                          (concat (doom-modeline-spc)
+                                  stat)))))))
 
         (defsubst doom-modeline--build-server-section+ (stat-func fallback-str)
           (when-let ((stat (funcall stat-func
@@ -11242,21 +11232,27 @@
           (when (bound-and-true-p anaconda-mode)
             (doom-modeline--build-server-section+ #'+modeline-anaconda-status "Anaconda")))
 
-        (doom-modeline-def-segment lsp+
-          "The LSP server state."
-          (when doom-modeline-lsp
-            (let ((body (cond ((bound-and-true-p lsp-mode)
-                               doom-modeline--lsp)
-                              ((bound-and-true-p eglot--managed-mode)
-                               doom-modeline--eglot)
-                              ((bound-and-true-p anaconda-mode)
-                               (doom-modeline--anaconda-server)))))
-              (when body
-                (concat
-                 (if (doom-modeline--active)
-                     body
-                   (and doom-modeline-lsp-show-in-inactive-buffers+
-                        (doom-modeline-propertize-icon body 'mode-line-inactive))))))))
+        (doom-modeline-def-segment meta-icons+
+          "Icons indicating various kinds of states related to the current buffer.
+      Think minor-mode list except not full text."
+          (let* ((face (if (doom-modeline--active)
+                           'doom-modeline-panel
+                         'mode-line-inactive))
+                 (icons (string-join
+                         (delq
+                          nil (list (cond ((bound-and-true-p lsp-mode)
+                                           doom-modeline--lsp)
+                                          ((bound-and-true-p eglot--managed-mode)
+                                           doom-modeline--eglot)
+                                          ((bound-and-true-p anaconda-mode)
+                                           (doom-modeline--anaconda-server)))
+                                    (and (buffer-narrowed-p)
+                                         (doom-modeline-icon 'nerd-mdi "json" "{}" "{}" :face face))
+                                    ))
+                         (doom-modeline-spc))))
+            (unless (string-empty-p icons)
+              (concat ;; (doom-modeline-spc)
+               icons))))
 
         (defsubst doom-modeline--build-flychecker-section+ (stat-func)
           (when-let* ((stat (funcall stat-func
@@ -11317,7 +11313,7 @@
           ;; Right hand side
           '(misc-info
             minor-modes
-            lsp+
+            meta-icons+
             input-method
             buffer-encoding
             buffer-position
@@ -11337,9 +11333,28 @@
           (when (symbol-function it)
             (defalias it (symbol-function 'doom-modeline-format--mohkale))))
 
-        (dolist (buf (buffer-list))
-          (with-current-buffer buf
-            (doom-modeline-set-main-modeline))))
+        (define-minor-mode doom-modeline-mode
+          "Toggle doom-modeline on or off."
+          :group 'doom-modeline
+          :global t
+          :lighter nil
+          :keymap doom-modeline-mode-map
+          (if doom-modeline-mode
+              (progn
+                (doom-modeline-refresh-bars)        ; Create bars
+                (doom-modeline-set-main-modeline)   ; Set mode-line for current buffer
+                (doom-modeline-set-main-modeline t) ; Set default mode-line
+
+                (dolist (buf (buffer-list))
+                  (with-current-buffer buf
+                    (doom-modeline-set-main-modeline))))
+            ;; Restore mode-line
+            (setq         mode-line-format doom-modeline--default-format)
+            (setq-default mode-line-format doom-modeline--default-format)
+
+            (dolist (buf (buffer-list))
+              (with-current-buffer buf
+                (setq mode-line-format doom-modeline--default-format))))))
     #+END_SRC
 
 ** occur
@@ -18010,12 +18025,14 @@
       `(doom-modeline-buffer-modified ((,cls (:inherit doom-modeline-buffer-file))))
       `(doom-modeline-lsp-error ((,cls (:inherit compilation-mode-line-fail))))
       `(doom-modeline-lsp-warning ((,cls (:inherit compilation-mode-line-run))))
-      `(doom-modeline-lsp-success ((,cls (:inherit compilation-mode-line-exit))))
+      `(doom-modeline-lsp-success ((,cls ())))
       `(doom-modeline-lsp-running ((,cls (:foreground ,blue-int :inherit compilation-mode-line-run))))
 
       `(doom-modeline-urgent ((,cls (:inherit compilation-mode-line-fail))))
       `(doom-modeline-debug ((,cls (:inherit compilation-mode-line-run))))
       `(doom-modeline-info ((,cls (:inherit compilation-mode-line-exit))))
+
+      `(doom-modeline-buffer-minor-mode ((,cls (:foreground ,purple))))
 
      ;;; evil
       `(vimish-fold-overlay ((,cls (:background ,dark-grey :foreground ,green))))
