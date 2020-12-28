@@ -11387,6 +11387,116 @@
 * Extensions
   Optional [[*Packages][packages]] that users can opt to configure from the ~+packages~ variable.
 
+** selectrum
+   :PROPERTIES:
+   :header-args: :tangle (package-yes! selectrum)
+   :END:
+
+*** selectrum
+    #+BEGIN_SRC emacs-lisp
+      (use-package selectrum
+        :ensure t
+        :defer  t
+        :hook (after-init . selectrum-mode)
+        :init
+        (setq selectrum-num-candidates-displayed 15)
+
+        :config
+        (leader/set-keys
+          "RET" 'selectrum-repeat
+          )
+
+        (general-define-key
+         :keymaps 'selectrum-minibuffer-map
+         "C-j" 'next-line
+         "C-k" 'previous-line
+         "C-h" 'backward-char
+         "C-l" (defun selectrum-forward-char-or-exit+ ()
+                 (interactive)
+                 (call-interactively (if (eolp)
+                                         'selectrum-select-current-candidate
+                                       'forward-char)))
+         "M-j" 'next-matching-history-element
+         "M-k" 'previous-matching-history-element
+         "C-o" 'beginning-of-buffer
+         "M-o" 'end-of-buffer
+         "C-d" 'scroll-up-command
+         "C-u" 'scroll-down-command
+         "M-i" 'selectrum-insert-current-candidate
+         "<S-return>" 'selectrum-submit-exact-input))
+    #+END_SRC
+
+*** selectrum-prescient
+    #+BEGIN_SRC emacs-lisp
+      (use-package selectrum-prescient
+        :ensure t
+        :defer  t
+        :hook (selectrum-mode . selectrum-prescient-mode))
+    #+END_SRC
+
+*** consult
+    #+BEGIN_SRC emacs-lisp
+      (use-package consult
+        :ensure t
+        :defer  t
+        :hook (selectrum-mode . consult-preview-mode)
+        :init
+        (general-define-key
+         :keymaps 'selectrum-mode-map
+         [remap switch-to-buffer] 'consult-buffer
+         [remap multi-occur] 'consult-multi-occur
+         [remap apropros-command] 'consult-apropos
+         "C-M-y" 'consult-yank-pop)
+
+        (leader/set-keys
+          "ss" 'consult-line
+          "ji" 'consult-imenu
+          "hx" 'consult-complex-command
+          "ax" 'consult-mode-command
+          "rr" 'consult-register
+          "rm" 'consult-mark
+          "jo" 'consult-outline
+          "fr" 'consult-recent-file
+          "eg" 'consult-error))
+
+      (use-package consult-selectrum
+        :ensure t
+        :defer  t)
+    #+END_SRC
+
+*** consult-flycheck
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package consult-flycheck
+        :ensure t
+        :defer  t
+        :init
+        (leader/set-keys
+          "eg" 'consult-flycheck))
+    #+END_SRC
+
+*** marginalia
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package marginalia
+        :ensure t
+        :defer  t
+        :hook (selectrum-mode . marginalia-mode))
+    #+END_SRC
+
+*** embark
+    #+BEGIN_SRC emacs-lisp
+      (use-package embark
+        :ensure t
+        :defer  t
+        :init
+        (general-define-key
+         :keymaps 'selectrum-minibuffer-map
+         "<C-return>" 'embark-act
+         "M-RET" 'embark-act-noexit
+         "C-c o" 'embark-occur
+         "C-c O" 'embark-live-occur
+         "C-c e" 'embark-export))
+    #+END_SRC
+
 ** ivy
    :PROPERTIES:
    :header-args+: :tangle (package-yes! ivy)
@@ -18014,6 +18124,11 @@
       ;; for some reason... if hydra-posframe-face inherits default, internal border won't work
       `(hydra-posframe-face ((,cls (:background ,very-dark-grey :foreground ,very-light-grey))))
       `(hydra-posframe-border-face ((,cls (:inherit internal-border))))
+
+     ;;; selectrum
+      `(selectrum-current-candidate ((,cls (:foreground ,very-dark-grey :font-weight 'normal :inherit highlight))))
+      `(selectrum-primary-highlight ((,cls (:background "#555555"))))
+      `(selectrum-secondary-highlight ((,cls (:background "#7777FF")))) ;; #8A498A
 
      ;;; ivy
       ;; by default, it seems if ivy-highlight-face has its own spec, it'll interfere
