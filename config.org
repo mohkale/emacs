@@ -36,6 +36,8 @@ The packages you can configure my emacs to install.
       ;; wakatime                                                       ; Track your habits using the [[wakatime][https://wakatime.com/]]
       ;; ztree                                                          ; Directory tree viewer, think NERDTree
 
+  ;;; Completion frameworks
+      ivy                                                               ; A clean minimalist completion framework.
   ;;; Mode lines
       doom-modeline                                                     ; A fast and feature-full mode-line package based on [[https://github.com/hlissner/doom-emacs][doom]]!
       ;; spaceline                                                      ; The same mode-line package as [[https://github.com/syl20bnr/spacemacs][spacemacs]].
@@ -123,6 +125,17 @@ The packages you can configure my emacs to install.
 
   (defvar +icons-prefer-nerd-font t
     "When true and `nerd-font' is available, override `all-the-icons' fonts with nerd-fonts")
+
+  (defvar +find-file-ignore-regexp
+    (rx (or (and ".#" (one-or-more any))
+            (and bol "flycheck_")
+            (and ".class" eol)
+            (and ".o" eol)
+            (and "node_modules")
+            (and ".git" (zero-or-one "/") eol)
+            (and ".elc" eol)
+            (and ".bundle/")
+            (and (any ?. ?-) "lock" (zero-or-one ".json") eol))))
 #+END_SRC
 
 #+BEGIN_SRC emacs-lisp

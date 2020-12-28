@@ -601,8 +601,9 @@ standalone org file containing hydra definitions.
 * ivy
   the actual ivy hydra has trailing whitespace and is inseperably tied to C-o for both entry and exit, despite me not liking the former and changing the latter. This is my variant, much of the same functionality, just different display.
 
-  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-ivy-custom.el
-    (require 'ivy-hydra)
+  #+BEGIN_SRC emacs-lisp :tangle "lisp/hydras/hydra-ivy-custom.el"
+    (unless (require 'ivy-hydra nil t)
+      (message "Failed to require `ivy-hydra'."))
 
     (defhydra hydra-ivy (:foreign-keys run :hint nil)
       "
