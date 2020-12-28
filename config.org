@@ -1,0 +1,130 @@
+#+PROPERTY: header-args :tangle lisp/+config-default.el :shebang ";; -*- lexical-binding: t -*-"
+
+Default configuration parameters for my emacs distribution. This configuration is
+only used when there's an error loading the actual config at =+config.el=.
+
+The packages you can configure my emacs to install.
+
+#+BEGIN_SRC emacs-lisp
+  (defvar +packages
+    '(magit                                                             ; It's git... but magical  ,
+      ;; ace-link                                                       ; Jump to links in the current buffer through an avy interface
+      link-hint                                                         ; Jump to links in the current buffer through an avy interface
+      ;; adaptive-wrap                                                  ; Visually wrap long lines. doesn't alter what you write.
+      anzu                                                              ; Show the number of search results incrementally
+      auto-highlight-symbol                                             ; Automatically highlight the symbol at point
+      browser-edit                                                      ; Interface emacs with [[https://www.chromium.org/][chromium]]
+      ;; command-log-mode                                               ; Echo commands as you enter them
+      dashboard                                                         ; A feature full emacs dashboard
+      ;; deft                                                           ; Note management system based on multiple org files
+      ;; ebuku                                                          ; Interface to the, ebuku, bookmark manager
+      engine-mode                                                       ; Run a search on a given search engine and view in brower
+      eshell                                                            ; A nice lispy shell
+      ;; expand-region                                                  ; Expand visual mode by semantic units
+      flycheck                                                          ; A better buffer linter and error-checker package
+      ;; frog-jump-buffer                                               ; Posframe to jump to a buffer
+      ;; hide-comnt                                                     ; Minor mode to disable rendering of comments
+      imenu                                                             ; Interactively jump to points of interest in this buffer
+      olivetti                                                          ; A nice writing environment for emacs
+      ;; pdf-tools                                                      ; Use emacs as quick and dirty pdf viewer
+      ;; piper                                                          ; Interactive shell pipelines with emacs
+      rainbow-mode                                                      ; Automatically color/highlight css color names
+      ;; rake                                                           ; Run rake tasks
+      ;; vi-tilde-fringe                                                ; Show tildes at the end of the buffer
+      ;; vlc-rc                                                         ; Control [[https://www.videolan.org/vlc/index.en-GB.html][VLC]] from emacs
+      ;; vterm                                                          ; A virtual terminal emulator... interfaced with emacs
+      ;; wakatime                                                       ; Track your habits using the [[wakatime][https://wakatime.com/]]
+      ;; ztree                                                          ; Directory tree viewer, think NERDTree
+
+  ;;; Mode lines
+      doom-modeline                                                     ; A fast and feature-full mode-line package based on [[https://github.com/hlissner/doom-emacs][doom]]!
+      ;; spaceline                                                      ; The same mode-line package as [[https://github.com/syl20bnr/spacemacs][spacemacs]].
+
+  ;;; Buffer Menus
+      ;; buffer-menu                                                    ; The (default) builtin buffer menu
+      ibuffer                                                           ; An improved buffer menu
+
+  ;;; LSP Clients
+      eglot                                                             ; A light weight and clean LSP client
+      ;; lsp-mode                                                       ; A comprehensive and feature full client
+
+  ;;; Interactive Diffs
+      ;; ediff                                                          ; The builtin alternative, it has decades worth of bloat.
+      vdiff                                                             ; A diff tool inspired by [[https://github.com/justbur/emacs-vdiff][vimdiff]]
+
+  ;;; Package Enhancements
+      ;; counsel-world-clock                                            ; Inspect the current time from ivy
+      ;; diredfl                                                        ; Make dired /extra/ colorful
+      ;; image-dired                                                    ; View images in dired like sessions
+      ;; edit-indirect                                                  ; Edit regions of a buffer in another mode.
+      ;; hydra-posframe                                                 ; Show hydras in a posframe
+      ebib                                                              ; Nice emacs based interface for editing bibtex files
+                                                                        ; NOTE: This package requires bibtex to be enabled
+      ;; tramp-term                                                     ; Make term work seamlessly in tramp sessions
+      ibuffer-vc                                                        ; Filter ibuffer buffers by version-control repos
+      ibuffer-tramp                                                     ; Only show ibuffer buffers in remote tramp sessions
+      ;; ibuffer-persp                                                  ; Filter ibuffer buffers by emacs perspectives
+      ibuffer-projectile                                                ; Filter ibuffer buffers by active projects
+      ;; company-emoji                                                  ; Show emojis in company-completion candidates
+
+  ;;; language-support
+      ;; ggtags                                                         ; GNU Global source code tagging system
+      ;; ycmd                                                           ; A language-server for most languages. written in python.
+      ;; ruby-robe                                                      ; Code navigation, doc-lookup and completion for Ruby
+
+  ;;; Languages
+      bibtex
+      c
+      ;; cmake
+      css
+      csv
+      elisp
+      git-langs
+      ;; haskell
+      html
+      ;; java
+      golang
+      javascript
+      ;; typescript                                                     ; NOTE requires javascript to also be enabled
+      json
+      ;; jupyter
+      ;; kotlin
+      ;; glsl
+      latex
+      makefile
+      markdown
+      python
+      ;; powershell
+      ;; restclient
+      ruby
+      rust
+      sh-script
+      sql
+      ssh-config
+      vimlang
+      yaml
+      ;; yarn
+      )
+    "Packages I want setup on startup.")
+#+END_SRC
+
+#+BEGIN_SRC emacs-lisp
+  (defvar +sh-use-lsp nil
+    "When true `sh-script-mode' and it's derivatives will use LSP when available")
+
+  (defvar +man-command (if (member system-type '(cygwin ms-dos windows-nt)) 'woman 'man)
+    "Preferred command used for manuals")
+
+  (defvar +c-prefer-clangd t
+    "When true lsp and c will use clangd over ccls")
+
+  (defvar +icons-available t
+    "When true `all-the-icons' will be available even in terminal emacs.")
+
+  (defvar +icons-prefer-nerd-font t
+    "When true and `nerd-font' is available, override `all-the-icons' fonts with nerd-fonts")
+#+END_SRC
+
+#+BEGIN_SRC emacs-lisp
+  (provide '+config-default)
+#+END_SRC

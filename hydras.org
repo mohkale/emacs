@@ -1,9 +1,9 @@
 #+TITILE: Hydras
-#+PROPERTY: header-args :comments link :mkdirp yes :noweb yes :hlines no
+#+PROPERTY: header-args :comments link :mkdirp yes :noweb yes :hlines no :tangle lisp/+hydras.el
 
 standalone org file containing hydra definitions.
 
-#+BEGIN_SRC emacs-lisp :tangle yes
+#+BEGIN_SRC emacs-lisp
   (dolist (hydra '(hydra-eyebrowse
                    hydra-flycheck
                    hydra-ibuffer
@@ -50,6 +50,8 @@ standalone org file containing hydra definitions.
 
     "x."    '("hydra-text-zoom" . hydra-text-zoom/body)
     "l"     '("hydra-layouts"   . hydra-persp/body))
+
+  (provide '+hydras)
 #+END_SRC
 
 * text-zoom
