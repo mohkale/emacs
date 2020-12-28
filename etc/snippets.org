@@ -1,6 +1,25 @@
 #+TITLE snippets
 #+PROPERTY: header-args :tangle-mode (identity #o644) :mkdirp yes :noweb yes :hlines no :shebang "# -*- mode: snippet -*-" :tangle no
 
+#+NAME: strip-trailing-new-lines
+#+BEGIN_SRC emacs-lisp
+  ;; Inspired by [[https://emacs.stackexchange.com/questions/61108/make-tangle-dont-add-a-newline-at-the-end-of-the-file][here]], this prevents org from tangling snippets with trailing
+  ;; newlines interfering with their expansions.
+
+  (defun org-zap-newline-at-eob+ ()
+    (goto-char (point-max))
+    (when (equal (char-before) ?\n)
+      (delete-char -1)
+      (save-buffer)))
+
+  ;; (setq-local org-babel-post-tangle-hook org-babel-post-tangle-hook)
+  (add-hook 'org-babel-post-tangle-hook #'org-zap-newline-at-eob+)
+#+END_SRC
+
+#+BEGIN_SRC emacs-lisp :tangle ../var/snippets-tangle.junk
+<<strip-trailing-new-lines()>>
+#+END_SRC
+
 * snippet-mode
 ** elisp
    #+BEGIN_SRC snippet :tangle snippets/snippet-mode/elisp
