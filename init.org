@@ -11321,10 +11321,10 @@
 ** window
    Make the window seperator a [[https://www.reddit.com/r/emacs/comments/3u0d0u/how_do_i_make_the_vertical_window_divider_more/][straight-line]], like tmux.
 
-   #+BEGIN_SRC emacs-lisp :tangle no
+   #+BEGIN_SRC emacs-lisp
      (add-hook 'window-configuration-change-hook
                (defun +change-window-divider ()
-                 (let ((display-table (or buffer-display-table standard-display-table)))
+                 (when-let ((display-table (or buffer-display-table standard-display-table)))
                    (set-display-table-slot display-table 5 ?│)
                    (set-window-display-table (selected-window) display-table))))
    #+END_SRC
