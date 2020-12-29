@@ -11752,7 +11752,15 @@
         :after  prescient
         :hook (ivy-mode . ivy-prescient-mode)
         :config
-        (add-to-list 'ivy-prescient-sort-commands 'counsel-find-file t))
+        (add-to-list 'ivy-prescient-sort-commands 'counsel-find-file t)
+
+        (add-hook 'ivy-prescient-mode-hook
+                  (defun ivy-prescient-disable-sort-find-file+ ()
+                    (when (and (eq (car ivy-prescient-sort-commands) :not)
+                               (memq 'counsel-find-file
+                                     (cdr ivy-prescient-sort-commands)))
+                      (ivy--alist-set 'ivy-sort-functions-alist
+                                      #'read-file-name-internal #'ivy-sort-file-function-default)))))
     #+END_SRC
 
 *** ivy-avy
