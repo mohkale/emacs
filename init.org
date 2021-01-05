@@ -914,7 +914,7 @@
       That said... I need a place to put minor-mode keys and this was
       unoccupied.")
 
-      (defvar leader-server-leader-prefix "y"
+      (defvar leader-server-leader-prefix "l"
         "put leader keys related to active servers under this prefix.")
 
       (defvar leader-diff-leader-prefix "d"
@@ -929,6 +929,8 @@
         :straight (spaceleader :type git :host github :repo "mohkale/spaceleader")
         :config
         (require 'spaceleader-base)
+
+        (leader/set-keys leader-server-leader-prefix "lang-server")
 
         (general-define-key
          "C-@" (general-simulate-key "C-SPC")) ;; C-SPC in terminal
@@ -6180,7 +6182,7 @@
          "bA" 'persp-add-buffer
          "br" 'persp-remove-buffer
          "bR" 'persp-remove-current-buffer
-         "fl" 'find-file-new-perspective)
+         "f M-l" 'find-file-new-perspective)
 
        :config
        (require 'eyebrowse)
