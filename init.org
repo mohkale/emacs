@@ -10008,10 +10008,10 @@
                                '(file-name buffer-name)))))
 
         (defun doom-modeline-truncate-right+ (val)
-          (string-truncate-left! val 1))
+          (string-truncate-right! val 1))
 
         (defun doom-modeline-truncate-left+ (val)
-          (string-truncate-right! val 1))
+          (string-truncate-left! val 1))
 
         (defun doom-modeline-truncate+ (val)
           (string-truncate! val 1 1))
@@ -10134,6 +10134,11 @@
                           (concat (doom-modeline-spc)
                                   stat)))))))
 
+        (advice-add #'doom-modeline-lsp-icon :override
+                    (defun doom-modeline-lsp-icon+ (text face)
+                      (doom-modeline-icon 'nerd-oct "rocket" "🚀" text
+                                          :face face :height 1.0 :v-adjust -0.0575)))
+
         (defsubst doom-modeline--build-server-section+ (stat-func fallback-str)
           (when-let ((stat (funcall stat-func
                                     'doom-modeline-lsp-success
@@ -10174,12 +10179,11 @@
                                           ((bound-and-true-p anaconda-mode)
                                            (doom-modeline--anaconda-server)))
                                     (and (buffer-narrowed-p)
-                                         (doom-modeline-icon 'nerd-mdi "json" "{}" "{}" :face face))
-                                    ))
+                                         (doom-modeline-icon 'nerd-mdi "json" "{}" "{}" :face face))))
                          (doom-modeline-spc))))
             (unless (string-empty-p icons)
               (concat ;; (doom-modeline-spc)
-               icons))))
+                      icons))))
 
         (defsubst doom-modeline--build-flychecker-section+ (stat-func)
           (when-let* ((stat (funcall stat-func
@@ -10221,8 +10225,8 @@
         (doom-modeline-def-segment space+
           (doom-modeline-spc))
 
-        (advice-add #'doom-modeline-segment--buffer-encoding :around
-                    #'doom-modeline-limited-width-hide+)
+        (advice-add #'doom-modeline-segment--buffer-encoding :filter-return #'doom-modeline-truncate-right+)
+        (advice-add #'doom-modeline-segment--buffer-encoding :around #'doom-modeline-limited-width-hide+)
 
         (doom-modeline-def-modeline 'mohkale
           ;; Left hand side
@@ -10246,8 +10250,6 @@
             buffer-position
             major-mode))
 
-        ;; prevent doom-modeline from restoring mode-line defaults for certain modes
-        ;; see the init for `doom-modeline-mode' which modes get updated mode-lines.
         (dolist (it '(doom-modeline-format--main
                       doom-modeline-format--dashboard
                       doom-modeline-format--project
