@@ -8759,7 +8759,10 @@
    That package that displays help messages in the minibuffer.
 
    #+BEGIN_SRC emacs-lisp
-     (use-package eldoc :delight "")
+     (use-package eldoc
+       :delight ""
+       :config
+       (setq eldoc-echo-area-prefer-doc-buffer t))
    #+END_SRC
 
 ** electric-pair
@@ -8845,12 +8848,12 @@
        (general-define-key
         :keymaps 'flymake-mode-map
         ; TODO implement
-        [remap hydra-flycheck/body] (flymake-unsupported-command+ hydra-flymake/body)
         [remap flycheck-select-checker] (flymake-unsupported-command+ flycheck-select-checker)
         [remap flycheck-describe-checker] (flymake-unsupported-command+ flycheck-describe-checker)
         [remap flycheck-explain-error-at-point] (flymake-unsupported-command+ flycheck-explain-error-at-point)
         [remap toggle-flycheck-messages] (flymake-unsupported-command+ toggle-flycheck-messages)
 
+        [remap hydra-flycheck/body] 'hydra-flymake/body
         [remap flycheck-clear] 'flymake-proc-stop-all-syntax-checks
         [remap flycheck-first-error] 'flymake-first-error+
         [remap flycheck-last-error] 'flymake-last-error+
@@ -13141,18 +13144,6 @@
        (leader/set-keys-for-mode 'eglot--managed-mode
          "hy" 'eglot-help-at-point)
 
-       (defun eglot-toggle-help-buffer+ (&optional arg)
-         (interactive "P")
-         (setq eglot-auto-display-help-buffer
-               (if arg
-                   (not (zerop (prefix-numeric-value arg)))
-                 (not eglot-auto-display-help-buffer)))
-
-         (message "%s auto-display of eglot-help buffers"
-                  (if eglot-auto-display-help-buffer
-                      (propertize "enabled" 'face 'compilation-info)
-                    (propertize "disabled" 'face 'compilation-error))))
-
        (leader/with-prefix leader-server-leader-prefix
          (leader/set-keys-for-mode 'eglot--managed-mode
            ;; unbound 'eglot-clear-status
@@ -13166,7 +13157,6 @@
            "f" 'eglot-format
            "F" 'eglot-format-buffer
            "o" 'eglot-reconnect
-           "t" 'eglot-toggle-help-buffer+
 
            "g" "goto"
            "gg" 'eglot-find-implementation

@@ -6,6 +6,7 @@ standalone org file containing hydra definitions.
 #+BEGIN_SRC emacs-lisp
   (dolist (hydra '(hydra-eyebrowse
                    hydra-flycheck
+                   hydra-flymake
                    hydra-ibuffer
                    hydra-indent
                    hydra-ein
@@ -492,6 +493,26 @@ standalone org file containing hydra definitions.
       ("k"  flycheck-previous-error "Previous")
       ("gg" flycheck-first-error "First")
       ("G"  flycheck-last-error "Last")
+      ("q"  nil :exit t))
+  #+END_SRC
+
+* flymake
+  #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-flymake.el
+    (defvar hydra-flymake--window nil
+      "Window showing hydra-flymake diagnostics.")
+
+    (defhydra hydra-flymake
+      (:pre (let ((buffer-window (selected-window)))
+              (setq hydra-flymake--window (flymake-show-diagnostics-buffer))
+              (select-window buffer-window))
+       :post (when hydra-flymake--window
+               (quit-window nil hydra-flymake--window))
+       :hint nil)
+      "Errors"
+      ("j"  flymake-goto-next-error "Next")
+      ("k"  flymake-goto-prev-error "Previous")
+      ("gg" flymake-first-error+ "First")
+      ("G"  flymake-last-error+ "Last")
       ("q"  nil :exit t))
   #+END_SRC
 
