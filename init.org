@@ -11,6 +11,10 @@
 
   #+NAME: tangle-config
   #+BEGIN_SRC emacs-lisp :tangle no
+    ;; Disable annoying temporary files while tangling.
+    (setq auto-save-default nil
+          make-backup-files nil
+          create-lockfiles  nil)
     (org-babel-tangle-file "config.org")
     nil
   #+END_SRC
@@ -19,8 +23,12 @@
   #+BEGIN_SRC emacs-lisp :results values
     (require 'cl-lib)
 
-    (unless (load (concat user-emacs-directory "lisp/+config") t)
-      (load (concat user-emacs-directory "lisp/+config-default")))
+    (unless (or (load (concat user-emacs-directory "lisp/+config") t)
+                (load (concat user-emacs-directory "lisp/+config-default") t))
+      ;; This'll probably crash emacs init, unless we're tangling.
+      ;; I can't seem to find a variable that can detect this so for now
+      ;; I just carry on all the same.
+      (warn "Failed to load dotemacs configuration file"))
 
     (defmacro package! (&rest pkgs)
       "Assert whther all the packages in PKGS are to be installed"

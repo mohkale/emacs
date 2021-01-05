@@ -1,11 +1,12 @@
-#+PROPERTY: header-args :tangle lisp/+config-default.el :shebang ";; -*- lexical-binding: t -*-"
+#+PROPERTY: header-args :tangle lisp/+config-default.el :shebang ";; -*- lexical-binding: t -*-" :noweb yes
 
 Default configuration parameters for my emacs distribution. This configuration is
 only used when there's an error loading the actual config at =+config.el=.
 
 The packages you can configure my emacs to install.
 
-#+BEGIN_SRC emacs-lisp
+#+NAME: config-packages
+#+BEGIN_SRC emacs-lisp :results values
   (defvar +packages
     '(magit                                                             ; It's git... but magical  ,
       ;; ace-link                                                       ; Jump to links in the current buffer through an avy interface
@@ -112,7 +113,8 @@ The packages you can configure my emacs to install.
     "Packages I want setup on startup.")
 #+END_SRC
 
-#+BEGIN_SRC emacs-lisp
+#+NAME: config-options
+#+BEGIN_SRC emacs-lisp :results values
   (defvar +sh-use-lsp nil
     "When true `sh-script-mode' and it's derivatives will use LSP when available")
 
@@ -142,4 +144,18 @@ The packages you can configure my emacs to install.
 
 #+BEGIN_SRC emacs-lisp
   (provide '+config-default)
+#+END_SRC
+
+We need to evaluate these options when initially tangling otherwise ~+packages~ and
+other variables won't be properly defined (and my [[file:bin/tangle][tangle script]] doesn't actually
+tangle when [[file:bin/tangle-targets][checking]] whether blocks need to be tangled). To get around multiple
+defvar declarations only using the first, I recommend using ~setq~ in
+=lisp/+config.el=, instead of simply =defvar=.
+~lisp/+config-default~ should match the output of this file anyways so that's not as
+big of a concern.
+
+#+BEGIN_SRC emacs-lisp
+  <<config-packages()>>
+  <<config-options()>>
+  nil
 #+END_SRC
