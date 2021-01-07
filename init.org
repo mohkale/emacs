@@ -10136,6 +10136,8 @@
               doom-modeline-buffer-state-icon nil
               doom-modeline-height 1)
 
+        (advice-add 'doom-modeline--set-char-widths :override #'ignore)
+
         :config
         (setq find-file-visit-truename
               (or find-file-visit-truename                                 ; if already enabled, don't alter it
@@ -10163,7 +10165,7 @@
         (advice-add 'doom-modeline-icon :filter-return
                     (defun doom-modeline--pad-icon-on-terminal+ (value)
                       (if (and (not (display-graphic-p))
-                               doom-modeline-icon)
+                               value)
                           (let ((props (text-properties-at 0 value)))
                             (apply 'propertize
                                    (concat (substring-no-properties value)
@@ -10270,11 +10272,6 @@
                         (when stat
                           (concat (doom-modeline-spc)
                                   stat)))))))
-
-        (advice-add #'doom-modeline-lsp-icon :override
-                    (defun doom-modeline-lsp-icon+ (text face)
-                      (doom-modeline-icon 'nerd-oct "rocket" "🚀" text
-                                          :face face :height 1.0 :v-adjust -0.0575)))
 
         (defsubst doom-modeline--build-server-section+ (stat-func fallback-str)
           (when-let ((stat (funcall stat-func
