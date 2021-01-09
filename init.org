@@ -466,6 +466,17 @@
                   (add-hook sym #',fn ,append))))))
   #+END_SRC
 
+  This should be in core but I need it pretty early on so I've moved it here.
+
+  #+BEGIN_SRC emacs-lisp
+    (defmacro plist-pop! (list prop &optional default)
+      "delete PROP from plist LIST, returning value of PROP.
+        if PROP isn't in LIST, DEFAULT will be returned."
+      `(prog1
+           (or (plist-get ,list ,prop) ,default)
+         (cl-remf ,list ,prop)))
+  #+END_SRC
+
 ** packages
    Let's setup the packages needed to bootstrap my dotfiles, we're gonna need:
 
@@ -1090,6 +1101,62 @@
          :states leader-norm-states
          "C-SPC" (eval
                   `(general-simulate-key ,leader-key))))
+    Let's add a ~use-package~ keyword for setting up leader-keys.
+
+    #+BEGIN_SRC emacs-lisp
+      ;; Where these are placed determines whether they're deferred or not.
+      (let ((tail (nthcdr (cl-position :init use-package-keywords) use-package-keywords)))
+        (setcdr tail (cons :leader (cdr tail))))
+      (let ((tail (nthcdr (cl-position :config use-package-keywords) use-package-keywords)))
+        (setcdr tail (cons :lazy-leader (cdr tail))))
+
+      (defun use-package-normalize/:leader (_name keyword args)
+        args)
+
+      (defun use-package-leader-format-args+ (args)
+        ;; Properties
+        ;;  :defer - when true, leader are only assigned after package load
+        ;;  :modes/:mode - when true leaders are only bound in given major modes
+        ;;  :minor - when true :modes applies to minor-modes, not majors
+        ;;  :prefix - call leader/with-prefix with argument before rendering
+        (cl-loop
+         with modes = nil
+         with minor = nil
+         with prefix = nil
+         with leader-func = nil
+         with res = nil
+         for arg in args
+         do (let ((major (not (plist-pop! arg :minor))))
+              (setq modes (or (plist-pop! arg :modes)
+                              (plist-pop! arg :mode))
+                    prefix (plist-pop! arg :prefix)
+                    res (if modes
+                            (list (if major 'leader/set-keys-for-major-mode 'leader/set-keys-for-mode)
+                                  modes)
+                            ""
+                          '(leader/set-keys))
+                    leader-func '(leader/set-keys-for-mode)))
+         when (not arg)
+         do (display-warning 'use-package ":leader got no bindings")
+         else
+         do (setq res `(,@res ,@arg))
+         end
+         when prefix
+         do (setq res `(leader/with-prefix ,prefix ,res))
+         end
+         collect res))
+
+      (defun use-package-handler/:leader (name _keyword args rest state &optional defer)
+        (let ((body (use-package-process-keywords name rest state)))
+          (if (not args)
+              body
+            (use-package-concat
+             (funcall use-package--hush-function _keyword
+                      (list (cons 'progn (use-package-leader-format-args+ args))))
+             body))))
+
+      (defalias 'use-package-normalize/:lazy-leader #'use-package-normalize/:leader)
+      (defalias 'use-package-handler/:lazy-leader #'use-package-handler/:leader)
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
@@ -1601,13 +1668,6 @@
     or aliases."
       (declare (doc-string 1) (pure t) (side-effect-free t))
       `(lambda () (interactive) ,@body))
-
-    (defmacro plist-pop! (list prop &optional default)
-      "delete PROP from plist LIST, returning value of PROP.
-    if PROP isn't in LIST, DEFAULT will be returned."
-      `(prog1
-           (or (plist-get ,list ,prop) ,default)
-         (cl-remf ,list ,prop)))
 
     (defun keyword-sym-normalise! (sym)
       "convert a keyword symbol, SYM, to a non-keyword symbol.
