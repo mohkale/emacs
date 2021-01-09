@@ -1418,6 +1418,35 @@
                            (run-hooks 'after-load-theme-hook)))
     #+END_SRC
 
+*** search-recenter
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (defun +search-recenter (&rest args)
+        "Recenter the current window after a search operation.
+      This is a smart recentering command. If you're at the end of a buffer and a
+      recentering to the middle ends up showing more trailing (empty) lines then
+      it recenters to avoid them. Similair logic is in place for the start of the
+      buffer. Otherwise it recenters to the middle."
+        (let ((current-line (line-number-at-pos (point)))
+              (window-height-2 (/ (window-body-height) 2))
+              (first-line (line-number-at-pos (point-min)))
+              (last-line (line-number-at-pos (max 0 (- (point-max) 1)))))
+          (cl-destructuring-bind (line . recenter-positions)
+              (cond ((>= (+ current-line window-height-2) last-line)
+                     (cons last-line '(bottom)))
+                    ((<= (- current-line window-height-2) first-line)
+                     (cons first-line '(top)))
+                    (t (cons nil '(middle))))
+            (save-excursion
+              (when line
+                (goto-line line))
+              (recenter-top-bottom)))))
+
+      ;; Advise all search commands to perform a recentering.
+      (advice-add 'evil-ex-search-forward  :after #'+search-recenter)
+      (advice-add 'evil-ex-search-next     :after #'+search-recenter)
+      (advice-add 'evil-ex-search-previous :after #'+search-recenter)
+    #+END_SRC
+
 *** display-buffer
     Customise display-buffer-alist to prioritise switching focus to displayed
     buffers, instead of showing them and then making me have to switch to them
