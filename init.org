@@ -39,6 +39,7 @@
         ;; pdf-tools                                                      ; Use emacs as quick and dirty pdf viewer
         ;; piper                                                          ; Interactive shell pipelines with emacs
         rainbow-mode                                                      ; Automatically color/highlight css color names
+        skeletor                                                          ; Project skeleton generator package
         ;; rake                                                           ; Run rake tasks
         ;; vi-tilde-fringe                                                ; Show tildes at the end of the buffer
         ;; vlc-rc                                                         ; Control [[https://www.videolan.org/vlc/index.en-GB.html][VLC]] from emacs
@@ -14363,6 +14364,75 @@
              rake-cache-file (var! "rake.cache"))
 
        (defalias 'rake-refresh #'rake-regenerate-cache))
+   #+END_SRC
+
+** skeletor
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! skeletor)
+   :END:
+
+   Project skeleton [[https://github.com/chrisbarrett/skeletor.el][unpacker]] in emacs-lisp.
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package skeletor
+       :ensure t
+       :defer  t
+       :commands (skeletor-create-project+)
+       :leader
+       ("pm" 'skeletor-create-project+)
+
+       :custom
+       (skeletor-user-directory (etc! "project-skeletons"))
+       (skeletor-project-directory (expand-file-name  "~/prog/repos"))
+       (skeletor-completing-read-function 'completing-read
+        "Make skeletor defer to the current completion framework.")
+       (skeletor-show-project-command
+        (defun skeletor-show-project-command+ (dir)
+          "Skeletor show project directory in different window."
+          (display-buffer (dired-noselect dir)
+                          '((display-buffer-reuse-window
+                             display-buffer--maybe-pop-up-frame-or-window
+                             display-buffer-use-some-window
+                             display-buffer-pop-up-frame)))))
+
+       :config
+       ;; Fix issues with the base ruby gem project skeleton. See [[https://github.com/chrisbarrett/skeletor.el/issues/45][#45]].
+       (skeletor-define-constructor "Ruby Gem"
+         :requires-executables '(("bundle" . "http://bundler.io"))
+         :no-license? t
+         :no-license? t
+         :initialise
+         (lambda (spec)
+           (let-alist spec
+             (let ((flags (list
+                           "--no-coc" ;; code of conduct
+                           (concat "--test=" (shell-quote-argument
+                                              (funcall skeletor-completing-read-function
+                                                       "Testing framework: " '("minitest" "rspec"))))
+                           (concat "--" (unless (yes-or-no-p "Apply an MIT License") "no-") "mit"))))
+               (skeletor-shell-command (format "bundle gem %s %s"
+                                               (string-truncate-right!
+                                                (cl-loop for f in flags concat f concat " "))
+                                               (shell-quote-argument .project-name))
+                                       .project-dir)))))
+
+       (advice-add 'skeletor--initialize-git-repo :override
+                   (defun skeletor--initialize-git-repo+  (dir)
+                     "Override of `skeletor--initialize-git-repo' which produces only one initial commit."
+                     (let ((default-directory dir))
+                       (skeletor--log-info "Initialising git...")
+                       (unless (f-exists? (f-join dir ".git"))
+                         (skeletor-shell-command "git init"))
+                       (skeletor-shell-command "git add -A && git commit --allow-empty -m 'Initial commit'")
+                       (message "Initialising git...done"))))
+
+       (defun skeletor-create-project+ (dir skeleton)
+         "Variant of `skeleton-create-project' which defaults to the current directory."
+         (interactive (list (when current-prefix-arg
+                              (read-directory-name "Project directory"))
+                            (skeletor--read-project-type)))
+         (let ((skeletor-project-directory (or dir default-directory)))
+           (skeletor-create-project skeleton))))
    #+END_SRC
 
 ** tramp-term
