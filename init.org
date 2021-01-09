@@ -14435,6 +14435,33 @@
            (skeletor-create-project skeleton))))
    #+END_SRC
 
+*** templates
+   :PROPERTIES:
+   :header-args+: :tangle (package-str! "lisp/+skeletor-templates.el" skeletor)
+   :END:
+
+   #+BEGIN_SRC emacs-lisp :tangle (package-yes! skeletor)
+     (with-eval-after-load 'skeletor
+       (require '+skeletor-templates))
+   #+END_SRC
+
+   A basic [[file:etc/project-skeletons/c-make/][C/C++]] project template using a Makefile and either clang or gcc.
+
+   #+BEGIN_SRC emacs-lisp
+     (skeletor-define-template "c-make"
+       :title "C/C++ [make]"
+       :substitutions
+       '(("__MAIN__" . (lambda ()
+                         (read-string "Entry point: " nil nil "main")))
+         ("__CCLD__" . (lambda ()
+                       (funcall skeletor-completing-read-function "Compiler: "
+                                '("clang" "gcc" "g++"))))))
+   #+END_SRC
+
+   #+BEGIN_SRC emacs-lisp
+   (provide '+skeletor-templates)
+   #+END_SRC
+
 ** tramp-term
    create remote terminal sessions effortlessly... this should be built into term tbh.
 
