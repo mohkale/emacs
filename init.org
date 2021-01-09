@@ -86,6 +86,7 @@
         ;; ggtags                                                         ; GNU Global source code tagging system
         ;; ycmd                                                           ; A language-server for most languages. written in python.
         ;; ruby-robe                                                      ; Code navigation, doc-lookup and completion for Ruby
+        anaconda                                                          ; A no-longer mainatained, but still powerful language-server for python
 
     ;;; Languages
         bibtex
@@ -15189,6 +15190,19 @@
          "TAB"   'tab-to-tab-stop
          "<tab>" 'tab-to-tab-stop))
     #+END_SRC
+
+*** python-lsp
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! python :lsp :not anaconda)
+    :END:
+
+    Your going to need a python language server, I recommend [[https://github.com/palantir/python-language-server][this]] one that's based on
+    [[https://github.com/davidhalter/jedi][jedi]]. There's also a microsoft based [[https://github.com/microsoft/python-language-server][server]].
+
+    #+BEGIN_SRC emacs-lisp
+      (add-hook 'python-mode-hook +lsp-command)
+    #+END_SRC
+
 *** anaconda
     :PROPERTIES:
     :header-args+: :tangle (package-yes! python anaconda)
