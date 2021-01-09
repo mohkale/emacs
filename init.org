@@ -166,10 +166,23 @@
 
     (defmacro package! (&rest pkgs)
       "Assert whther all the packages in PKGS are to be installed"
-      (append '(and) (cl-loop for pkg in pkgs collect `(member (quote ,pkg) +packages))))
+      ;; (append '(and) (cl-loop for pkg in pkgs collect `(member (quote ,pkg) +packages)))
+      (let (pkg res)
+        (while (prog1 (setq pkg (car pkgs))
+                 (setq pkgs (cdr pkgs)))
+          (cond ((eq pkg :not)
+                 (push `(not (package! ,@pkgs)) res)
+                 (setq pkgs nil))
+                ((eq pkg :lsp)
+                 (push '+lsp-command res))
+                (t (push `(member (quote ,pkg) +packages) res))))
+        `(and ,@res)))
 
     (defmacro package-yes! (&rest pkgs)
       `(if (package! ,@pkgs) "yes" "no"))
+
+    (defmacro package-str! (str &rest pkgs)
+      `(if (package! ,@pkgs) ,str "no"))
 
     (defvar +lsp-command
       (let ((lsp   (package! lsp-mode))
@@ -9936,7 +9949,7 @@
 
 *** spaceline
     :PROPERTIES:
-    :header-args+: :tangle (if (package! spaceline) "init.el" "no")
+    :header-args+: :tangle (package-str! "init.el" spaceline)
     :END:
 
     An amazing mode line... needs to be initialised before all others to make sure
@@ -16137,9 +16150,8 @@
 
    Enable the bash language server when it's on my system.
 
-   #+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp :tangle (package-yes! sh-script :lsp)
      (when (and +sh-use-lsp
-                +lsp-command
                 (executable-find "bash-language-server"))
        (add-hook 'sh-mode-hook +lsp-command))
    #+END_SRC
@@ -16606,7 +16618,7 @@
 *** lsp
     LSP implementation for C++/C.
 
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! c :lsp)
       ;; prefer clang to ccls (when available).
       (when (and +c-prefer-clangd
                  (package! eglot)
@@ -16615,9 +16627,8 @@
           (add-to-list 'eglot-server-programs
                        '((c++-mode c-mode) "clangd"))))
 
-      (when +lsp-command
-        (add-hook 'c-mode-hook   +lsp-command)
-        (add-hook 'c++-mode-hook +lsp-command))
+      (add-hook 'c-mode-hook   +lsp-command)
+      (add-hook 'c++-mode-hook +lsp-command)
     #+END_SRC
 
 *** disaster
@@ -16636,14 +16647,14 @@
    :header-args+: :tangle (package-yes! kotlin)
    :END:
 
+   #+BEGIN_SRC emacs-lisp :tangle (package-yes! kotlin :lsp)
+     (add-hook 'kotlin-mode-hook +lsp-command)
+   #+END_SRC
+
    #+BEGIN_SRC emacs-lisp
      (use-package kotlin-mode
        :ensure t
        :defer  t
-       :init
-       (when +lsp-command
-         (add-hook 'kotlin-mode-hook +lsp-command))
-
        :config
        (push (cons 'kotlin-mode 4) +indent-config)
 
@@ -17036,16 +17047,15 @@
 *** lsp
     Requires ~npm install --global vscode-css-languageserver-bin~.
 
-    #+BEGIN_SRC emacs-lisp
-      (when +lsp-command
-        (add-hook 'css-mode-hook  +lsp-command)
-        (add-hook 'scss-mode-hook +lsp-command)
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! css :lsp)
+      (add-hook 'css-mode-hook  +lsp-command)
+      (add-hook 'scss-mode-hook +lsp-command)
 
-        (when (package! eglot)
-          (with-eval-after-load 'eglot
-             (push '((css-mode scss-mode)
-                     "css-languageserver" "--stdio")
-                   eglot-server-programs))))
+      (when (package! eglot)
+        (with-eval-after-load 'eglot
+          (push '((css-mode scss-mode)
+                  "css-languageserver" "--stdio")
+                eglot-server-programs)))
     #+END_SRC
 
 *** less-css-mode
@@ -17161,21 +17171,20 @@
      #+END_SRC
 
 *** lsp
-    #+BEGIN_SRC emacs-lisp
-      (when +lsp-command
-        (if (eq +lsp-command 'lsp)
-            (use-package lsp-haskell
-              :ensure t
-              :defer  t
-              :after  haskell-mode
-              :hook ((haskell-mode . lsp) ;; order of evaluation matters
-                     (haskell-mode . (lambda ()
-                                       (require 'lsp-haskell)
-                                       ;; until there's actually any useful info
-                                       (setq-local lsp-eldoc-enable-hover nil))))
-              :config
-              (setq lsp-haskell-process-args-hie (list "-d" "-l" (make-temp-file "hie." nil ".log"))))
-          (add-hook 'haskell-mode-hook +lsp-command)))
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! haskell :lsp)
+      (if (eq +lsp-command 'lsp)
+          (use-package lsp-haskell
+            :ensure t
+            :defer  t
+            :after  haskell-mode
+            :hook ((haskell-mode . lsp) ;; order of evaluation matters
+                   (haskell-mode . (lambda ()
+                                     (require 'lsp-haskell)
+                                     ;; until there's actually any useful info
+                                     (setq-local lsp-eldoc-enable-hover nil))))
+            :config
+            (setq lsp-haskell-process-args-hie (list "-d" "-l" (make-temp-file "hie." nil ".log"))))
+        (add-hook 'haskell-mode-hook +lsp-command))
     #+END_SRC
 
 ** golang
@@ -17255,9 +17264,8 @@
     The golang language server.
     requires: ~GO111MODULE=on  go get -u golang.org/x/tools/gopls@latest~.
 
-    #+BEGIN_SRC emacs-lisp
-      (when +lsp-command
-        (add-hook 'go-mode-hook +lsp-command))
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! golang :lsp)
+      (add-hook 'go-mode-hook +lsp-command)
     #+END_SRC
 
 ** rust
