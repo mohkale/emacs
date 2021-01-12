@@ -3,7 +3,7 @@
 #+TITLE: init.org
 #+STARTUP: content
 
-#+PROPERTY: header-args :tangle init.el :tangle-mode (identity #o544) :comments link :mkdirp yes :noweb yes :hlines no :shebang ";; -*- lexical-binding: t -*-"
+#+PROPERTY: header-args :tangle init.el :tangle-mode (identity #o544) :comments link :mkdirp yes :noweb yes :hlines no :shebang ";; -*- lexical-binding: t -*-" :lexical t
 
 * Config
   Configure the rest of the emacs packages in this config file.
@@ -92,6 +92,7 @@
     ;;; Languages
         bibtex
         c
+        clojure
         ;; cmake
         css
         csv
@@ -633,7 +634,7 @@
     | profile-dotemacs    | 26d98fd26c75281c6a7934479ed9df54ca8c6259df4b3ef435097800aaf6dca5 | http://www.randomsample.de/profile-dotemacs.el                                            |
     | open-junk-file      | c0b835b329758dced4ccae6c2f3fd5af16af929437110ddde00ea55dc7d47be3 | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/open-junk-file.el      |
     | sqlite-dump         | 8277c32f3e9dad7f760b946609c918dd51f32990137f839a000fb6ff5a049939 | https://user42.tuxfamily.org/sqlite-dump/index.html                                       |
-    | company-cmake       | 4d682308eb4f6a4be92a4b7dcb2d181b5c26b4337799de0a308969d8babef0a2 | https://raw.githubusercontent.com/purcell/company-cmake/master/company-cmake.el           |
+    | company-cmake       | 5d741fa41e82fab7e04a52e0e98f4a1aec666470788bbacdf3e11b90085f3b6e | https://raw.githubusercontent.com/purcell/company-cmake/master/company-cmake.el           |
     | transpose-frame     | a40264a07b25d2c1d8d1be341d42952329d1bbfab8c23100904627fef4f4c7b8 | https://www.emacswiki.org/emacs/download/transpose-frame.el                               |
     | hs-lint             | 61bf6d3cfd43f2729d85ed407a7de5fd6b025540229bc0b57c37785d0b6d7450 | https://raw.githubusercontent.com/ndmitchell/hlint/master/data/hs-lint.el                 |
     | hlint-refactor-mode | 55d5a9e99f0384b15eacfdf2b17ae313c6ddbb0343980ed324707fcaaf2b718a | https://raw.githubusercontent.com/mpickering/hlint-refactor-mode/master/hlint-refactor.el |
@@ -1870,6 +1871,14 @@
        (interactive)
        (find-file (etc! "snippets.org")))
 
+     (defun find-dotemacs-config-file ()
+       (interactive)
+       (if-let ((file (cl-loop for f in (list (lisp! "+config.el")
+                                              (lisp! "+config-default.el"))
+                               when (file-exists-p f) return f)))
+           (find-file file)
+         (user-error "No configuration file found")))
+
      (defun find-dotemacs-snippet ()
        (interactive)
        (let ((default-directory (etc! "snippets")))
@@ -1892,7 +1901,8 @@
        "fea" 'find-dotemacs-snippet
        "fey" 'find-dotemacs-snippets-file
        "fel" 'find-dotemacs-file
-       "fef" 'find-file-from-dotemacs)
+       "fef" 'find-file-from-dotemacs
+       "fex" 'find-dotemacs-config-file)
    #+END_SRC
 
 ** buffers
@@ -2024,10 +2034,10 @@
      (leader/set-keys
        "f~" 'write-backup
        "fa" 'write-autosave
-       "fd" 'show-and-copy-directory
        "fD" 'delete-buffer-file
        "fR" 'rename-buffer-file
        "fy" 'show-and-copy-buffer-file-name
+       "fu" 'show-and-copy-directory
        "f%" 'show-and-copy-buffer-file-basename
        ;; "fo" 'open-file-or-directory-in-external-app ;; TODO implement
        )
@@ -5370,12 +5380,11 @@
         (:mode 'org-mode
          "]" 'org-ref-insert-link)
 
-        :config
-        (with-no-warnings
-          (defvaralias 'reftex-default-bibliography 'bibtex-files)
-          (defvaralias 'reftex-default-bibliography 'bibtex-files)
-          (defvaralias 'org-ref-bibliography-notes 'bibtex-completion-notes-path))
+        :init
+        (defvaralias 'reftex-default-bibliography 'bibtex-files)
+        (defvaralias 'org-ref-bibliography-notes 'bibtex-completion-notes-path)
 
+        :config
         (setq org-ref-latex-bibliography-absolute-p t
               org-ref-pdf-directory (let ((path bibtex-completion-library-path))
                                       (if (listp path) (car path) path))
@@ -5433,7 +5442,7 @@
            "C-f"     company-filter-candidates
            "C-o"     company-last-candidate+
            "M-o"     company-first-candidate+)
-         "bindings which override any local bindings while the company popup is active.
+         "Bindings which override any local bindings while the company popup is active.
      DO NOT alter this (by setting a new value) while the popup is active, or be prepared
      to restart emacs.")
 
@@ -5679,6 +5688,7 @@
        :config
        (setq inhibit-compacting-font-caches t)
        (push '(rustic-mode all-the-icons-alltheicon "rust") all-the-icons-mode-icon-alist)
+       (push '(web-mode    all-the-icons-faicon     "html5") all-the-icons-mode-icon-alist)
 
        (defun all-the-icons-insert-all-icons ()
          (interactive)
@@ -5762,6 +5772,7 @@
                               ((all-the-icons-alltheicon . "google-drive")     .    (all-the-icons-nerd-mdi    . "google-drive"))
                               ((all-the-icons-alltheicon . "gulp")             .    (all-the-icons-nerd-seti   . "gulp"))
                               ((all-the-icons-alltheicon . "haskell")          .    (all-the-icons-nerd-seti   . "haskell"))
+                              ((all-the-icons-alltheicon . "html5")            .    (all-the-icons-nerd-fa     . "html5"))
                               ((all-the-icons-alltheicon . "java")             .    (all-the-icons-nerd-fae    . "java"))
                               ((all-the-icons-alltheicon . "nodejs")           .    (all-the-icons-nerd-mdi    . "nodejs"))
                               ((all-the-icons-alltheicon . "prolog")           .    (all-the-icons-nerd-dev    . "prolog"))
@@ -5776,6 +5787,7 @@
                               ((all-the-icons-alltheicon . "test-ruby")        .    (all-the-icons-nerd-oct    . "ruby"))
                               ((all-the-icons-fileicon   . "cljs")             .    (all-the-icons-nerd-dev    . "clojure"))
                               ((all-the-icons-fileicon   . "docker")           .    (all-the-icons-nerd-linux  . "docker"))
+                              ((all-the-icons-fileicon   . "bib")              .    (all-the-icons-nerd-mdi    . "bible"))
                               ((all-the-icons-fileicon   . "php")              .    (all-the-icons-nerd-dev    . "php"))
                               ((all-the-icons-fileicon   . "racket")           .    (all-the-icons-fileicon    . "lisp")))))
             ;; For each variable all-the-icons uses to lookup contextual icons.
@@ -6147,6 +6159,9 @@
    #+BEGIN_SRC emacs-lisp
      (use-package lorem-ipsum
        :defer  t
+       :commands (Lorem-ipsum-insert-list
+                  Lorem-ipsum-insert-paragraphs
+                  Lorem-ipsum-insert-sentences)
        :leader
        ("il"  "lorem-ipsum"
         "ill" 'Lorem-ipsum-insert-list
@@ -9038,6 +9053,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package flyspell
+       :hook (git-commit-mode . flyspell-mode)
        :init
        (evil-ex-define-cmd "spell" #'flyspell-buffer)
 
@@ -10622,8 +10638,8 @@
        (:prefix "k"
         "m" 'pp-macroexpand-last-sexp
         "M" 'pp-macroexpand-expression
-        "x" 'pp-eval-last-sexp
-        "X" 'pp-eval-expression)
+        "p" 'pp-eval-last-sexp
+        "P" 'pp-eval-expression)
 
        :init
        (with-eval-after-load 'elisp-mode
@@ -10798,7 +10814,7 @@
 
        (advice-add 'server-edit :before
                    (defun server-edit--auto-save-on-exit (&rest args)
-                     "automatically save file before server exit"
+                     "Automatically save file before server exit"
                      (save-buffer)))
 
        :lazy-leader
@@ -10867,7 +10883,7 @@
         "a dummy minor mode for files being edited by `server'.
       makes it easier to bind keys (& leaders :grinning: for them)."
         nil
-        "ServerEdit"
+        " ServerEdit"
         '(;; ([remap evil-write] . server-edit)
           ([remap evil-save-and-close] . server-edit)
           ([remap evil-quit-all-with-error-code] . server-abort)))
@@ -11599,11 +11615,14 @@
     #+END_SRC
 
 *** marginalia
-    #+BEGIN_SRC emacs-lisp :tangle no
+    #+BEGIN_SRC emacs-lisp
       (use-package marginalia
         :ensure t
         :defer  t
-        :hook (selectrum-mode . marginalia-mode))
+        :hook (selectrum-mode . marginalia-mode)
+        :general
+        (:keymaps 'embark-general-map
+         "A" 'marginalia-cycle))
     #+END_SRC
 
 *** embark
@@ -11854,6 +11873,8 @@
         :hook (ivy-mode . ivy-prescient-mode)
         :config
         (add-to-list 'ivy-prescient-sort-commands 'counsel-find-file t)
+        (add-to-list 'ivy-prescient-sort-commands 'counsel-imenu t)
+        (add-to-list 'ivy-prescient-sort-commands 'flyspell-correct-ivy t)
 
         (add-hook 'ivy-prescient-mode-hook
                   (defun ivy-prescient-disable-sort-find-file+ ()
@@ -12259,7 +12280,6 @@
         ("r"  "register/rings"
          "fs" "recursive-find"
 
-         "af" 'counsel-faces
          "ee" 'counsel-compilation-errors
          "ic" 'counsel-unicode-char
          "ie" 'counsel-org-entity
@@ -12286,7 +12306,7 @@
          "sb" 'counsel-grep
          ;; recursive searches
          "sv" 'counsel-git-grep
-         "sp" 'counsel-pt
+         ;; "sp" 'counsel-pt
          "sa" 'counsel-ag
          "sr" 'counsel-rg
 
@@ -12302,6 +12322,8 @@
          "x" 'counsel-wmctrl
          "C-x" 'counsel-wmctrl)
         (:keymaps 'counsel-mode-map
+         [remap describe-face] 'counsel-faces
+         [remap package-install] 'counsel-package
          [remap ivy-switch-buffer] 'counsel-switch-buffer
          [remap find-file] 'counsel-find-file
          [remap org-capture] 'counsel-org-capture
@@ -13946,6 +13968,7 @@
 
        (setq whitespace-exempt-modes
              (append '(magit-status-mode
+                       magit-process-mode
                        magit-log-mode
                        magit-diff-mode)
                      whitespace-exempt-modes))
@@ -15367,6 +15390,9 @@
         :defer t
         :straight (python :type built-in)
         :hook (python-mode . flycheck-mode)
+        :custom
+        (python-indent-guess-indent-offset-verbose nil
+         "Disable annoying notification when indent guess fails")
         :init
         (defalias 'python-repl 'run-python)
 
@@ -15643,7 +15669,7 @@
 *** solargraph
     Language server implementation for ruby.
 
-    #+BEGIN_SRC emacs-lisp :tangle (if +lsp-command "yes" "no")
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! :lsp)
       (add-hook +ruby-mode-hook
                 (defun ruby-enable-lsp-in-projects+ (&rest args)
                   (when (eq +ruby-use-lsp 'projectile)
@@ -15710,6 +15736,7 @@
       (use-package ruby-tools
         :ensure t
         :defer  t
+        :diminish ruby-tools-mode
         :init
         (add-hook +ruby-mode-hook #'ruby-tools-mode)
 
@@ -15743,6 +15770,7 @@
       (use-package ruby-electric
         :ensure t
         :defer  t
+        :diminish ruby-electric-mode
         :init
         (add-hook +ruby-mode-hook #'ruby-electric-mode)
 
@@ -16799,7 +16827,7 @@
                           (setq start-p    (string-match-p start-regexp    current-line)))
                   (setq inserted t)
                   (let ((start-column (line-beginning-column)))
-                    (when start-p (incf start-column)) ;; one char past start column
+                    (when start-p (cl-incf start-column)) ;; one char past start column
                     (dotimes (_ arg)
                       ;; (goto-char (line-end-position))
                       (newline)
@@ -16988,7 +17016,7 @@
    :header-args+: :tangle (package-yes! javascript typescript)
    :END:
 
-   typescript depends on javascript +for now+.
+   Typescript depends on javascript +for now+.
 
    #+BEGIN_SRC emacs-lisp
      (use-package typescript-mode
@@ -17433,6 +17461,8 @@
              TeX-source-correlate-start-server t
              tex-print-file-extension ".pdf")
 
+       (defvaralias 'LaTeX-mode-hook 'latex-mode-hook)
+
        (defvar latex-modes+ '(latex-mode tex-mode)
          "list of tex related modes. used for leader and pretty symbols.")
 
@@ -17501,9 +17531,6 @@
                (latex-mode . TeX-PDF-mode)
                (latex-mode . TeX-source-correlate-mode))
         :init
-        (with-no-warnings
-          (defvaralias 'LaTeX-mode-hook 'latex-mode-hook))
-
         (defvar TeX-view-in-emacs+ nil
           "when true, view latex documents in emacs PDFTools.
       This variable should be set before requiring Auctex.")
@@ -18174,7 +18201,7 @@
       `(font-lock-constant-face ((,cls (:foreground ,red-256 :inherit bold))))
       `(font-lock-function-name-face ((,cls (:foreground ,yellow-int-256))))
       `(font-lock-negation-char-face ((,cls (:foreground ,red-256))))
-      `(font-lock-preprocessor-face ((,cls (:foreground ,green-int-256))))
+      `(font-lock-preprocessor-face ((,cls (:inherit font-lock-keyword-face))))
       `(font-lock-string-face ((,cls (:foreground ,blue))))
       `(font-lock-doc-face ((t (:foreground ,blue))))
       `(font-lock-type-face ((,cls (:foreground ,red-256))))
@@ -18461,6 +18488,13 @@
       `(woman-bold     ((,cls (:foreground ,red :inherit bold))))
       `(woman-italic   ((,cls (:foreground ,green))))
       `(woman-unknown  ((,cls (:inherit error))))
+
+     ;;; vline
+      `(vline ((,cls (:inherit hl-line))))
+      `(vline-visual ((,cls (:inherit hl-line))))
+
+     ;;; marginalia
+      `(marginalia-documentation ((,cls (:inherit font-lock-comment-face))))
       )
 
       (custom-theme-set-variables 'an-old-hope
