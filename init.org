@@ -10113,6 +10113,10 @@
                   (not (member doom-modeline-buffer-file-name-style
                                '(file-name buffer-name)))))
 
+        (advice-add 'mode-line-frame-control :override
+                    (defun mode-line-frame-control+ ()
+                      "%F "))
+
         (defun doom-modeline-truncate-right+ (val)
           (string-truncate-right! val 1))
 
@@ -10209,21 +10213,25 @@
               'doom-modeline-evil-normal-state)))
 
         (doom-modeline-def-segment evil-state-and-winum+
-          (propertize
-           (concat " "
-                   (cond
-                    ((active-minibuffer-window)
-                     (doom-modeline-icon 'faicon "dot-circle-o" ?M ?M))
-                    ((bound-and-true-p winum-mode)
-                     (substring-no-properties (winum-get-number-string)))
-                    ((bound-and-true-p ace-window-display-mode)
-                     (aw-update)
-                     (window-parameter (selected-window) 'ace-window-path))
-                    ((bound-and-true-p window-numbering-mode)
-                     (window-numbering-get-number-string))
-                    (t " "))
-                   " ")
-           'face (doom-modeline--evil-face+)))
+          (let* ((face (doom-modeline--evil-face+))
+                 (space (propertize " " 'face face)))
+            (concat space
+                    (when (> (length (frames-on-display-list)) 1)
+                      (propertize (format-mode-line (mode-line-frame-control))
+                                  'face `(:weight bold :inherit ,face)))
+                    (propertize
+                     (cond
+                      ((active-minibuffer-window) "●")
+                      ((bound-and-true-p winum-mode)
+                       (substring-no-properties (winum-get-number-string)))
+                      ((bound-and-true-p ace-window-display-mode)
+                       (aw-update)
+                       (window-parameter (selected-window) 'ace-window-path))
+                      ((bound-and-true-p window-numbering-mode)
+                       (window-numbering-get-number-string))
+                      (t " "))
+                     'face face)
+                    space)))
 
         (doom-modeline-def-segment vc-status+
           (when (and vc-mode
