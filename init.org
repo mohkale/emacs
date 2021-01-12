@@ -14448,9 +14448,10 @@
      (use-package skeletor
        :ensure t
        :defer  t
-       :commands (skeletor-create-project+)
+       :commands (skeletor-create-project+
+                  skeletor-expand-project+)
        :leader
-       ("pm" 'skeletor-create-project+)
+       ("pm" 'skeletor-expand-project+)
 
        :custom
        (skeletor-user-directory (etc! "project-skeletons"))
@@ -14503,7 +14504,26 @@
                               (read-directory-name "Project directory"))
                             (skeletor--read-project-type)))
          (let ((skeletor-project-directory (or dir default-directory)))
-           (skeletor-create-project skeleton))))
+           (skeletor-create-project skeleton)))
+
+       (defun skeletor-expand-project+ (dir skeleton)
+         "Expand a skeletor project in the cwd."
+         (interactive (list (when current-prefix-arg
+                              (read-directory-name "Project directory"))
+                            (skeletor--read-project-type)))
+         ;; use `default-directory' if `dir' not given and trim trailing path vars
+         (setq dir (string-trim (or dir default-directory) nil
+                                (rx (one-or-more (eval (f-path-separator))))))
+         ;; confirm with user when creating in an already populated directory.
+         (when (and (> (length (directory-files dir)) 2)
+                    (not (yes-or-no-p "Directory not empty, continue project creation?")))
+           (user-error "Project creation cancelled because directory not empty: %s" dir))
+         ;; seperate path and defer to skeletor
+         (let ((name (path-basename dir))
+               (dir  (path-dirname  dir)))
+           (cl-letf (((symbol-function 'skeletor--read-project-name)
+                      (lambda () name)))
+             (skeletor-create-project-at dir skeleton)))))
    #+END_SRC
 
 *** templates
