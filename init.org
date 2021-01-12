@@ -1697,6 +1697,117 @@
         (add-hook 'emacs-startup-hook 'animate-birthday-present))
     #+END_SRC
 
+*** dotfiles
+    :PROPERTIES:
+    :header-args+: :tangle lisp/+dotfiles.el
+    :END:
+
+    This branch defines commands to interface with scripts from my [[https://github.com/mohkale/dotfiles][dotfiles]].
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package +dotfiles
+        :defer t
+        :commands (+dot-goto-repo
+                   +dot-goto-fsmap
+                   +dot-goto-fsmap-dirs
+                   +dot-goto-executable
+                   +dot-open-bookmark)
+        :leader
+        ("fd" "dotfiles"
+         "fdp" '+dot-goto-repo
+         "fdf" '+dot-goto-fsmap
+         "fdd" '+dot-goto-fsmap-dirs
+         "fdx" '+dot-goto-executable
+         "fdb" '+dot-open-bookmark))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
+      (defvar +dot-goto-repo-history nil)
+      (defun +dot-goto-repo ()
+        (interactive)
+        "List repositories using my [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-repos][ls-repos]] script and ask for one to jump to."
+        (let ((repo (completing-read "Repo: "
+                                     (process-lines "ls-repos")
+                                     nil t nil '+dot-goto-repo-history)))
+          (dired repo)))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
+      (defvar +dot-goto-executable-history nil)
+      (defun +dot-goto-executable ()
+        (interactive)
+        "List and jump to an executable using [[https://github.com/mohkale/dotfiles/blob/master/bin/ls-exec][ls-exec]]."
+        (let ((cand (completing-read "Executable:"
+                                     (process-lines "ls-exec"))))
+          (find-file cand)))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
+      (defvar +dot-goto-fsmap-history nil)
+      (defun +dot-goto-fsmap (&optional dirs-only)
+        "List file system maps (using [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-fsmaps][here]]) and find one in emacs."
+        (interactive "P")
+        (if-let ((fsmaps (save-match-data
+                           (cl-loop for fsmap in (process-lines
+                                                  "sh" "-c"
+                                                  (concat "ls-fsmaps -er" (when dirs-only " -d")
+                                                          "| if hash column 2>/dev/null; then column -s : -t; else tr ':' ' '; fi"))
+                                    with path  = nil
+                                    with alias = nil
+                                    with spacing = nil
+                                    when (string-match (rx bol
+                                                           (group (one-or-more (not whitespace)))
+                                                           (group (+ (any whitespace)))
+                                                           (group (one-or-more anychar))
+                                                           eol)
+                                                       fsmap)
+                                      do (setq alias   (match-string 1 fsmap)
+                                               spacing (match-string 2 fsmap)
+                                               path    (match-string 3 fsmap))
+                                      and collect (propertize
+                                                   (concat (propertize alias 'face 'font-lock-type-face)
+                                                            spacing
+                                                            ;; (propertize path 'face (if (file-directory-p path) 'dired-directory 'default))
+                                                            path)
+                                                   'fsmap path)))))
+            (find-file (get-text-property 0 'fsmap (completing-read "File system map: " fsmaps nil t nil '+dot-goto-fsmap-history)))
+          (user-error "No fsmaps found")))
+
+      (defun +dot-goto-fsmap-dirs ()
+        (interactive)
+        (+dot-goto-fsmap '(4)))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
+      (defvar +dot-open-bookmark-history nil)
+      (defun +dot-open-bookmark ()
+        "List system bookmarks (using [[https://github.com/mohkale/dotfiles/blob/master/bin/ls-bookmarks][this]]) and open it in your default browser."
+        (interactive)
+        (if-let ((bookmarks (cl-loop for row in (process-lines "ls-bookmarks")
+                                  do (setq row (split-string row "\t"))
+                                  with url   = nil
+                                  with tags  = nil
+                                  with title = nil
+                                  do (setq url   (nth 0 row)
+                                           tags  (nth 1 row)
+                                           title (nth 2 row))
+                                  when (string-prefix-p "http" url)
+                                    collect (propertize
+                                             (concat (unless (string-empty-p tags)
+                                                       (propertize (concat "(" tags ") ") 'face 'bold))
+                                                     title
+                                                     (when url
+                                                       (when-let ((domain (url-domain (url-generic-parse-url url))))
+                                                         (concat " [" (propertize domain 'face 'font-lock-preprocessor-face) "]"))))
+                                             'bookmark url))))
+            (xopen-url+ (get-text-property 0 'bookmark (completing-read "Bookmark: " bookmarks nil t nil '+dot-open-bookmark-history)))
+          (user-error "No bookmarks")))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
+      (provide '+dotfiles)
+    #+END_SRC
+
 * Core
   core functions needed to edit with emacs.
 
