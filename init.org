@@ -8877,8 +8877,22 @@
    #+BEGIN_SRC emacs-lisp
      (use-package eldoc
        :delight ""
+       :commands (eldoc-doc-buffer-no-select+)
+       :custom
+       (eldoc-echo-area-prefer-doc-buffer t)
+
        :config
-       (setq eldoc-echo-area-prefer-doc-buffer t))
+       (defun eldoc-doc-buffer-no-select+ ()
+         (interactive)
+         (let ((display-buffer-alist
+                `((,(rx "*eldoc*")
+                   ,@default-display-buffer-action)
+                  ,@display-buffer-alist)))
+           (eldoc-doc-buffer t)))
+
+       :leader
+       ("hb" 'eldoc-doc-buffer
+        "ho" 'eldoc-doc-buffer-no-select+))
    #+END_SRC
 
 ** electric-pair
@@ -11965,16 +11979,23 @@
     #+END_SRC
 
 *** ivy-lsp
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! lsp-mode)
       (use-package lsp-ivy
         :ensure t
         :defer  t
-        :after (:any eglot lsp-mode)
+        :after lsp-mode
         :leader
-        (:mode '(lsp-mode eglot--managed-mode)
+        (:mode 'lsp-mode
          :minor t
-         "jy" 'lsp-ivy-workspace-symbol
-         "jY" 'lsp-ivy-global-workspace-symbol))
+         "jl" 'lsp-ivy-workspace-symbol
+         "jL" 'lsp-ivy-global-workspace-symbol)
+
+        :config
+        ;; Fixed ivy issue, see [[https://github.com/emacs-lsp/lsp-ivy/issues/27][#25]].
+        (advice-add #'ivy-update-candidates :around
+                    (defun ivy-update-candidates-dynamic-collection-workaround+ (old-fun &rest args)
+                      (cl-letf (((symbol-function #'completion-metadata) #'ignore))
+                        (apply old-fun args)))))
     #+END_SRC
 
 *** ivy-flyspell
@@ -13181,15 +13202,13 @@
      (use-package eglot
        :ensure t
        :defer  t
+       :custom
+       (eglot-stay-out-of '(company))                                                ; I'll set my backends myself, thank you.
+       (eglot-ignored-server-capabilites '(:documentHighlightProvider))              ; Prevent eglot highlighting the symbol at point
+
+
        :config
        (require 'yasnippet) ;; needed or else snippet expansion won't happen.
-
-       ;; I'll set my backends myself, thank you.
-       (setq eglot-stay-out-of '(company))
-
-       ;; prevent eglot highlighting the symbol at point
-       (setq eglot-ignored-server-capabilites
-             '(:documentHighlightProvider))
 
        (company/configure-mode (eglot--managed-mode)
          ;; eglot doesn't have it's own company backend
@@ -13741,15 +13760,25 @@
      (use-package lsp-mode
        :ensure t
        :defer  t
-       ;; never use lsp-mode, use lsp.
+       :custom
+       (lsp-auto-guess-root t)
+       (lsp-prefer-flymake nil)
+       (lsp-enable-snippet t)
+       ;; (lsp-auto-configure nil)
+       (lsp-modeline-diagnostics-enable nil)
+       (lsp-enable-symbol-highlighting nil)
+       (lsp-eldoc-render-all t)
+       (lsp-enable-xref t)
+       (lsp-headerline-breadcrumb-enable nil)
+       (lsp-session-file (var! "lsp/session"))
+       (lsp-server-install-dir (var! "lsp/servers"))
+
        :config
-       (setq lsp-prefer-flymake             nil
-             lsp-enable-snippet             nil
-             lsp-enable-symbol-highlighting nil
-             lsp-auto-guess-root            t
-             lsp-map+ (make-sparse-keymap)
-             lsp-session-file (var! "lsp/session")
-             lsp-server-install-dir (var! "lsp/servers"))
+       (setq lsp-map+ (make-sparse-keymap))
+
+       :general
+       (:keymaps 'lsp-mode-map
+        [remap display-local-help] 'lsp-describe-thing-at-point)
 
        :lazy-leader
        (:mode 'lsp-mode
@@ -13813,22 +13842,11 @@
          "pG" 'lsp-ui-peek-find-definitions))
     #+END_SRC
 
-*** company-lsp
-    use lsp as a completion backend for company.
-
+*** dap-mode
     #+BEGIN_SRC emacs-lisp
-      (use-package company-lsp
+      (use-package dap-mode
         :ensure t
-        :defer  t
-        :after  lsp-mode
-        :commands company-lsp
-        :init
-        (company/configure-mode (lsp-mode)
-          company-lsp)
-
-        :config
-        ;; reduces write lag
-        (setq company-lsp-cache-candidates t))
+        :defer  t)
     #+END_SRC
 
 ** magit
