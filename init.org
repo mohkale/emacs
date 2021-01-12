@@ -13473,91 +13473,102 @@
    #+END_SRC
 
 ** engine-mode
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! engine-mode)
+   :END:
+
    Search engine interaction for emacs. lets you create enteractive functions to run
    search queries on user specified engines. eg. engine/search-google will prompt you
    for a string and then open your default browser on google (having run the query).
 
-   #+NAME: engine-mode-search-engines
-   | Search Engine | Key | Identifier               | URL                                                                      |
-   |---------------+-----+--------------------------+--------------------------------------------------------------------------|
-   | DuckDuckGo    | d   | duckduckgo               | https://duckduckgo.com/?q=%s                                             |
-   | Github        | G   | github                   | https://github.com/search?ref=simplesearch&q=%s                          |
-   | Google        | g   | google                   | http://www.google.com/search?ie=utf-8&oe=utf-8&q=%s                      |
-   | GoogleImages  | i   | google-images            | http://www.google.com/images?hl=en&source=hp&q=%s                        |
-   | GoogleMaps    | m   | google-maps              | http://maps.google.com/maps?q=%s                                         |
-   | StackOverflow | s   | stack-overflow           | https://stackoverflow.com/search?q=%s                                    |
-   | Wikipedia     | w   | wikipedia                | http://www.wikipedia.org/search-redirect.php?language=en&go=Go&search=%s |
-   | Youtube       | y   | youtube                  | http://www.youtube.com/results?aq=f&oq=&search_query=%s                  |
-   |---------------+-----+--------------------------+--------------------------------------------------------------------------|
-   | MyAnimeList   | aa  | myanimelist              | https://myanimelist.net/search/all?q=%s                                  |
-   | Anime         | aA  | myanimelist/anime        | https://myanimelist.net/anime.php?q=%s                                   |
-   | Manga         | am  | myanimelist/manga        | https://myanimelist.net/manga.php?q=%s                                   |
-   | Characters    | ac  | myanimelist/chars        | https://myanimelist.net/character.php?q=%s                               |
-   | People        | ap  | myanimelist/people       | https://myanimelist.net/people.php?q=%s                                  |
-   | News          | an  | myanimelist/news         | https://myanimelist.net/news/search?q=%s                                 |
-   | Articles      | aF  | myanimelist/articles     | https://myanimelist.net/featured/search?q=%s                             |
-   | Forums        | af  | myanimelist/forums       | https://myanimelist.net/forum/search?u=&uloc=1&loc=-1&q=%s               |
-   | Clubs         | aC  | myanimelist/clubs        | https://myanimelist.net/clubs.php?action=find&cn=%s                      |
-   | Users         | au  | myanimelist/users        | https://myanimelist.net/users.php?q=%s                                   |
-   |---------------+-----+--------------------------+--------------------------------------------------------------------------|
-   | Nyaa          | nn  | nyaa                     | https://nyaa.si/?f=0&c=0_0&q=%s                                          |
-   | Anime         | na  | nyaa/anime-english       | https://nyaa.si/?f=0&c=1_2&q=%s                                          |
-   | AnimeAll      | nA  | nyaa/anime               | https://nyaa.si/?f=0&c=1_0&q=%s                                          |
-   | Music         | nm  | nyaa/music               | https://nyaa.si/?f=0&c=2_0&q=%s                                          |
-   | Literature    | nl  | nyaa/literature-english  | https://nyaa.si/?f=0&c=3_1&q=%s                                          |
-   | LiteratureAll | nL  | nyaa/literature          | https://nyaa.si/?f=0&c=3_0&q=%s                                          |
-   | LiveAction    | nv  | nyaa/live-action-english | https://nyaa.si/?f=0&c=4_1&q=%s                                          |
-   | LiveActionAll | nV  | nyaa/live-action         | https://nyaa.si/?f=0&c=4_0&q=%s                                          |
-   | Images        | ni  | nyaa/images              | https://nyaa.si/?f=0&c=5_0&q=%s                                          |
-   | Software      | ns  | nyaa/software            | https://nyaa.si/?f=0&c=6_0&q=%s                                          |
-   | Games         | ng  | nyaa/games               | https://nyaa.si/?f=0&c=6_2&q=%s                                          |
-
-   #+NAME: engine-mode-prefix-names
-   | prefix | name        |
-   |--------+-------------|
-   | n      | Nyaa        |
-   | a      | MyAnimeList |
-
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! engine-mode) :var engines=engine-mode-search-engines prefix-aliases=engine-mode-prefix-names :results output
-     (setq engines (cdr engines)) ;; strip header row
-
+   #+BEGIN_SRC emacs-lisp
      (use-package engine-mode
        :ensure t
        :defer  t
-       :init
-       (let ((engine-prefix "se"))
-         (leader/set-keys engine-prefix "engines")
+       :custom
+       (engine/browser-function #'xopen-url+))
+   #+END_SRC
 
-         (dolist (engine engines)
-           (let* ((key               (nth 1 engine))
-                  (identifier-string (nth 2 engine))
-                  (engine            (nth 0 engine))
+   Here's a list of all the search-engines my emacs will setup alongside the
+   associated keybindings, elisp identifiers and URLs.
 
-                  (function-identifier (intern
-                                        (concat "engine/search-"
-                                                identifier-string)))
-                  (key (unless (string-empty-p key)
-                         (concat engine-prefix key))))
-             (when key
-               (leader/set-keys key `(,engine . ,function-identifier)))
-             (autoload function-identifier "engine-mode.el" nil t)))
+   #+NAME: engine-mode-search-engines
+   | Search Engine   | Key     | Identifier               | URL                                                                                                               |
+   |-----------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
+   | DuckDuckGo      | sed     | duckduckgo               | https://duckduckgo.com/?q=%s                                                                                      |
+   | Github          | seG     | github                   | https://github.com/search?ref=simplesearch&q=%s                                                                   |
+   | Google          | seg     | google                   | http://www.google.com/search?ie=utf-8&oe=utf-8&q=%s                                                               |
+   | GoogleImages    | sei     | google-images            | http://www.google.com/images?hl=en&source=hp&q=%s                                                                 |
+   | GoogleMaps      | sem     | google-maps              | http://maps.google.com/maps?q=%s                                                                                  |
+   | StackOverflow   | ses     | stack-overflow           | https://stackoverflow.com/search?q=%s                                                                             |
+   | Wikipedia       | sew     | wikipedia                | http://www.wikipedia.org/search-redirect.php?language=en&go=Go&search=%s                                          |
+   | Youtube         | sey     | youtube                  | http://www.youtube.com/results?aq=f&oq=&search_query=%s                                                           |
+   |-----------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
+   | MyAnimeList     | sea SPC | myanimelist              | https://myanimelist.net/search/all?q=%s                                                                           |
+   | Anime           | seaa    | myanimelist/anime        | https://myanimelist.net/anime.php?q=%s                                                                            |
+   | Manga           | seam    | myanimelist/manga        | https://myanimelist.net/manga.php?q=%s                                                                            |
+   | Characters      | seac    | myanimelist/chars        | https://myanimelist.net/character.php?q=%s                                                                        |
+   | People          | seap    | myanimelist/people       | https://myanimelist.net/people.php?q=%s                                                                           |
+   | News            | sean    | myanimelist/news         | https://myanimelist.net/news/search?q=%s                                                                          |
+   | Articles        | seaF    | myanimelist/articles     | https://myanimelist.net/featured/search?q=%s                                                                      |
+   | Forums          | seaf    | myanimelist/forums       | https://myanimelist.net/forum/search?u=&uloc=1&loc=-1&q=%s                                                        |
+   | Clubs           | seaC    | myanimelist/clubs        | https://myanimelist.net/clubs.php?action=find&cn=%s                                                               |
+   | Users           | seau    | myanimelist/users        | https://myanimelist.net/users.php?q=%s                                                                            |
+   |-----------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
+   | Nyaa            | senn    | nyaa                     | https://nyaa.si/?f=0&c=0_0&q=%s                                                                                   |
+   | Anime           | sena    | nyaa/anime-english       | https://nyaa.si/?f=0&c=1_2&q=%s                                                                                   |
+   | AnimeAll        | senA    | nyaa/anime               | https://nyaa.si/?f=0&c=1_0&q=%s                                                                                   |
+   | Music           | senm    | nyaa/music               | https://nyaa.si/?f=0&c=2_0&q=%s                                                                                   |
+   | Literature      | senl    | nyaa/literature-english  | https://nyaa.si/?f=0&c=3_1&q=%s                                                                                   |
+   | LiteratureAll   | senL    | nyaa/literature          | https://nyaa.si/?f=0&c=3_0&q=%s                                                                                   |
+   | LiveAction      | senv    | nyaa/live-action-english | https://nyaa.si/?f=0&c=4_1&q=%s                                                                                   |
+   | LiveActionAll   | senV    | nyaa/live-action         | https://nyaa.si/?f=0&c=4_0&q=%s                                                                                   |
+   | Images          | seni    | nyaa/images              | https://nyaa.si/?f=0&c=5_0&q=%s                                                                                   |
+   | Software        | sens    | nyaa/software            | https://nyaa.si/?f=0&c=6_0&q=%s                                                                                   |
+   | Games           | seng    | nyaa/games               | https://nyaa.si/?f=0&c=6_2&q=%s                                                                                   |
 
-         (dolist (alias prefix-aliases)
-           (let* ((prefix (concat engine-prefix (car alias)))
-                  (name   (nth 1 alias)))
-             (leader/set-keys prefix name))))
+   Lastly heres some prefix keys (leader prefixes) that don't connect to commands,
+   but to groups of commands.
 
-       :config
-       (dolist (engine engines)
-         (let* ((identifier-string (nth 2 engine))
-                (query-link        (nth 3 engine))
-                (identifier (when identifier-string
-                              (intern identifier-string))))
-           (when (and identifier
-                      (not (string-empty-p query-link)))
-             (eval
-              `(defengine ,identifier
-                 ,query-link))))))
+   #+NAME: engine-mode-prefix-names
+   | prefix | name         |
+   |--------+--------------|
+   | se     | engines      |
+   | sen    | Nyaa         |
+   | sea    | MyAnimeList  |
+
+   Okay now let's make emacs actually setup these engine commands and bindings.
+
+   #+BEGIN_SRC emacs-lisp :var engines=engine-mode-search-engines
+     (setq engines (cdr engines)) ;; strip header row
+
+     ;; Assign leader keys and setup autoloads for each searcher.
+     (cl-loop for (engine key id-str) in engines
+              with id-sym = nil
+              do (setq id-sym (intern
+                               (concat "engine/search-" id-str)))
+              when (string-empty-p engine)
+                do (setq engine id-str)
+              do (progn
+                   (when key
+                     (leader/set-keys key (cons engine id-sym)))
+                   (autoload id-sym "engine-mode.el" nil t)))
+
+     (with-eval-after-load 'engine-mode
+       (cl-loop for (- - id-str query) in engines
+                with id-sym = nil
+                when (and id-str query)
+                  do (setq id-sym (intern id-str))
+                  and do (eval
+                          `(defengine ,id-sym
+                             ,query))))
+   #+END_SRC
+
+   #+BEGIN_SRC emacs-lisp :var prefix-aliases=engine-mode-prefix-names
+     (eval
+      `(leader/set-keys
+         ,@(cl-loop for (prefix name) in prefix-aliases
+                    collect prefix collect name)))
    #+END_SRC
 
 ** expand-region
