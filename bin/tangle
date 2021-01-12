@@ -1,12 +1,12 @@
 #!/usr/bin/env ruby
 # TODO: Minimise file system lookups.
 
+require 'set'
 require 'rake'
 require 'open3'
 require 'logger'
 require 'stringio'
 require 'rbconfig'
-require 'pathname'
 require 'optparse'
 require 'tempfile'
 require 'fileutils'
@@ -44,50 +44,57 @@ def null_logger
   Logger.new devnull
 end
 
-options = {
+opts = {
   file: 'init.org',
-  init_file: File.expand_path(File.join(File.dirname(__FILE__), '../init.el')), # used for byte-compilation
   compile: false,
 }
 
-parser = OptionParser.new do |opts|
-  opts.banner = "Usage: tangle [options]"
+parser = OptionParser.new do |it|
+  it.banner = "Usage: tangle [options]"
 
-  opts.on('-f', '--file=FILE', 'Tangle FILE')
-  opts.on('-l', '--logfile=FILE', 'Log to FILE, defaults to null or STDERR') do |file|
+  it.on('-f', '--file=FILE', 'Tangle FILE')
+  it.on('-l', '--logfile=FILE', 'Log to FILE, defaults to null or STDERR') do |file|
     file == '-' ? STDERR : File.open(file, 'a')
   end
 
-  opts.on('-i', '--[no-]interactive', 'Force treatment of STDOUT as terminal or not')
-  opts.on('-c', '--[no-]compile', 'Force byte-compilation of tangled elisp files')
+  it.on('-d', '--dependency=FILE', 'add FILE as a tangle dependency') do |file|
+    if opts[:dependency]
+      [*opts[:dependency], File.expand_path(file)]
+    else
+      [File.expand_path(file)]
+    end
+  end
 
-  opts.on('-v', '--[no-]verbose', 'Raise verbosity of program output')
-  opts.on("-h", "--help", "Print this help message") { puts opts; exit 0 }
-end.parse!(into: options)
+  it.on('-i', '--[no-]interactive', 'Force treatment of STDOUT as terminal or not')
+  it.on('-c', '--[no-]compile', 'Force byte-compilation of tangled elisp files')
+
+  it.on('-v', '--[no-]verbose', 'Raise verbosity of program output')
+  it.on("-h", "--help", "Print this help message") { puts it; exit 0 }
+end.parse!(into: opts)
 
 # force interactive execution
-unless options[:interactive].nil?
-  STDOUT.sync = options[:interactive]
+unless opts[:interactive].nil?
+  STDOUT.sync = opts[:interactive]
 end
 
-unless options[:logfile]
-  options[:logfile] = (STDOUT.isatty || options[:interactive]) ? File.open(File::NULL, 'w') : STDERR
+unless opts[:logfile]
+  opts[:logfile] = (STDOUT.isatty || opts[:interactive]) ? File.open(File::NULL, 'w') : STDERR
 end
 
 # only print indicator lines when stderr isn't active
-options[:indicator] = options[:logfile] != STDERR
+opts[:indicator] = opts[:logfile] != STDERR
 
-logger = Logger.new(options[:logfile])
-logger.level = Logger::DEBUG if options[:verbose]
-options[:logger] = logger
+logger = Logger.new(opts[:logfile])
+logger.level = Logger::DEBUG if opts[:verbose]
+opts[:logger] = logger
 
-# what to show in messages.
-display_file = options[:file]
-
-# what to actually access
-options[:file] = File.expand_path options[:file]
+opts[:file] = File.expand_path opts[:file]
 if %w[cygwin msys].include? RbConfig::CONFIG['host_os']
-  options[:file] = `cygpath -wa #{Shellwords.escape options[:file]}`.strip
+  opts[:file] = `cygpath -wa #{Shellwords.escape opts[:file]}`.strip
+
+  options[:dependency] = options[:dependency].map do |file|
+    `cygpath -wa #{Shellwords.escape file}`.strip
+  end
 end
 
 # provides an incremental iterator over chars using counter
@@ -223,13 +230,11 @@ def tangle_dependencies(file, opts={}, &block)
     serr.each_line { |line| stream.puts line }
     sout.each_line do |line|
       src, dest = line.chomp.split(':')
-      block.call(Pathname.new(src), Pathname.new(dest)) if block
+      block.call(src, dest) if block
     end
     wait.value.success?
   end
 end
-
-TargetDateStatus = Struct.new(:tangled, :compiled)
 
 def tangle_file(file, opts={})
   cmd = [
@@ -306,84 +311,90 @@ ensure
   file.unlink
 end
 
-Indicator.new(options).wrap do |i|
-  i.message = "Checking source file: #{display_file}"
+Indicator.new(opts).wrap do |it|
+  it.message = "Checking source file: #{opts[:file]}"
+  default_target = opts[:file].ext + '.el'
 
-  unless File.exist? options[:file]
-    i.state = Indicator::FAILED
-    i.message = "Failed to find source file: #{display_file}"
+  unless File.exist? opts[:file]
+    it.state = Indicator::FAILED
+    it.message = "Failed to find source file: #{display_file}"
     exit 1
   end
 
-  Dir.chdir File.dirname(options[:file])
+  Dir.chdir File.dirname(opts[:file])
 
-  i.state = Indicator::DOING
-  i.message = "Checking tangle targets"
-  uptodate = TargetDateStatus.new(true, true)
-  needs_compiling = []
-  needs_tangling = []
-  if !tangle_dependencies(options[:file], options) do |src, dest|
-       logger.debug "Found tangle target from #{src}: #{dest}"
-       if !FileUtils.uptodate?(dest, [src])
-         logger.info("File #{dest} is out of date")
-         needs_tangling << src
-         uptodate.tangled &&= false
-         if dest.extname == '.el' &&
-            !dest.basename.to_s.start_with?('.')
-           uptodate.compiled &&= false
-           needs_compiling << dest
-         end
-       elsif options[:compile] &&
-             dest.extname == '.el' &&
-             !dest.basename.to_s.start_with?('.') &&
-             !FileUtils.uptodate?(dest.dirname / (dest.basename('.el').to_s + '.elc'), [dest])
-         logger.info("File #{dest} needs to be compiled")
-         uptodate.compiled &&= false
-         needs_compiling << dest
-       end
-     end
-    i.state = Indicator::FAILED
-    i.message = 'Failed to determine tangle targets'
-    exit 1
-  end
+  it.state = Indicator::DOING
+  it.message = "Checking tangle targets"
 
-  if needs_tangling.include? Pathname.new(options[:file])
-    needs_tangling = [Pathname.new(options[:file])]
-  else
-    needs_tangling = needs_tangling.uniq
-  end
-
-  if uptodate.tangled && uptodate.compiled
-    i.state = Indicator::OK
-    i.message = "Everything is up to date"
-    return
-  end
-
-  if !uptodate.tangled
-    needs_tangling.each do |file|
-      i.state = Indicator::DOING
-      i.message = "Tangling file #{file}"
-
-      if !tangle_file(file, options)
-        i.state = Indicator::FAILED
-        i.message = "Failed to tangle file #{file}"
-        exit 1
-      end
+  all_compile = Set.new                                                         # List of compilation targets tied to the main tangle target
+  to_compile, to_tangle = Set.new, Set.new
+  opts.fetch(:dependency, []).each do |dep|
+    if File.exist?(dep) && FileUtils.uptodate?(dep, [default_target])
+      to_tangle  << opts[:file]
+      to_compile << default_target
     end
   end
 
-  if !uptodate.compiled && options[:compile] && needs_compiling.length > 0
-    i.state = Indicator::DOING
-    i.message = "Byte-compiling files"
-    if !compile_files(options[:init_file], needs_compiling, options)
-      i.state = Indicator::FAILED
-      i.message = "Failed to byte-compile files"
+  if to_tangle.empty?
+    tangle_res = tangle_dependencies(opts[:file], opts) do |src, dest|
+      logger.debug "Found tangle target from #{src}: #{dest}"
+      all_compile << dest if opts[:compile]
+      if !FileUtils.uptodate?(dest, [src])
+        logger.info("File #{dest} is out of date")
+        to_tangle  << src
+        to_compile << dest if opts[:compile] && File.extname(dest) == '.el'
+      elsif opts[:compile] &&
+            File.extname(dest) == '.el' &&
+            !File.basename(dest).start_with?('.') &&
+            !FileUtils.uptodate?(dest[0...-3] + '.elc', [dest])
+        logger.info("File #{dest} needs to be compiled")
+        to_compile << dest
+      end
+    end
+    if !tangle_res
+      it.state = Indicator::FAILED
+      it.message = 'Failed to determine tangle targets'
       exit 1
     end
   end
 
-  i.state = Indicator::DONE
-  i.message = "Tangled " + (options[:compile] ? "and compiled " : '') + display_file
+  # Assume if the main tangle target is out of date, everything else needs to be
+  # tangled as well, but just tangling the main file will make everything up to
+  # date.
+  if to_tangle.include?(opts[:file])
+    to_tangle = [opts[:file]]
+    to_compile = all_compile
+  end
+
+  if to_tangle.empty? && to_compile.empty?
+    it.state = Indicator::OK
+    it.message = "Everything is up to date"
+    return
+  end
+
+  to_tangle.each do |file|
+    it.state = Indicator::DOING
+    it.message = "Tangling file #{file}"
+
+    if !tangle_file(file, opts)
+      it.state = Indicator::FAILED
+      it.message = "Failed to tangle file #{file}"
+      exit 1
+    end
+  end
+
+  if to_compile.length > 0
+    it.state = Indicator::DOING
+    it.message = "Byte-compiling files"
+    if !compile_files(default_target, to_compile, opts)
+      it.state = Indicator::FAILED
+      it.message = "Failed to byte-compile files"
+      exit 1
+    end
+  end
+
+  it.state = Indicator::DONE
+  it.message = "Tangled " + (opts[:compile] ? "and compiled " : '') + opts[:file]
 end
 
 logger.close
