@@ -8310,9 +8310,40 @@
        :config
        (evil-set-initial-state 'debugger-mode 'motion)
 
+       :leader
+       ("kd" 'debug-on-entry
+        "kx" 'cancel-debug-on-entry)
+
        :general
        (:keymaps 'debugger-mode-map
-        [remap quit-window] 'debugger-quit))
+        [remap quit-window] 'debugger-quit)
+       (:keymaps 'debugger-mode-map
+        :states 'motion
+        "TAB" 'forward-button
+        "RET" 'backtrace-help-follow-symbol
+        "+" 'backtrace-multi-line
+        "-" 'backtrace-single-line
+        "=" 'debugger-return-value                                                   ; exit current stack frame with inputted value
+        "d" 'debugger-frame                                                          ; drop a breakpoint at the frame at point
+        "x" 'debugger-frame-clear                                                    ; clear a break point at the frame at point
+        "c" 'debugger-continue
+        "s" 'debugger-step-through
+        [remap evil-next-visual-line]     'backtrace-forward-frame
+        [remap evil-previous-visual-line] 'backtrace-backward-frame)
+
+       :lazy-leader
+       (:mode 'debugger-mode
+        "e" 'debugger-eval-expression
+        "r" 'debugger-record-expression
+        "j" 'debugger-jump                                                           ; jump down to current stack frame, skipping any upcoming debug-on-entry calls
+        "b" 'debugger-frame                                                          ; drop a breakpoint at the frame at point
+        "a" 'debugger-list-functions                                                 ; NOTE: not all that useful interactively
+        "g" 'backtrace-help-follow-symbol ;; 'backtrace-goto-source
+        ;; toggles
+        "c" 'backtrace-toggle-print-circle
+        "." 'backtrace-expand-ellipses
+        "s" 'backtrace-toggle-print-gensym
+        "l" 'backtrace-toggle-locals))
    #+END_SRC
 
 ** diff
