@@ -110,6 +110,7 @@
         latex
         makefile
         markdown
+        nim
         python
         ;; powershell
         ;; restclient
@@ -17083,6 +17084,58 @@
             :config
             (setq lsp-haskell-process-args-hie (list "-d" "-l" (make-temp-file "hie." nil ".log"))))
         (add-hook 'haskell-mode-hook +lsp-command))
+    #+END_SRC
+
+** nim
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! nim)
+   :END:
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package nim-mode
+       :ensure t
+       :defer  t
+       :hook (nim-mode . nim-eldoc-on)
+       :config
+       (+set-compilation-bindings 'nim-compile-mode 'nim-compile-mode-map)
+
+       (advice-add 'nim-compile--assert :override
+                   (defun nim-compile--assert+ (command)
+                     "Check COMMAND.
+     Basically copied from `compile-command's document."
+                     (or (stringp command)
+                         (and (bound-and-true-p compilation-read-command)
+                              (compilation-read-command)))))
+
+       :general
+       (:keymaps 'nim-mode-map
+        [remap compile] 'nim-compile)
+       (:keymaps 'nim-mode-map
+        :states 'insert
+        "DEL" 'nim-electric-backspace)
+
+       :lazy-leader
+       (:mode 'nim-mode
+        "c" 'nim-compile))
+   #+END_SRC
+
+*** lsp
+    Firstly in case lsp is not available, lets rely on the builtin nim help
+    facilities curtesy of [[https://nim-lang.org/docs/nimsuggest.html][nimsuggest]].
+
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! nim :not :lsp)
+      (add-hook 'nim-mode-hook #'nimsuggest-mode)
+    #+END_SRC
+
+    Lets use [[https://github.com/PMunch/nimlsp][nimlsp]].
+
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! nim :lsp)
+      (add-hook 'nim-mode-hook +lsp-command)
+      (remove-hook 'nim-mode-hook 'nim-eldoc-on)                                      ; eldoc is taken care of by my lsp package.
+
+      (when (package! eglot)
+        (with-eval-after-load 'eglot
+          (push '((nim-mode nimscript-mode) . ("nimlsp")) eglot-server-programs)))
     #+END_SRC
 
 ** golang
