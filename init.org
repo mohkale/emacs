@@ -87,7 +87,7 @@
         ;; ggtags                                                         ; GNU Global source code tagging system
         ;; ycmd                                                           ; A language-server for most languages. written in python.
         ;; ruby-robe                                                      ; Code navigation, doc-lookup and completion for Ruby
-        anaconda                                                          ; A no-longer mainatained, but still powerful language-server for python
+        ;; anaconda                                                       ; A no-longer mainatained, but still powerful language-server for python
 
     ;;; Languages
         bibtex
@@ -13238,6 +13238,19 @@
        (eglot-stay-out-of '(company))                                                ; I'll set my backends myself, thank you.
        (eglot-ignored-server-capabilites '(:documentHighlightProvider))              ; Prevent eglot highlighting the symbol at point
 
+       :init
+       (defmacro eglot-configure-workspace+ (mode &rest json)
+         "Set workspace configuration for MODE to JSON.
+     This works by creating a hook for mode that sets `eglot-workspace-configuration'."
+         (let* ((mode (eval mode))
+                (hook (intern (concat (symbol-name mode) "-hook")))
+                (func (intern (concat "eglot-configure-workspace--" (symbol-name mode) "+"))))
+           `(add-hook ',hook
+                      (defun ,func ()
+                        (setq eglot-workspace-configuration
+                              (append (bound-and-true-p eglot-workspace-configuration)
+                                      (quote ,json)))))))
+       (put 'eglot-configure-workspace+ 'lisp-indent-function 'defun)
 
        :config
        (require 'yasnippet) ;; needed or else snippet expansion won't happen.
@@ -15397,15 +15410,23 @@
     #+END_SRC
 
 *** python-lsp
-    :PROPERTIES:
-    :header-args+: :tangle (package-yes! python :lsp :not anaconda)
-    :END:
-
     Your going to need a python language server, I recommend [[https://github.com/palantir/python-language-server][this]] one that's based on
     [[https://github.com/davidhalter/jedi][jedi]]. There's also a microsoft based [[https://github.com/microsoft/python-language-server][server]].
 
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! python :lsp :not anaconda)
       (add-hook 'python-mode-hook +lsp-command)
+    #+END_SRC
+
+    Lets setup any custom server configurations for ~pyls~ configurations.
+
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! python :lsp eglot :not anaconda)
+      (eglot-configure-workspace+ 'python-mode
+        (pyls
+         (plugins
+          (pydocstyle (enabled . t))
+          (jedi_completion
+           (fuzzy . t)
+           (follow_builtin_imports . :json-false)))))
     #+END_SRC
 
 *** anaconda
