@@ -382,7 +382,8 @@
         org-publish-timestamp-directory                    (var! "org/timestamps/")
         org-registry-file                                  (var! "org/registry.el")
         org-default-notes-file                             (org! "notes.org")
-        org-projectile-projects-directory                  (org! "notes/projects/")
+        projectile-org-projects-directory+                 (org! "notes/projects/")
+        org-projectile-projects-directory                  projectile-org-projects-directory+
         org-projectile-projects-file                       (org! "notes/projects/global.org")
         org-preview-latex-image-directory                  (var! "org/latex")
         package-quickstart-file                            (var! "package-qs.el")
@@ -4530,8 +4531,8 @@
                                    :template ("* [/] %^{title} %^g"
                                               "  %?"))))))
 
-       ;; templates for projectile-projects.
-       counsel-projectile-org-capture-templates
+       ;; Templates for projectile-projects.
+       projectile-org-capture-templates+
        (doct `(("[${name}] Task"
                 :keys "p"
                 :template ("* TODO %?"
@@ -6858,6 +6859,78 @@
        (advice-add 'projectile-run-project     :around #'projectile-compile--double-prefix-means-run-comint)
        (advice-add 'projectile-compile-project :around #'projectile-compile--double-prefix-means-run-comint)
        (advice-add 'projectile-test-project    :around #'projectile-compile--double-prefix-means-run-comint)
+
+       (defvar projectile-org-capture-templates+ nil)
+       (defvar projectile-org-capture-templates-contexts+ nil)
+
+       (defun projectile-org-capture-templates+ (name root)
+         "Adapted from `counsel-projectile-org-capture'."
+         (cl-loop
+          with replace-fun = `(lambda (string)
+                                (replace-regexp-in-string
+                                 "\\${[^}]+}"
+                                 (lambda (s)
+                                   (pcase s
+                                     ("${root}" ,root)
+                                     ("${name}" ,name)))
+                                 string))
+          for template in projectile-org-capture-templates+
+          collect (cl-loop
+                   for item in template
+                   if (= (cl-position item template) 1) ;; template's name
+                   collect (funcall replace-fun item)
+                   else if (= (cl-position item template) 3) ;; template's target
+                   collect (cl-loop
+                            for x in item
+                            if (stringp x)
+                            collect (funcall replace-fun x)
+                            else
+                            collect x)
+                   else
+                   collect item)))
+
+       (defun projectile-org-capture+ ()
+         "`org-capture' wrapper which includes project specific capture templates."
+         (interactive)
+         (let* ((root (ignore-errors (projectile-project-root)))
+                (name (projectile-project-name))
+                (org-capture-templates-contexts
+                 (append (when root
+                           projectile-org-capture-templates-contexts+)
+                         org-capture-templates-contexts))
+                (org-capture-templates
+                 (append org-capture-templates
+                         (when root
+                           (projectile-org-capture-templates+ name root)))))
+           (call-interactively
+            (cond ((package! ivy) 'counsel-org-capture)
+                  ((package! selectrum) 'consult-org-capture)
+                  (t 'org-capture)))))
+
+       (defun projectile-org-project-file+ ()
+         (interactive)
+         (find-file
+          (if-let ((cands (let ((default-directory projectile-org-projects-directory+))
+                            (cl-loop for file in (cl-remove-if
+                                                  (apply-partially #'string-match-p +find-file-ignore-regexp)
+                                                  (append (file-expand-wildcards "*.org")
+                                                          (file-expand-wildcards "**/*.org")))
+                                     collect (cons file (concat default-directory "/" file))))))
+              (alist-get
+               (completing-read
+                "Find file: " (lambda (string predicate action)
+                                (if (eq action 'metadata)
+                                    '(metadata (category . file))
+                                  (complete-with-action action cands string predicate)))
+                nil t)
+               cands nil nil #'string-equal)
+            (user-error "No project org files have been found at %s" projectile-org-projects-directory+))))
+
+       :general
+       (:keymaps 'projectile-mode-map
+        [remap org-capture]         'projectile-org-capture+
+        [remap counsel-org-capture] 'projectile-org-capture+
+        [remap consult-org-capture] 'projectile-org-capture+)
 
        :leader
        ("fp"    'projectile-switch-project
