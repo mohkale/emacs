@@ -3,16 +3,14 @@
 #+TITLE: init.org
 #+STARTUP: content
 
-#+PROPERTY: header-args :tangle init.el :tangle-mode (identity #o544) :comments link :mkdirp yes :noweb yes :hlines no :shebang ";; -*- lexical-binding: t -*-" :lexical t
+#+PROPERTY: header-args :tangle init.el :tangle-mode (identity #o544) :comments link :mkdirp yes :noweb yes :hlines no :shebang ";; -*- lexical-binding: t -*-"
 
 * Config
   Configure the rest of the emacs packages in this config file.
 
-  NOTE: This branch only contains the *default* configuration options and these
-  options will be reset every tangle, to create permanent ~local~ modifications
-  to this create a lisp file at ~lisp/+config.el~ and that will be sourced instead
-  of this. I recommend having that file load ~lisp/+config-default.el~ just to
-  make sure all the default variables are defined.
+  NOTE: This branch only contains the *default* configuration options and these options will
+  be reset every tangle, to create permanent ~local~ modifications to this create a lisp file
+  at ~lisp/+config.el~ and that will be sourced instead of this.
 
   #+NAME: eval-default-config
   #+BEGIN_SRC emacs-lisp :results values :tangle lisp/+config-default.el
@@ -22,7 +20,7 @@
         link-hint                                                         ; Jump to links in the current buffer through an avy interface
         ;; adaptive-wrap                                                  ; Visually wrap long lines. doesn't alter what you write.
         anzu                                                              ; Show the number of search results incrementally
-        auto-highlight-symbol                                             ; Automatically highlight the symbol at point
+        ;; auto-highlight-symbol                                          ; Automatically highlight the symbol at point
         browser-edit                                                      ; Interface emacs with [[https://www.chromium.org/][chromium]]
         ;; command-log-mode                                               ; Echo commands as you enter them
         dashboard                                                         ; A feature full emacs dashboard
@@ -111,7 +109,7 @@
         latex
         makefile
         markdown
-        nim
+        ;; nim
         python
         ;; powershell
         ;; restclient
@@ -614,6 +612,8 @@
       (defun use-package-handler/:only (name-symbol _ condition rest state)
         (let ((body (use-package-process-keywords name-symbol rest state)))
           `((when ,condition ,@body))))
+
+      (enable-theme 'use-package)                                           ; see [[https://github.com/jwiegley/use-package/pull/881][here]].
     #+END_SRC
 
 *** external
@@ -754,6 +754,7 @@
              find-file-suppress-same-file-warnings t                                ; don't warn when finding a file that's already open.
              recentf-max-saved-items 2048                                           ; keep this many files in the recentf history.
              completion-ignore-case t                                               ; make completion case insensitive, holding down shift is annoying.
+             completions-detailed t                                                 ; show annotations for certain completion candidates
              recenter-positions '(top middle bottom))
      #+END_SRC
 
@@ -987,7 +988,6 @@
 
           ;; some extra bindings I've got in st, see term/xterm.el
           (when (featurep 'xterm)
-            (define-key xterm-function-map "\e[32;2u"  [33554464])
             (define-key xterm-function-map "\e[127;2u" [S-backspace])
             (define-key xterm-function-map "\e[127;5u" [C-backspace])
             (define-key xterm-function-map "\e[127;6u" [C-S-backspace])
@@ -1002,16 +1002,29 @@
             (define-key xterm-function-map "\e[1;2D"   [S-left])
             (define-key xterm-function-map "\e[1;2C"   [S-right])
             (define-key xterm-function-map "\e[1;5Z"   [C-S-tab])
-            (define-key xterm-function-map "\e[32;3u"  [134217760])
-            (define-key xterm-function-map "\e[58;4u"  [134217786])                         ; M-:
-            (define-key xterm-function-map "\e[58;6u"  [67108922])                          ; C-:
-            (define-key xterm-function-map "\e[124;6u" [67108988])                          ; C-|
-            (define-key xterm-function-map "\e[124;8u" [201326716])                         ; C-M-|
-            (define-key xterm-function-map "\e[62;6u"  [67108926])                          ; C->
-            (define-key xterm-function-map "\e[60;6u"  [67108924])                          ; C->
-            (define-key xterm-function-map "\e[105;7u" [134217737])                         ; C-M-i
-            (define-key xterm-function-map "\e[27;3u"  [134217755])                         ; M-ESC
-            (define-key xterm-function-map "\e[27;5u"  [67108891])                          ; C-ESC
+            (define-key xterm-function-map "\e[49;5u"  (kbd "C-1"))
+            (define-key xterm-function-map "\e[50;5u"  (kbd "C-2"))
+            (define-key xterm-function-map "\e[51;5u"  (kbd "C-3"))
+            (define-key xterm-function-map "\e[52;5u"  (kbd "C-4"))
+            (define-key xterm-function-map "\e[53;5u"  (kbd "C-5"))
+            (define-key xterm-function-map "\e[54;5u"  (kbd "C-6"))
+            (define-key xterm-function-map "\e[55;5u"  (kbd "C-7"))
+            (define-key xterm-function-map "\e[56;5u"  (kbd "C-8"))
+            (define-key xterm-function-map "\e[57;5u"  (kbd "C-9"))
+            (define-key xterm-function-map "\e[48;5u"  (kbd "C-0"))
+            (define-key xterm-function-map "\e[32;2u"  (kbd "S-SPC"))
+            (define-key xterm-function-map "\e[58;4u"  (kbd "M-:"))
+            (define-key xterm-function-map "\e[58;6u"  (kbd "C-:"))
+            (define-key xterm-function-map "\e[124;6u" (kbd "C-|"))
+            (define-key xterm-function-map "\e[124;8u" (kbd "C-M-|"))
+            (define-key xterm-function-map "\e[94;6u" (kbd "C-^"))
+            (define-key xterm-function-map "\e[60;4u"  (kbd "M-<"))
+            (define-key xterm-function-map "\e[62;4u"  (kbd "M->"))
+            (define-key xterm-function-map "\e[62;6u"  (kbd "C->"))
+            (define-key xterm-function-map "\e[60;6u"  (kbd "C-<"))
+            (define-key xterm-function-map "\e[105;7u" (kbd "C-M-i"))
+            (define-key xterm-function-map "\e[27;3u"  (kbd "M-ESC"))
+            (define-key xterm-function-map "\e[27;5u"  (kbd "C-ESC"))
 
             ;; define xterm codes for ctrl+shift alphabet keys
             (cl-loop for (i . char) in (-zip (number-sequence 65 90)
@@ -1179,8 +1192,10 @@
         "jd" '("jump-to-directory" . dired-jump)
         "jD" '("jump-to-directory-other-window" . dired-jump-other-window)
 
+        "ic" 'insert-char
         "al" 'find-library
         "ae" 'package-install
+        "at" 'load-theme
         "aE" 'package-list-packages
 
         "ff" 'find-file
@@ -1722,54 +1737,70 @@
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
+      (defvar +dot-goto-repo-command '("ls-repos"))
+
       (defvar +dot-goto-repo-history nil)
       (defun +dot-goto-repo ()
         (interactive)
         "List repositories using my [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-repos][ls-repos]] script and ask for one to jump to."
         (let ((repo (completing-read "Repo: "
-                                     (process-lines "ls-repos")
+                                     (apply #'process-lines +dot-goto-repo-command)
                                      nil t nil '+dot-goto-repo-history)))
           (dired repo)))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
+      (defvar +dot-goto-executable-command '("ls-exec"))
+
       (defvar +dot-goto-executable-history nil)
       (defun +dot-goto-executable ()
         (interactive)
         "List and jump to an executable using [[https://github.com/mohkale/dotfiles/blob/master/bin/ls-exec][ls-exec]]."
         (let ((cand (completing-read "Executable:"
-                                     (process-lines "ls-exec"))))
+                                     (apply #'process-lines +dot-goto-executable-command))))
           (find-file cand)))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
+      (defvar +dot-goto-fsmap-command
+        '("sh" "-c"
+          "ls-fsmaps -er | if hash column 2>/dev/null; then column -s : -t; else tr ':' ' '; fi"))
+
+      (defvar +dot-goto-fsmap-dirs-command
+        '("sh" "-c"
+          "ls-fsmaps -erd | if hash column 2>/dev/null; then column -s : -t; else tr ':' ' '; fi"))
+
+      (defun +dot-goto-fsmap-format-lines (lines)
+        (save-match-data
+          (cl-loop for fsmap in lines
+                   with path  = nil
+                   with alias = nil
+                   with spacing = nil
+                   when (string-match (rx bol
+                                          (group (one-or-more (not whitespace)))
+                                          (group (+ (any whitespace)))
+                                          (group (one-or-more anychar))
+                                          eol)
+                                      fsmap)
+                     do (setq alias   (match-string 1 fsmap)
+                              spacing (match-string 2 fsmap)
+                              path    (match-string 3 fsmap))
+                     and collect (propertize
+                                  (concat (propertize alias 'face 'font-lock-type-face)
+                                           spacing
+                                           ;; (propertize path 'face (if (file-directory-p path) 'dired-directory 'default))
+                                           path)
+                                  'fsmap path))))
+
       (defvar +dot-goto-fsmap-history nil)
       (defun +dot-goto-fsmap (&optional dirs-only)
         "List file system maps (using [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-fsmaps][here]]) and find one in emacs."
         (interactive "P")
-        (if-let ((fsmaps (save-match-data
-                           (cl-loop for fsmap in (process-lines
-                                                  "sh" "-c"
-                                                  (concat "ls-fsmaps -er" (when dirs-only " -d")
-                                                          "| if hash column 2>/dev/null; then column -s : -t; else tr ':' ' '; fi"))
-                                    with path  = nil
-                                    with alias = nil
-                                    with spacing = nil
-                                    when (string-match (rx bol
-                                                           (group (one-or-more (not whitespace)))
-                                                           (group (+ (any whitespace)))
-                                                           (group (one-or-more anychar))
-                                                           eol)
-                                                       fsmap)
-                                      do (setq alias   (match-string 1 fsmap)
-                                               spacing (match-string 2 fsmap)
-                                               path    (match-string 3 fsmap))
-                                      and collect (propertize
-                                                   (concat (propertize alias 'face 'font-lock-type-face)
-                                                            spacing
-                                                            ;; (propertize path 'face (if (file-directory-p path) 'dired-directory 'default))
-                                                            path)
-                                                   'fsmap path)))))
+        (if-let ((fsmaps (+dot-goto-fsmap-format-lines
+                          (apply #'process-lines
+                                 (if dirs-only
+                                     +dot-goto-fsmap-dirs-command
+                                   +dot-goto-fsmap-command)))))
             (find-file (get-text-property 0 'fsmap (completing-read "File system map: " fsmaps nil t nil '+dot-goto-fsmap-history)))
           (user-error "No fsmaps found")))
 
@@ -1779,27 +1810,33 @@
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
+      (defvar +dot-open-bookmark-command '("ls-bookmarks"))
+
+      (defun +dot-open-bookmark-format-lines (lines)
+        (cl-loop for row in lines
+                 do (setq row (split-string row "\t"))
+                 with url   = nil
+                 with tags  = nil
+                 with title = nil
+                 do (setq url   (nth 0 row)
+                          tags  (nth 1 row)
+                          title (nth 2 row))
+                 when (string-prefix-p "http" url)
+                   collect (propertize
+
+                            (concat (unless (string-empty-p tags)
+                                      (propertize (concat "(" tags ") ") 'face 'bold))
+                                    title
+                                    (when url
+                                      (when-let ((domain (url-domain (url-generic-parse-url url))))
+                                        (concat " [" (propertize domain 'face 'font-lock-preprocessor-face) "]"))))
+                            'bookmark url)))
+
       (defvar +dot-open-bookmark-history nil)
       (defun +dot-open-bookmark ()
         "List system bookmarks (using [[https://github.com/mohkale/dotfiles/blob/master/bin/ls-bookmarks][this]]) and open it in your default browser."
         (interactive)
-        (if-let ((bookmarks (cl-loop for row in (process-lines "ls-bookmarks")
-                                  do (setq row (split-string row "\t"))
-                                  with url   = nil
-                                  with tags  = nil
-                                  with title = nil
-                                  do (setq url   (nth 0 row)
-                                           tags  (nth 1 row)
-                                           title (nth 2 row))
-                                  when (string-prefix-p "http" url)
-                                    collect (propertize
-                                             (concat (unless (string-empty-p tags)
-                                                       (propertize (concat "(" tags ") ") 'face 'bold))
-                                                     title
-                                                     (when url
-                                                       (when-let ((domain (url-domain (url-generic-parse-url url))))
-                                                         (concat " [" (propertize domain 'face 'font-lock-preprocessor-face) "]"))))
-                                             'bookmark url))))
+        (if-let ((bookmarks (+dot-open-bookmark-format-lines (apply #'process-lines +dot-open-bookmark-command))))
             (xopen-url+ (get-text-property 0 'bookmark (completing-read "Bookmark: " bookmarks nil t nil '+dot-open-bookmark-history)))
           (user-error "No bookmarks")))
     #+END_SRC
@@ -3478,9 +3515,24 @@
      (use-package evil
        :ensure t
        :defer  t
-       :init
-       ;; needs to be in init, or else doesn't work.
-       (setq evil-undo-system 'undo-tree))
+       :custom
+       (evil-undo-system 'undo-tree)
+       (evil-cross-lines t)
+       (evil-default-state 'motion)
+       (evil-want-C-i-jump nil)
+       (evil-want-C-u-scroll t)
+       (evil-want-visual-char-semi-exclusive t)
+       (evil-toggle-key "M-z")
+       (evil-search-module 'evil-search)
+
+       :config
+       (setq evil--jumps-buffer-targets                                                   ; see [[https://emacs.stackexchange.com/questions/42060/add-dired-buffers-to-evil-jump-list][here]].
+             (rx "*"
+                 (or "new"
+                     "Help"
+                     "scratch"
+                     (and "Org src " (zero-or-more any) "[ " (zero-or-more any) " ]"))
+                 "*")))
    #+END_SRC
 
 *** matchit
@@ -3877,23 +3929,6 @@
         :ensure t
         :demand t
         :init
-        (setq-default evil-cross-lines t
-                      evil-default-state 'motion
-                      evil-want-C-i-jump nil
-                      evil-want-C-u-scroll t
-                      evil-want-visual-char-semi-exclusive t
-                      evil-toggle-key "M-z"
-                      evil-search-module 'evil-search)
-
-        ;; see [[https://emacs.stackexchange.com/questions/42060/add-dired-buffers-to-evil-jump-list][here]].
-        (setq evil--jumps-buffer-targets
-              (rx "*"
-                  (or "new"
-                      "Help"
-                      "scratch"
-                      (and "Org src " (zero-or-more any) "[ " (zero-or-more any) " ]"))
-                  "*"))
-
         (defun evil-set-initial-state+ (mode state)
           (with-eval-after-load 'evil
             (evil-set-initial-state mode state)
@@ -3952,7 +3987,7 @@
         (:states '(insert emacs multiedit)
          "C-o" 'evil-copy-from-above
          "M-o" 'evil-copy-from-below
-         "M-e" 'evil-execute-in-normal-state)
+         "C-c C-o" 'evil-execute-in-normal-state)
         ("C->" 'evil-shift-right-line
          "C-<" 'evil-shift-left-line)
         (:states 'normal
@@ -4610,8 +4645,7 @@
       By default this function simply finds the default notes file, as indicated
       by `org-default-notes-file'. When ARG is non-nil, you are instead prompted
       interactively with all org files known to emacs (through `dotemacs-org-path',
-      `dotemacs-agenda-files' etc.) and then allowed to select which one to visit.
-      "
+      `dotemacs-agenda-files' etc.) and then allowed to select which one to visit."
         (interactive "P")
         (if (not arg)
             (progn
@@ -4707,28 +4741,29 @@
         (put 'org-read-date-command 'lisp-indent-function 'defun)
 
         :config
-        (setq-default org-src-window-setup 'current-window
-                      org-todo-keywords '((sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED"))
-                      org-refile-targets '((nil :maxlevel . 9)
-                                           (org-agenda-files :maxlevel . 9))
-                      org-log-done 'time ; record when a TODO item is done.
-                      org-outline-path-complete-in-steps nil ; refile in a single go
-                      org-refile-use-outline-path t  ; show full paths for refiling
-                      org-cycle-separator-lines 0 ; prevents weird coloring of collapsed trees
-                      org-log-into-drawer "LOGBOOK" ; where org-add-note stores notes
+        (setq org-src-window-setup 'current-window
+              org-goto-interface 'outline-path-completion
+              org-todo-keywords '((sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED"))
+              org-refile-targets '((nil :maxlevel . 9)
+                                   (org-agenda-files :maxlevel . 9))
+              org-log-done 'time ; record when a TODO item is done.
+              org-outline-path-complete-in-steps nil ; refile in a single go
+              org-refile-use-outline-path t  ; show full paths for refiling
+              org-cycle-separator-lines 0 ; prevents weird coloring of collapsed trees
+              org-log-into-drawer "LOGBOOK" ; where org-add-note stores notes
 
-                      ;; break org-cycle-seperator-lines from working automatically
-                      ;; org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
+              ;; break org-cycle-seperator-lines from working automatically
+              ;; org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
 
-                      ;; native tabs are slow and unreliable... :sad:
-                      org-src-tab-acts-natively nil
-                      org-fontify-done-headline nil
+              ;; native tabs are slow and unreliable... :sad:
+              org-src-tab-acts-natively nil
+              org-fontify-done-headline nil
 
-                      org-agenda-files (append
-                                        (file-expand-wildcards (org! "*.org"))
-                                        (file-expand-wildcards (org! "university/*.org")))
+              org-agenda-files (append
+                                (file-expand-wildcards (org! "*.org"))
+                                (file-expand-wildcards (org! "university/*.org")))
 
-                      org-archive-location (concat (org! "archive.org") "::* %s"))
+              org-archive-location (concat (org! "archive.org") "::* %s"))
 
         (setq org-archive-file-header-format
               "# -*- mode: org; coding: utf-8-unix -*-
@@ -5338,8 +5373,6 @@
 
                     (auto-fill-mode +1)))
 
-        (setq org-roam-capture-function #'counsel-org-capture)
-
         ;; see [[https://github.com/progfolio/doct/issues/16][#16]].
         (defun doct-org-roam+ (groups)
           (let (converted)
@@ -5530,29 +5563,30 @@
        :init
 
        (defvar company-menu-bindings+
-         `("C-1"     company-complete-number
-           "C-2"     company-complete-number
-           "C-3"     company-complete-number
-           "C-4"     company-complete-number
-           "C-5"     company-complete-number
-           "C-6"     company-complete-number
-           "C-7"     company-complete-number
-           "C-8"     company-complete-number
-           "M-l"     company-complete-common-or-next-char+
-           "<C-i>"   company-complete-common
-           "C-j"     company-select-next
-           "C-k"     company-select-previous
-           "C-d"     company-next-page
-           "C-u"     company-previous-page
-           "C-l"     company-complete-selection
-           "C-h"     company-show-doc-buffer
-           "<tab>"   company-complete-common-or-cycle
-           "RET"     company-complete-selection
-           "C-/"     company-filter-candidates
-           "C-s"     company-filter-candidates
-           "C-f"     company-filter-candidates
-           "C-o"     company-last-candidate+
-           "M-o"     company-first-candidate+)
+         `(("C-1"   . company-complete-number)
+           ("C-2"   . company-complete-number)
+           ("C-3"   . company-complete-number)
+           ("C-4"   . company-complete-number)
+           ("C-5"   . company-complete-number)
+           ("C-6"   . company-complete-number)
+           ("C-7"   . company-complete-number)
+           ("C-8"   . company-complete-number)
+           ("M-l"   . company-complete-common-or-next-char+)
+           ("<C-i>" . company-complete-common)
+           ("C-j"   . company-select-next)
+           ("C-k"   . company-select-previous)
+           ("C-d"   . company-next-page)
+           ("C-u"   . company-previous-page)
+           ("C-l"   . company-complete-selection)
+           ("C-h"   . company-show-doc-buffer)
+           ("<tab>" . company-complete-common-or-cycle)
+           ("C-:"   . completion-at-point)
+           ("RET"   . company-complete-selection)
+           ("C-/"   . company-filter-candidates)
+           ("C-s"   . company-filter-candidates)
+           ("C-f"   . company-filter-candidates)
+           ("C-o"   . company-last-candidate+)
+           ("M-o"   . company-first-candidate+))
          "Bindings which override any local bindings while the company popup is active.
      DO NOT alter this (by setting a new value) while the popup is active, or be prepared
      to restart emacs.")
@@ -5607,18 +5641,19 @@
 
        ;; use transient bindings inside the completion menu
        (defun company-set-bindings+ (&rest _)
-         (apply 'general-define-key
-                :keymaps 'override
-                :states  'insert
-                company-menu-bindings+))
+         (apply
+          'general-define-key
+          :keymaps 'override
+          :states  'insert
+          (cl-loop for (key . value) in company-menu-bindings+
+                   collect key collect value)))
 
        (defun company-unset-bindings+ (&rest _)
          (apply 'general-define-key
                 :keymaps 'override
                 :states  'insert
-                (cl-loop for (i . arg) in (-zip (number-sequence 0 (length company-menu-bindings+))
-                                                company-menu-bindings+)
-                         collect (if (zerop (% i 2)) arg nil))))
+                (cl-loop for (key . -) in company-menu-bindings+
+                         collect key collect nil)))
 
        (add-hook 'company-completion-started-hook   'company-set-bindings+)
        (add-hook 'company-completion-finished-hook  'company-unset-bindings+)
@@ -5646,7 +5681,7 @@
         "ESC"    'company-search-abort)
        (:keymaps 'company-active-map
         "C-w" nil ;; was company-show-location
-        "C-e" 'company-show-location))
+        "C-p" 'company-show-location))
    #+END_SRC
 
 *** configure-mode
@@ -5796,6 +5831,19 @@
        ("xi" 'all-the-icons-insert
         "xI" 'all-the-icons-insert-all-icons)
 
+       :init
+       (defun all-the-icons-pad-on-tty-advice+ (value)
+         ":filter-return advice for all-the-icons functions which appends
+     an extra space to the icon when displaying icons on the tty."
+         (if (and (not (display-graphic-p))
+                  value)
+             (let ((props (text-properties-at 0 value)))
+               (apply 'propertize
+                      (concat (substring-no-properties value)
+                              " ")
+                      props))
+           value))
+
        :config
        (setq inhibit-compacting-font-caches t)
        (push '(rustic-mode all-the-icons-alltheicon "rust") all-the-icons-mode-icon-alist)
@@ -5874,6 +5922,7 @@
                                       collect (cons ati-var
                                                     (intern (concat "all-the-icons-nerd-" family)))))
                 (match-subs '(((all-the-icons-alltheicon . "aws")              .    (all-the-icons-nerd-fa     . "amazon"))
+                              ((all-the-icons-alltheicon . "c-line")           .    (all-the-icons-nerd-custom . "c"))
                               ((all-the-icons-alltheicon . "clojure-line")     .    (all-the-icons-nerd-dev    . "clojure"))
                               ((all-the-icons-alltheicon . "cplusplus-line")   .    (all-the-icons-nerd-custom . "cpp"))
                               ((all-the-icons-alltheicon . "csharp-line")      .    (all-the-icons-nerd-mdi    . "language-csharp"))
@@ -5893,6 +5942,7 @@
                               ((all-the-icons-alltheicon . "rust")             .    (all-the-icons-nerd-dev    . "rust"))
                               ((all-the-icons-alltheicon . "sass")             .    (all-the-icons-nerd-dev    . "sass"))
                               ((all-the-icons-alltheicon . "scala")            .    (all-the-icons-nerd-dev    . "scala"))
+                              ((all-the-icons-alltheicon . "script")           .    (all-the-icons-nerd-seti   . "html"))
                               ((all-the-icons-alltheicon . "swift")            .    (all-the-icons-nerd-dev    . "swift"))
                               ((all-the-icons-alltheicon . "terminal")         .    (all-the-icons-nerd-fa     . "terminal"))
                               ((all-the-icons-alltheicon . "test-ruby")        .    (all-the-icons-nerd-oct    . "ruby"))
@@ -6810,7 +6860,14 @@
        (advice-add 'projectile-test-project    :around #'projectile-compile--double-prefix-means-run-comint)
 
        :leader
-       ("p"  "projectile"
+       ("fp"    'projectile-switch-project
+        "pP"    'projectile-switch-project
+        "pf"    'projectile-find-file
+        "pd"    'projectile-find-dir
+        "pb"    'projectile-switch-to-buffer
+        "po"    'projectile-org-project-file+
+
+        "p"  "projectile"
         "p TAB" 'projectile-find-other-file
         "p!" 'projectile-run-shell-command-in-root
         "p%" 'projectile-replace-regexp
@@ -6832,6 +6889,7 @@
         "p[" 'projectile-previous-project-buffer
         "p]" 'projectile-next-project-buffer
         "pt" 'projectile-test-project
+        "pi" 'projectile-install-project
         "pso" 'projectile-multi-occur
         ;; "pxe" 'projectile-run-eshell
         ;; "pxi" 'projectile-run-ielm
@@ -8055,6 +8113,15 @@
                   (lambda (buf &rest _)
                     (setq compilation-last-buffer buf)))
 
+        (defun compilation-colorize+ ()
+          "Colorize from `compilation-filter-start' to `point'.
+      Taken from [[https://emacs.stackexchange.com/a/38531][here]]."
+          (require 'ansi-color)
+          (let ((inhibit-read-only t))
+            (ansi-color-apply-on-region
+             compilation-filter-start (point))))
+        (add-hook 'compilation-filter-hook #'compilation-colorize+)
+
         (defun display-compilation-buffer ()
           (interactive)
           (let* ((buffer
@@ -8088,8 +8155,8 @@
             "gn"  'next-error-no-select
             "gp"  'previous-error-no-select
             "o"   'compilation-display-error
-            "j"   'compilation-next-error
-            "k"   'compilation-previous-error
+            ;; "j"   'compilation-next-error
+            ;; "k"   'compilation-previous-error
             "x"   'kill-compilation
             "C-j" 'compilation-next-file
             "C-k" 'compilation-previous-file)
@@ -9038,6 +9105,7 @@
        :commands (eldoc-doc-buffer-no-select+)
        :custom
        (eldoc-echo-area-prefer-doc-buffer t)
+       (eldoc-echo-area-display-truncation-message nil)
 
        :config
        (defun eldoc-doc-buffer-no-select+ ()
@@ -9187,6 +9255,18 @@
         "cr" 'flyspell-region
         "cw" 'flyspell-word))
    #+END_SRC
+
+*** flyspell-correct
+    #+BEGIN_SRC emacs-lisp
+      (use-package flyspell-correct
+        :ensure t
+        :defer  t
+        :leader
+        (:mode 'flyspell-mode
+         :minor t
+         :prefix leader-minor-mode-leader-prefix
+         leader-minor-mode-leader-prefix 'flyspell-correct-wrapper))
+    #+END_SRC
 
 *** ispell
    #+BEGIN_SRC emacs-lisp
@@ -10306,16 +10386,7 @@
         (advice-add 'doom-modeline-segment--buffer-position :filter-return
                     #'doom-modeline-truncate+)
 
-        (advice-add 'doom-modeline-icon :filter-return
-                    (defun doom-modeline--pad-icon-on-terminal+ (value)
-                      (if (and (not (display-graphic-p))
-                               value)
-                          (let ((props (text-properties-at 0 value)))
-                            (apply 'propertize
-                                   (concat (substring-no-properties value)
-                                           " ")
-                                   props))
-                        value)))
+        (advice-add 'doom-modeline-icon :filter-return #'all-the-icons-pad-on-tty-advice+)
 
         (advice-add #'doom-modeline--buffer-name :filter-return
                     (defun doom-modeline-buffer-name-truncate+ (val)
@@ -10917,6 +10988,8 @@
    #+BEGIN_SRC emacs-lisp
      (use-package server
        :demand t
+       :custom
+       (server-client-instructions nil)
        :config
        ;; see [[http://emacshorrors.com/posts/determining-if-the-server-is-started-or-the-wonders-of-server-running-p.html][emacs-horrors]] for why this is sometimes useless :(
        (when (windows-p)
@@ -11594,6 +11667,7 @@
        :defer t
        :config
        (evil-set-initial-state 'xref--xref-buffer-mode 'motion)
+       (remove-hook 'xref-after-jump-hook 'recenter)
 
        :leader
        ("jb" 'xref-pop-marker-stack
@@ -11870,12 +11944,6 @@
          "m"   'ivy-occur-toggle-calling)
 
         :general
-        ("M-x" 'counsel-M-x)
-        (:keymaps 'counsel-find-file-map
-         "C-h" 'counsel-up-directory)
-        (:keymaps '(counsel-ag-map counsel-imenu-map)
-         "C-l" 'ivy-forward-char-or-partial-or-done
-         "M-l" 'ivy-call-and-recenter)
         (:keymaps 'ivy-minibuffer-map
          "C-j"   nil                                                                 ; was ivy-alt-done
          "M-j"   nil                                                                 ; was ivy-yank-word
@@ -11957,7 +12025,8 @@
         (:keymaps 'ivy-reverse-i-search-map
          "C-k" 'previous-line
          "C-d" 'ivy-reverse-i-search-kill)
-        (:keymaps 'ivy-occur-mode-map
+        (:keymaps '(ivy-occur-mode-map
+                    ivy-occur-grep-mode-map)
          :states 'motion
          "q" nil
          "RET" 'ivy-occur-press-and-switch
@@ -11982,11 +12051,19 @@
         :defer  t
         :after  prescient
         :hook (ivy-mode . ivy-prescient-mode)
-        :config
-        (add-to-list 'ivy-prescient-sort-commands 'counsel-find-file t)
-        (add-to-list 'ivy-prescient-sort-commands 'counsel-imenu t)
-        (add-to-list 'ivy-prescient-sort-commands 'flyspell-correct-ivy t)
+        :custom
+        (ivy-prescient-enable-sorting t)
+        (ivy-prescient-sort-commands
+         '(:not
+           swiper
+           swiper-isearch
+           ivy-switch-buffer
+           counsel-find-file
+           counsel-imenu
+           flyspell-correct-ivy
+           counsel-yank-pop))
 
+        :config
         (add-hook 'ivy-prescient-mode-hook
                   (defun ivy-prescient-disable-sort-find-file+ ()
                     (when (and (eq (car ivy-prescient-sort-commands) :not)
@@ -12034,11 +12111,9 @@
         :init
         (when (emacs>= "27")
           (setq xref-show-definitions-function #'ivy-xref-show-defs))
-        (setq xref-show-xrefs-function #'ivy-xref-show-xrefs)
+        (setq xref-show-xrefs-function #'ivy-xref-show-defs)
 
         :config
-        (remove-hook 'xref-after-jump-hook 'recenter)
-
         (defun ivy-xref-call-or-done ()
           (interactive)
           (let (orig-point orig-buffer
@@ -12093,36 +12168,9 @@
          "[" 'ivy-bibtex)
 
         :config
-        (setq bibtex-completion-pdf-extension '(".pdf" ".epub" ".pptx" ".doc" ".docx")
-              bibtex-completion-pdf-open-function 'xopen-url+)
-
-        (defun bibtex-completion-format-citation-org-mode-cite+ (keys)
-          "Format cite references for keys in KEYS for `org-mode'."
-          (s-join ", " (--map (format "cite:%s" it) keys)))
-
-        (setq bibtex-completion-format-citation-functions
-              '((org-mode      . bibtex-completion-format-citation-org-mode-cite+)
-                (latex-mode    . bibtex-completion-format-citation-cite)
-                (markdown-mode . bibtex-completion-format-citation-pandoc-citeproc)
-                (default       . bibtex-completion-format-citation-default)))
-
         (defun ivy-bibtex-insert-pdftools-link (cand)
-          (let* ((default-directory (or +org-pdf-directory default-directory))
-                  (key (cdr (assoc "=key=" (cdr cand))))
-                  (pdf (car (bibtex-completion-find-pdf key bibtex-completion-find-additional-pdfs))))
-            (unless pdf
-              (user-error "bib entry with key %s doesn't have an associated pdf file" key))
+          (bibtex-insert-pdftools-link+ (list (alist-get "=key=" (cdr cand) nil nil #'string-equal))))
 
-            (setq pdf (abbreviate-file-name (expand-file-name pdf)))
-
-            (insert (concat
-                      "[[pdftools:"
-                      pdf
-                      "::"
-                      (read-from-minibuffer "Page:" "1")
-                      "]["
-                      (read-string "Description: " nil nil pdf)
-                      "]]"))))
         (setq ivy-bibtex-default-action #'ivy-bibtex-insert-pdftools-link)
         (ivy-add-actions 'ivy-bibtex '(("j" ivy-bibtex-insert-pdftools-link "Insert pdftool link"))))
     #+END_SRC
@@ -12138,7 +12186,7 @@
         ("is" 'ivy-yasnippet)
 
         :general
-        (:states 'insert
+        (:states '(insert normal)
          "C-M-i" 'ivy-yasnippet))
     #+END_SRC
 
@@ -12169,17 +12217,13 @@
       (use-package flyspell-correct-ivy
         :ensure t
         :defer  t
-        :after  flyspell
+        :after  (flyspell flyspell-correct)
         :init
         ;; NOTE wrapper works backwards through the buffer by default.
         ;;      pass a two prefix args to check forward.
-        (setq flyspell-correct-interface #'flyspell-correct-ivy)
+        (setq flyspell-correct-interface #'flyspell-correct-ivy))
+    #+END_SRC
 
-        :leader
-        (:mode 'flyspell-mode
-         :minor t
-         :prefix leader-minor-mode-leader-prefix
-         leader-minor-mode-leader-prefix 'flyspell-correct-wrapper))
     #+END_SRC
 
 *** swiper
@@ -12332,6 +12376,10 @@
         :defer  t
         :hook (ivy-mode . counsel-mode)
         :diminish counsel-mode
+        :custom
+        (counsel-preselect-current-file t)
+        (org-roam-capture-function #'counsel-org-capture)
+
         :init
         (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
         (fset 'describe-bindings (symbol-function 'counsel-descbinds))
@@ -12339,14 +12387,9 @@
         (with-no-warnings
           (defvaralias 'counsel-find-file-ignore-regexp '+find-file-ignore-regexp))
 
-        (with-eval-after-load 'org
-          (leader/set-keys
-            "oh" '("org-headlines" . counsel-org-agenda-headlines)))
-
         (with-eval-after-load 'company
-          (setq company-menu-bindings+
-                (append company-menu-bindings+
-                        '("C-:" counsel-company))))
+          (when-let ((cell (rassoc 'completion-at-point company-menu-bindings+)))
+            (setcdr cell 'counsel-company)))
 
         (with-eval-after-load 'esh-mode
           (leader/set-keys-for-major-mode 'eshell-mode
@@ -12359,8 +12402,9 @@
               counsel-find-file-occur-use-find t
               counsel-evil-registers-height ivy-height)
 
-        (when (windows-p)
-          (setq counsel-rg-base-command "rg --with-filename --no-heading --line-number --path-separator // --color never %s ."))
+        (setq counsel-rg-base-command
+         (cond ((windows-p) counsel-rg-base-command)
+               (t '("rg" "-M" "240" "--with-filename" "--no-heading" "--line-number" "--color" "never" "--pcre2" "%s"))))
 
         (counsel-mode +1)
 
@@ -12392,7 +12436,6 @@
          "fs" "recursive-find"
 
          "ee" 'counsel-compilation-errors
-         "ic" 'counsel-unicode-char
          "ie" 'counsel-org-entity
          "Mm" 'counsel-major
 
@@ -12429,18 +12472,22 @@
          "G" 'counsel-org-goto-all)
 
         :general
+        ("M-x" 'counsel-M-x)
         (:keymaps 'emacs-window-map
          "x" 'counsel-wmctrl
          "C-x" 'counsel-wmctrl)
         (:keymaps 'counsel-mode-map
+         [remap insert-char] 'counsel-unicode-char
          [remap describe-face] 'counsel-faces
          [remap package-install] 'counsel-package
          [remap ivy-switch-buffer] 'counsel-switch-buffer
          [remap find-file] 'counsel-find-file
          [remap org-capture] 'counsel-org-capture
+         [remap load-theme] 'counsel-load-theme
          [remap find-library] 'counsel-find-library
          [remap install-package] 'counsel-package
          [remap describe-function] 'counsel-describe-function
+         [rempa org-completing-goto+] 'counsel-org-agenda-headlines
          [remap describe-variable] 'counsel-describe-variable)
         (:keymaps 'flymake-mode-map
          [remap counsel-flycheck] 'counsel-flymake)
@@ -12450,7 +12497,11 @@
          "<C-backspace>" nil)
         (:keymaps 'counsel-describe-map
          "C-."   'hydra-ivy/body
-         "C-S-." 'counsel-find-symbol))
+         "C-S-." 'counsel-find-symbol)
+        (:keymaps '(counsel-ag-map counsel-imenu-map)
+         "C-l" 'ivy-forward-char-or-partial-or-done
+         "M-l" 'ivy-call-and-recenter)
+         )
     #+END_SRC
 
 *** counsel-evil-jumps
@@ -12600,18 +12651,11 @@
       (use-package counsel-projectile
         :ensure t
         :defer  t
-        ;; :hook (projectile-mode . counsel-projectile-mode)
-        :init
-        (setq counsel-projectile-org-capture-templates-first-p nil)
+        :custom
+        (counsel-projectile-org-capture-templates-first-p nil)
 
         :leader
-        (;; 'counsel-projectile-org-agenda
-         "fp"    'counsel-projectile-switch-project
-         "pP"    'counsel-projectile-switch-project
-         "pf"    'counsel-projectile-find-file
-         "pd"    'counsel-projectile-find-dir
-         "pb"    'counsel-projectile-switch-to-buffer
-         "p SPC" 'counsel-projectile
+        ("p SPC" 'counsel-projectile
 
          "ps"  "search"
          "psg" 'counsel-projectile-grep
@@ -12620,8 +12664,11 @@
          "psr" 'counsel-projectile-rg)
 
         :general
-        (general-define-key
-         [remap counsel-org-capture] 'counsel-projectile-org-capture))
+        ([remap counsel-org-capture]                 'counsel-projectile-org-capture
+         [remap counsel-projectile-switch-project]   'counsel-projectile-switch-project
+         [remap counsel-projectile-find-file]        'counsel-projectile-find-file
+         [remap counsel-projectile-find-dir]         'counsel-projectile-find-dir
+         [remap counsel-projectile-switch-to-buffer] 'counsel-projectile-switch-to-buffer))
     #+END_SRC
 
 *** counsel-css
@@ -13604,50 +13651,50 @@
    associated keybindings, elisp identifiers and URLs.
 
    #+NAME: engine-mode-search-engines
-   | Search Engine   | Key     | Identifier               | URL                                                                                                               |
-   |-----------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
-   | DuckDuckGo      | sed     | duckduckgo               | https://duckduckgo.com/?q=%s                                                                                      |
-   | Github          | seG     | github                   | https://github.com/search?ref=simplesearch&q=%s                                                                   |
-   | Google          | seg     | google                   | http://www.google.com/search?ie=utf-8&oe=utf-8&q=%s                                                               |
-   | GoogleImages    | sei     | google-images            | http://www.google.com/images?hl=en&source=hp&q=%s                                                                 |
-   | GoogleMaps      | sem     | google-maps              | http://maps.google.com/maps?q=%s                                                                                  |
-   | StackOverflow   | ses     | stack-overflow           | https://stackoverflow.com/search?q=%s                                                                             |
-   | Wikipedia       | sew     | wikipedia                | http://www.wikipedia.org/search-redirect.php?language=en&go=Go&search=%s                                          |
-   | Youtube         | sey     | youtube                  | http://www.youtube.com/results?aq=f&oq=&search_query=%s                                                           |
-   |-----------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
-   | MyAnimeList     | sea SPC | myanimelist              | https://myanimelist.net/search/all?q=%s                                                                           |
-   | Anime           | seaa    | myanimelist/anime        | https://myanimelist.net/anime.php?q=%s                                                                            |
-   | Manga           | seam    | myanimelist/manga        | https://myanimelist.net/manga.php?q=%s                                                                            |
-   | Characters      | seac    | myanimelist/chars        | https://myanimelist.net/character.php?q=%s                                                                        |
-   | People          | seap    | myanimelist/people       | https://myanimelist.net/people.php?q=%s                                                                           |
-   | News            | sean    | myanimelist/news         | https://myanimelist.net/news/search?q=%s                                                                          |
-   | Articles        | seaF    | myanimelist/articles     | https://myanimelist.net/featured/search?q=%s                                                                      |
-   | Forums          | seaf    | myanimelist/forums       | https://myanimelist.net/forum/search?u=&uloc=1&loc=-1&q=%s                                                        |
-   | Clubs           | seaC    | myanimelist/clubs        | https://myanimelist.net/clubs.php?action=find&cn=%s                                                               |
-   | Users           | seau    | myanimelist/users        | https://myanimelist.net/users.php?q=%s                                                                            |
-   |-----------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
-   | Nyaa            | senn    | nyaa                     | https://nyaa.si/?f=0&c=0_0&q=%s                                                                                   |
-   | Anime           | sena    | nyaa/anime-english       | https://nyaa.si/?f=0&c=1_2&q=%s                                                                                   |
-   | AnimeAll        | senA    | nyaa/anime               | https://nyaa.si/?f=0&c=1_0&q=%s                                                                                   |
-   | Music           | senm    | nyaa/music               | https://nyaa.si/?f=0&c=2_0&q=%s                                                                                   |
-   | Literature      | senl    | nyaa/literature-english  | https://nyaa.si/?f=0&c=3_1&q=%s                                                                                   |
-   | LiteratureAll   | senL    | nyaa/literature          | https://nyaa.si/?f=0&c=3_0&q=%s                                                                                   |
-   | LiveAction      | senv    | nyaa/live-action-english | https://nyaa.si/?f=0&c=4_1&q=%s                                                                                   |
-   | LiveActionAll   | senV    | nyaa/live-action         | https://nyaa.si/?f=0&c=4_0&q=%s                                                                                   |
-   | Images          | seni    | nyaa/images              | https://nyaa.si/?f=0&c=5_0&q=%s                                                                                   |
-   | Software        | sens    | nyaa/software            | https://nyaa.si/?f=0&c=6_0&q=%s                                                                                   |
-   | Games           | seng    | nyaa/games               | https://nyaa.si/?f=0&c=6_2&q=%s                                                                                   |
-   |-----------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
-   | CppReference    | spc     | cpp-reference            | https://en.cppreference.com/mwiki/index.php?title=Special%%3ASearch&search=%s                                     |
-   | Github          | spg     | github                   | https://github.com/search?q=%s                                                                                    |
-   | Go              | sp9     | godoc                    | https://godoc.org/?q=%s                                                                                           |
-   | JavaDocs        | spj     | java-oracle-docs         | https://www.google.com/search?q=%s+site%%3Ahttps%%3A%%2F%%2Fdocs.oracle.com%%2Fen%%2Fjava%%2Fjavase%%2F15%%2Fdocs |
-   | MozillaMDN      | spm     | mozilla-mdn              | https://developer.mozilla.org/en-US/search?q=%s                                                                   |
-   | Qt5             | spq     | qt5                      | https://doc.qt.io/qt-5/search-results.html?q=%s                                                                   |
-   | RubyDoc         | spr     | ruby-doc                 | https://ruby-doc.com/search.html?q=%s                                                                             |
-   | Rust            | spu     | rust                     | https://doc.rust-lang.org/std/?search=%s                                                                          |
-   | Python          | spp     | python                   | https://docs.python.org/3/search.html?q=%s                                                                        |
-   | W3SchoolsColors | spx     | w3schools-colors         | https://www.w3schools.com/colors/colors_converter.asp?color=%s                                                    |
+   | Search Engine     | Key     | Identifier               | URL                                                                                                               |
+   |-------------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
+   | DuckDuckGo        | sed     | duckduckgo               | https://duckduckgo.com/?q=%s                                                                                      |
+   | Github            | seG     | github                   | https://github.com/search?ref=simplesearch&q=%s                                                                   |
+   | Google            | seg     | google                   | http://www.google.com/search?ie=utf-8&oe=utf-8&q=%s                                                               |
+   | GoogleImages      | sei     | google-images            | http://www.google.com/images?hl=en&source=hp&q=%s                                                                 |
+   | GoogleMaps        | sem     | google-maps              | http://maps.google.com/maps?q=%s                                                                                  |
+   | StackOverflow     | sep     | stack-overflow           | https://stackoverflow.com/search?q=%s                                                                             |
+   | Wikipedia         | sew     | wikipedia                | http://www.wikipedia.org/search-redirect.php?language=en&go=Go&search=%s                                          |
+   | Youtube           | sey     | youtube                  | http://www.youtube.com/results?aq=f&oq=&search_query=%s                                                           |
+   |-------------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
+   | MyAnimeList       | sea SPC | myanimelist              | https://myanimelist.net/search/all?q=%s                                                                           |
+   | Anime             | seaa    | myanimelist/anime        | https://myanimelist.net/anime.php?q=%s                                                                            |
+   | Manga             | seam    | myanimelist/manga        | https://myanimelist.net/manga.php?q=%s                                                                            |
+   | Characters        | seac    | myanimelist/chars        | https://myanimelist.net/character.php?q=%s                                                                        |
+   | People            | seap    | myanimelist/people       | https://myanimelist.net/people.php?q=%s                                                                           |
+   | News              | sean    | myanimelist/news         | https://myanimelist.net/news/search?q=%s                                                                          |
+   | Articles          | seaF    | myanimelist/articles     | https://myanimelist.net/featured/search?q=%s                                                                      |
+   | Forums            | seaf    | myanimelist/forums       | https://myanimelist.net/forum/search?u=&uloc=1&loc=-1&q=%s                                                        |
+   | Clubs             | seaC    | myanimelist/clubs        | https://myanimelist.net/clubs.php?action=find&cn=%s                                                               |
+   | Users             | seau    | myanimelist/users        | https://myanimelist.net/users.php?q=%s                                                                            |
+   |-------------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
+   | Nyaa              | senn    | nyaa                     | https://nyaa.si/?f=0&c=0_0&q=%s                                                                                   |
+   | NyaaAnime         | sena    | nyaa/anime-english       | https://nyaa.si/?f=0&c=1_2&q=%s                                                                                   |
+   | NyaaAnimeAll      | senA    | nyaa/anime               | https://nyaa.si/?f=0&c=1_0&q=%s                                                                                   |
+   | NyaaMusic         | senm    | nyaa/music               | https://nyaa.si/?f=0&c=2_0&q=%s                                                                                   |
+   | NyaaLiterature    | senl    | nyaa/literature-english  | https://nyaa.si/?f=0&c=3_1&q=%s                                                                                   |
+   | NyaaLiteratureAll | senL    | nyaa/literature          | https://nyaa.si/?f=0&c=3_0&q=%s                                                                                   |
+   | NyaaLiveAction    | senv    | nyaa/live-action-english | https://nyaa.si/?f=0&c=4_1&q=%s                                                                                   |
+   | NyaaLiveActionAll | senV    | nyaa/live-action         | https://nyaa.si/?f=0&c=4_0&q=%s                                                                                   |
+   | NyaaImages        | seni    | nyaa/images              | https://nyaa.si/?f=0&c=5_0&q=%s                                                                                   |
+   | NyaaSoftware      | sens    | nyaa/software            | https://nyaa.si/?f=0&c=6_0&q=%s                                                                                   |
+   | NyaaGames         | seng    | nyaa/games               | https://nyaa.si/?f=0&c=6_2&q=%s                                                                                   |
+   |-------------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
+   | CppReference      | spc     | cpp-reference            | https://en.cppreference.com/mwiki/index.php?title=Special%%3ASearch&search=%s                                     |
+   | Github            | spg     | github                   | https://github.com/search?q=%s                                                                                    |
+   | Go                | sp9     | godoc                    | https://godoc.org/?q=%s                                                                                           |
+   | JavaDocs          | spj     | java-oracle-docs         | https://www.google.com/search?q=%s+site%%3Ahttps%%3A%%2F%%2Fdocs.oracle.com%%2Fen%%2Fjava%%2Fjavase%%2F15%%2Fdocs |
+   | MozillaMDN        | spm     | mozilla-mdn              | https://developer.mozilla.org/en-US/search?q=%s                                                                   |
+   | Qt5               | spq     | qt5                      | https://doc.qt.io/qt-5/search-results.html?q=%s                                                                   |
+   | RubyDoc           | spr     | ruby-doc                 | https://ruby-doc.com/search.html?q=%s                                                                             |
+   | Rust              | spu     | rust                     | https://doc.rust-lang.org/std/?search=%s                                                                          |
+   | Python            | spp     | python                   | https://docs.python.org/3/search.html?q=%s                                                                        |
+   | W3SchoolsColors   | spx     | w3schools-colors         | https://www.w3schools.com/colors/colors_converter.asp?color=%s                                                    |
 
    Lastly heres some prefix keys (leader prefixes) that don't connect to commands,
    but to groups of commands.
@@ -13665,6 +13712,9 @@
    #+BEGIN_SRC emacs-lisp :var engines=engine-mode-search-engines
      (setq engines (cdr engines)) ;; strip header row
 
+     (defvar engine-engines+ nil
+       "alist of search engines keys and functions.")
+
      ;; Assign leader keys and setup autoloads for each searcher.
      (cl-loop for (engine key id-str) in engines
               with id-sym = nil
@@ -13678,13 +13728,14 @@
                    (autoload id-sym "engine-mode.el" nil t)))
 
      (with-eval-after-load 'engine-mode
-       (cl-loop for (- - id-str query) in engines
+       (cl-loop for (name - id-str query) in engines
                 with id-sym = nil
                 when (and id-str query)
                   do (setq id-sym (intern id-str))
                   and do (eval
-                          `(defengine ,id-sym
-                             ,query))))
+                          `(defengine ,id-sym ,query))
+                  and do (cl-pushnew (cons (or name id-str) (engine/function-name id-sym))
+                                     engine-engines+)))
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp :var prefix-aliases=engine-mode-prefix-names
@@ -13694,6 +13745,17 @@
                     collect prefix collect name)))
    #+END_SRC
 
+   Lets create a command to interactively select and execute a search engine.
+
+   #+BEGIN_SRC emacs-lisp
+     (defun engine-search+ ()
+       (interactive)
+       (call-interactively
+        (alist-get (completing-read "Engine: " engine-engines+)
+                   engine-engines+ nil nil #'string-equal)))
+
+     (leader/set-keys "ses" 'engine-search+)
+   #+END_SRC
 ** expand-region
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! expand-region)
      (use-package expand-region
@@ -16490,9 +16552,11 @@
         :defer  t
         :hook ((markdown-mode . display-line-numbers-mode)
                (markdown-mode . flycheck-mode))
-        :config
-        (setq markdown-indent-on-enter 'indent-and-new-item)
+        :custom
+        (markdown-indent-on-enter 'indent-and-new-item)
+        (markdown-fontify-code-blocks-natively t)
 
+        :config
         (advice-add 'markdown-insert-list-item :before
                     (defun markdown-insert-list-item--adjust-line+ (&rest args)
                       "by default, inserting a new list item goes below the current item."
@@ -17989,6 +18053,45 @@
         (setq company-bibtex-bibliography bibtex-files))
     #+END_SRC
 
+*** bibtex-completion
+    #+BEGIN_SRC emacs-lisp
+      (use-package bibtex-completion
+        :ensure nil
+        :defer  t
+        :commands (bibtex-insert-pdftools-link+)
+        :config
+        (setq bibtex-completion-pdf-extension '(".pdf" ".epub" ".pptx" ".doc" ".docx")
+              bibtex-completion-pdf-open-function 'xopen-url+)
+
+        (defun bibtex-completion-format-citation-org-mode-cite+ (keys)
+          "Format cite references for keys in KEYS for `org-mode'."
+          (s-join ", " (--map (format "cite:%s" it) keys)))
+
+        (setq bibtex-completion-format-citation-functions
+              '((org-mode      . bibtex-completion-format-citation-org-mode-cite+)
+                (latex-mode    . bibtex-completion-format-citation-cite)
+                (markdown-mode . bibtex-completion-format-citation-pandoc-citeproc)
+                (default       . bibtex-completion-format-citation-default)))
+
+        (defun bibtex-insert-pdftools-link+ (keys)
+          (let ((default-directory (or +org-pdf-directory default-directory)))
+            (dolist (key keys)
+              (let ((pdf (car (bibtex-completion-find-pdf key bibtex-completion-find-additional-pdfs))))
+                (unless pdf
+                  (user-error "Bib entry with key %s doesn't have an associated pdf file" key))
+
+                (setq pdf (abbreviate-file-name (expand-file-name pdf)))
+
+                (insert (concat
+                         "[[pdftools:"
+                         pdf
+                         "::"
+                         (read-from-minibuffer "Page:" "1")
+                         "]["
+                         (read-string "Description: " nil nil pdf)
+                         "]]")))))))
+    #+END_SRC
+
 *** ebib
     biblatex/bibtex database management interface for emacs. TODO read [[https://joostkremers.github.io/ebib/ebib-manual.html][manual]].
 
@@ -18594,7 +18697,7 @@
       `(ivy-actual-highlight-face ((,cls (:foreground ,very-dark-grey :background ,turquoise
                                           :distant-foreground ,turquoise :inherit bold))))
       `(ivy-highlight-face ((,cls (:inherit ivy-actual-highlight-face))))
-      `(ivy-current-match ((,cls (:foreground ,very-dark-grey :font-weight 'normal :inherit highlight))))
+      `(ivy-current-match ((,cls (:foreground ,very-dark-grey :weight bold :inherit highlight))))
 
      ;;; org-mode
       `(org-link ((,cls (:inherit (link bold)))))
@@ -18620,10 +18723,14 @@
       `(rustic-compilation-column ((,cls (:inherit compilation-column-number))))
       `(rustic-compilation-line ((,cls (:inherit compilation-line-number))))
 
+     ;;; dired
+      `(dired-symlink ((,cls (:foreground ,blue))))
+      `(dired-special ((,cls (:foreground ,purple))))
+
      ;;; dashboard
       `(dashboard-text-banner ((,cls (:foreground ,orange-int))))
-      `(dashboard-items-face ((,cls (:font-weight 'normal))))
-      `(dashboard-no-items-face ((,cls (:font-weight 'normal))))
+      `(dashboard-items-face ((,cls (:weight normal))))
+      `(dashboard-no-items-face ((,cls (:weight normal))))
       `(dashboard-heading ((,cls (:inherit (bold dashboard-navigator)))))
 
      ;;; eshell-prompt-extras
