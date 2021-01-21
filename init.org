@@ -49,6 +49,9 @@
         ivy                                                               ; A clean minimalist completion framework.
         ;; selectrum                                                      ; An ivy-like package designed to be more consistent and predictable
 
+    ;;; Completion Assistants
+        prescient                                                         ; Sorting/Filtering based on frequency and proximity.
+
     ;;; Mode lines
         doom-modeline                                                     ; A fast and feature-full mode-line package based on [[https://github.com/hlissner/doom-emacs][doom]]!
         ;; spaceline                                                      ; The same mode-line package as [[https://github.com/syl20bnr/spacemacs][spacemacs]].
@@ -80,6 +83,8 @@
         ;; ibuffer-persp                                                  ; Filter ibuffer buffers by emacs perspectives
         ibuffer-projectile                                                ; Filter ibuffer buffers by active projects
         ;; company-emoji                                                  ; Show emojis in company-completion candidates
+
+        ;; ivy-prescient                                                  ; Sort ivy candidates through prescient. (WARN [[https://github.com/raxod502/prescient.el/issues?q=is%3Aissue+ivy+history][issues]])
 
     ;;; language-support
         ;; ggtags                                                         ; GNU Global source code tagging system
@@ -3495,7 +3500,7 @@
     #+END_SRC
 
 *** prescient
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! prescient)
       (use-package prescient
         :ensure t
         :demand t
@@ -3503,8 +3508,7 @@
         (setq prescient-save-file (var! "prescient-history.el"))
 
         :config
-        (prescient-persist-mode +1)                                         ; persist statistics between emacs sessions
-        )
+        (prescient-persist-mode +1))                                                  ; persist statistics between emacs sessions
     #+END_SRC
 
 ** evil
@@ -5810,7 +5814,7 @@
     #+END_SRC
 
 *** prescient
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! prescient)
       (use-package company-prescient
         :ensure t
         :defer  t
@@ -12118,7 +12122,7 @@
     #+END_SRC
 
 *** ivy-prescient
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy prescient ivy-prescient)
       (use-package ivy-prescient
         :ensure t
         :defer  t
