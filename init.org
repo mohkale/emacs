@@ -2025,13 +2025,23 @@
        (interactive)
        (find-file (etc! "snippets.org")))
 
-     (defun find-dotemacs-config-file ()
-       (interactive)
-       (if-let ((file (cl-loop for f in (list (lisp! "+config.el")
-                                              (lisp! "+config-default.el"))
-                               when (file-exists-p f) return f)))
-           (find-file file)
-         (user-error "No configuration file found")))
+     (defun find-dotemacs-config-file (&optional arg)
+       (interactive "P")
+       (cl-destructuring-bind (file . point)
+           (or (unless arg
+                 (let ((conf (lisp! "+config.el")))
+                   (and (file-exists-p conf)
+                        (cons conf nil))))
+               (save-window-excursion
+                 (find-dotemacs-org-file)
+                 (cons (buffer-file-name)
+                       (cdr (cl-assoc "Config" (imenu--make-index-alist t) :test #'string-equal)))))
+         (if file
+             (progn
+               (find-file file)
+               (when point
+                 (goto-char point)))
+           (user-error "No configuration file found"))))
 
      (defun find-dotemacs-snippet ()
        (interactive)
