@@ -4698,6 +4698,7 @@
       (use-package org
         :defer t
         :hook (org-mode . display-line-numbers-mode)
+        :commands (org-completing-goto+)
         :init
         (add-hook 'org-mode-hook
                   (lambda (&rest _)
@@ -4786,6 +4787,10 @@
                                                  (unless (eq evil-state 'normal)
                                                    (evil-normal-state))))
 
+        (defun org-completing-goto+ ()
+          (interactive)
+          (org-refile '(4)))
+
         ;;  _
         ;; | | __ _ _ __   __ _ _   _  __ _  __ _  ___  ___
         ;; | |/ _` | '_ \ / _` | | | |/ _` |/ _` |/ _ \/ __|
@@ -4832,7 +4837,9 @@
          "oy" 'org-copy-subtree
          "oY" 'org-cut-subtree
          "on" 'org-next-link
-         "op" 'org-previous-link)
+         "op" 'org-previous-link
+
+         "oh" 'org-completing-goto+)
 
         :lazy-leader
         (:mode 'org-mode
