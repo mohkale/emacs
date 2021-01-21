@@ -1,19 +1,19 @@
 .POSIX:
 
-BIN_DIR = bin
-SRC_DIR = src
-OBJ_DIR = obj
-INC_DIR = includes
-TARGET  = __MAIN__
+BIN_DIR := bin
+SRC_DIR := src
+OBJ_DIR := obj
+INC_DIR := includes
+TARGET  := __MAIN__
 
-TARGET_BIN = $(BIN_DIR)/$(TARGET)
+TARGET_BIN := $(BIN_DIR)/$(TARGET)
 
-CC = __CCLD__
-CCFLAGS = $(shell cat compile_flags.txt)
-LDFLAGS = -Wall -pedantic
+CC := __CCLD__
+CCFLAGS := $(shell cat compile_flags.txt)
+LDFLAGS := -Wall -pedantic
 
-SRC = $(shell find $(SRC_DIR) -type f -iname "*.cc")
-OBJ = $(SRC:$(SRC_DIR)/%.cc=$(OBJ_DIR)/%.o)
+SRC := $(shell find $(SRC_DIR) -type f -iname "*.cc")
+OBJ := $(SRC:$(SRC_DIR)/%.cc=$(OBJ_DIR)/%.o)
 
 all: $(TARGET_BIN)
 

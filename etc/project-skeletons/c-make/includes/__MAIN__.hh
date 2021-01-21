@@ -1,10 +1,10 @@
-#ifndef __MAIN___H
-#define __MAIN___H
+#ifndef __(upcase (alist-get "__MAIN__" subs nil nil #'string-equal))___H
+#define __(upcase (alist-get "__MAIN__" subs nil nil #'string-equal))___H
 
 #include <stdio.h>
 
 void hello(const char* target) {
-  printf("Hello %s\n", target);
+    printf("Hello %s\n", target);
 }
 
-#endif /* __MAIN___H */
+#endif /* __(upcase (alist-get "__MAIN__" subs nil nil #'string-equal))___H */
