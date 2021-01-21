@@ -8841,17 +8841,34 @@
 *** all-the-icons
     #+BEGIN_SRC emacs-lisp
       (use-package all-the-icons-dired
-        :defer  t
-        :ensure t
+        :straight (all-the-icons-dired :fork (:host github :repo "mohkale/all-the-icons-dired" :branch "icons-predicate"))
+        :defer t
         :diminish "DiredIcons"
         :after all-the-icons
         :hook (dired-mode . all-the-icons-dired-mode)
+        :custom
+        (all-the-icons-dired-enabled-p
+         (defun all-the-icons-dired-enabled-p+ ()
+           (and (derived-mode-p 'dired-mode)
+                (or +icons-available
+                    (display-graphic-p)))))
+
         :config
-        (add-hook 'all-the-icons-dired-mode-hook
-                  (defun all-the-icons-dired-mode--setup-insert+ (&rest _)
-                    (if (bound-and-true-p all-the-icons-dired-mode)
-                        (advice-add 'dired-insert-subdir :around #'all-the-icons-dired--refresh-advice)
-                      (advice-remove 'dired-insert-subdir #'all-the-icons-dired--refresh-advice)))))
+        (advice-add 'all-the-icons-dired--refresh :around
+                    (defun all-the-icons-dired-setup-tty-icons+ (func &rest args)
+                      (cl-letf (((symbol-function 'all-the-icons-icon-for-file--default)
+                                 (symbol-function 'all-the-icons-icon-for-file))
+                                ((symbol-function 'all-the-icons-icon-for-file)
+                                 (lambda (&rest icon-args)
+                                   (all-the-icons-pad-on-tty-advice+
+                                    (apply 'all-the-icons-icon-for-file--default icon-args))))
+                                ((symbol-function 'all-the-icons-icon-for-dir--default)
+                                 (symbol-function 'all-the-icons-icon-for-dir))
+                                ((symbol-function 'all-the-icons-icon-for-dir)
+                                 (lambda (&rest icon-args)
+                                   (all-the-icons-pad-on-tty-advice+
+                                    (apply 'all-the-icons-icon-for-dir--default icon-args)))))
+                        (apply func args)))))
     #+END_SRC
 
 *** hide
