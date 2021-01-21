@@ -5425,6 +5425,9 @@
           (cond ((package! ivy)
                  (require 'counsel)
                  (counsel-rg nil org-roam-directory))
+                ((package! selectrum)
+                 (require 'consult)
+                 (consult-ripgrep org-roam-directory))
                 (t (message "No rg package found"))))
 
         (setq org-roam-directory (org! "brain")
@@ -11858,12 +11861,135 @@
 *** selectrum
     #+BEGIN_SRC emacs-lisp
       (use-package selectrum
-        ;; :ensure t
-        :straight (selectrum :fork (:host github :repo "clemera/selectrum" :branch "experiment-with-different-prompt-selection-scheme-for-files"))
+        :ensure t
         :defer  t
         :hook (after-init . selectrum-mode)
-        :init
-        (setq selectrum-num-candidates-displayed 15)
+        :commands (selectrum-preprocess+
+                   selectrum-highlight+)
+        :custom
+        (selectrum-num-candidates-displayed 15)
+        (selectrum-count-style 'current/matches)
+        :config
+      ;;; Sorting configuration and workarounds
+        (defun selectrum-sort-cands+ (cands)
+          (cond
+           ;; Finding file-names should sort directories first.
+           ((eq minibuffer-completion-table 'read-file-name-internal)
+              ;; Only sort based on filename, with directories being first :-)
+              (sort cands
+                    (lambda (x y)
+                      (let ((x-dir (eq (aref x (- (length x) 1)) ?/))
+                            (y-dir (eq (aref y (- (length y) 1)) ?/)))
+                        (cond
+                         ((and x-dir y-dir)
+                         (string< (directory-file-name x) (directory-file-name y)))
+                         (x-dir t)
+                         (y-dir nil)
+                         (t (string< x y)))))))))
+
+        (defun selectrum-preprocess+ (cands)
+          (when selectrum-should-sort-p
+            (setq cands
+                  (or (selectrum-sort-cands+ cands)
+                      (when (bound-and-true-p selectrum-prescient-mode)
+                        (selectrum-prescient--preprocess cands))
+                      (selectrum-default-candidate-preprocess-function cands))))
+          cands)
+
+      ;;; Update highlighting for certain completions
+        (defun selectrum-highlight-candidates+ (input cands)
+          (if (eq 'file (completion-metadata-get
+                         (completion-metadata
+                          input
+                          minibuffer-completion-table
+                          minibuffer-completion-predicate)
+                         'category))
+              (cl-loop for cand in cands
+                       for len = (length cand)
+                       if (and (> len 0)
+                               (eq (aref cand (1- len)) ?/))
+                       collect (selectrum--add-face cand 'dired-directory)
+                       else
+                       collect cand)
+            cands))
+
+        (defun selectrum-highlight+ (input cands)
+          (cl-reduce (lambda (cands func)
+                       (funcall func input cands))
+                     (delq nil (list #'selectrum-highlight-candidates+
+                                     (cond ((eq (bound-and-true-p selectrum-refine-candidates-function)
+                                                #'orderless-filter)
+                                            #'orderless-highlight-matches)
+                                           ((bound-and-true-p selectrum-prescient-mode)
+                                            #'selectrum-prescient--highlight)
+                                           (t #'selectrum-default-candidate-highlight-function))))
+                     :initial-value cands))
+
+        (defun selectrum-override-current-candidate-face-face-range+ (str overriding-faces)
+          (cl-loop for i from 0 to (length str)
+                   with last-face = nil
+                   with current-face = nil
+                   do (setq current-face
+                            (when-let ((face (get-text-property i 'face str)))
+                              (if (listp face) (car face) face)))
+                   with seq-range = nil
+                   when (and current-face (member current-face overriding-faces))
+                     when seq-range
+                       when (eq current-face last-face)
+                         ;; Incremenet existing sequence
+                         do (setcdr seq-range i)
+                       else
+                         ;; Finished previous sequence and started a new one
+                         collect (cons last-face seq-range)
+                         and do (setq seq-range (cons i i))
+                       end
+                     else
+                       do (setq seq-range (cons i i))
+                     end
+                   else when seq-range
+                     collect (cons last-face seq-range)
+                     and do (setq seq-range nil)
+                   end
+                   do (setq last-face current-face)))
+
+        (advice-add 'selectrum--add-face :before-until
+                    (defun selectrum-override-current-candidate-face+ (str face)
+                      "Use `selectrum-current-candidate' but keep match highlighting.
+      This is a workaround until [[https://github.com/raxod502/selectrum/issues/353][#353]] gets resolved."
+                      (when (and (eq face 'selectrum-current-candidate)
+                                 (not (eq this-command #'describe-face)))
+                        (setq copied (copy-sequence str))
+                        (if (version< emacs-version "27")
+                            (font-lock-prepend-text-property 0 end 'face face copied)
+                          (add-face-text-property 0 (length copied) face nil copied))
+
+                        (dolist (seq (selectrum-override-current-candidate-face-face-range+
+                                      str '(orderless-match-face-0
+                                            orderless-match-face-1
+                                            orderless-match-face-2
+                                            orderless-match-face-3)))
+                          (cl-destructuring-bind (face . (start . end))
+                              seq
+                            (if (version< emacs-version "27")
+                                (font-lock-prepend-text-property start end 'face face copied)
+                              (add-face-text-property start (1+ end) face nil copied))))
+                        copied)))
+
+        (defun selectrum-update-regexp-search-ring+ (&rest _args)
+          "Update search rings based on the last `selectrum-read' command.
+      This works for isearch and evil and can automatically detect and compile
+      regexp when an external package (eg. orderless) is used."
+          (when-let ((regexp (cond ((eq selectrum-refine-candidates-function
+                                        'orderless-filter)
+                                    (eval
+                                     `(rx (or ,@(cl-loop for regexp in (funcall orderless-pattern-compiler
+                                                                                selectrum--previous-input-string)
+                                                         collect `(regexp ,regexp))))))
+                                   (t selectrum--previous-input-string))))
+            (push regexp regexp-search-ring)
+            (when (boundp 'evil-ex-search-pattern)
+              (setq evil-ex-search-pattern (list regexp t t))
+              (evil-ex-search-activate-highlight (list regexp t t)))))
 
         :leader
         ("RET" 'selectrum-repeat)
@@ -11878,8 +12004,12 @@
                  (call-interactively (if (eolp)
                                          'selectrum-select-current-candidate
                                        'forward-char)))
-         "M-j" 'next-matching-history-element
-         "M-k" 'previous-matching-history-element
+         "M-j" 'next-history-element
+         "M-k" 'previous-history-element
+         "C-r" 'next-matching-history-element
+         "C-s" 'previous-matching-history-element
+         [C-i] 'selectrum-insert-current-candidate
+         "C-i" 'selectrum-insert-current-candidate
          "C-o" 'end-of-buffer
          "M-o" 'beginning-of-buffer
          "C-d" 'scroll-up-command
@@ -11889,51 +12019,45 @@
     #+END_SRC
 
 *** selectrum-prescient
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! selectrum prescient)
       (use-package selectrum-prescient
+        :after prescient
         :ensure t
         :defer  t
-        :hook (selectrum-mode . selectrum-prescient-mode))
+        :hook ((selectrum-mode . selectrum-prescient-mode))
+        :init
+        (add-hook 'selectrum-prescient-mode-hook
+                  (lambda ()
+                    ;; override highlight functions
+                    (setq selectrum-preprocess-candidates-function #'selectrum-preprocess+
+                          selectrum-highlight-candidates-function #'selectrum-highlight+))))
     #+END_SRC
 
-*** consult
+*** selectrum-orderless
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! selectrum orderless)
+    :END:
+
     #+BEGIN_SRC emacs-lisp
-      (use-package consult
-        :ensure t
-        :defer  t
-        :hook (selectrum-mode . consult-preview-mode)
-        :leader
-        ("ji" 'consult-imenu
-         "hx" 'consult-complex-command
-         "ax" 'consult-mode-command
-         "rr" 'consult-register
-         "rm" 'consult-mark
-         "ju" 'consult-outline
-         "fr" 'consult-recent-file
-         "eg" 'consult-error)
+      (defun selectrum-setup-orderless+ ()
+        (setq selectrum-refine-candidates-function #'orderless-filter
+              selectrum-highlight-candidates-function #'selectrum-highlight+))
 
-        :general
-        ([remap switch-to-buffer] 'consult-buffer
-         [remap multi-occur] 'consult-multi-occur
-         [remap apropros-command] 'consult-apropos
-         [remap goto-line] 'consult-goto-line
-         [remap isearch-forward] 'consult-line
-         "C-M-y" 'consult-yank-pop
-         "C-s" 'consult-line))
-
-      (use-package consult-selectrum
-        :ensure t
-        :defer  t)
+      (defun selectrum-teardown-orderless+ ()
+        (warn "ivy-teardown-orderless: Not yet implemented"))
     #+END_SRC
 
-*** consult-flycheck
-    #+BEGIN_SRC emacs-lisp :tangle no
-      (use-package consult-flycheck
-        :ensure t
-        :defer  t
-        :leader
-        ("eg" 'consult-flycheck))
+    #+BEGIN_SRC emacs-lisp
+      (if (package! prescient)
+          (add-hook 'selectrum-prescient-mode-hook
+                    (defun selectrum-prescient-setup-orderless+ ()
+                      (cond ((bound-and-true-p selectrum-prescient-mode)
+                             (selectrum-setup-orderless+))
+                            (+orderless-requires-prescient
+                             (selectrum-teardown-orderless+)))))
+        (add-hook 'selectrum-mode-hook #'selectrum-setup-orderless+))
     #+END_SRC
+
 
 *** marginalia
     #+BEGIN_SRC emacs-lisp
@@ -11943,7 +12067,13 @@
         :hook (selectrum-mode . marginalia-mode)
         :general
         (:keymaps 'embark-general-map
-         "A" 'marginalia-cycle))
+         "A" 'marginalia-cycle)
+
+        :config
+        (advice-add #'marginalia-cycle :after
+                    (lambda ()
+                      (when (bound-and-true-p selectrum-mode)
+                        (selectrum-exhibit)))))
     #+END_SRC
 
 *** embark
@@ -11951,14 +12081,247 @@
       (use-package embark
         :ensure t
         :defer  t
+        :config
+        (setq embark-action-indicator
+              (lambda (map)
+                (which-key--show-keymap "Embark" map nil nil 'no-paging)
+                #'which-key--hide-popup-ignore-command)
+              embark-become-indicator embark-action-indicator)
+
+        (push 'embark-collect-mode whitespace-exempt-modes)
+
+        (advice-add 'embark-export           :around #'restore-default-display-buffer-actions)
+        (advice-add 'embark-collect-live     :around #'restore-default-display-buffer-actions)
+        (advice-add 'embark-collect-snapshot :around #'restore-default-display-buffer-actions)
+
         :general
         (:keymaps 'selectrum-minibuffer-map
          "<C-return>" 'embark-act
          "M-RET" 'embark-act-noexit
-         "C-c C-o" 'embark-occur
-         "C-c M-o" 'embark-live-occur
-         "C-c C-e" 'embark-export))
+         "C-c C-o" 'embark-collect-snapshot
+         "C-c M-o" 'embark-collect-live
+         "C-c C-e" 'embark-export)
+        (:keymaps 'embark-collect-mode-map
+         :states 'motion
+         "a" 'embark-act
+         "<" 'tabulated-list-narrow-current-column
+         ">" 'tabulated-list-widen-current-column
+         "gj" 'forward-button
+         "gk" 'backward-button
+         "<C-return>" 'embark-act)
+
+        :lazy-leader
+        (:mode 'embark-collect-mode
+         "," 'embark-act
+         "s" 'embark-collect-direct-action-minor-mode
+         "l" 'embark-collect-toggle-view                                             ; list -> grid -> list
+         "a" 'embark-collect-direct-action-minor-mode
+         "e" 'embark-export
+         "z" 'embark-occur-zebra-minor-mode
+         "n" 'tabulated-list-narrow-current-column
+         "w" 'tabulated-list-widen-current-column))
+
+      (use-package embark-consult
+        :ensure t
+        :defer  t
+        :after  (embark consult)
+        :hook (embark-collect-mode . embark-consult-preview-minor-mode))
     #+END_SRC
+
+*** consult
+    #+BEGIN_SRC emacs-lisp
+      (defvar consult-manual-preview-key (kbd "M-SPC")
+        "Manual key to trigger `consult--read' previews.")
+
+      (use-package consult
+        :straight (consult :fork (:host github :repo "mohkale/consult" :branch "consult-yasnippet"))
+        ;; :ensure t
+        :defer  t
+        :commands (consult-ripgrep-no-project+
+                   consult-grep-no-project+)
+        :custom
+        (consult-project-root-function #'projectile-project-root)
+        (consult-async-default-split "/")
+        (consult-fontify-max-size 100000)
+        (register-preview-function #'consult-register-preview)
+        (consult-ripgrep-command
+         ;; Variant command which disregards no-matches
+         '("sh" "-c"
+           ;; '("rg" "--null" "--line-buffered" "--color=always" "--max-columns=500" "--no-heading" "--line-number" "." "-e")
+           "rg --null --line-buffered --color=always --max-columns=500 --no-heading --line-number . -e \"$@\"
+            if [ $? -eq 0 ] || [ $? -eq 1 ]; then
+              exit 0
+            else
+              exit $?
+            fi" "rg"))
+        (consult-async-refresh-delay 0.05)
+        (consult-config
+         `((consult-ripgrep :preview-key ,consult-manual-preview-key)
+           (org-roam-rg :preview-key ,consult-manual-preview-key)
+           (consult-find :initial ,(concat consult-async-default-split "*" consult-async-default-split))))
+
+        :init
+        ;; (with-no-warnings
+        ;;   (defvaralias 'consult-line-history 'regexp-search-ring))
+
+        :config
+        (advice-add 'consult-line :after #'selectrum-update-regexp-search-ring+)
+
+        (evil-set-command-property 'consult-outline :jump t)
+        (evil-set-command-property 'consult-mark :jump t)
+        (evil-set-command-property 'consult-line :jump t)
+        (evil-set-command-property 'consult-line-symbol-at-point :jump t)
+        (evil-set-command-property 'consult-line-from-isearch :jump t)
+
+        (defvar consult-font-lock-exclude+
+          '(Man-mode
+            adoc-mode
+            bbdb-mode
+            bongo-library-mode
+            bongo-mode
+            bongo-playlist-mode
+            bookmark-bmenu-mode
+            circe-channel-mode
+            circe-query-mode
+            circe-server-mode
+            deadgrep-mode
+            debbugs-gnu-mode
+            dired-mode
+            elfeed-search-mode
+            elfeed-show-mode
+            emms-playlist-mode
+            emms-stream-mode
+            erc-mode
+            eshell-mode
+            eww-mode
+            forth-block-mode
+            forth-mode
+            fundamental-mode
+            gnus-article-mode
+            gnus-group-mode
+            gnus-summary-mode
+            help-mode
+            helpful-mode
+            jabber-chat-mode
+            magit-popup-mode
+            matrix-client-mode
+            matrix-client-room-list-mode
+            mu4e-headers-mode
+            mu4e-view-mode
+            nix-mode
+            notmuch-search-mode
+            notmuch-tree-mode
+            occur-edit-mode
+            occur-mode
+            org-agenda-mode
+            package-menu-mode
+            rcirc-mode
+            sauron-mode
+            sieve-mode
+            treemacs-mode
+            twittering-mode
+            vc-dir-mode
+            w3m-mode
+            woman-mode
+            xref--xref-buffer-mode)
+          "The equivalent of `swiper-font-lock-exclude'")
+
+        (advice-add 'consult--line-candidates :around
+                    (defun consult--line-candidate-setup (func &rest args)
+                      (let ((inhibit-field-text-motion t))
+                        (apply func args))))
+
+        (advice-add #'consult--fontify-all :around
+                    (defun consult--fontify-prevent-p+ (func &rest args)
+                      "The equivalent of `swiper-font-lock-ensure-p'."
+                      (unless (or (derived-mode-p 'magit-mode)
+                                  (bound-and-true-p magit-blame-mode)
+                                  (memq major-mode consult-font-lock-exclude+)
+                                  (not (derived-mode-p 'prog-mode)))
+                        (apply func args))))
+
+        (defmacro with-consult-ignore-project+ (func)
+          `(defun ,(intern (concat (symbol-name func) "-no-project+")) ()
+             ,(format "Variant of `%s' which skips project checks." func)
+             (interactive)
+             (let ((consult-project-root-function nil))
+               (funcall-interactively (quote ,func)))))
+
+        (with-consult-ignore-project+ consult-ripgrep)
+        (with-consult-ignore-project+ consult-grep)
+
+        :leader
+        ("ji" 'consult-imenu
+         "ju" 'consult-outline
+         "hx" 'consult-complex-command
+         "ax" 'consult-mode-command
+         "rr" 'consult-register
+         "rm" 'consult-mark
+         "fr" 'consult-recent-file
+         "eg" 'consult-error
+         "sr" 'consult-ripgrep-no-project+
+         "sb" 'consult-grep-no-project+
+         "sv" 'consult-git-grep
+         "fsf" 'consult-find
+         "kg" 'consult-kmacro
+         "ry" 'consult-yank
+         "aa" 'consult-mode-command
+         [remap man] 'consult-man
+
+         "ps" "search"
+         "psr" 'consult-ripgrep
+         "psv" 'consult-git-grep
+         "psg" 'consult-grep
+         "psi" 'consult-project-imenu)
+        (:mode 'org-mode
+         "g" 'consult-outline)
+        (:minor t :mode 'flymake-mode  "eg" 'consult-flymake)
+
+        :general
+        ([remap switch-to-buffer] 'consult-buffer
+         [remap multi-occur] 'consult-multi-occur
+         [remap apropros-command] 'consult-apropos
+         [remap goto-line] 'consult-goto-line
+         [remap isearch-forward] 'consult-line
+         [remap keep-lines] 'consult-keep-lines
+         [remap load-theme] 'consult-theme
+         [remap flush-lines] 'consult-flush-lines
+         "C-." 'hydra-selectrum/body
+         "C-M-y" 'consult-yank-pop
+         "C-s" 'consult-line))
+    #+END_SRC
+
+*** consult-flycheck
+    #+BEGIN_SRC emacs-lisp
+      (use-package consult-flycheck
+        :ensure t
+        :defer  t
+        :leader
+        (:minor t :mode 'flycheck-mode "eg" 'consult-flycheck))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
+        :defer  t
+        :general
+*** consult-extensions
+    :PROPERTIES:
+    :header-args: :tangle (package-str! "lisp/+consult-custom.el" selectrum)
+    :END:
+
+    #+BEGIN_SRC emacs-lisp :tangle (package-str! "init.el" selectrum)
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
+      (require 'consult)
+      (require 'embark)
+      (require 'marginalia)
+    #+END_SRC
+
+
+**** consult-extensions-eob
+     #+BEGIN_SRC emacs-lisp
+       (provide '+consult-custom)
+     #+END_SRC
 
 ** ivy
    :PROPERTIES:
@@ -18874,9 +19237,16 @@
       `(hydra-posframe-border-face ((,cls (:inherit internal-border))))
 
      ;;; selectrum
-      `(selectrum-current-candidate ((,cls (:foreground ,very-dark-grey :font-weight 'normal :inherit highlight))))
+      `(selectrum-current-candidate ((,cls (:foreground ,very-dark-grey :weight bold :inherit highlight))))
       `(selectrum-primary-highlight ((,cls (:background "#555555"))))
       `(selectrum-secondary-highlight ((,cls (:background "#7777FF")))) ;; #8A498A
+
+     ;;; consult
+      `(consult-async-finished ((,cls (:inherit compilation-info))))
+      `(consult-async-running ((,cls (:inherit compilation-warning))))
+      `(consult-async-failed ((,cls (:inherit compilation-error))))
+      `(consult-narrow-indicator ((,cls (:foreground ,blue :weight bold))))
+      `(consult-preview-match ((,cls (:foreground ,blue-int :weight bold))))
 
      ;;; orderless
       ;; Match face were taken from ivys default match faces.
