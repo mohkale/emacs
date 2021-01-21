@@ -7004,6 +7004,16 @@
                                         :test    "go test"
                                         :test-suffix "_test")
 
+      (projectile-register-project-type 'cmake '("CMakeLists.txt")
+                                        :project-file "CMakeLists.txt"
+                                        :compilation-dir "build"
+                                        :test "ctest"
+                                        :configure "cmake %s -B %s"
+                                        :run     "cmake --build . --target run"
+                                        :compile "cmake --build ."
+                                        :install "cmake --build . --target install"
+                                        :package "cmake --build . --target package")
+
       (provide '+projectile-project-types)
     #+END_SRC
 
