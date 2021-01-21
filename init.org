@@ -84,6 +84,8 @@
         ibuffer-projectile                                                ; Filter ibuffer buffers by active projects
         ;; company-emoji                                                  ; Show emojis in company-completion candidates
 
+        ;; ivy-rich                                                       ; Extra documentation and meta-info for core ivy functions
+        ;; ivy-rich-icons                                                 ; Enable icons with ivy-find
         ;; ivy-prescient                                                  ; Sort ivy candidates through prescient. (WARN [[https://github.com/raxod502/prescient.el/issues?q=is%3Aissue+ivy+history][issues]])
 
     ;;; language-support
@@ -12320,6 +12322,25 @@
         (setq flyspell-correct-interface #'flyspell-correct-ivy))
     #+END_SRC
 
+*** ivy-rich
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy-rich)
+      (use-package ivy-rich
+        :ensure t
+        :defer  t
+        :hook (ivy-mode . ivy-rich-mode)
+        :config
+        ;; Make ivy candidates take up the full line.
+        (setcdr (assq t ivy-format-functions-alist) #'ivy-format-function-line))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy-rich ivy-rich-icons)
+      (use-package all-the-icons-ivy-rich
+        :ensure t
+        :defer  t
+        ;; :hook (ivy-rich-mode . all-the-icons-ivy-rich-mode)
+
+        :config
+        (advice-add 'all-the-icons-ivy-rich--format-icon :filter-return #'all-the-icons-pad-on-tty-advice+))
     #+END_SRC
 
 *** swiper
