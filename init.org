@@ -51,6 +51,7 @@
 
     ;;; Completion Assistants
         prescient                                                         ; Sorting/Filtering based on frequency and proximity.
+        ;; orderless                                                      ; Blazingly fast completion regexp generator using space seperated patterns
 
     ;;; Mode lines
         doom-modeline                                                     ; A fast and feature-full mode-line package based on [[https://github.com/hlissner/doom-emacs][doom]]!
@@ -156,6 +157,10 @@
               (and ".elc" eol)
               (and ".bundle/")
               (and (any ?. ?-) "lock" (zero-or-one ".json") eol))))
+
+    (defvar +orderless-requires-prescient nil
+      "When true, if `prescient' and `orderless' are both configured,
+    when prescient is disabled orderless is also disabled.")
 
     (provide '+config-default) nil
   #+END_SRC
@@ -3511,7 +3516,40 @@
         (setq smex-save-file (var! "smex-save.el")))
     #+END_SRC
 
+*** orderless
+    A package for building nicer matching regexps for completion using space
+    seperated components. Atm it doesn't (and has no intentions for) ordering
+    completion based on match counts or accuracy (shame 😢) but we can get around
+    that by using prescient.
+
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! orderless)
+      (use-package orderless
+        :ensure t
+        :demand t
+        :config
+        (defun flex-if-twiddle (pattern _index _total)
+          "Glob when trailing tilde."
+          (when (string-suffix-p "~" pattern)
+            `(orderless-flex . ,(substring pattern 0 -1))))
+
+        (defun without-if-bang (pattern _index _total)
+          "Exclude literal when leading punctuation-mark."
+          (when (string-prefix-p "!" pattern)
+            `(orderless-without-literal . ,(substring pattern 1))))
+
+        (setq orderless-matching-styles '(orderless-regexp)
+              orderless-style-dispatchers '(flex-if-twiddle
+                                            without-if-bang)))
+    #+END_SRC
+
 *** prescient
+    A package for remembering and sorting completion candidates based on frequency of
+    usage. This is intended to be used with orderless, however because prescient has
+    its own functions for filtering if orderless is disabled prescient will take over
+    that as well.
+
+    For tips on how to integrate this with orderless see [[https://github.com/oantolin/orderless/issues/25#issuecomment-743740717][orderless#25]].
+
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! prescient)
       (use-package prescient
         :ensure t
@@ -12150,6 +12188,7 @@
         :after  prescient
         :hook (ivy-mode . ivy-prescient-mode)
         :custom
+        (ivy-prescient-enable-filtering (not (package! orderless)))
         (ivy-prescient-enable-sorting t)
         (ivy-prescient-sort-commands
          '(:not
@@ -12169,6 +12208,42 @@
                                      (cdr ivy-prescient-sort-commands)))
                       (ivy--alist-set 'ivy-sort-functions-alist
                                       #'read-file-name-internal #'ivy-sort-file-function-default)))))
+    #+END_SRC
+
+*** ivy-orderless
+    :PROPERTIES:
+    :header-args: :tangle (package-yes! ivy orderless)
+    :END:
+
+    Here's some helpers to setup and tear down orderless.
+
+    #+BEGIN_SRC emacs-lisp
+      (defvar ivy-orderless-default-re-builder+ nil
+        "The default re-builder in `ivy-re-builders-alist' before orderless was setup.")
+
+      (defun ivy-setup-orderless+ ()
+        (let ((cell (assoc t ivy-re-builders-alist)))
+          (setq ivy-orderless-default-re-builder+ (cdr cell))
+          (setcdr cell #'orderless-ivy-re-builder))
+        ;; Disable orderless in `swiper-isearch' because of performance
+        ;; issues. See [[https://github.com/abo-abo/swiper/issues/2418][swiper#2418]].
+        (push '(swiper-isearch . ivy--regex-plus) ivy-re-builders-alist))
+
+      (defun ivy-teardown-orderless+ ()
+        (setcdr (assoc t ivy-re-builders-alist) ivy-orderless-default-re-builder+))
+    #+END_SRC
+
+    Now we attach orderless to ivy, either through ivy-prescient or through ivy itself.
+
+    #+BEGIN_SRC emacs-lisp
+      (if (package! prescient ivy-prescient)
+          (add-hook 'ivy-prescient-mode-hook
+                    (defun ivy-prescient-setup-orderless+ ()
+                      (cond ((bound-and-true-p ivy-prescient-mode)
+                             (ivy-setup-orderless+))
+                            (+orderless-requires-prescient
+                             (ivy-teardown-orderless+)))))
+        (add-hook 'ivy-mode-hook #'ivy-setup-orderless+))
     #+END_SRC
 
 *** ivy-avy
@@ -18802,6 +18877,19 @@
       `(selectrum-current-candidate ((,cls (:foreground ,very-dark-grey :font-weight 'normal :inherit highlight))))
       `(selectrum-primary-highlight ((,cls (:background "#555555"))))
       `(selectrum-secondary-highlight ((,cls (:background "#7777FF")))) ;; #8A498A
+
+     ;;; orderless
+      ;; Match face were taken from ivys default match faces.
+      `(orderless-match-face-0 ((,cls (:background "#555555"))))
+      `(orderless-match-face-1 ((,cls (:background "#777777"))))
+      `(orderless-match-face-2 ((,cls (:background "#7777ff"))))
+      `(orderless-match-face-3 ((,cls (:background "#8a498a"))))
+
+     ;;; swiper
+      `(swiper-match-face-1 ((,cls (:background "#555555"))))
+      `(swiper-match-face-2 ((,cls (:background "#777777"))))
+      `(swiper-match-face-3 ((,cls (:background "#7777ff"))))
+      `(swiper-match-face-4 ((,cls (:background "#8a498a"))))
 
      ;;; ivy
       ;; by default, it seems if ivy-highlight-face has its own spec, it'll interfere
