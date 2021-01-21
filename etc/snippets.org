@@ -3010,3 +3010,891 @@
       \usepackage{$0}
    #+END_SRC
 
+* c-lang-common
+** typedef
+   #+BEGIN_SRC snippet :tangle snippets/c-lang-common/typedef
+      # -*- mode: snippet -*-
+      # name: typedef
+      # key: typedef
+      # --
+      typedef ${1:type} ${2:alias};
+   #+END_SRC
+
+** guard
+   #+BEGIN_SRC snippet :tangle snippets/c-lang-common/guard
+      # -*- mode: snippet -*-
+      # name: #ifndef XXX; #define XXX; #endif
+      # key: guard
+      # --
+      #ifndef ${1:`(upcase (file-name-nondirectory (file-name-sans-extension (or (buffer-file-name) ""))))`_H}
+      #define $1
+
+      $0
+
+      #endif /* $1 */
+   #+END_SRC
+
+** main
+   #+BEGIN_SRC snippet :tangle snippets/c-lang-common/main
+      # -*- mode: snippet -*-
+      # name: main
+      # key: main
+      # --
+      int main(${1:int argc, char *argv[]}) {
+          $0
+          return 0;
+      }
+   #+END_SRC
+
+** inc.1
+   #+BEGIN_SRC snippet :tangle snippets/c-lang-common/incl
+      # -*- mode: snippet -*-
+      # name: #include "..."
+      # key  : incl
+      # --
+      #include "$1"
+   #+END_SRC
+
+** inc
+   #+BEGIN_SRC snippet :tangle snippets/c-lang-common/inc
+      # -*- mode: snippet -*-
+      # name: #include <...>
+      # key  : inc
+      # --
+      #include <$1>
+   #+END_SRC
+
+** ifdef
+   #+BEGIN_SRC snippet :tangle snippets/c-lang-common/ifdef
+      # -*- mode: snippet -*-
+      # name: ifdef
+      # key: ifdef
+      # --
+      #ifdef ${1:MACRO}
+      $0
+      #endif // $1
+   #+END_SRC
+
+# ** function_doxygen_doc
+#    #+BEGIN_SRC snippet :tangle snippets/c-lang-common/function_doxygen_doc
+#       # -*- mode: snippet -*-
+#       # contributor: Dan Pitic <dpitic@gmail.com>
+#       # name: Function Doxygen Doc
+#       # key: doxy
+#       # group: doxygen
+#       # --
+#       /**
+#        * @brief      ${1:function description}
+#        *
+#        * @details    ${2:detailed description}
+#        *
+#        * @param      ${3:param}
+#        *
+#        * @return     ${4:return type}
+#        */
+#    #+END_SRC
+
+** fopen
+   #+BEGIN_SRC snippet :tangle snippets/c-lang-common/fopen
+      # -*- mode: snippet -*-
+      # name: FILE *fp = fopen(..., ...);
+      # key: fopen
+      # --
+      FILE *${fp} = fopen(${"file"}, "${r}");
+   #+END_SRC
+
+* cc-mode
+** while
+   #+BEGIN_SRC snippet :tangle snippets/cc-mode/while
+      # -*- mode: snippet -*-
+      # name: while
+      # key: while
+      # --
+      while (${1:condition}) {
+            $0
+      }
+   #+END_SRC
+
+** ternary
+   #+BEGIN_SRC snippet :tangle snippets/cc-mode/ternary
+      # -*- mode: snippet -*-
+      # name: ternary
+      # key: ?
+      # --
+      (${1:cond}) ? ${2:then} : ${3:else};
+   #+END_SRC
+
+** switch
+   #+BEGIN_SRC snippet :tangle snippets/cc-mode/switch
+      # -*- mode: snippet -*-
+      # name: switch (...) { case : ... default: ...}
+      # key: switch
+      # --
+      switch (${1:expr}) {
+      case ${2:constexpr}:${3: \{}
+          $0
+          break;
+      ${3:$(if (string-match "\{" yas-text) "\}\n" "")}default:
+          break;
+      }
+   #+END_SRC
+
+** struct
+   #+BEGIN_SRC snippet :tangle snippets/cc-mode/struct
+      # -*- mode: snippet -*-
+      # name: struct ... { ... }
+      # key: struct
+      # --
+      struct ${1:name} {
+          $0
+      };
+   #+END_SRC
+
+** printf
+   #+BEGIN_SRC snippet :tangle snippets/cc-mode/printf
+      # -*- mode: snippet -*-
+      # name: printf
+      # key: printf
+      # --
+      printf("${1:%s}\\n"${1:$(if (string-match "%" yas-text) ", " "\);")
+      }$2${1:$(if (string-match "%" yas-text) "\);" "")}
+   #+END_SRC
+
+** if
+   #+BEGIN_SRC snippet :tangle snippets/cc-mode/if
+      # -*- mode: snippet -*-
+      # name: if (...) { ... }
+      # key: if
+      # --
+      if (${1:condition}) ${2:\{
+          $0
+      \}}
+   #+END_SRC
+
+# ** function_description
+#    #+BEGIN_SRC snippet :tangle snippets/cc-mode/function_description
+#       # -*- mode: snippet -*-
+#       #cotributor: Henrique Jung <henriquenj@gmail.com>
+#       # name: Function description
+#       # key: \brief
+#       # group: doxygen
+#       # --
+#       /**
+#        *  \brief ${1:function description}
+#        ${2:*
+#        *  ${3:Detailed description}
+#        *
+#        }*  \param ${4:param}
+#        *  \return ${5:return type}
+#        */
+#    #+END_SRC
+
+** for_n
+   #+BEGIN_SRC snippet :tangle snippets/cc-mode/for_n
+      # -*- mode: snippet -*-
+      # contributor: York Zhao
+      # name: for_n
+      # key: forn
+      # --
+      for (${1:auto }${2:i} = ${3:0}; $2 < ${4:MAXIMUM}; ++$2) {
+          $0
+      }
+   #+END_SRC
+
+** for
+   #+BEGIN_SRC snippet :tangle snippets/cc-mode/for
+      # -*- mode: snippet -*-
+      # name: for
+      # key: for
+      # --
+      for (${1:i = 0}; ${2:i < N}; ${3:++i}) {
+          $0
+      }
+   #+END_SRC
+
+# ** file_description
+#    #+BEGIN_SRC snippet :tangle snippets/cc-mode/file_description
+#       # -*- mode: snippet -*-
+#       #cotributor: Henrique Jung <henriquenj@gmail.com>
+#       # name: File description
+#       # key: \file
+#       # group: doxygen
+#       # --
+#       /**
+#        *   \file ${1:`(file-name-nondirectory(buffer-file-name))`}
+#        *   \brief ${2:A Documented file.}
+#        ${3:*
+#        *  ${4:Detailed description}
+#        *
+#       }*/
+#    #+END_SRC
+
+** else
+   #+BEGIN_SRC snippet :tangle snippets/cc-mode/else
+      # -*- mode: snippet -*-
+      # name: else { ... }
+      # key: else
+      # --
+      else${1: {
+          $0
+      }}
+   #+END_SRC
+
+** do
+   #+BEGIN_SRC snippet :tangle snippets/cc-mode/do
+      # -*- mode: snippet -*-
+      # name: do { ... } while (...)
+      # key: do
+      # --
+      do {
+          $0
+      } while (${1:condition});
+   #+END_SRC
+
+** case
+   #+BEGIN_SRC snippet :tangle snippets/cc-mode/case
+      # -*- mode: snippet -*-
+      # name: case : {...}
+      # key: case
+      # expand-env: ((yas-also-auto-indent-first-line t))
+      # --
+      case ${2:constexpr}:${3: \{}
+          $0
+          break;
+      ${3:$(if (string-match "\{" yas-text) "\}" "")}
+   #+END_SRC
+
+* c-mode
+   #+BEGIN_SRC text :tangle snippets/c-mode/.yas-parents :shebang
+      cc-mode
+      c-lang-common
+   #+END_SRC
+
+** union
+   #+BEGIN_SRC snippet :tangle snippets/c-mode/union
+      # -*- mode: snippet -*-
+      # name: union
+      # key: union
+      # --
+      typedef union {
+              $0
+      } ${1:name};
+   #+END_SRC
+
+** printf
+   #+BEGIN_SRC snippet :tangle snippets/c-mode/printf
+      # -*- mode: snippet -*-
+      # name: printf
+      # key: pr
+      # --
+      printf("${1:format string}"${2: ,a0,a1});
+   #+END_SRC
+
+** packed
+   #+BEGIN_SRC snippet :tangle snippets/c-mode/packed
+      # -*- mode: snippet -*-
+      # name: packed
+      # key: packed
+      # --
+      __attribute__((__packed__))$0
+   #+END_SRC
+
+** malloc
+   #+BEGIN_SRC snippet :tangle snippets/c-mode/malloc
+      # -*- mode: snippet -*-
+      # name: malloc
+      # key: malloc
+      # --
+      malloc(sizeof($1)${2: * ${3:3}});
+      $0
+   #+END_SRC
+
+** fprintf
+   #+BEGIN_SRC snippet :tangle snippets/c-mode/fprintf
+      # -*- mode: snippet -*-
+      # name: fprintf
+      # key: fprintf
+      # --
+      fprintf(${1:stdout}, "${2:format string}", ${3:variable});
+   #+END_SRC
+
+** define
+   #+BEGIN_SRC snippet :tangle snippets/c-mode/define
+      # -*- mode: snippet -*-
+      # name: define
+      # key: d
+      # --
+      #define $0
+   #+END_SRC
+
+* c++-mode
+   #+BEGIN_SRC text :tangle snippets/c++-mode/.yas-parents :shebang
+      cc-mode
+      c-lang-common
+   #+END_SRC
+
+   #+BEGIN_SRC emacs-lisp :tangle snippets/c++-mode/.yas-setup.el :shebang ";; -*- lexical-binding: t -*-"
+      (require 'yasnippet)
+
+      (defun yas-c++-class-name (str)
+        "Search for a class name like `DerivedClass' in STR
+      (which may look like `DerivedClass : ParentClass1, ParentClass2, ...')
+
+      If found, the class name is returned, otherwise STR is returned"
+        (yas-substr str "[^: ]*"))
+
+      (defun yas-c++-class-method-declare-choice ()
+        "Choose and return the end of a C++11 class method declaration"
+        (yas-choose-value '(";" " = default;" " = delete;")))
+   #+END_SRC
+
+** using
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/using
+      # -*- mode: snippet -*-
+      # name: using namespace ...
+      # key: using
+      # --
+      using namespace ${std};
+      $0
+   #+END_SRC
+
+** tryw
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/tryw
+      # -*- mode: snippet -*-
+      # name: tryw
+      # key: tryw
+      # --
+      try {
+          `(or yas/selected-text (car kill-ring))`
+      } catch ${1:Exception} {
+
+      }
+   #+END_SRC
+
+** try
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/try
+      # -*- mode: snippet -*-
+      # name: try
+      # key: try
+      # a bit too intrusive now still, not always I want to do this
+      # --
+      try {
+          $0
+      } catch (${1:type}) {
+
+      }
+   #+END_SRC
+
+# ** trm
+#    #+BEGIN_SRC snippet :tangle snippets/c++-mode/trm
+#       # -*- mode: snippet -*-
+#       # name: generate_n
+#       # key: trm
+#       # --
+#       ${1:container}.erase($1.find_last_not_of(" \t\n\r") + 1);
+#       $0
+#    #+END_SRC
+
+** throw
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/throw
+      # -*- mode: snippet -*-
+      # name: throw
+      # key: throw
+      # --
+      throw ${1:MyError}($0);
+   #+END_SRC
+
+** this
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/this
+      # -*- mode: snippet -*-
+      # name: this
+      # key: th
+      # --
+      this
+   #+END_SRC
+
+# ** test_suite
+#    #+BEGIN_SRC snippet :tangle snippets/c++-mode/test_suite
+#       # -*- mode: snippet -*-
+#       # name: test_suite
+#       # key: ts
+#       # group: testing
+#       # --
+#       BOOST_AUTO_TEST_SUITE( ${1:test_suite1} )
+#
+#       $0
+#
+#       BOOST_AUTO_TEST_SUITE_END()
+#    #+END_SRC
+
+# ** test_main
+#    #+BEGIN_SRC snippet :tangle snippets/c++-mode/test_main
+#       # -*- mode: snippet -*-
+#       # name: test_main
+#       # key: test_main
+#       # group: testing
+#       # --
+#       int main(int argc, char **argv) {
+#             ::testing::InitGoogleTest(&argc, argv);
+#              return RUN_ALL_TESTS();
+#       }
+#    #+END_SRC
+
+# ** test case
+#    #+BEGIN_SRC snippet :tangle snippets/c++-mode/test-case
+#       # -*- mode: snippet -*-
+#       # name: test case
+#       # key: tc
+#       # group: testing
+#       # --
+#       BOOST_AUTO_TEST_CASE( ${1:test_case} ) {
+#               $0
+#       }
+#    #+END_SRC
+
+** template
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/template
+      # -*- mode: snippet -*-
+      # name: template
+      # key: temp
+      # --
+      template<${1:$$(yas/choose-value '("typename" "class"))} ${2:T}>
+      $0
+   #+END_SRC
+
+** std_colon
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/std_colon
+      # -*- mode: snippet -*-
+      # name: std::
+      # key: st
+      # --
+      std::$0
+   #+END_SRC
+
+** std
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/std
+      # -*- mode: snippet -*-
+      # name: std
+      # key: std
+      # --
+      using namespace std;
+   #+END_SRC
+
+** protected
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/protected
+      # -*- mode: snippet -*-
+      # name: protected
+      # key: pt
+      # expand-env: ((yas-also-auto-indent-first-line t))
+      # --
+      protected:
+              $0
+   #+END_SRC
+
+** private
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/private
+      # -*- mode: snippet -*-
+      # name: private
+      # key: pr
+      # expand-env: ((yas-also-auto-indent-first-line t))
+      # --
+      private:
+              $0
+   #+END_SRC
+
+** operator_ostream
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator_ostream
+      # -*- mode: snippet -*-
+      # name: operator<<
+      # key: <<
+      # group: operator overloading
+      # --
+      std::ostream& operator<<(std::ostream& os, const ${1:Name}& ${2:c}) {
+               $0
+               return os;
+      }
+   #+END_SRC
+
+** operator_istream
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator_istream
+      # -*- mode: snippet -*-
+      # name: operator>>
+      # key: >>
+      # group: operator overloading
+      # --
+      std::istream& operator>>(std::istream& is, const ${1:Name}& ${2:c}) {
+               $0
+         return is;
+      }
+   #+END_SRC
+
+** operator[]
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator[]
+     # -*- mode: snippet -*-
+     # name: operator[]
+     # key: []
+     # group: operator overloading
+     # --
+     ${1:Name}& operator[](${2:int index}) {
+             $0
+     }
+   #+END_SRC
+
+** operator==
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator==
+      # -*- mode: snippet -*-
+      # name: operator==
+      # key: ==
+      # group: operator overloading
+      # --
+      bool ${1:Name}::operator==(const $1 &other) const {
+           $0
+      }
+   #+END_SRC
+
+** operator=
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator=
+      # -*- mode: snippet -*-
+      # name: operator=
+      # key: =
+      # where this is a reference to myself
+      # group: operator overloading
+      # --
+      ${1:Name}& $1::operator=(const $1 &rhs) {
+          if (this == &rhs)
+            return *this;
+          $0
+          return *this;
+      }
+   #+END_SRC
+
+** operator+=
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator+=
+      # -*- mode: snippet -*-
+      # name: operator+=
+      # key: +=
+      # group: operator overloading
+      # --
+      ${1:Name}& $1::operator+=(${2:const $1 &rhs}) {
+        $0
+        return *this;
+      }
+   #+END_SRC
+
+** operator+
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator+
+      # -*- mode: snippet -*-
+      # name: operator+
+      # key: +
+      # group: operator overloading
+      # --
+      ${1:Name} $1::operator+(const $1 &other) {
+          $1 result = *this;
+          result += other;
+          return result;
+      }
+   #+END_SRC
+
+** operator!=
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator!=
+     # -*- mode: snippet -*-
+     # name: operator!=
+     # key: !=
+     # group: operator overloading
+     # --
+     bool ${1:Name}::operator!=(const $1 &other) const {
+         return !(*this == other);
+     }
+   #+END_SRC
+
+** namespace
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/namespace
+      # -*- mode: snippet -*-
+      # name: namespace
+      # key: ns
+      # --
+      namespace ${1:Namespace} {
+
+                `yas/selected-text`
+
+      }  // $1
+   #+END_SRC
+
+** member_function
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/member_function
+     # -*- mode: snippet -*-
+     # name: member_function
+     # key: mf
+     # --
+     ${1:type} ${2:Name}::${3:name}(${4:args})${5: const} {
+         $0
+     }
+   #+END_SRC
+
+** inline
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/inline
+      # -*- mode: snippet -*-
+      # name: inline
+      # key: il
+      # --
+      inline $0
+   #+END_SRC
+
+** fun_declaration
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/fun_declaration
+      # -*- mode: snippet -*-
+      # name: fun_declaration
+      # key: f
+      # --
+      ${1:type} ${2:name}(${3:args})${4: const};
+   #+END_SRC
+
+** friend
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/friend
+      # -*- mode: snippet -*-
+      # name: friend
+      # key: fr
+      # --
+      friend $0;
+   #+END_SRC
+
+** fori
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/fori
+      # -*- mode: snippet -*-
+      # name: fori
+      # key: fori
+      # --
+      for (${1:auto }${2:it} = ${3:var}.begin(); $2 != $3.end(); ++$2) {
+          $0
+      }
+   #+END_SRC
+
+# ** fixture
+#    #+BEGIN_SRC snippet :tangle snippets/c++-mode/fixture
+#       # -*- mode: snippet -*-
+#       # name: fixture
+#       # key: fixt
+#       # --
+#       BOOST_FIXTURE_TEST_SUITE( ${1:name}, ${2:Fixture} )
+#
+#       $0
+#
+#       BOOST_AUTO_TEST_SUITE_END()
+#    #+END_SRC
+
+** enum
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/enum
+      # -*- mode: snippet -*-
+      # name: enum
+      # key: enum
+      # --
+      enum ${1:NAME}{
+      $0
+      };
+   #+END_SRC
+
+** doc
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/doc
+      # -*- mode: snippet -*-
+      # name: doc
+      # key: doc
+      # --
+      /**
+       * $0
+       */
+   #+END_SRC
+
+** delete[]
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/delete[]
+     # -*- mode: snippet -*-
+     # name: delete[]
+     # key: dla
+     # --
+     delete[] ${1:arr};
+   #+END_SRC
+
+** delete
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/delete
+      # -*- mode: snippet -*-
+      # name: delete
+      # key: dl
+      # --
+      delete ${1:pointer};
+   #+END_SRC
+
+** d_operator_ostream
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/d_operator_ostream
+      # -*- mode: snippet -*-
+      # name: d_operator<<
+      # key: <<
+      # --
+      friend std::ostream& operator<<(std::ostream&, const ${1:Name}&);
+   #+END_SRC
+
+** d_operator_istream
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/d_operator_istream
+      # -*- mode: snippet -*-
+      # name: d_operator>>
+      # key: >>
+      # --
+      friend std::istream& operator>>(std::istream&, const ${1:Name}&);
+   #+END_SRC
+
+** d_operator[]_const
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/d_operator[]_const
+     # -*- mode: snippet -*-
+     # name: d_operator[]_const
+     # key: c[
+     # --
+     const ${1:Name}& operator[](${2:int index}) const;
+   #+END_SRC
+
+** d_operator[]
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/d_operator[]
+     # -*- mode: snippet -*-
+     # name: d_operator[]
+     # key: [
+     # --
+     ${1:Name}& operator[](${2:int index});
+   #+END_SRC
+
+** d_operator
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/d_operator
+      # -*- mode: snippet -*-
+      # name: d_operator<<
+      # key: <<
+      # --
+      friend std::ostream& operator<<(std::ostream&, const ${1:Name}&);
+   #+END_SRC
+
+** d+=
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/d+=
+      # -*- mode: snippet -*-
+      # name: d+=
+      # key: d+=
+      # --
+      ${1:Name}& operator+=(${2:const $1 &});
+   #+END_SRC
+
+** cpp
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/cpp
+      # -*- mode: snippet -*-
+      # name: cpp
+      # key: cpp
+      # --
+      #include "`(file-name-nondirectory (file-name-sans-extension (buffer-file-name)))`.h"
+   #+END_SRC
+
+** constructor
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/constructor
+      # -*- mode: snippet -*-
+      # name: constructor
+      # key: ct
+      # --
+      ${1:Name}::$1(${2:args}) ${3: : ${4:init}} {
+              $0
+      }
+   #+END_SRC
+
+** const_[]
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/const_[]
+     # -*- mode: snippet -*-
+     # name: const_[]
+     # key: c[
+     # --
+     const ${1:Name}& operator[](${2:int index}) const {
+         $0
+     }
+   #+END_SRC
+
+** class11
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/class11
+     # -*- mode: snippet -*-
+     # name: class11
+     # key: cls11
+     # group: c++11
+     # uuid: d7c41f87-9b8a-479d-bb12-89f4cbdd46a7
+     # contributor: Ved Vyas
+     # desc: Snippet for C++11 classes based on c++-mode/class. Allows for Rule of
+     # [0, All]. A choice between ";", " = default;", and " = delete;" is presented
+     # for each method. The methods and some of the optional keywords/specifiers are
+     # exposed as fields that users can easily skip-and-clear.
+     # Hackish query-replace-regexp to renumber non-mirror fields in the region
+     # between public and protected (can use N as a field number in the snippet):
+     # \${[0-9N]*:\([^\$]\) -> ${\,(+ 2 \#):\1
+     # References:
+     # 1. http://en.cppreference.com/w/cpp/language/rule_of_three#Rule_of_five
+     # 2. https://en.wikipedia.org/wiki/Rule_of_three_%28C%2B%2B_programming%29#Example_in_C.2B.2B
+     # 3. http://stackoverflow.com/a/4782927
+     # --
+     class ${1:Name}
+     {
+     public:
+     ${2:  ${3://! Default constructor
+       }${1:$(yas-c++-class-name yas-text)}()${4:;$(yas-c++-class-method-declare-choice)}
+
+     }${5:  ${6://! Copy constructor
+       }${1:$(yas-c++-class-name yas-text)}(const ${1:$(yas-c++-class-name yas-text)} &other)${7:;$(yas-c++-class-method-declare-choice)}
+
+     }${8:  ${9://! Move constructor
+       }${1:$(yas-c++-class-name yas-text)}(${1:$(yas-c++-class-name yas-text)} &&other)${10: noexcept}${11:;$(yas-c++-class-method-declare-choice)}
+
+     }${12:  ${13://! Destructor
+       }${14:virtual }~${1:$(yas-c++-class-name yas-text)}()${15: noexcept}${16:;$(yas-c++-class-method-declare-choice)}
+
+     }${17:  ${18://! Copy assignment operator
+       }${1:$(yas-c++-class-name yas-text)}& operator=(const ${1:$(yas-c++-class-name yas-text)} &other)${19:;$(yas-c++-class-method-declare-choice)}
+
+     }${20:  ${21://! Move assignment operator
+       }${1:$(yas-c++-class-name yas-text)}& operator=(${1:$(yas-c++-class-name yas-text)} &&other)${22: noexcept}${23:;$(yas-c++-class-method-declare-choice)}
+
+     }$0
+
+     protected:
+     private:
+     };
+   #+END_SRC
+
+** class
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/class
+      # -*- mode: snippet -*-
+      # name: class
+      # key: cls
+      # --
+      class ${1:Name}
+      {
+      public:
+          ${1:$(yas-c++-class-name yas-text)}();
+          ${2:virtual ~${1:$(yas-c++-class-name yas-text)}();}
+      };
+      $0
+   #+END_SRC
+
+# ** boost_require
+#    #+BEGIN_SRC snippet :tangle snippets/c++-mode/boost_require
+#       # -*- mode: snippet -*-
+#       # name: boost_require
+#       # key: req
+#       # group: boost
+#       # --
+#       BOOST_REQUIRE( ${1:condition} );
+#       $0
+#    #+END_SRC
+
+** beginend
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/beginend
+      # -*- mode: snippet -*-
+      # name: v.begin(), v.end()
+      # key: beginend
+      # --
+      ${1:v}.begin(), $1.end
+   #+END_SRC
+
+** assert
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/assert
+      # -*- mode: snippet -*-
+      # name: assert
+      # key: ass
+      # --
+      assert($0);
+   #+END_SRC
