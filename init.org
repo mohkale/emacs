@@ -515,11 +515,10 @@
    - delight
    - diminish
    - dash
-   - bind-map
+   - s
+   - f
 
-   TODO choose delight or diminish, not both.
-
-   But ~package.el~ is annoying, let's prevent it from starting itself.
+   ~package.el~, [[https://github.com/hlissner/doom-emacs/blob/develop/docs/faq.org#how-does-doom-start-up-so-quickly][not on my watch, criminal scum!]].
 
    #+BEGIN_SRC emacs-lisp
      (setq package-enable-at-startup  nil
@@ -537,49 +536,28 @@
 
    Specify the package archives to be used by ~package.el~.
 
-   TODO maybe include src_emacs-lisp{'("org" . "http://orgmode.org/elpa/")}.
-
    #+NAME: package-archives
    | name  | url                           |
    |-------+-------------------------------|
    | melpa | https://melpa.org/packages/   |
    | gnu   | http://elpa.gnu.org/packages/ |
 
-   #+BEGIN_SRC emacs-lisp :var archives=package-archives :results value
-     (setq package-archives (cl-loop for (name source) in archives
-                                     collect (cons name source)))
+   #+BEGIN_SRC emacs-lisp :var archives=package-archives :results value :tangle no
+     (setq package-archives
+           (cl-loop for (name source) in archives
+                    collect (cons name source)))
    #+END_SRC
 
-   Initialise packages. This is a slow and painful process, but I haven't found a way
-   to disable it without breaking everything. There's no way to check my required packages
-   are installed without initializing.
+   Configure package-managers and configuration declarations.
 
    #+BEGIN_SRC emacs-lisp
-     (package-initialize)
+     (setq straight-use-package-by-default nil
+           use-package-always-ensure       nil
+           straight-allow-recipe-inheritance t
+           straight-process-buffer " *straight*")
    #+END_SRC
 
-   That said, we can avoid ~package-refresh-contents~ until it's needed.
-
-   #+BEGIN_SRC emacs-lisp
-     (add-transient-hook! #'package-install
-      (package-refresh-contents))
-   #+END_SRC
-
-   Finally, install base packages +took you long enough :tongue:+.
-
-   #+BEGIN_SRC emacs-lisp :var to-install=setup-packages-list
-     (dolist (package to-install)
-       ;; iterate for all required packages
-       (setq package (intern (car package)))
-
-       (unless (package-installed-p package)
-         (package-install package))
-
-       (require package))
-   #+END_SRC
-
-   Also install [[https://github.com/raxod502/straight.el][straight]], the modern package manager for emacs. I would use straight
-   exclusively, but it's *noticably* slow when you've got a lot of packages.
+   For my config I'll be using [[https://github.com/raxod502/straight.el][straight]], the modern package manager for emacs.
 
    #+BEGIN_SRC emacs-lisp
      (with-no-warnings
@@ -599,12 +577,14 @@
        (load bootstrap-file nil 'nomessage))
    #+END_SRC
 
-   Make straight more like ~use-package~'s default behaviour.
+   Finally, install base packages +took you long enough :tongue:.
 
-   #+BEGIN_SRC emacs-lisp
-     (setq straight-use-package-by-default nil
-           use-package-always-ensure       nil
-           straight-allow-recipe-inheritance t)
+   #+BEGIN_SRC emacs-lisp :var to-install=setup-packages-list
+     (dolist (package to-install)
+       (setq package (intern (car package)))
+
+       (straight-use-package package)
+       (require package))
    #+END_SRC
 
 *** extensions
@@ -627,102 +607,6 @@
           `((when ,condition ,@body))))
 
       (enable-theme 'use-package)                                           ; see [[https://github.com/jwiegley/use-package/pull/881][here]].
-    #+END_SRC
-
-*** external
-    Some packages don't have git repos or an easy to install interface, for these
-    I've taken to just retrieving the files at startup and using a simple hash check
-    to ensure they haven't been tampered with.
-
-    TODO look into [[https://github.com/quelpa/quelpa][quelpa]], it purports to let you do just this.
-
-    #+NAME: external-packages
-    | name                | hash                                                             | url                                                                                       |
-    |---------------------+------------------------------------------------------------------+-------------------------------------------------------------------------------------------|
-    |                     | <15>                                                             |                                                                                           |
-    | hide-comnt          | 9668645eab1fd8d223967ab90d3d34fe6e98aa3af47516f45e18f094137d7c6c | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/hide-comnt.el          |
-    | imenu-tree          | c4b3ae0d8b5c3e5a50c9c4b3f96fd48e309c2fae9a8902a1d649063c7b3b611c | https://www.emacswiki.org/emacs/download/imenu-tree.el                                    |
-    | help-fns+           | 57c5c864fef8052df6d0d22d778c4379d28ac69dc377a34ea75d5cbed117c120 | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/help-fns%2B.el         |
-    | lorem-ipsum         | 54cb139d6c88632aaef6364a2a6c6cadbb9a5082eb5032e69b5139dcc7074d88 | https://www.emacswiki.org/emacs/download/lorem-ipsum.el                                   |
-    | profile-dotemacs    | 26d98fd26c75281c6a7934479ed9df54ca8c6259df4b3ef435097800aaf6dca5 | http://www.randomsample.de/profile-dotemacs.el                                            |
-    | open-junk-file      | c0b835b329758dced4ccae6c2f3fd5af16af929437110ddde00ea55dc7d47be3 | https://raw.githubusercontent.com/emacsmirror/emacswiki.org/master/open-junk-file.el      |
-    | sqlite-dump         | 8277c32f3e9dad7f760b946609c918dd51f32990137f839a000fb6ff5a049939 | https://user42.tuxfamily.org/sqlite-dump/index.html                                       |
-    | company-cmake       | 5d741fa41e82fab7e04a52e0e98f4a1aec666470788bbacdf3e11b90085f3b6e | https://raw.githubusercontent.com/purcell/company-cmake/master/company-cmake.el           |
-    | transpose-frame     | a40264a07b25d2c1d8d1be341d42952329d1bbfab8c23100904627fef4f4c7b8 | https://www.emacswiki.org/emacs/download/transpose-frame.el                               |
-    | hs-lint             | 61bf6d3cfd43f2729d85ed407a7de5fd6b025540229bc0b57c37785d0b6d7450 | https://raw.githubusercontent.com/ndmitchell/hlint/master/data/hs-lint.el                 |
-    | hlint-refactor-mode | 55d5a9e99f0384b15eacfdf2b17ae313c6ddbb0343980ed324707fcaaf2b718a | https://raw.githubusercontent.com/mpickering/hlint-refactor-mode/master/hlint-refactor.el |
-    | miniedit            | c632c33c099362b084d965c51ec4b933be1278c7064096ce3b97cc830436055b | https://raw.githubusercontent.com/emacsmirror/miniedit/master/miniedit.el                 |
-    | ibuffer-persp       | 6395294e2dd368866d79a81d37c27961e0f871937ccd82cff317e5ad67c52652 | https://raw.githubusercontent.com/rakshasa/ibuffer-persp/master/ibuffer-persp.el          |
-    | org-link-edit       | ac84061d951ef9ef82794ba7f4416afb6da4283a182490a11ae455077321814c | https://raw.githubusercontent.com/kyleam/org-link-edit/master/org-link-edit.el            |
-    | org-man             | 71008c37977474b4d25d4610925db199bbd7e2548d3427d8e44ab59aa6b12a47 | https://raw.githubusercontent.com/abo-abo/org-mode/mirror/contrib/lisp/org-man.el         |
-    | vline               | d2be35d52bbfddf10367e8bc2326630ae5f85e6720ec4714d715cde7904846fb | https://raw.githubusercontent.com/emacsmirror/vline/master/vline.el                       |
-    | org-eldoc           | c79cba0929a6886449d39a32ef629653759d0041fe8d97f9727d8004f89b0592 | https://github.com/msnoigrs/org-mode/raw/master/contrib/lisp/org-eldoc.el                 |
-
-    #+BEGIN_SRC emacs-lisp :var package-list=external-packages
-      (defun external-packages/download-external-package (url dest-path)
-        (let* ((dest-buffer (get-buffer-create "*external-packages*"))
-               (download-args `("curl"              ; program
-                                nil                 ; input file
-                                ,dest-buffer        ; output dest
-                                nil                 ; redisplay?
-                                ; args
-                                "--create-dirs"
-                                "-L"
-                                "-o" ,dest-path
-                                ,url))
-               exit-code)
-          (with-current-buffer dest-buffer
-            (insert (format "curl: %s\n"
-                            (nthcdr 4 download-args)))
-            (setq exit-code (apply 'call-process download-args))
-            (insert "\n"))
-
-          exit-code))
-
-      (defun external-packages/validate-package-hash (file dest-path hash)
-        (let (result)
-          (if (string-equal "" hash)
-              (progn
-                (display-warning 'external-packages (format "package %s has no hash check given: %s"
-                                                            file
-                                                            url))
-                (setq result t))
-            (with-temp-buffer
-              (insert-file-contents dest-path)
-              (let ((hash-result (secure-hash 'sha256 (buffer-string))))
-                (if (string-equal hash hash-result)
-                    (setq result t)
-                  (display-warning 'external-packages (format "package %s failed with hash: %s != %s"
-                                                              file
-                                                              hash
-                                                              hash-result))
-                  (delete-file dest-path)))))
-          result))
-
-      (let ((install-path external-packages-directory)
-            failed-installs)
-        (push install-path load-path)
-        ;; include packages in load path
-
-        (dolist (row package-list)
-          (let* ((file (nth 0 row))
-                 (hash (nth 1 row))
-                 (url  (nth 2 row))
-                 (dest-path (expand-file-name (join-path install-path (concat file ".el"))))
-                 download-args exit-code)
-            (unless (or (string-equal "" file)
-                        (string-equal "" url))
-              (unless (file-exists-p dest-path) ;; only download when doesn't already exist
-                (unless (and (zerop (external-packages/download-external-package url dest-path))
-                             (external-packages/validate-package-hash file dest-path hash))
-                  (push file failed-installs))))))
-
-        (if (eq failed-installs nil)
-            (let ((buffer (get-buffer "*external-packages*")))
-              (and buffer
-                   (kill-buffer buffer))) ;; kill process buffer when nothing failed
-          (display-warning :warning (format "external-package : failed to download packages: %s" failed-installs))
-          ))
     #+END_SRC
 
 ** editor
@@ -1081,7 +965,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package xclip
-        :ensure t
+        :straight t
         :init
         (xclip-mode +1))
     #+END_SRC
@@ -1116,10 +1000,12 @@
     Setup [[https://github.com/mohkale/spaceleader][spaceleader]], my own leader-key package designed to work like [[https://www.spacemacs.org/][spacemacs]].
 
     #+BEGIN_SRC emacs-lisp
+      (use-package bind-map
+        :straight t)
+
       (use-package spaceleader
-        :defer  nil
+        :straight (spaceleader :host github :repo "mohkale/spaceleader")
         :demand t
-        :straight (spaceleader :type git :host github :repo "mohkale/spaceleader")
         :config
         (require 'spaceleader-base) ;; Allow base leader bindings.
         (leader/set-keys leader-server-leader-prefix "lang-server")
@@ -1207,9 +1093,16 @@
 
         "ic" 'insert-char
         "al" 'find-library
-        "ae" 'package-install
         "at" 'load-theme
-        "aE" 'package-list-packages
+
+        "ap" "packages"
+        "api" 'straight-use-package
+        "apu" 'straight-pull-all
+        "apf" 'straight-fetch-all
+        "apx" 'straight-prune-build
+        "apr" 'straight-rebuild-all
+        "apz" 'straight-freeze-versions
+        "apt" 'straight-thaw-versions
 
         "ff" 'find-file
         "bb" 'switch-to-buffer
@@ -1644,7 +1537,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package persistent-scratch
-        :ensure t
+        :straight t
         :defer  t
         :init
         (defun multiscratch-scratch-buffer-p (&optional buffer)
@@ -2344,7 +2237,7 @@
      ;; variables defined in an alist that's bound to come in very useful
      ;; ヽ(*´з｀*)ﾉ.
      (use-package editorconfig
-       :ensure t
+       :straight t
        :config
        (setq editorconfig-lisp-use-default-indent t)
        (push '(plantuml-mode plantuml-indent-level) editorconfig-indentation-alist))
@@ -3501,7 +3394,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package flx
-        :ensure t
+        :straight t
         :defer  t)
     #+END_SRC
 
@@ -3510,7 +3403,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package smex
-        :ensure t
+        :straight t
         :defer  t
         :config
         (setq smex-save-file (var! "smex-save.el")))
@@ -3524,7 +3417,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! orderless)
       (use-package orderless
-        :ensure t
+        :straight t
         :demand t
         :config
         (defun flex-if-twiddle (pattern _index _total)
@@ -3552,7 +3445,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! prescient)
       (use-package prescient
-        :ensure t
+        :straight t
         :demand t
         :init
         (setq prescient-save-file (var! "prescient-history.el"))
@@ -3568,7 +3461,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package evil
-       :ensure t
+       :straight t
        :defer  t
        :custom
        (evil-undo-system 'undo-tree)
@@ -3595,7 +3488,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package evil-matchit
-        :ensure t
+        :straight t
         :defer  t
         :hook (evil-mode . global-evil-matchit-mode)
         :init
@@ -3614,7 +3507,7 @@
 *** surround
     #+BEGIN_SRC emacs-lisp
       (use-package evil-surround
-        :ensure t
+        :straight t
         :hook (evil-mode . global-evil-surround-mode)
         :config
         (setq-default evil-surround-pairs-alist
@@ -3646,7 +3539,7 @@
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! anzu)
       (use-package evil-anzu
         :after anzu
-        :ensure t
+        :straight t
         :demand t)
     #+END_SRC
 
@@ -3654,7 +3547,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package evil-numbers
         :defer  t
-        :ensure t
+        :straight t
         :general
         (:states 'normal
          "C-S-a" 'evil-numbers/inc-at-pt
@@ -3668,7 +3561,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package evil-snipe
-        :ensure t
+        :straight t
         :defer  t
         :diminish
         evil-snipe-mode
@@ -3755,7 +3648,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package evil-exchange
-        :ensure t
+        :straight t
         :defer  t
         :general
         (:states leader-norm-states
@@ -3766,13 +3659,13 @@
 *** multiedit
     #+BEGIN_SRC emacs-lisp
       (use-package iedit
-        :ensure t
+        :straight t
         :defer  t
         :init
         (setq iedit-toggle-key-default nil))
 
       (use-package evil-multiedit
-        :ensure t
+        :straight t
         :demand t
         :after  evil
         :commands (evil-multiedit
@@ -3829,7 +3722,7 @@
 
     #+BEGIN_SRC emacs-lisp
        (use-package evil-traces
-         :ensure t
+         :straight t
          :defer  t
          :hook (evil-mode . evil-traces-mode)
          :diminish
@@ -3840,7 +3733,7 @@
 *** args
     #+BEGIN_SRC emacs-lisp
       (use-package evil-args
-        :ensure t
+        :straight t
         :defer  t
         :hook ((emacs-lisp-mode       . evil-args-adjust-for-elisp+)
                (lisp-interaction-mode . evil-args-adjust-for-elisp+))
@@ -3876,7 +3769,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package evil-easymotion
-        :ensure t
+        :straight t
         :defer  t
         :leader
         (:prefix "jh"
@@ -3906,13 +3799,11 @@
     #+END_SRC
 
 *** vimish-fold
-    folding like vim
+    Folding like vim
 
     #+BEGIN_SRC emacs-lisp
       (use-package vimish-fold
-        :straight (vimish-fold :type git :host github :repo "mrkkrp/vimish-fold"
-                               ;; :fork (:host github :repo "mohkale/vimish-fold")
-                               )
+        :straight (vimish-fold :host github :repo "mrkkrp/vimish-fold")
         :hook ((text-mode . vimish-fold-mode)
                (prog-mode . vimish-fold-mode)
                (conf-mode . vimish-fold-mode))
@@ -3981,7 +3872,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package evil
-        :ensure t
+        :straight t
         :demand t
         :init
         (defun evil-set-initial-state+ (mode state)
@@ -4438,7 +4329,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package org-bullets
-        :ensure t
+        :straight t
         :defer  t
         :hook (org-mode . org-bullets-mode))
     #+END_SRC
@@ -4448,6 +4339,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package org-link-edit
+        :straight (org-link-edit :host github :repo "kyleam/org-link-edit")
         :defer t
         :commands (org-link-edit-forward-slurp
                    org-link-edit-forward-barf
@@ -4455,30 +4347,49 @@
                    org-link-edit-backward-barf))
     #+END_SRC
 
-*** org-eldoc
+*** org-contrib
+
     #+BEGIN_SRC emacs-lisp
-      (use-package org-eldoc
-        :demand t
+      (use-package org-plus-contrib
+        :straight t
+        :defer t
         :after org
         :init
+      ;;; org-eldoc
+        (require 'org-eldoc)
+        (org-eldoc-load)
+
         (defun org-eldoc-get-link+ ()
           "When point is on a link, show the link destination in eldoc."
           (let ((ctx (org-element-lineage (org-element-context) '(link) t)))
             (org-element-property :path ctx)))
 
-        (advice-add 'org-eldoc-documentation-function :before-until #'org-eldoc-get-link+))
+        (advice-add 'org-eldoc-documentation-function :before-until #'org-eldoc-get-link+)
+
+      ;;; org-man
+        (setq org-man-command +man-command))
     #+END_SRC
 
 *** org-toc
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package toc-org
-        :ensure t
+        :straight t
         :defer  t
         ;; :hook (org-mode . toc-org-mode)
         )
     #+END_SRC
 
 *** org-capture
+    #+BEGIN_SRC emacs-lisp
+      (use-package doct
+        :straight (doct :github github :repo "progfolio/doct")
+        :after org-capture
+        :commands (doct)
+        :demand t
+        :init
+        (setq doct-default-entry-type 'entry))
+    #+END_SRC
+
     #+BEGIN_SRC emacs-lisp
       (use-package org-capture
         :after org
@@ -4498,15 +4409,6 @@
         (:keymaps 'org-capture-mode-map
          [remap evil-save-and-close] 'org-capture-finalize
          [remap evil-quit] 'org-capture-kill))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package doct
-        :straight (doct :host github :repo "progfolio/doct" :branch "master")
-        :after org-capture
-        :demand t
-        :init
-        (setq doct-default-entry-type 'entry))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/+org-capture.el
@@ -4736,6 +4638,7 @@
 *** org-mode
     #+BEGIN_SRC emacs-lisp
       (use-package org
+        :straight '(org :type built-in)
         :defer t
         :hook (org-mode . display-line-numbers-mode)
         :commands (org-completing-goto+)
@@ -5269,7 +5172,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package org-fragtog
-        :ensure t
+        :straight t
         :defer  t
         :after org
         :config
@@ -5283,7 +5186,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package org-ql
-        ;; :ensure t
+        ;; :straight t
         :straight t
         :defer  t
         :commands (ivy-org-ql-query
@@ -5384,12 +5287,10 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package org-roam
+        :straight t
+        :defer t
         :diminish
         org-roam-mode
-        :ensure t
-        ;; :straight (org-roam :type git :host github :repo "org-roam/org-roam"
-        ;;                     :fork (:host github :repo "zaeph/org-roam" :branch "nested-captures"))
-        :defer  t
         :hook (after-init . org-roam-mode)
         :commands org-roam-rg
         :init
@@ -5463,7 +5364,7 @@
          "os" 'org-roam-rg))
 
       (use-package org-roam-server
-        :ensure t
+        :straight t
         :defer  t
         :leader
         ("oG" 'org-roam-server-mode)
@@ -5538,16 +5439,6 @@
                                  :export   #'+org-pdf-export))
     #+END_SRC
 
-*** org-man
-    lets you link manual entries from org-mode.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package org-man
-        :defer nil
-        :after org
-        :config
-        (setq org-man-command +man-command))
-    #+END_SRC
 
 *** org-ref
     Support citations, references and links in org mode documents.
@@ -5557,7 +5448,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! bibtex)
       (use-package org-ref
-        :ensure t
+        :straight t
         :defer  t
         :after  org
         :leader
@@ -5595,7 +5486,7 @@
 ** company
    #+BEGIN_SRC emacs-lisp
      (use-package company
-       :ensure t
+       :straight t
        :defer  2
        :delight
        company-mode
@@ -5832,7 +5723,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package company-quickhelp
-        :ensure t
+        :straight t
         :defer  t
         ;; :hook (company-mode . company-quickhelp-mode)
         :config
@@ -5843,7 +5734,7 @@
          "C-M-h" 'company-quickhelp-manual-begin))
 
       (use-package company-quickhelp-terminal
-        :ensure t
+        :straight t
         :defer  t
         :hook (company-quickhelp-mode . company-quickhelp-terminal-mode))
     #+END_SRC
@@ -5851,7 +5742,7 @@
 *** prescient
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! prescient)
       (use-package company-prescient
-        :ensure t
+        :straight t
         :defer  t
         :after prescient
         :hook (company-mode . company-prescient-mode))
@@ -5863,7 +5754,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package all-the-icons
-       :ensure t
+       :straight t
        :defer  t
        :commands (all-the-icons--insert-all-icons
                   all-the-icons-family+)
@@ -5916,7 +5807,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package nerd-fonts
-        :straight (nerd-fonts :type git :host github :repo "mohkale/nerd-fonts.el")
+        :straight (nerd-fonts :host github :repo "mohkale/nerd-fonts.el")
         :after all-the-icons
         :demand t
         :config
@@ -6013,7 +5904,7 @@
 ** avy
    #+BEGIN_SRC emacs-lisp
      (use-package avy
-       :ensure t
+       :straight t
        :defer  t
        :leader
        ("jj" 'avy-goto-char
@@ -6027,7 +5918,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package browse-url
-       :ensure t
+       :straight t
        :defer  t
        :commands xopen-url+
        :config
@@ -6053,7 +5944,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package buffer-move
-       :ensure t
+       :straight t
        :defer  t
        :commands (rotate-windows)
        :config
@@ -6094,7 +5985,7 @@
 ** define-word
    #+BEGIN_SRC emacs-lisp
      (use-package define-word
-       :ensure t
+       :straight t
        :defer  t
        :leader
        ("hdW" 'define-word
@@ -6107,7 +5998,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package drag-stuff
        :defer  t
-       :ensure t
+       :straight t
        :general
        ("C-<up>" 'drag-stuff-up
         "C-<down>" 'drag-stuff-down))
@@ -6116,7 +6007,7 @@
 ** emojify
    #+BEGIN_SRC emacs-lisp
      (use-package emojify
-       :ensure t
+       :straight t
        :defer  t
        :hook ((org-mode              . emojify-mode)
               (git-commit-mode       . emojify-mode)
@@ -6157,7 +6048,7 @@
 *** company
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! company-emoji)
       (use-package company-emoji
-        :ensure t
+        :straight t
         :defer  t
         :after  emojify
         :init
@@ -6172,7 +6063,7 @@
 ** eyebrowse
    #+BEGIN_SRC emacs-lisp
      (use-package eyebrowse
-       :ensure t
+       :straight t
        :defer 30
        :config
        (eyebrowse-mode +1)
@@ -6197,7 +6088,7 @@
 ** gitlink
    #+BEGIN_SRC emacs-lisp
      (use-package git-link
-       :ensure t
+       :straight t
        :defer  t
        :init
        ;; default is to open the generated link
@@ -6213,6 +6104,7 @@
 ** help-fns+
    #+BEGIN_SRC emacs-lisp
      (use-package help-fns+
+       :straight (help-fns+ :host github :repo "emacsmirror/help-fns-plus")
        :defer t
        :commands (describe-buffer
                   describe-keymap
@@ -6230,7 +6122,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package hide-mode-line
-       :ensure t
+       :straight t
        :defer  t)
    #+END_SRC
 
@@ -6239,7 +6131,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package hl-todo
-       :ensure t
+       :straight t
        :defer  t
        :hook ((prog-mode . global-hl-todo-mode)
               (text-mode . global-hl-todo-mode)
@@ -6270,14 +6162,14 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package hydra
-       :ensure t
+       :straight t
        :defer  t
        :commands defhydra
        :config
        (setq lv-use-separator t))
 
      (use-package pretty-hydra
-       :ensure t
+       :straight t
        :defer  t)
    #+END_SRC
 
@@ -6287,7 +6179,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! hydra-posframe)
       (use-package hydra-posframe
-        :straight (hydra-posframe :type git :host github :repo "Ladicle/hydra-posframe")
+        :straight (hydra-posframe :host github :repo "Ladicle/hydra-posframe")
         :defer t
         :after hydra
         :init
@@ -6314,7 +6206,7 @@
 ** ialign
    #+BEGIN_SRC emacs-lisp
      (use-package ialign
-       :ensure t
+       :straight t
        :defer  t
        :commands evil-ialign
 
@@ -6359,10 +6251,8 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package lorem-ipsum
+       :straight t
        :defer  t
-       :commands (Lorem-ipsum-insert-list
-                  Lorem-ipsum-insert-paragraphs
-                  Lorem-ipsum-insert-sentences)
        :leader
        ("il"  "lorem-ipsum"
         "ill" 'Lorem-ipsum-insert-list
@@ -6375,13 +6265,9 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package miniedit
+       :straight (miniedit :host github :repo "emacsorphanage/miniedit")
        :defer t
        :delight (miniedit-mode "MiniEdit")
-       :commands (miniedit
-                  miniedit-install
-                  miniedit-install-for-xemacs
-                  miniedit-introduction
-                  miniedit-quick-start)
        :config
        (setq miniedit-show-help-p nil) ;; thanks... but no thanks
 
@@ -6407,6 +6293,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package open-junk-file
+       :straight (open-junk-file :host github :repo "rubikitch/open-junk-file")
        :defer t
        :commands (open-junk-file
                   goto-junk-file-directory
@@ -6471,8 +6358,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package org-link-minor-mode
        :defer t
-       :straight (org-link-minor-mode :type git :host github
-                  :repo "seanohalpin/org-link-minor-mode")
+       :straight (org-link-minor-mode :host github :repo "seanohalpin/org-link-minor-mode")
        :hook ((text-mode . enable-org-link-minor-mode)
               (prog-mode . enable-org-link-minor-mode)
               (conf-mode . enable-org-link-minor-mode))
@@ -6494,6 +6380,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package page-break-lines
+       :straight t
        :defer t
        :hook ((org-mode                    . page-break-lines-mode)
               (help-mode                   . page-break-lines-mode)
@@ -6508,7 +6395,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package pcre2el
-       :ensure t
+       :straight t
        :defer  t
        :leader
        ("xr"   "regexp"
@@ -6538,7 +6425,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package persp-mode
-       :ensure t
+       :straight t
        :defer  150
        :diminish persp-mode
 
@@ -6823,7 +6710,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package projectile
-       :ensure t
+       :straight t
        :defer  10
        :delight ""
        :hook (prog-mode . projectile-mode)
@@ -7122,7 +7009,7 @@
 ** real-auto-save-mode
    #+BEGIN_SRC emacs-lisp
      (use-package real-auto-save
-       :ensure t
+       :straight t
        :defer  t
        :init
        (setq real-auto-save-interval 6))
@@ -7133,7 +7020,7 @@
 
    #+BEGIN_SRC emacs-lisp
       (use-package sudo-edit
-        :ensure t
+        :straight t
         :defer  t
         :commands sudo-edit
         :leader
@@ -7143,6 +7030,7 @@
 ** transpose-frame
    #+BEGIN_SRC emacs-lisp
      (use-package transpose-frame
+       :straight (transpose-frame :host github :repo "emacsorphanage/transpose-frame")
        :defer t
        :general
        (:keymaps 'emacs-window-map
@@ -7160,7 +7048,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package rainbow-delimiters
-       :ensure t
+       :straight t
        :defer  t
        :hook (prog-mode . rainbow-delimiters-mode)
        :commands rainbow-delimiters-mode)
@@ -7169,7 +7057,7 @@
 ** undo-tree
    #+BEGIN_SRC emacs-lisp
      (use-package undo-tree
-       :ensure t
+       :straight t
        :defer  t
        :diminish
        :init
@@ -7264,7 +7152,7 @@
 ** uuidgen
    #+BEGIN_SRC emacs-lisp
      (use-package uuidgen
-       :ensure t
+       :straight t
        :defer  t
        :leader
        ("iU" 'uuidgen
@@ -7279,7 +7167,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package visible-mark
-       :ensure t
+       :straight t
        :defer  t
        :commands (visible-mark-mode))
     #+END_SRC
@@ -7291,7 +7179,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package which-key
-       :ensure t
+       :straight t
        :demand t
        :diminish
        :commands (which-key-M-x+)
@@ -7372,13 +7260,11 @@
    package used by ~magit~ for controlling emacsclient.
 
    #+BEGIN_SRC emacs-lisp
-     (use-package with-editor
-       :lazy-leader
-       (:mode 'with-editor-mode
-        :minor t
-        :prefix leader-major-mode-prefix
-        ","  'with-editor-finish
-        "q"  'with-editor-cancel))
+     (with-eval-after-load 'with-editor
+       (leader/with-prefix leader-major-mode-prefix
+         (leader/set-keys-for-mode 'with-editor-mode
+           ","  'with-editor-finish
+           "q"  'with-editor-cancel)))
     #+END_SRC
 
 ** winum
@@ -7386,7 +7272,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package winum
-       :ensure t
+       :straight t
        :demand t
        :config
        (winum-mode)
@@ -7436,7 +7322,7 @@
 *** yasnippet
     #+BEGIN_SRC emacs-lisp
       (use-package yasnippet
-        :ensure t
+        :straight t
         :defer  load-me-now-duration
         :diminish yas-minor-mode
         :leader
@@ -7765,7 +7651,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package auto-yasnippet
-        :ensure t
+        :straight t
         :defer  t
         :leader
         ("iS"  "auto-yasnippet"
@@ -8218,7 +8104,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package compile
-        :ensure t
+        :straight t
         :defer  t
         :commands (display-compilation-buffer
                    +set-compilation-bindings)
@@ -8894,7 +8780,7 @@
 *** all-the-icons
     #+BEGIN_SRC emacs-lisp
       (use-package all-the-icons-dired
-        :straight (all-the-icons-dired :fork (:host github :repo "mohkale/all-the-icons-dired" :branch "icons-predicate"))
+        :straight (:fork (:host github :repo "mohkale/all-the-icons-dired" :branch "icons-predicate"))
         :defer t
         :diminish "DiredIcons"
         :after all-the-icons
@@ -8955,7 +8841,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! diredfl)
       (use-package diredfl
-        :ensure t
+        :straight t
         :defer  t
         :hook (dired-mode . diredfl-mode))
     #+END_SRC
@@ -8965,7 +8851,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package dired-git-info
-        :ensure t
+        :straight t
         :defer  t
         :general
         (:keymaps 'dired-mode-map
@@ -9228,7 +9114,7 @@
            "tv" 'ediff-toggle-verbose-help-meta-buffer)
 
          (use-package evil-ediff
-           :ensure t
+           :straight t
            :defer  nil
            :commands (evil-ediff-init)
            :init
@@ -9398,7 +9284,7 @@
 *** flyspell-correct
     #+BEGIN_SRC emacs-lisp
       (use-package flyspell-correct
-        :ensure t
+        :straight t
         :defer  t
         :leader
         (:mode 'flyspell-mode
@@ -9730,7 +9616,7 @@
 *** vc
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer ibuffer-vc)
       (use-package ibuffer-vc
-        :ensure t
+        :straight t
         :defer  t
         :after ibuffer
         :config
@@ -9745,7 +9631,7 @@
 *** tramp
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer ibuffer-tramp)
       (use-package ibuffer-tramp
-        :ensure t
+        :straight t
         :defer  t
         :after ibuffer
         :config
@@ -9759,11 +9645,9 @@
 *** persp
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer-persp)
       (use-package ibuffer-persp
-        :straight (ibuffer-persp :type built-in)
+        :straight (ibuffer-persp :host github :repo "rakshasa/ibuffer-persp")
         :after ibuffer
         :defer t
-        :commands (ibuffer-persp-current
-                   ibuffer-persp-other)
         :config
         (defalias 'ibuffer-persp-current #'ibuffer-persp-set-filter-groups-by-persp-name-not-nil)
         (defalias 'ibuffer-persp-other #'ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
@@ -9777,7 +9661,7 @@
 *** projectile
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer-projectile)
       (use-package ibuffer-projectile
-        :ensure t
+        :straight t
         :defer  t
         :after ibuffer
         :commands (ibuffer-projectile-mode)
@@ -9834,7 +9718,7 @@
 *** list
     #+BEGIN_SRC emacs-lisp
       (use-package imenu-list
-        :ensure t
+        :straight t
         :defer  t
         :leader
         ("jI" 'imenu-anywhere)
@@ -9852,7 +9736,7 @@
 *** imenu-anywhere
     #+BEGIN_SRC emacs-lisp
       (use-package imenu-anywhere
-        :ensure t
+        :straight t
         :defer  t
         :leader
         ("bi" 'imenu-list))
@@ -10216,8 +10100,8 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package powerline
-        :straight (powerline :type git :host github :repo "jonathanchu/emacs-powerline"
-                             :fork (:host github :repo "milkypostman/powerline")))
+        :straight (powerline :host github :repo "jonathanchu/emacs-powerline"
+                             :fork (:repo "milkypostman/powerline")))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
@@ -11373,7 +11257,7 @@
 *** eshell-prompt-extras
     #+BEGIN_SRC emacs-lisp
       (use-package eshell-prompt-extras
-        :ensure t
+        :straight t
         :defer  t
         :after esh-mode
         :init
@@ -11757,8 +11641,8 @@
 ** vline
    #+BEGIN_SRC emacs-lisp
      (use-package vline
+       :straight (vline :host github :repo "emacsmirror/vline")
        :defer t
-       :commands (vline-mode)
        :leader
        ("tv" 'vline-mode))
    #+END_SRC
@@ -11861,7 +11745,7 @@
 *** selectrum
     #+BEGIN_SRC emacs-lisp
       (use-package selectrum
-        :ensure t
+        :straight t
         :defer  t
         :hook (after-init . selectrum-mode)
         :commands (selectrum-preprocess+
@@ -12022,7 +11906,7 @@
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! selectrum prescient)
       (use-package selectrum-prescient
         :after prescient
-        :ensure t
+        :straight t
         :defer  t
         :hook ((selectrum-mode . selectrum-prescient-mode))
         :init
@@ -12062,7 +11946,7 @@
 *** marginalia
     #+BEGIN_SRC emacs-lisp
       (use-package marginalia
-        :ensure t
+        :straight t
         :defer  t
         :hook (selectrum-mode . marginalia-mode)
         :general
@@ -12079,7 +11963,7 @@
 *** embark
     #+BEGIN_SRC emacs-lisp
       (use-package embark
-        :ensure t
+        :straight t
         :defer  t
         :config
         (setq embark-action-indicator
@@ -12122,7 +12006,7 @@
          "w" 'tabulated-list-widen-current-column))
 
       (use-package embark-consult
-        :ensure t
+        :straight t
         :defer  t
         :after  (embark consult)
         :hook (embark-collect-mode . embark-consult-preview-minor-mode))
@@ -12134,8 +12018,7 @@
         "Manual key to trigger `consult--read' previews.")
 
       (use-package consult
-        :straight (consult :fork (:host github :repo "mohkale/consult" :branch "consult-yasnippet"))
-        ;; :ensure t
+        :straight t
         :defer  t
         :commands (consult-ripgrep-no-project+
                    consult-grep-no-project+)
@@ -12313,7 +12196,7 @@
 *** consult-flycheck
     #+BEGIN_SRC emacs-lisp
       (use-package consult-flycheck
-        :ensure t
+        :straight t
         :defer  t
         :leader
         (:minor t :mode 'flycheck-mode "eg" 'consult-flycheck))
@@ -13113,7 +12996,7 @@
 *** ivy-prescient
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy prescient ivy-prescient)
       (use-package ivy-prescient
-        :ensure t
+        :straight t
         :defer  t
         :after  prescient
         :hook (ivy-mode . ivy-prescient-mode)
@@ -13179,7 +13062,7 @@
 *** ivy-avy
     #+BEGIN_SRC emacs-lisp
       (use-package ivy-avy
-        :ensure t
+        :straight t
         :defer  t
         :after  ivy
         :commands ivy-avy
@@ -13193,7 +13076,7 @@
 *** ivy-hydra
     #+BEGIN_SRC emacs-lisp
       (use-package ivy-hydra
-        :ensure t
+        :straight t
         :defer  t
         :commands hydra-ivy/body
         :config
@@ -13208,7 +13091,7 @@
 *** ivy-xref
     #+BEGIN_SRC emacs-lisp
       (use-package ivy-xref
-        :ensure t
+        :straight t
         :defer  t
         :after  (ivy xref)
         :init
@@ -13263,7 +13146,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy bibtex)
       (use-package ivy-bibtex
-        :ensure t
+        :straight t
         :defer  t
         :leader
         ("ob" 'ivy-bibtex)
@@ -13283,7 +13166,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package ivy-yasnippet
-        :ensure t
+        :straight t
         :defer  t
         :leader
         ("is" 'ivy-yasnippet)
@@ -13296,7 +13179,7 @@
 *** ivy-lsp
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! lsp-mode)
       (use-package lsp-ivy
-        :ensure t
+        :straight t
         :defer  t
         :after lsp-mode
         :leader
@@ -13318,7 +13201,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package flyspell-correct-ivy
-        :ensure t
+        :straight t
         :defer  t
         :after  (flyspell flyspell-correct)
         :init
@@ -13330,7 +13213,7 @@
 *** ivy-rich
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy-rich)
       (use-package ivy-rich
-        :ensure t
+        :straight t
         :defer  t
         :hook (ivy-mode . ivy-rich-mode)
         :config
@@ -13340,7 +13223,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy-rich ivy-rich-icons)
       (use-package all-the-icons-ivy-rich
-        :ensure t
+        :straight t
         :defer  t
         ;; :hook (ivy-rich-mode . all-the-icons-ivy-rich-mode)
 
@@ -13353,7 +13236,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package swiper
-        :ensure t
+        :straight t
         :defer  t
         :config
         (with-no-warnings
@@ -13494,7 +13377,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package counsel
-        :ensure t
+        :straight t
         :defer  t
         :hook (ivy-mode . counsel-mode)
         :diminish counsel-mode
@@ -13708,7 +13591,7 @@
 *** counsel-pydoc
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy python)
       (use-package counsel-pydoc
-        :ensure t
+        :straight t
         :defer  t
         :after (python counsel)
         :leader
@@ -13719,7 +13602,7 @@
 *** counsel-ggtags
     #+BEGIN_SRC emacs-lisp
       (use-package counsel-gtags
-        :ensure t
+        :straight t
         :defer  t
         :after counsel
         :leader
@@ -13740,7 +13623,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package counsel-tramp
-        :ensure t
+        :straight t
         :defer  t
         :after counsel
         :leader
@@ -13753,7 +13636,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package counsel-web
-        :straight (counsel-web :type git :host github :repo "mnewt/counsel-web")
+        :straight (counsel-web :host github :repo "mnewt/counsel-web")
         :defer  t
         :after counsel
         :commands (counsel-web-suggest                                                ; async
@@ -13771,7 +13654,7 @@
 *** counsel-projectile
     #+BEGIN_SRC emacs-lisp
       (use-package counsel-projectile
-        :ensure t
+        :straight t
         :defer  t
         :custom
         (counsel-projectile-org-capture-templates-first-p nil)
@@ -13796,7 +13679,7 @@
 *** counsel-css
     #+BEGIN_SRC emacs-lisp
       (use-package counsel-css
-        :ensure t
+        :straight t
         :defer  t
         :after (:all counsel (:any css-mode less-css-mode))
         :lazy-leader
@@ -13807,7 +13690,7 @@
 *** counsel-jq
     #+BEGIN_SRC emacs-lisp
       (use-package counsel-jq
-        :ensure t
+        :straight t
         :defer  t
         :after json-mode
         :leader
@@ -13818,7 +13701,7 @@
 *** counsel-world-clock
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package counsel-word-clock
-        :straight (counsel-word-clock :type git :host github :repo "kchenphy/counsel-world-clock")
+        :straight (counsel-word-clock :host github :repo "kchenphy/counsel-world-clock")
         :defer t)
    #+END_SRC
 
@@ -13827,7 +13710,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package helm-make
-        :ensure t
+        :straight t
         :defer  t
         :init
         (setq helm-make-completion-method 'ivy)
@@ -13847,7 +13730,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package ace-link
-       :ensure t
+       :straight t
        :defer  t
        :commands (ace-link-fallback-function+)
        :leader
@@ -13939,7 +13822,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! adaptive-wrap)
      (use-package adaptive-wrap
-       :ensure t
+       :straight t
        :defer  t)
    #+END_SRC
 
@@ -13949,7 +13832,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! anzu)
      (use-package anzu
-       :ensure t
+       :straight t
        :defer  5
        :diminish
        :config
@@ -13965,7 +13848,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! auto-highlight-symbol)
      (use-package auto-highlight-symbol
-       :ensure t
+       :straight t
        :defer  t
        :config
        (global-auto-highlight-symbol-mode +1)
@@ -13978,7 +13861,7 @@
 ** bufler
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! bufler)
      (use-package bufler
-       :ensure t
+       :straight t
        :defer  t
        :init
        (push 'bufler-list-mode whitespace-exempt-modes)
@@ -14020,7 +13903,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! command-log-mode)
      (use-package command-log-mode
-       :ensure t
+       :straight t
        :defer  t)
    #+END_SRC
 
@@ -14163,20 +14046,13 @@
 *** dashboard
     #+BEGIN_SRC emacs-lisp :only (package-yes! dashboard) :var dashboard-footer-icon-associations=dashboard-footer-icons dashboard-quotes=dashboard-displayed-quotes
       (use-package dashboard
-        :ensure t
+        :straight t
         :demand t
         :commands goto-home-buffer
         :leader
         ("bh" 'goto-home-buffer)
 
         :init
-        (defun get-loaded-packages+ ()
-          "return the number of packages loaded so far"
-          (if (bound-and-true-p package-alist)
-              package-activated-list
-            (if (and (boundp 'straight--profile-cache) (hash-table-p straight--profile-cache))
-                (hash-table-size straight--profile-cache))))
-
         (defmacro dashboard-defun-shortcut-function+ (shortcut-char search-label &optional no-next-line)
           "translation of `dashboard-insert-shortcut' but less bizarre."
           (let* ((func-name (intern (concat "dashboard-" shortcut-char "-shortcut"))))
@@ -14212,21 +14088,14 @@
         (dashboard-setup-startup-hook)
 
         ;; determine the appropriate banner to display on the dashboard
-        (defun dashboard-image-banner-p ()
-          "whether to use text graphics, or image graphics."
-          (display-graphic-p))
-
         (defun dashboard-select-random-banner+ (&optional arg)
-          "toggle another banner to be used on the dashboard.
-      By default, if `dashboard-image-banner-p' is true, the default official banner
-      will be used. if otherwise a random text banner will be defaulted to."
+          "Toggle another banner to be used on the dashboard."
           (setq dashboard-startup-banner
-                (if (and (not arg)
-                         (dashboard-image-banner-p))
-                    'official ;; prefer official cover.
+                (if (and (not arg) (display-graphic-p))
+                    'official                                                         ; prefer official cover.
                   (seq-random-elt
-                   (or (file-expand-wildcards (concat
-                                               +dashboard-banners-directory "*"))
+                   (or (file-expand-wildcards
+                        (concat +dashboard-banners-directory "*"))
                        '(1 2 3))))))
 
         ;; for some reason, the font-lock rules for the dashboard don't seem to
@@ -14240,7 +14109,7 @@
         (advice-add 'dashboard-refresh-buffer :before
                     (lambda (&rest _)
                       (dashboard-select-random-banner+)))
-        (dashboard-select-random-banner+) ;; choose initial banner
+        (dashboard-select-random-banner+)                                             ; choose initial banner
 
         ;; goto home buffer, or recreate the home buffer, when appropriate.
         (defun goto-home-buffer ()
@@ -14303,16 +14172,24 @@
         (add-hook 'emacs-startup-hook
                   (defun dashboard--startup-handler ()
                     "update dashboard init info."
-                    (let ((loaded-packages (get-loaded-packages+)))
-                      (setq dashboard-init-info (if loaded-packages
-                                                    (format "%d packages loaded in %s"
-                                                            (length loaded-packages)
-                                                            (emacs-init-time))
-                                                  (format "emacs loaded in %s" (emacs-init-time))))
+                    (setq dashboard-init-info
+                          (concat
+                           "Emacs loaded "
+                           (when-let ((count
+                                       (cond ((bound-and-true-p package-alist)
+                                              (length package-activated-list))
+                                             ((bound-and-true-p straight--profile-cache)
+                                              (let ((count 0))
+                                                (maphash (lambda (key val)
+                                                           (when val (setq count (1+ count))))
+                                                         straight--success-cache)
+                                                count)))))
+                             (format "%d packages " count))
+                           "in " (emacs-init-time)))
 
                       ;; don't switch to dashboard on error buffer
                       (unless (eq 1 (length (window-list)))
-                        (winum-select-window-1)))))
+                        (winum-select-window-1))))
 
         (advice-add 'dashboard-choose-banner :before-until
                     (defun dashboard-choose-banner-allow-text-banners+ ()
@@ -14356,7 +14233,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! deft)
      (use-package deft
-       :ensure t
+       :straight t
        :defer  t
        :leader
        ("od" 'deft)
@@ -14418,7 +14295,7 @@
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ebuku)
      (use-package ebuku
        :defer t
-       :straight (ebuku :type git :host github :repo "flexibeast/ebuku"))
+       :straight (ebuku :host github :repo "flexibeast/ebuku"))
    #+END_SRC
 
 ** edit-indirect
@@ -14426,7 +14303,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! edit-indirect)
      (use-package edit-indirect
-       :ensure t
+       :straight t
        :defer  t
        :commands (edit-indirect-region
                   edit-indirect-commit
@@ -14470,7 +14347,7 @@
      (cond
       ((eq +browser-edit-package 'edit-with-emacs)
        (use-package edit-server
-         :ensure t
+         :straight t
          :defer  120
          :delight
          (edit-server-edit-mode "ESE") ;; emacs server edit
@@ -14498,14 +14375,14 @@
 
        ;; fixes issues with non conventional input components likes gmails compose box
        (use-package edit-server-htmlize
-         :ensure t
+         :straight t
          :defer  t
          :hook ((edit-server-start . edit-server-maybe-dehtmlize-buffer)
                 (edit-server-done  . edit-server-maybe-htmlize-buffer))))
 
       ((eq +browser-edit-package 'atomic)
        (use-package atomic-chrome
-         :ensure t
+         :straight t
          :defer  30
          :delight
          (atomic-chrome-edit-mode "Atomic")
@@ -14534,7 +14411,7 @@
 ** eglot
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! eglot)
      (use-package eglot
-       :ensure t
+       :straight t
        :defer  t
        :custom
        (eglot-stay-out-of '(company))                                                ; I'll set my backends myself, thank you.
@@ -14670,7 +14547,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! jupyter)
      (use-package ein
-       :ensure t
+       :straight t
        :defer  t
        :init
        (with-eval-after-load 'org
@@ -14763,7 +14640,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package engine-mode
-       :ensure t
+       :straight t
        :defer  t
        :custom
        (engine/browser-function #'xopen-url+))
@@ -14881,7 +14758,7 @@
 ** expand-region
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! expand-region)
      (use-package expand-region
-       :ensure t
+       :straight t
        :defer  t
        :general
        (:states 'visual
@@ -14894,7 +14771,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! flycheck)
      (use-package flycheck
-       :ensure t
+       :straight t
        :defer  t
        :diminish flycheck-mode
        :config
@@ -14904,7 +14781,7 @@
        (require '+flycheck-fringe)
 
        (use-package flycheck-pos-tip
-         :ensure t
+         :straight t
          :defer  t
          :hook (flycheck-mode-hook . flycheck-pos-tip-mode)
          :commands flycheck-pos-tip-mode)
@@ -15083,7 +14960,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! frog-jump-buffer)
      (use-package frog-jump-buffer
-       :ensure t
+       :straight t
        :defer  t
        :leader
        ("jb" 'frog-jump-buffer))
@@ -15092,7 +14969,7 @@
 ** ggtags
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ggtags)
      (use-package ggtags
-       :ensure t
+       :straight t
        :defer  t
        :leader
        ("T"  "tags"
@@ -15110,8 +14987,8 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! hide-comnt)
      (use-package hide-comnt
+       :straight (hide-comnt :host github :repo "emacsmirror/hide-comnt")
        :defer t
-       :commands hide/show-comments-toggle
        :leader
        ("t/" 'hide/show-comments-toggle))
    #+END_SRC
@@ -15121,7 +14998,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! link-hint)
      (use-package link-hint
-       :ensure t
+       :straight t
        :defer  t
        :leader
        ("j RET" 'link-hint-open-link
@@ -15143,7 +15020,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package lsp-mode
-       :ensure t
+       :straight t
        :defer  t
        :custom
        (lsp-auto-guess-root t)
@@ -15209,7 +15086,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package lsp-ui
-        :ensure t
+        :straight t
         :defer  t
         ;; :hook (lsp-mode-hook . lsp-ui-mode)
         :after lsp-mode
@@ -15230,7 +15107,7 @@
 *** dap-mode
     #+BEGIN_SRC emacs-lisp
       (use-package dap-mode
-        :ensure t
+        :straight t
         :defer  t)
     #+END_SRC
 
@@ -15243,7 +15120,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package evil-magit
-       :ensure t
+       :straight t
        :demand t
        :init
        (setq evil-magit-state 'motion
@@ -15259,7 +15136,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package magit
-       :ensure t
+       :straight t
        :defer  t
        :init
        (setq magit-revision-show-gravatars  '("^Author:     " . "^Commit:     ")
@@ -15382,7 +15259,7 @@
 *** magit-todos
     #+BEGIN_SRC emacs-lisp
       (use-package magit-todos
-        :ensure t
+        :straight t
         :defer  t
         :after  magit
         :hook (magit-mode . magit-todos-mode)
@@ -15399,7 +15276,7 @@
 *** magit-gitflow
     #+BEGIN_SRC emacs-lisp
       (use-package magit-gitflow
-        :ensure t
+        :straight t
         :defer  t
         :after  (magit--handle-bookmark magit)
         :hook (magit-mode . turn-on-magit-gitflow)
@@ -15414,7 +15291,7 @@
 *** transient
     #+BEGIN_SRC emacs-lisp
       (use-package transient
-        :ensure t
+        :straight t
         :defer  t
         :config
         (setq transient-history-file (var! "transient/history.el")
@@ -15433,7 +15310,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! olivetti)
      (use-package olivetti
-       :ensure t
+       :straight t
        :defer  t
        :commands olivetti-setup-buffer
        :hook (olivetti-mode . olivetti-setup-buffer)
@@ -15478,7 +15355,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package pdf-tools
-       :ensure t
+       :straight t
        :defer  t
        :mode ("\\.pdf$" . pdf-view-mode)
        ;; see [[https://www.reddit.com/r/emacs/comments/6g15nk/pdftools_latex_freeze/][here]].
@@ -15747,7 +15624,7 @@
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! piper)
      (use-package piper
        :defer t
-       :straight (emacs-piper :type git :host gitlab :repo "howardabrams/emacs-piper")
+       :straight (emacs-piper :host gitlab :repo "howardabrams/emacs-piper")
        :commands (piper-ui)
        :leader
        (:prefix "|"
@@ -15764,7 +15641,7 @@
 ** rake
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! rake)
      (use-package rake
-       :ensure t
+       :straight t
        :defer  t
        :commands (rake-refresh)
        :leader
@@ -15787,7 +15664,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package skeletor
-       :ensure t
+       :straight t
        :defer  t
        :commands (skeletor-create-project+
                   skeletor-expand-project+)
@@ -15946,7 +15823,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! tramp-term)
      (use-package tramp-term
-       :ensure t
+       :straight t
        :defer  t
        :after  term
        :init
@@ -15970,7 +15847,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! rainbow-mode)
      (use-package rainbow-mode
-       :ensure t
+       :straight t
        :defer  t)
     #+END_SRC
 
@@ -15980,7 +15857,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! vi-tilde-fringe)
      (use-package vi-tilde-fringe
-       :ensure t
+       :straight t
        :defer  t
        :diminish
        :commands (vi-tilde-fringe-mode global-vi-tilde-fringe-mode)
@@ -15996,7 +15873,7 @@
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! vdiff)
      (use-package vdiff
-       :ensure t
+       :straight t
        :defer  t
        :config
        (defvar vdiff-use-relative-line-numbers nil
@@ -16082,7 +15959,7 @@
 ** vlc-rc
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! vlc-rc)
      (use-package vlc-rc
-       :straight (vlc-rc :type git :host github :repo "mohkale/vlc-rc")
+       :straight (vlc-rc :host github :repo "mohkale/vlc-rc")
        :defer t
        ;; can't defer for now, hopefully when use-package
        ;; supports bind-keymap with specific map, change.
@@ -16118,7 +15995,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package vterm
-       :ensure t
+       :straight t
        :defer  t
        :commands (vterm-toggle
                   vterm-toggle-fullscreen
@@ -16134,7 +16011,7 @@
              vterm-keymap-exceptions '("C-SPC" "C-g" "C-c" "M-x"))
 
        (use-package vterm-toggle
-         :ensure t
+         :straight t
          :defer  t
          :init
          (defun vterm-toggle-fullscreen (&optional arg)
@@ -16356,7 +16233,7 @@
 ** wakatime
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! wakatime)
      (use-package wakatime-mode
-       :ensure t
+       :straight t
        :defer  t
        :hook (after-init-hook . global-wakatime-mode)
        :config
@@ -16371,7 +16248,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package ycmd
-        :ensure t
+        :straight t
         :defer  t
         :delight "YCMD"
         :hook (ycmd-mode . ycmd-eldoc-setup)
@@ -16424,7 +16301,7 @@
 *** company-ycmd
     #+BEGIN_SRC emacs-lisp
       (use-package company-ycmd
-        :ensure t
+        :straight t
         :demand t
         :after (company ycmd)
         :init
@@ -16435,7 +16312,7 @@
 *** flycheck-ycmd
     #+BEGIN_SRC emacs-lisp
       (use-package flycheck-ycmd
-        :ensure t
+        :straight t
         :defer  t
         :after (flycheck ycmd)
         :hook (ycmd-mode . flycheck-ycmd-setup))
@@ -16444,7 +16321,7 @@
 ** ztree
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ztree)
      (use-package ztree
-       :ensure t
+       :straight t
        :defer  t
        :config
        (evil-set-initial-state 'ztree-mode 'motion)
@@ -16480,7 +16357,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package clojure-mode
-       :ensure t
+       :straight t
        :defer  t
        :mode ((rx ".edn") . clojure-mode))
    #+END_SRC
@@ -16493,7 +16370,7 @@
 *** restclient-mode
     #+BEGIN_SRC emacs-lisp
       (use-package restclient
-        :ensure t
+        :straight t
         :defer  t
         :commands (restclient)
         :config
@@ -16537,7 +16414,7 @@
 *** company-restclient
     #+BEGIN_SRC emacs-lisp
       (use-package company-restclient
-        :ensure t
+        :straight t
         :defer  t
         :after  restclient
         :commands (company-restclient)
@@ -16549,7 +16426,7 @@
 *** org-babel-restclient
     #+BEGIN_SRC emacs-lisp
       (use-package ob-restclient
-        :ensure t
+        :straight t
         :defer  t
         :after (org restclient)
         :init
@@ -16663,7 +16540,7 @@
 *** paredit
     #+BEGIN_SRC emacs-lisp
       (use-package paredit
-        :ensure t
+        :straight t
         :defer  t
         :diminish paredit-mode
         :hook (emacs-lisp-mode . paredit-mode)
@@ -16827,7 +16704,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package anaconda-mode
         :diminish anaconda-mode
-        :ensure t
+        :straight t
         :defer  t
         :hook ((python-mode . enable-anaconda-mode+)
                (anaconda-mode . anaconda-eldoc-mode))
@@ -16866,7 +16743,7 @@
 **** company-anaconda
      #+BEGIN_SRC emacs-lisp
        (use-package company-anaconda
-         :ensure t
+         :straight t
          :defer  t
          :after  anaconda-mode
          :init
@@ -16877,7 +16754,7 @@
 *** pyimport
     #+BEGIN_SRC emacs-lisp
       (use-package pyimport
-        :ensure t
+        :straight t
         :defer  t
         :leader
         (:mode 'python-mode
@@ -16891,7 +16768,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package py-isort
-        :ensure t
+        :straight t
         :defer  t
         :leader
         (:mode 'python-mode
@@ -16905,7 +16782,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package pip-requirements
-        :ensure t
+        :straight t
         :defer  t
         :mode ("^requirements\\.txt$" . pip-requirements-mode))
     #+END_SRC
@@ -16915,7 +16792,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package yapfify
-        :ensure t
+        :straight t
         :defer  t
         :leader
         (:mode 'python-mode
@@ -16969,7 +16846,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package enh-ruby-mode
         :only (eq +ruby-package 'enh-ruby)
-        :ensure t
+        :straight t
         :defer  t
         :mode ("\\.rb$" . enh-ruby-mode)
         :interpreter "ruby"
@@ -17027,7 +16904,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ruby-robe)
       (use-package robe
-        :ensure t
+        :straight t
         :defer  t
         :init
         (add-hook +ruby-mode-hook
@@ -17056,7 +16933,7 @@
 *** inf-ruby
     #+BEGIN_SRC emacs-lisp
       (use-package inf-ruby
-        :ensure t
+        :straight t
         :defer  t
         :init
         (defalias 'ruby-repl 'inf-ruby)
@@ -17078,7 +16955,7 @@
 *** ruby-tools
     #+BEGIN_SRC emacs-lisp
       (use-package ruby-tools
-        :ensure t
+        :straight t
         :defer  t
         :diminish ruby-tools-mode
         :init
@@ -17097,7 +16974,7 @@
 *** bundle
     #+BEGIN_SRC emacs-lisp
       (use-package bundler
-        :ensure t
+        :straight t
         :defer  t
         :leader
         (:mode +ruby-mode
@@ -17112,7 +16989,7 @@
 *** ruby-electric
     #+begin_src emacs-lisp
       (use-package ruby-electric
-        :ensure t
+        :straight t
         :defer  t
         :diminish ruby-electric-mode
         :init
@@ -17145,7 +17022,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package powershell
-       :ensure t
+       :straight t
        :defer  t)
    #+END_SRC
 
@@ -17157,7 +17034,7 @@
 *** web-mode
     #+BEGIN_SRC emacs-lisp
       (use-package web-mode
-        :ensure t
+        :straight t
         :defer  t
         :mode (rx "." (or "erb" "html" "vue"))
         :init
@@ -17275,7 +17152,7 @@
 *** emmet-mode
     #+BEGIN_SRC emacs-lisp :tangle (or (package-yes! html) (package-yes! markdown))
       (use-package emmet-mode
-        :ensure t
+        :straight t
         :defer  t
         :hook ((web-mode      . emmet-mode)
                (markdown-mode . emmet-mode)
@@ -17306,7 +17183,7 @@
 *** company-web
     #+BEGIN_SRC emacs-lisp
       (use-package company-web
-        :ensure t
+        :straight t
         :defer  t
         :after  web-mode
         :config
@@ -17317,7 +17194,7 @@
 *** web-beautify
     #+BEGIN_SRC emacs-lisp
       (use-package web-beautify
-        :ensure t
+        :straight t
         :defer  t
         :after  web-mode
         :leader
@@ -17335,7 +17212,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package json-mode
-       :ensure t
+       :straight t
        :defer  t
        :mode (rx ".json")
        :hook (json-mode . flycheck-mode)
@@ -17355,7 +17232,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package vimrc-mode
-       :ensure t
+       :straight t
        :defer  t
        :mode (rx ".vim")
        :hook (vimrc-mode . flycheck-mode)
@@ -17369,7 +17246,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package sql
-       :ensure t
+       :straight t
        :defer  t
        :mode ("\\.sql" . sql-mode)
        :hook (sql-mode . flycheck-mode)
@@ -17409,7 +17286,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package sqlup-mode
-        :ensure t
+        :straight t
         :defer  t
         :after  sql
         :hook ((sql-mode . sqlup-mode)
@@ -17424,15 +17301,6 @@
          "ub" 'sqlup-capitalize-keywords-in-buffer))
     #+END_SRC
 
-*** sqlite-dump
-    converts an sqlite database file into the SQL schema required to reproduce it.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package sqlite-dump
-        :defer t
-        :commands sqlite-dump)
-    #+END_SRC
-
 ** YAML
    :PROPERTIES:
    :header-args+: :tangle (package-yes! yaml)
@@ -17440,7 +17308,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package yaml-mode
-       :ensure t
+       :straight t
        :defer  t
        :mode (rx "." (or "yaml" "yml"))
        :hook (yaml-mode . flycheck-mode)
@@ -17466,7 +17334,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package csv-mode
-       :ensure t
+       :straight t
        :defer  t
        :init
        (setq csv-separators '("," ":" ";" "\t"))
@@ -17501,7 +17369,7 @@
    :END:
 
    #+BEGIN_SRC emacs-lisp
-     (use-package yarn-mode :ensure t)
+     (use-package yarn-mode :straight t)
    #+END_SRC
 
 ** glsl
@@ -17511,7 +17379,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package glsl-mode
-       :ensure t
+       :straight t
        :mode ("\\.vs$" . glsl-mode))
    #+END_SRC
 
@@ -17573,7 +17441,7 @@
 *** company-shell
     #+BEGIN_SRC emacs-lisp
       (use-package company-shell
-        :ensure t
+        :straight t
         :defer  t
         :after  sh-mode
         :config
@@ -17588,7 +17456,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package ssh-config-mode
-       :ensure t
+       :straight t
        :defer  t
        :delight (ssh-config-mode "SSH")
        ;; TODO advise last host to behave like org mode
@@ -17670,7 +17538,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package markdown-mode
-        :ensure t
+        :straight t
         :defer  t
         :hook ((markdown-mode . display-line-numbers-mode)
                (markdown-mode . flycheck-mode))
@@ -17891,7 +17759,7 @@
 *** markdown-toc
     #+BEGIN_SRC emacs-lisp
       (use-package markdown-toc
-        :ensure t
+        :straight t
         :defer  t
         :lazy-leader
         (:mode 'markdown-mode
@@ -17904,7 +17772,7 @@
 *** gh-md
     #+BEGIN_SRC emacs-lisp
       (use-package gh-md
-        :ensure t
+        :straight t
         :defer  t
         :after  markdown-mode
         :leader
@@ -17920,7 +17788,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package cmake-mode
-       :ensure t
+       :straight t
        :defer  t
        :mode (rx (or "CMakeLists.txt" ".cmake"))
        :hook (cmake-mode . flycheck-mode))
@@ -17929,6 +17797,7 @@
 *** company-cmake
     #+BEGIN_SRC emacs-lisp
       (use-package company-cmake
+        :straight (company-cmake :host github :fork "company-cmake")
         :after cmake
         :defer t
         :init
@@ -17994,7 +17863,7 @@
 *** disaster
     #+BEGIN_SRC emacs-lisp
       (use-package disaster
-        :ensure t
+        :straight t
         :defer  t
         :after  cc-mode
         :leader
@@ -18013,7 +17882,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package kotlin-mode
-       :ensure t
+       :straight t
        :defer  t
        :config
        (push (cons 'kotlin-mode 4) +indent-config)
@@ -18057,7 +17926,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package meghanada
-       :ensure t
+       :straight t
        :defer  t
        :delight (meghanada-mode "MEG")
        :hook (java-mode . meghanada-mode)
@@ -18137,7 +18006,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package js2-mode
-        :ensure t
+        :straight t
         :defer  t
         :mode (rx ".js")
         :hook ((js2-mode . flycheck-mode)
@@ -18226,7 +18095,7 @@
 *** js-doc
     #+BEGIN_SRC emacs-lisp
       (use-package js-doc
-        :ensure t
+        :straight t
         :defer  t
         :config
         ;; (general-define-key
@@ -18253,7 +18122,7 @@
       ;; most of this doesn't seem to work very well...
       ;; so I'm only using a few functions with simple features.
       (use-package js2-refactor
-        :ensure t
+        :straight t
         :defer  t
         :diminish
         :hook (js2-mode . js2-refactor-mode)
@@ -18290,7 +18159,7 @@
 *** xref-js2
     #+BEGIN_SRC emacs-lisp
       (use-package xref-js2
-        :ensure t
+        :straight t
         :defer  t
         :hook (xref-backend-functions . xref-js2-xref-backend)
         :config
@@ -18300,7 +18169,7 @@
 *** skewer-mode
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package skewer-mode
-        :ensure t
+        :straight t
         :defer  t
         :delight
         (skewer-css-mode "skewerC")
@@ -18366,7 +18235,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package typescript-mode
-       :ensure t
+       :straight t
        :defer  t
        :mode ("\\.tsx" . typescript-mode)
        :hook (typescript-mode . javascript-enable-lsp-in-projects)
@@ -18442,7 +18311,7 @@
 *** hindent
     #+BEGIN_SRC emacs-lisp
       (use-package hindent
-        :ensure t
+        :straight t
         :defer  t
         :hook (haskell-mode . hindent-mode))
     #+END_SRC
@@ -18450,7 +18319,7 @@
 *** company-cabal
     #+BEGIN_SRC emacs-lisp
       (use-package company-cabal
-        :ensure t
+        :straight t
         :defer  t
         :after haskell-mode
         :init
@@ -18461,7 +18330,7 @@
 *** flycheck-haskell
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! haskell flycheck)
       (use-package flycheck-haskell
-        :ensure t
+        :straight t
         :defer  t
         :after  haskell-mode)
     #+END_SRC
@@ -18469,7 +18338,7 @@
 *** haskell-mode
     #+BEGIN_SRC emacs-lisp
       (use-package haskell-mode
-        :ensure t
+        :straight t
         :defer  t
         :init
         (push 'haskell-interactive-mode whitespace-exempt-modes)
@@ -18517,30 +18386,11 @@
         (:keymaps 'haskell-mode-map "C-M-i" nil))
     #+END_SRC
 
-*** hs-lint
-    :PROPERTIES:
-    :header-args+: :tangle no
-    :END:
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package hs-lint
-        :defer t
-        :commands (hs-lint hs-lint-mode))
-    #+END_SRC
-
-**** hlint-refactor-mode
-     #+BEGIN_SRC emacs-lisp
-       (use-package hlint-refactor-mode
-         :defer t
-         :commands (hlint-refactor-refactor-buffer
-                    hlint-refactor-refactor-at-point))
-     #+END_SRC
-
 *** lsp
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! haskell :lsp)
       (if (eq +lsp-command 'lsp)
           (use-package lsp-haskell
-            :ensure t
+            :straight t
             :defer  t
             :after  haskell-mode
             :hook ((haskell-mode . lsp) ;; order of evaluation matters
@@ -18560,7 +18410,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package nim-mode
-       :ensure t
+       :straight t
        :defer  t
        :hook (nim-mode . nim-eldoc-on)
        :config
@@ -18612,7 +18462,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package go-mode
-       :ensure t
+       :straight t
        :defer  t
        :config
        ;; only run when current buffer is in go-mode
@@ -18654,7 +18504,7 @@
       (use-package go-guru
         ;; only use when lsp based language support is available
         :only (not +lsp-command)
-        :ensure t
+        :straight t
         :defer  t
         :after  go-mode
         :init
@@ -18698,7 +18548,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package rustic
-       :ensure t
+       :straight t
        :defer  t
        :config
        (setq rustic-format-trigget 'on-save
@@ -18773,21 +18623,21 @@
 *** gitignore
     #+BEGIN_SRC emacs-lisp
      (use-package gitignore-mode
-       :ensure t
+       :straight t
        :defer  t)
     #+END_SRC
 
 *** gitconfig
     #+BEGIN_SRC emacs-lisp
      (use-package gitconfig-mode
-       :ensure t
+       :straight t
        :defer  t)
     #+END_SRC
 
 *** gitattributes
     #+BEGIN_SRC emacs-lisp
      (use-package gitattributes-mode
-       :ensure t
+       :straight t
        :defer  t)
     #+END_SRC
 
@@ -18870,7 +18720,7 @@
 *** auctex
     #+BEGIN_SRC emacs-lisp
       (use-package tex-site
-        :ensure auctex
+        :straight auctex
         :after  tex-mode
         :defer  t
         :hook ((latex-mode . TeX-fold-mode)
@@ -19167,7 +19017,7 @@
 *** company-bibtex
     #+BEGIN_SRC emacs-lisp
       (use-package company-bibtex
-        :ensure t
+        :straight t
         :defer  t
         :after (company bibtex)
         :init
@@ -19178,7 +19028,7 @@
 *** bibtex-completion
     #+BEGIN_SRC emacs-lisp
       (use-package bibtex-completion
-        :ensure nil
+        :straight nil
         :defer  t
         :commands (bibtex-insert-pdftools-link+)
         :config
@@ -19219,7 +19069,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ebib bibtex)
       (use-package ebib
-        :ensure t
+        :straight t
         :defer  t
         :init
         (setq ebib-notes-directory (org! "notes"))
