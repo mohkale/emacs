@@ -12300,15 +12300,45 @@
         (:minor t :mode 'flycheck-mode "eg" 'consult-flycheck))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp
-        :defer  t
-        :general
 *** consult-extensions
     :PROPERTIES:
     :header-args: :tangle (package-str! "lisp/+consult-custom.el" selectrum)
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle (package-str! "init.el" selectrum)
+      (dolist (cmd '(consult-evil-jumps+
+                     consult-evil-marks+
+                     consult-unicode-char+
+                     consult-xref-show-xrefs+
+                     consult-xref-show-defs+
+                     consult-org-capture+
+                     consult-yasnippet
+                     consult-bibtex+
+                     consult-compilation-errors+))
+        (autoload cmd "+consult-custom.el" nil t))
+
+      (setq org-roam-capture-function 'consult-org-capture+)
+
+      (when (emacs>= "27")
+        (setq xref-show-definitions-function #'consult-xref-show-defs+))
+      (setq xref-show-xrefs-function #'consult-xref-show-defs+)
+
+      (leader/set-keys
+        "ee" 'consult-compilation-errors+
+        "rj" 'consult-evil-jumps+
+        "rn" 'consult-evil-marks+
+        "ob" 'consult-bibtex+)
+
+      (leader/set-keys-for-major-mode 'org-mode
+        "[" 'consult-bibtex+)
+
+      (general-define-key
+       :states '(insert normal)
+       "C-M-i" 'consult-yasnippet)
+
+      (general-define-key
+       [remap org-capture] 'consult-org-capture+
+       [remap insert-char] 'consult-unicode-char+)
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
@@ -12317,6 +12347,524 @@
       (require 'marginalia)
     #+END_SRC
 
+**** consult-compilation-errors
+     Taken from [[https://github.com/abo-abo/swiper/blob/25439e26a67b54d1f8aab1cbc727228427692ec8/counsel.el#L6868][counsel.el]].
+
+     #+BEGIN_SRC emacs-lisp
+       (defun consult--compilation-errors-candidates+ ()
+         (cl-loop for buf in (buffer-list)
+                  when (compilation-buffer-p buf)
+                    nconc (with-current-buffer buf
+                            (consult--error-candidates))))
+
+       (defvar consult--compilation-errors-history+ nil)
+       (defun consult-compilation-errors+ ()
+         "Copy paste of `consult-error' but not restricted to current buffer."
+         (interactive)
+         (consult--jump
+          (consult--read
+           "Go to error: "
+           (consult--with-increased-gc
+            (consult--compilation-errors-candidates+))
+           :category 'consult-error
+           :sort nil
+           :require-match t
+           :lookup #'consult--lookup-cadr
+           :narrow `(,(lambda (cand) (= (caddr cand) consult--narrow))
+                     (?e . "Error")
+                     (?w . "Warning")
+                     (?i . "Info"))
+           :history '(:input consult--error-history)
+           :preview
+           (consult--preview-position 'consult-preview-error))))
+     #+END_SRC
+
+**** consult-unicode
+     Taken from [[https://github.com/abo-abo/swiper/blob/25439e26a67b54d1f8aab1cbc727228427692ec8/counsel.el#L5319][counsel.el]].
+
+     #+BEGIN_SRC emacs-lisp
+       (defun consult--unicode-names+ ()
+         "Return formatted and sorted list of `ucs-names'.
+       The result of `ucs-names' is mostly, but not completely, sorted,
+       so this function ensures lexicographic order."
+         (let* (cands
+                (table (ucs-names))            ; Either hash map or alist
+                (fmt (lambda (name code)       ; Common format function
+                       (let ((cand (format "%06X %-58s %c" code name code)))
+                         (put-text-property 0 1 'code code cand)
+                         (push cand cands)))))
+           (if (not (hash-table-p table))
+               ;; Support `ucs-names' returning an alist in Emacs < 26.
+               ;; The result of `ucs-names' comes pre-reversed so no need to repeat.
+               (dolist (entry table)
+                 (funcall fmt (car entry) (cdr entry)))
+             (maphash fmt table)
+             ;; Reverse to speed up sorting
+             (setq cands (nreverse cands)))
+           (sort cands #'string-lessp)))
+
+       (defvar consult--unicode-table+
+         (lazy-completion-table consult--unicode-table+ consult--unicode-names+)
+         "See `counsel--unicode-table'")
+
+       (defvar consult-unicode-char-history+ nil)
+       (defun consult-unicode-char+ (&optional count)
+         (interactive "p")
+         (let ((completions-detailed nil))
+           (when-let* ((char (completing-read "Unicode name: " consult--unicode-table+
+                                              nil nil nil 'consult-unicode-char-history+)))
+             (insert-char (get-text-property 0 'code char) count))))
+     #+END_SRC
+
+**** consult-evil-jumps
+     Adapted from [[*counsel-evil-jumps][counsel-evil-jumps]].
+
+     #+BEGIN_SRC emacs-lisp
+       (defvar consult--evil-jumps-history+ nil)
+
+       (defun consult--evil-jumps-get+ ()
+         (cl-remove-duplicates
+          (evil--jumps-savehist-sync)
+          :test (lambda (a b)
+                  (and
+                   (equal (car a) (car b))
+                   (string-equal (car (cdr a))
+                                 (car (cdr b)))))))
+
+       (cl-defun consult--evil-jumps-format+ (open (point file))
+         (with-current-buffer (funcall open file)
+           (save-restriction
+             (save-excursion
+               (widen)
+               (ignore-errors
+                 (goto-char point))
+               (let* ((marker (point-marker))
+                      (line (line-number-at-pos point consult-line-numbers-widen))
+                      (begin (line-beginning-position))
+                      (end (line-end-position)))
+                 (concat
+                  (propertize
+                   (consult--encode-location marker)
+                   'invisible t
+                   'consult-location (cons marker line))
+                  (consult--region-with-cursor begin end marker)))))))
+
+       (defun consult-evil-jumps+ ()
+         (interactive)
+         (consult--with-file-preview (open)
+           (consult--jump
+            (consult--read
+             "Evil jump: "
+             (consult--with-increased-gc
+              (mapcar (apply-partially #'consult--evil-jumps-format+ open)
+                      (consult--evil-jumps-get+)))
+             :lookup #'consult--lookup-location
+             :preview (consult--preview-position)
+             :require-match t
+             :category 'consult-location
+             :history '(:input consult--evil-jumps-history+)))))
+     #+END_SRC
+
+**** consult-evil-marks
+     Taken from [[https://github.com/abo-abo/swiper/blob/25439e26a67b54d1f8aab1cbc727228427692ec8/counsel.el#L4198][counsel.el]].
+
+     #+BEGIN_SRC emacs-lisp
+       (defsubst consult--evil-marks-candidates+ ()
+         "Convert all evil-marks in the current buffer to mark candidates.
+       A mark is a register which points to a location in the current buffer.
+
+       NOTE: evil doesn't provide a standalone method to access the list of
+       marks in the current buffer, as it does with registers.
+       "
+         (when (fboundp 'evil-register-list)
+           (let* ((markers
+                   (append
+                    (cl-remove-if (lambda (m)
+                                    (or (evil-global-marker-p (car m))
+                                        (not (markerp (cdr m)))))
+                                  evil-markers-alist)
+                    (cl-remove-if (lambda (m)
+                                    (or (not (evil-global-marker-p (car m)))
+                                        (not (markerp (cdr m)))))
+                                  (default-value 'evil-markers-alist)))))
+             (cl-loop for reg in markers
+                      collect (cons (consult--register-format reg) (cdr reg))))))
+
+       (defun consult-evil-marks+ (&optional marker bol)
+         (interactive
+          (list
+           (if-let ((marks (consult--with-increased-gc (consult--evil-marks-candidates+))))
+               (consult--read
+                "Evil mark: "
+                marks
+                :category 'consult-location
+                :sort nil
+                :require-match t
+                :lookup #'consult--lookup-cdr
+                :history t ;; disable history
+                :add-history (thing-at-point 'symbol)
+                :preview (consult--preview-position))
+             (user-error "No evil-marks active in the current buffer"))
+           (when current-prefix-arg
+             (prefix-numeric-value current-prefix-arg))))
+         (goto-char marker)
+         (when bol
+           (goto-char (line-beginning-position))))
+     #+END_SRC
+
+**** consult-org-capture
+     Copied from [[https://github.com/abo-abo/swiper/blob/25439e26a67b54d1f8aab1cbc727228427692ec8/counsel.el#L3871][counsel.el]].
+
+     #+BEGIN_SRC emacs-lisp
+       (defun consult-org-capture-candidate+ ()
+         "Taken from `counsel-org-capture'."
+         (cl-loop
+          with prefixes = nil
+          for x in (or (org-contextualize-keys
+                        (org-capture-upgrade-templates org-capture-templates)
+                        org-capture-templates-contexts)
+                       '(("t" "Task" entry (file+headline "" "Tasks")
+                          "* TODO %?\n  %u\n  %a")))
+          nconc (let ((x-keys (car x)))
+                  ;; Remove prefixed keys until we get one that matches the current item.
+                  (while (and prefixes
+                              (let ((p1-keys (caar prefixes)))
+                                (or
+                                 (<= (length x-keys) (length p1-keys))
+                                 (not (string-prefix-p p1-keys x-keys)))))
+                    (pop prefixes))
+                  (if (> (length x) 2)
+                      (let ((desc (mapconcat #'cadr (reverse (cons x prefixes)) " | ")))
+                        (list (cons (format "%-5s %s" x-keys desc) x-keys)))
+                    (push x prefixes)
+                    nil))))
+
+       (defvar consult-org-capture-history+ nil)
+       (defun consult--org-capture+ ()
+         "Backend implementation for `consult-org-capture'."
+         (consult--read "Capture template: "
+                        (consult--with-increased-gc
+                         (consult-org-capture-candidate+s))
+                        :lookup #'consult--lookup-cdr
+                        :category 'org-capture
+                        :require-match t
+                        :sort nil
+                        :history 'consult-org-capture-history+))
+
+       (defun consult-org-capture+ (key)
+         "Capture something."
+         (interactive
+          (list (consult--org-capture+)))
+         (org-capture nil key))
+
+       (defun consult-org-capture-goto-target+ (key)
+         (interactive
+          (list (consult--org-capture+)))
+         (org-capture-goto-target key))
+
+       (defun consult-org-capture-insert-template+ (key)
+         (interactive
+          (list (consult--org-capture+)))
+         (org-capture (point) key))
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp
+       (embark-define-keymap embark-org-capture-completion-actions+
+         "Embark bindings for org-capture completion candidates."
+         ("t" consult-org-capture-goto-target+)
+         ("l" org-capture-goto-last-stored+)
+         ("i" consult-org-capture-insert-template+))
+
+       (add-to-list 'embark-keymap-alist '(org-capture . embark-org-capture-completion-actions+))
+     #+END_SRC
+
+**** consult-xref
+     Copy paste of [[https://github.com/alexmurray/ivy-xref][ivy-xref]].
+
+     #+BEGIN_SRC emacs-lisp
+       (defun consult-xref--cands+ (xrefs)
+         "Transform XREFS into a collection for display via `consult--read'.
+       Taken from `ivy-xref-make-collection'."
+         (let ((collection nil))
+           (dolist (xref xrefs)
+             (with-slots (summary location) xref
+               (let ((line (xref-location-line location)))
+                 (push (cons (concat
+                              (propertize
+                               (concat
+                                (file-name-nondirectory (xref-location-group location))
+                                (if (integerp line)
+                                    (format ":%d: " line)
+                                  ": "))
+                               'face 'compilation-info)
+                              summary)
+                             location)
+                       collection))))
+           (nreverse collection)))
+
+       (defun consult-xref-show-xrefs-lookup+ (input cands cand)
+         "Convert a candidate from `consult-xref--cands+' into a xref location marker."
+         (xref-location-marker (consult--lookup-cdr input cands cand)))
+
+       (defun consult-xref-show-xrefs-goto-xref+ (buffer marker)
+         "Jump to an xref MARKER with current buffer BUFFER.
+       Taken from `ivy-xref-show-xrefs'."
+         (condition-case err
+             (let* ((buf (marker-buffer marker)))
+               (with-current-buffer buffer
+                 (select-window
+                  ;; function signature changed in
+                  ;; 2a973edeacefcabb9fd8024188b7e167f0f9a9b6
+                  (if (version< emacs-version "26.0.90")
+                      (xref--show-pos-in-buf marker buf t)
+                    (xref--show-pos-in-buf marker buf)))))
+           (user-error (message (error-message-string err)))))
+
+       (defun consult-xref-show-xrefs+ (fetcher alist)
+         "Adapted from `ivy-xref-show-xrefs'."
+         (let* ((xrefs (if (functionp fetcher)
+                           ;; Emacs 27
+                           (or (assoc-default 'fetched-xrefs alist)
+                               (funcall fetcher))
+                         fetcher))
+                (buffer (xref--show-xref-buffer fetcher alist))
+                (cands (consult-xref--cands+ xrefs)))
+           (quit-window) ;; hide xrefs buffer immeadiately
+           (consult-xref-show-xrefs-goto-xref+
+            buffer
+            (consult--read
+             "xref: "
+             cands
+             :category 'xref-location
+             :lookup #'consult-xref-show-xrefs-lookup+
+             :require-match t
+             :default (car cands)))
+           buffer))
+
+       (defun consult-xref-show-defs+ (fetcher alist)
+         "Variant of `ivy-xref-show-defs' which jumps to first ref when only one ref.
+       Taken from `ivy-xref-show-defs'."
+         (let ((xrefs (funcall fetcher)))
+           (cond
+            ((not (cdr xrefs))
+             (xref-pop-to-location (car xrefs)
+                                   (assoc-default 'display-action alist)))
+            (t
+             (consult-xref-show-xrefs+ fetcher
+                                       (cons (cons 'fetched-xrefs xrefs)
+                                             alist))))))
+     #+END_SRC
+
+**** consult-bibtex
+     A native emacs variant for [[*ivy-bibtex][ivy-bibtex]].
+
+     #+BEGIN_SRC emacs-lisp
+       (require 'bibtex-completion)
+
+       (defvar consult-bibtex-history+ nil
+         "History for `consult-bibtex+'.")
+
+       (defvar consult-bibtex-default-action+ 'consult-bibtex-insert-pdftools-link
+         "The default action for the `consult-bibtex+` command.")
+
+       (defun consult-bibtex-read-entry+ (&optional arg local-bib)
+         (when arg
+           (bibtex-completion-clear-cache))
+         (bibtex-completion-init)
+         (let* ((candidates (cl-loop
+                             for cand in (bibtex-completion-candidates)
+                             collect (cons
+                                      (bibtex-completion-format-entry (cdr cand) (1- (frame-width)))
+                                      (bibtex-completion-get-value "=key=" cand))))
+                (preselect
+                 (when-let ((key (bibtex-completion-key-at-point)))
+                   (cl-find-if (lambda (cand)
+                                 (string-equal key (cdr cand)))
+                               candidates))))
+           (alist-get
+            (consult--read (format "BibTeX entries%s: " (if local-bib " (local)" ""))
+                           candidates
+                           :category 'bibtex-completion
+                           :default preselect
+                           :history '(:input consult-bibtex-history+))
+            candidates nil nil #'string-equal)))
+
+       (defun consult-bibtex+ (&optional arg local-bib)
+         (interactive "P")
+         (when-let ((entry (consult-bibtex-read-entry+ arg local-bib)))
+           (if consult-bibtex-default-action+
+               (funcall-interactively consult-bibtex-default-action+ entry)
+             (warn "`consult-bibtex-default-action+' is unassigned."))))
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp
+       (defmacro consult-bibtex-embark-action (name action)
+         `(defun ,name (key)
+            ,(format "Consult wrapper for `%s'." name)
+            (interactive (list (consult-bibtex-read-entry+)))
+            (if key
+                (,action (list key))
+              (warn "Failed to extract bibtex key from candidate: %s" key))))
+
+       (consult-bibtex-embark-action consult-bibtex-open-any           bibtex-completion-open-any)
+       (consult-bibtex-embark-action consult-bibtex-open-pdf           bibtex-completion-open-pdf)
+       (consult-bibtex-embark-action consult-bibtex-open-url-or-doi    bibtex-completion-open-url-or-doi)
+       (consult-bibtex-embark-action consult-bibtex-insert-citation    bibtex-completion-insert-citation)
+       (consult-bibtex-embark-action consult-bibtex-insert-reference   bibtex-completion-insert-reference)
+       (consult-bibtex-embark-action consult-bibtex-insert-key         bibtex-completion-insert-key)
+       (consult-bibtex-embark-action consult-bibtex-insert-bibtex      bibtex-completion-insert-bibtex)
+       (consult-bibtex-embark-action consult-bibtex-add-PDF-attachment bibtex-completion-add-PDF-attachment)
+       (consult-bibtex-embark-action consult-bibtex-edit-notes         bibtex-completion-edit-notes)
+       (consult-bibtex-embark-action consult-bibtex-show-entry         bibtex-completion-show-entry)
+       (consult-bibtex-embark-action consult-bibtex-add-pdf-to-library bibtex-completion-add-pdf-to-library)
+       (consult-bibtex-embark-action consult-bibtex-insert-pdftools-link bibtex-insert-pdftools-link+)
+
+       (embark-define-keymap embark-bibtex-completion-actions
+         "Embark bindings for bibtex completion candidates."
+         ("p" consult-bibtex-open-pdf)
+         ("u" consult-bibtex-open-url-or-doi)
+         ("c" consult-bibtex-insert-citation)
+         ("r" consult-bibtex-insert-reference)
+         ("k" consult-bibtex-insert-key)
+         ("b" consult-bibtex-insert-bibtex)
+         ("a" consult-bibtex-add-PDF-attachment)
+         ("e" consult-bibtex-edit-notes)
+         ("j" consult-bibtex-insert-pdftools-link)
+         ("s" consult-bibtex-show-entry)
+         ("l" consult-bibtex-add-pdf-to-library))
+
+       (add-to-list 'embark-keymap-alist '(bibtex-completion . embark-bibtex-completion-actions))
+     #+END_SRC
+
+**** consult-yasnippet
+     #+BEGIN_SRC emacs-lisp
+       (require 'consult)
+       (require 'yasnippet)
+
+       (defun consult-yasnippet--expand-template (template region region-contents)
+         "Expand the yasnippet template TEMPLATE at point."
+         (deactivate-mark)
+         (goto-char (car region))
+
+         ;; Restore marked region (when it existed) so that `yas-expand-snippet'
+         ;; overwrites it.
+         (when (not (string-equal "" region-contents))
+           (push-mark (point))
+           (push-mark (cdr region) nil t))
+
+         (cl-letf (((symbol-function 'yas-completing-read)
+                    (lambda (&rest _args) "")))
+           (yas-expand-snippet (yas--template-content template)
+                               nil nil
+                               (yas--template-expand-env template))))
+
+       (defun consult-yasnippet--preview ()
+         "Previewer for `consult--read'.
+       This function expands TEMPLATE at point in the buffer
+       `consult-yasnippet--read-template' was started in. This includes
+       overwriting any region that was active and removing any previous
+       previews that're already active.
+
+       When TEMPLATE is not given, this function essentially just resets
+       the state of the current buffer to before any snippets were previewed."
+         (let* ((buf (current-buffer))
+                (region (if (region-active-p)
+                            (cons (region-beginning) (region-end))
+                          (cons (point) (point))))
+                (region-contents (buffer-substring (car region) (cdr region))))
+           (lambda (template restore)
+             (with-current-buffer buf
+               (let ((yas-verbosity 0)
+                     (inhibit-redisplay t)
+                     (inhibit-read-only t)
+                     (orig-offset (- (point-max) (cdr region)))
+                     (yas-prompt-functions '(yas-no-prompt)))
+
+                 ;; We always undo any snippet previews before maybe setting up
+                 ;; some new previews.
+                 (delete-region (car region) (cdr region))
+                 (goto-char (car region))
+                 (setcar region (point))
+                 (insert region-contents)
+                 (setcdr region (point))
+
+                 (when (and template (not restore))
+                   (unwind-protect
+                       (consult-yasnippet--expand-template template region region-contents)
+                     (unwind-protect
+                         (mapc #'yas--commit-snippet
+                               (yas-active-snippets (point-min) (point-max)))
+                       (setcdr region (- (point-max) orig-offset))))
+                   (redisplay)))))))
+
+       (defun consult-yasnippet--candidates (&rest body)
+         "Retrieve the list of available snippets in the current buffer."
+         (unless (bound-and-true-p yas-minor-mode)
+           (error "`yas-minor-mode' not enabled in current buffer"))
+
+         (mapcar
+          (lambda (template)
+            (cons (concat (yas--template-name template)
+                          (propertize " "
+                                      'display (concat
+                                                " ["
+                                                (propertize (yas--template-key template)
+                                                            'face 'consult-key)
+                                                "]")))
+                  template))
+          (yas--all-templates (yas--get-snippet-tables))))
+
+       (defun consult-yasnippet--read-template ()
+         "Backend implementation of `consult-yasnippet'.
+
+       This starts a `completing-read' session with all the snippets in the current
+       snippet table with support for previewing the snippet to be expanded and
+       replacing the active region with the snippet expansion.
+
+       This function doesn't actually expand the snippet, it only reads and then
+       returns a snippet template from the user."
+         (barf-if-buffer-read-only)
+
+         (let* ((buffer-undo-list t))                                                  ; Prevent querying user (and showing previews) from updating the undo-history
+           (consult--read
+            "Choose a snippet: "
+            (consult-yasnippet--candidates)
+            :lookup 'consult--lookup-cdr
+            :require-match t
+            :preview (consult-yasnippet--preview)
+            :category 'yasnippet)))
+
+       (defun consult-yasnippet-visit-snippet-file (template)
+         "Visit the snippet file associated with TEMPLATE.
+       When called interactively this command previews snippet completions in
+       the current buffer, and then opens the selected snippets template file
+       using `yas--visit-snippet-file-1'."
+         (interactive (list (consult-yasnippet--read-template)))
+         (yas--visit-snippet-file-1 template))
+
+       (defun consult-yasnippet (template)
+         "Interactively select and expand the yasnippet template TEMPLATE.
+       When called interactively this command presents a completing read interface
+       containing all currently available snippet expansions, with live previews for
+       each snippet. Once selected a chosen snippet will be expanded at point using
+       `yas-expand-snippet'."
+         (interactive (list (consult-yasnippet--read-template)))
+         (barf-if-buffer-read-only)
+         (let* ((region (if (region-active-p)
+                            (cons (region-beginning) (region-end))
+                          (cons (point) (point))))
+                (region-contents (buffer-substring (car region) (cdr region))))
+           (consult-yasnippet--expand-template template region region-contents)))
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp
+       (embark-define-keymap embark-yasnippet-completion-actions
+         "Embark actions for `consult-yasnippet' and derivatives"
+         ;; NOTE: Binding differs from `ivy-yasnippet' which uses "v".
+         ("d" consult-yasnippet-visit-snippet-file))
+
+       (add-to-list 'embark-keymap-alist '(yasnippet . embark-yasnippet-completion-actions))
+     #+END_SRC
 
 **** consult-extensions-eob
      #+BEGIN_SRC emacs-lisp
