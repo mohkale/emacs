@@ -14,6 +14,7 @@
     ;; of defaults to determine what needs to be tangled.
     <<eval-default-config()>>
     <<load-config()>>
+    <<load-profile()>>
   #+END_SRC
 
   NOTE: This branch only contains the *default* configuration options and these options will
@@ -72,6 +73,27 @@
          (lsp   'lsp)
          (eglot 'eglot-ensure)))
       "command used to start a language server.")
+
+    nil
+  #+END_SRC
+
+  I also keep an EDN style local configuration at ~~/etc/profile.el~. It's basically
+  for host specific settings (eg. git passwords, etc.). Lets load that here.
+
+  #+NAME: load-profile
+  #+BEGIN_SRC emacs-lisp :results values
+    (let ((file (concat user-emacs-directory "etc/profile.el")))
+      (defvar +profile
+        (ignore-errors
+          (when (file-exists-p file)
+            (with-temp-buffer
+              (insert-file-contents file)
+              (read (current-buffer)))))
+        (concat "Alist local configuration properties.\nSourced from: " file)))
+
+    (defun +profile-get (prop &optional default)
+      (or (cdr (assoc prop +profile))
+          default))
 
     nil
   #+END_SRC
@@ -7369,68 +7391,36 @@
     #+END_SRC
 
 *** licenses
-    use yas to generate and insert license headers for the current buffer.
+    Use yas to generate and insert license headers for the current buffer.
 
     #+BEGIN_SRC emacs-lisp
       (use-package +yas-license
         :defer t
-        :commands (insert-license
-                   license-reload-profile)
+        :commands +insert-license
         :leader
-        ("ia" 'insert-license))
+        ("ia" '+insert-license))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/+yas-license.el
       (require 'yasnippet)
 
-      (defvar license-dir (etc! "licenses")
-        "directory in which to find license snippets.")
+      (defvar +license-dir (etc! "licenses")
+        "Directory in which to find license snippets.")
 
-      (defvar license-dont-be-evil nil
-        "append don't be evil clause to licenses.
+      (defvar +license-dont-be-evil nil
+        "Append don't be evil clause to licenses.
       see [[https://en.wikipedia.org/wiki/Douglas_Crockford][Douglas Crockford]].")
 
-      (defvar license-last-inserted nil
-        "the fully populated last inserted license template.")
+      (defvar +license-last-inserted nil
+        "The fully populated last inserted license template.")
 
-      (defun license-load-profile (&optional file)
-        (or file
-            (setq file (join-path license-dir ".profile")))
+      (cl-defun +license-get-name (&optional default)
+        (let ((name (s-join " " (delq nil (list
+                                           (+profile-get 'first-name)
+                                           (+profile-get 'last-name))))))
+          (if (string-empty-p name) default name)))
 
-        (when (file-exists-p file)
-          (with-temp-buffer
-            (insert-file-contents file)
-            (read (current-buffer)))))
-
-      ;; load initial profile
-      (defvar license-profile
-        (ignore-errors
-          (license-load-profile))
-        "alist setting properties to auto insert in a license.
-      properties include: last-name, first-name")
-
-      (defun license-get-prop (prop &optional default)
-        (or (cdr (assoc prop license-profile))
-            default))
-
-      (cl-defun license-get-name
-          (&optional default (profile license-profile))
-        (let ((first-name (license-get-prop 'first-name))
-              (last-name  (license-get-prop 'last-name)))
-          (cond
-           ((and first-name last-name)
-            (concat first-name " " last-name))
-           (first-name first-name)
-           (last-name last-name)
-           (t default))))
-
-      ;;;###autoload
-      (defun license-reload-profile ()
-        "set `license-profile' by rereading the profile file."
-        (interactive)
-        (setq license-profile (license-load-profile)))
-
-      (defun license--licenses (&optional dir)
+      (defun +license--licenses (&optional dir)
         "return an alist of (basename . file) for all .license files in DIR.
       Where DIR defaults to the current working directory (`default-directory')."
         (cl-loop
@@ -7441,28 +7431,24 @@
                               "*.license"))
          collect (cons (file-name-base file) file)))
 
-      (defun license--read-license ()
-        (let ((licenses (license--licenses license-dir))
+      (defun +license--read-license ()
+        (let ((licenses (+license--licenses +license-dir))
               license)
           (when (zerop (length licenses))
-            (error "no licenses found in dir: %s" default-directory))
+            (error "No licenses found in dir: %s" default-directory))
 
-          (if (eq 1 (length licenses))
-              (setq license (car licenses))
-            (ivy-read "License: "
-                      licenses
-                      :require-match t
-                      :preselect (when license-last-inserted
-                                   (car license-last-inserted))
-                      :action (lambda (x) (setq license x))))
+          (setq license
+                (if (eq 1 (length licenses))
+                    (car licenses)
+                  (assoc (completing-read "License: " licenses nil t) licenses)))
 
           (with-temp-buffer
             (insert-file-contents (cdr license))
             (cons (car license)
                   (buffer-substring (point-min) (point-max))))))
 
-      (cl-defmacro with-temp-buffer-and-same-vars ((&rest vars) &rest body)
-        "store the values of VARS in current buffer, and then create a
+      (cl-defmacro +with-temp-buffer-and-same-vars ((&rest vars) &rest body)
+        "Store the values of VARS in current buffer, and then create a
       temp buffer reassigning the values of VARS and then invoking BODY."
         (let* ((current-vars
                 (cl-loop with name = nil
@@ -7477,32 +7463,31 @@
              (with-temp-buffer
                (let ,assign-vars
                  ,@body)))))
-      (put 'with-temp-buffer-and-same-vars 'lisp-indent-function 'defun)
+      (put '+with-temp-buffer-and-same-vars 'lisp-indent-function 'defun)
 
-      (defun license--comment-template (template &optional prefix)
-        (with-temp-buffer-and-same-vars
+      (defun +license--comment-template (template &optional prefix)
+        (+with-temp-buffer-and-same-vars
             (comment-start comment-end comment-style
              comment-multi-line comment-add comment-continue)
           (insert template)
           (comment-region (point-min) (point-max) prefix)
           (buffer-substring (point-min) (point-max))))
 
-      ;;;###autoload
-      (defun insert-license (&optional prefix)
-        "insert a license from the known license list.
+      (defun +insert-license (&optional prefix)
+        "Insert a license from the known license list.
       with PREFIX, repeats insertion of the last inserted license."
         (interactive "P")
         (let* ((license
-                (if (and prefix license-last-inserted)
-                    license-last-inserted
-                  (license--read-license)))
+                (if (and prefix +license-last-inserted)
+                    +license-last-inserted
+                  (+license--read-license)))
                (comment-multi-line t))
           (yas-expand-snippet
-           (license--comment-template (cdr license))
+           (+license--comment-template (cdr license))
            nil nil
            '((yas-indent-line 'fixed)))
 
-          (setq license-last-inserted license)))
+          (setq +license-last-inserted license)))
 
       (provide 'yas-license)
     #+END_SRC
@@ -7513,7 +7498,7 @@
      :END:
 
      #+BEGIN_SRC snippet :tangle etc/licenses/GPL-2.0.license
-       Copyright (C) `(format-time-string "%Y")`  ${1:`(capitalize (license-get-name "name"))`}
+       Copyright (C) `(format-time-string "%Y")`  ${1:`(capitalize (+license-get-name "name"))`}
 
        This program is free software; you can redistribute it and/or
        modify it under the terms of the GNU General Public License
@@ -7531,7 +7516,7 @@
      #+END_SRC
 
      #+BEGIN_SRC snippet :tangle etc/licenses/GPL-3.0.license
-       Copyright (C) `(format-time-string "%Y")`  ${1:`(capitalize (license-get-name "name"))`}
+       Copyright (C) `(format-time-string "%Y")`  ${1:`(capitalize (+license-get-name "name"))`}
 
        This file is part of ${2:this program}.
 
@@ -7550,7 +7535,7 @@
      #+END_SRC
 
      #+BEGIN_SRC snippet :tangle etc/licenses/Apache-2.0.license
-       Copyright `(format-time-string "%Y")` ${1:`(capitalize (license-get-name "name"))`}
+       Copyright `(format-time-string "%Y")` ${1:`(capitalize (+license-get-name "name"))`}
 
        Licensed under the Apache License, Version 2.0 (the "License");
        you may not use this file except in compliance with the License.
@@ -7566,14 +7551,14 @@
      #+END_SRC
 
      #+BEGIN_SRC snippet :tangle etc/licenses/Boost.license
-                Copyright ${1:`(capitalize (license-get-name "name"))`} `(format-time-string "%Y")` - ${2:`(format-time-string "%Y")`}.
+                Copyright ${1:`(capitalize (+license-get-name "name"))`} `(format-time-string "%Y")` - ${2:`(format-time-string "%Y")`}.
        Distributed under the Boost Software License, Version 1.0.
           (See accompanying file LICENSE_1_0.txt or copy at
                 https://www.boost.org/LICENSE_1_0.txt)
      #+END_SRC
 
      #+BEGIN_SRC snippet :tangle etc/licenses/MIT.license
-       Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (license-get-name "name"))`}
+       Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (+license-get-name "name"))`}
 
        Permission is hereby granted, free of charge, to any person obtaining a copy
        of this software and associated documentation files (the "Software"), to deal
@@ -7595,7 +7580,7 @@
      #+END_SRC
 
      #+BEGIN_SRC snippet :tangle etc/licenses/ISC.license
-       Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (license-get-name "name"))`} ${2:`(license-get-prop 'email "user@your.domain")`}
+       Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (+license-get-name "name"))`} ${2:`(+profile-get 'email "user@your.domain")`}
 
        Permission to use, copy, modify, and distribute this software for any
        purpose with or without fee is hereby granted, provided that the above
@@ -7611,7 +7596,7 @@
      #+END_SRC
 
      #+BEGIN_SRC snippet :tangle etc/licenses/BSD.license
-       Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (license-get-name "name"))`}
+       Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (+license-get-name "name"))`}
 
        Redistribution and use in source and binary forms, with or without
        modification, are permitted provided that the following conditions
@@ -7636,7 +7621,7 @@
      #+END_SRC
 
      #+BEGIN_SRC snippet :tangle etc/licenses/BSD-3c.license
-       Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (license-get-name "name"))`}
+       Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (+license-get-name "name"))`}
 
        Redistribution and use in source and binary forms, with or without
        modification, are permitted provided that the following conditions
