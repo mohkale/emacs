@@ -1129,8 +1129,17 @@
         "jD" '("jump-to-directory-other-window" . dired-jump-other-window)
 
         "ic" 'insert-char
+
+        "a"  "applications"
+        "a:" 'eshell
+        "a*" 'calc-dispatch
+        "ac" 'calendar
+        "af" 'describe-face
+        "aX" 'customize
         "al" 'find-library
         "at" 'load-theme
+        "am" +man-command
+        "ae" 'list-processes
 
         "ap" "packages"
         "api" 'straight-use-package
@@ -3370,7 +3379,7 @@
                  (when (overlay-get ov :lorem-ipsum-overlay)
                    (delete-overlay ov)))
              ;; Add overlays.
-             (let ((lorem-ipsum-words (--> Lorem-ipsum-text
+             (let ((lorem-ipsum-words (--> lorem-ipsum-text
                                            (-flatten it) (apply #'concat it)
                                            (split-string it (rx (or space punct)) 'omit-nulls)))
                    (case-fold-search nil))
@@ -4675,6 +4684,10 @@
 
 *** org-mode
     #+BEGIN_SRC emacs-lisp
+      ;; See [[https://emacs.stackexchange.com/questions/58994/symbol-s-value-as-variable-is-void-org-priority-highest-using-org-agenda][here]].
+      (defvaralias 'org-priority-highest 'org-highest-priority)
+      (defvaralias 'org-priority-lowest  'org-lowest-priority)
+
       (use-package org
         :straight '(org :type built-in)
         :defer t
@@ -7152,6 +7165,9 @@
          (interactive)
          (funcall-interactively #'undo-tree-visualizer-set)
          (undo-tree-visualizer-selection-mode -1))
+
+       :leader
+       ("au" '("undo-tree" . undo-tree-visualize))
 
        :lazy-leader
        (:mode 'undo-tree-visualizer-mode
@@ -11842,7 +11858,7 @@
                       "Use `selectrum-current-candidate' but keep match highlighting.
       This is a workaround until [[https://github.com/raxod502/selectrum/issues/353][#353]] gets resolved."
                       (when (and (eq face 'selectrum-current-candidate)
-                                 (not (eq this-command #'describe-face)))
+                                 (not (eq selectrum--last-command #'describe-face)))
                         (setq copied (copy-sequence str))
                         (if (version< emacs-version "27")
                             (font-lock-prepend-text-property 0 end 'face face copied)
@@ -11994,6 +12010,13 @@
          "gj" 'forward-button
          "gk" 'backward-button
          "<C-return>" 'embark-act)
+        (:keymaps 'embark-general-map
+         "w" nil
+         "y" 'embark-save)
+        (:keymaps 'embark-file-map
+         "=" 'vdiff-files
+         "W" nil
+         "Y" 'embark-save-relative-path)
 
         :lazy-leader
         (:mode 'embark-collect-mode
@@ -12169,7 +12192,6 @@
          "kg" 'consult-kmacro
          "ry" 'consult-yank
          "aa" 'consult-mode-command
-         [remap man] 'consult-man
 
          "ps" "search"
          "psr" 'consult-ripgrep
@@ -12189,6 +12211,8 @@
          [remap keep-lines] 'consult-keep-lines
          [remap load-theme] 'consult-theme
          [remap flush-lines] 'consult-flush-lines
+         [remap man] 'consult-man
+         [remap woman] 'consult-man
          "C-." 'hydra-selectrum/body
          "C-M-y" 'consult-yank-pop
          "C-s" 'consult-line))
@@ -13507,7 +13531,8 @@
         (:keymaps '(counsel-ag-map counsel-imenu-map)
          "C-l" 'ivy-forward-char-or-partial-or-done
          "M-l" 'ivy-call-and-recenter)
-         )
+        (:keymaps 'counsel-find-file-map
+         "C-h" 'counsel-up-directory))
     #+END_SRC
 
 *** counsel-evil-jumps
