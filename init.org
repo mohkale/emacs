@@ -82,14 +82,15 @@
 
   #+NAME: load-profile
   #+BEGIN_SRC emacs-lisp :results values
-    (let ((file (concat user-emacs-directory "etc/profile.el")))
-      (defvar +profile
-        (ignore-errors
-          (when (file-exists-p file)
-            (with-temp-buffer
-              (insert-file-contents file)
-              (read (current-buffer)))))
-        (concat "Alist local configuration properties.\nSourced from: " file)))
+    (defvar +profile-file (concat user-emacs-directory "etc/profile.el"))
+
+    (defvar +profile
+      (ignore-errors
+        (when (file-exists-p file)
+          (with-temp-buffer
+            (insert-file-contents file)
+            (read (current-buffer)))))
+      "Alist local configuration properties.\nSourced from `+profile-file'")
 
     (defun +profile-get (prop &optional default)
       (or (cdr (assoc prop +profile))
@@ -11794,7 +11795,8 @@
                   (or (selectrum-sort-cands+ cands)
                       (when (bound-and-true-p selectrum-prescient-mode)
                         (selectrum-prescient--preprocess cands))
-                      (selectrum-default-candidate-preprocess-function cands))))
+                      (selectrum-default-candidate-preprocess-function cands)
+                      cands)))
           cands)
 
       ;;; Update highlighting for certain completions
@@ -11823,7 +11825,7 @@
                                             #'orderless-highlight-matches)
                                            ((bound-and-true-p selectrum-prescient-mode)
                                             #'selectrum-prescient--highlight)
-                                           (t #'selectrum-default-candidate-highlight-function))))
+                                           (t #'selectrum-candidates-identity))))
                      :initial-value cands))
 
         (defun selectrum-override-current-candidate-face-face-range+ (str overriding-faces)
