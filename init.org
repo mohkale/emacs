@@ -4669,7 +4669,8 @@
                         :caller 'org-find-file))
              ((package! selectrum)
               (find-file
-               (consult--read "Find file: " cands
+               (consult--read cands
+                              :prompt "Find file: "
                               :require-match t
                               :category 'file
                               :lookup #'consult--lookup-cdr)))
@@ -6882,7 +6883,7 @@
                            (projectile-org-capture-templates+ name root)))))
            (call-interactively
             (cond ((package! ivy) 'counsel-org-capture)
-                  ((package! selectrum) 'consult-org-capture)
+                  ((package! selectrum) 'consult-org-capture+)
                   (t 'org-capture)))))
 
        (defun projectile-org-project-file+ ()
@@ -6908,7 +6909,7 @@
        (:keymaps 'projectile-mode-map
         [remap org-capture]         'projectile-org-capture+
         [remap counsel-org-capture] 'projectile-org-capture+
-        [remap consult-org-capture] 'projectile-org-capture+)
+        [remap consult-org-capture+] 'projectile-org-capture+)
 
        :leader
        ("fp"    'projectile-switch-project
@@ -12053,41 +12054,33 @@
         (consult-async-default-split "/")
         (consult-fontify-max-size 100000)
         (register-preview-function #'consult-register-preview)
-        (consult-ripgrep-command
-         ;; Variant command which disregards no-matches
-         '("sh" "-c"
-           ;; '("rg" "--null" "--line-buffered" "--color=always" "--max-columns=500" "--no-heading" "--line-number" "." "-e")
-           "rg --null --line-buffered --color=always --max-columns=500 --no-heading --line-number . -e \"$@\"
-            if [ $? -eq 0 ] || [ $? -eq 1 ]; then
-              exit 0
-            else
-              exit $?
-            fi" "rg"))
+        (consult-ripgrep-command                                                      ; Variant command which disregards no-matches
+         "ignore-exit 1 rg --null --line-buffered --color=always --max-columns=500 --smart-case --no-heading --line-number . -e OPTS ARG")
         (consult-async-refresh-delay 0.05)
         (consult-config
          `((consult-ripgrep :preview-key ,consult-manual-preview-key)
            (org-roam-rg :preview-key ,consult-manual-preview-key)
+           (consult-ripgrep-no-project+ :preview-key ,consult-manual-preview-key)
+           (consult-grep-no-project+ :preview-key ,consult-manual-preview-key)
+           (consult-flyspell :sort nil)
            (consult-find :initial ,(concat consult-async-default-split "*" consult-async-default-split))))
-        (consult-imenu-narrow
-         '((emacs-lisp-mode
-            (?f . "Functions")
-            (?m . "Macros")
-            (?p . "Packages")
-            (?t . "Types")
-            (?v . "Variables"))
-           (c++-mode
-            (?c . "Constructor")
-            (?m . "Method")
-            (?v . "Variable")
-            (?f . "Function"))
-           (python-mode
-            (?n . "Field")
-            (?c . "Class")
-            (?m . "Method")
-            (?i . "Module")
-            (?f . "Function")
-            (?v . "Variable"))))
-
+        (consult-imenu-config
+         '((emacs-lisp-mode :toplevel "Functions"
+                            :types ((?f "Functions" font-lock-function-name-face)
+                                    (?m "Macros"    font-lock-function-name-face)
+                                    (?p "Packages"  font-lock-constant-face)
+                                    (?t "Types"     font-lock-type-face)
+                                    (?v "Variables" font-lock-variable-name-face)))
+           (c++-mode :types ((?c "Constructor" font-lock-function-name-face)
+                             (?m "Method" font-lock-function-name-face)
+                             (?v "Variable" font-lock-variable-name-face)
+                             (?f "Function" font-lock-function-name-face)))
+           (python-mode :types ((?n "Field" font-lock-variable-name-face)
+                                (?c "Class" font-lock-type-face)
+                                (?m "Method" font-lock-function-name-face)
+                                (?i "Module" font-lock-preprocessor-face)
+                                (?f "Function" font-lock-function-name-face)
+                                (?v "Variable" font-lock-variable-name-face)))))
         :init
         ;; (with-no-warnings
         ;;   (defvaralias 'consult-line-history 'regexp-search-ring))
@@ -12205,6 +12198,8 @@
         (:minor t :mode 'flymake-mode  "eg" 'consult-flymake)
 
         :general
+        (:keymaps 'selectrum-minibuffer-map
+         "C-." 'hydra-selectrum/body)
         ([remap switch-to-buffer] 'consult-buffer
          [remap multi-occur] 'consult-multi-occur
          [remap apropros-command] 'consult-apropos
@@ -12215,7 +12210,6 @@
          [remap flush-lines] 'consult-flush-lines
          [remap man] 'consult-man
          [remap woman] 'consult-man
-         "C-." 'hydra-selectrum/body
          "C-M-y" 'consult-yank-pop
          "C-s" 'consult-line))
     #+END_SRC
@@ -12231,7 +12225,7 @@
 
 *** consult-extensions
     :PROPERTIES:
-    :header-args: :tangle (package-str! "lisp/+consult-custom.el" selectrum)
+    :header-args+: :tangle (package-str! "lisp/+consult-custom.el" selectrum)
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle (package-str! "init.el" selectrum)
@@ -12292,9 +12286,9 @@
          (interactive)
          (consult--jump
           (consult--read
-           "Go to error: "
            (consult--with-increased-gc
             (consult--compilation-errors-candidates+))
+           :prompt "Go to error: "
            :category 'consult-error
            :sort nil
            :require-match t
@@ -12383,10 +12377,10 @@
          (consult--with-file-preview (open)
            (consult--jump
             (consult--read
-             "Evil jump: "
              (consult--with-increased-gc
               (mapcar (apply-partially #'consult--evil-jumps-format+ open)
                       (consult--evil-jumps-get+)))
+             :prompt "Evil jump: "
              :lookup #'consult--lookup-location
              :preview (consult--preview-position)
              :require-match t
@@ -12424,8 +12418,8 @@
           (list
            (if-let ((marks (consult--with-increased-gc (consult--evil-marks-candidates+))))
                (consult--read
-                "Evil mark: "
                 marks
+                :prompt "Evil mark: "
                 :category 'consult-location
                 :sort nil
                 :require-match t
@@ -12445,7 +12439,7 @@
      Copied from [[https://github.com/abo-abo/swiper/blob/25439e26a67b54d1f8aab1cbc727228427692ec8/counsel.el#L3871][counsel.el]].
 
      #+BEGIN_SRC emacs-lisp
-       (defun consult-org-capture-candidate+ ()
+       (defun consult-org-capture-candidates+ ()
          "Taken from `counsel-org-capture'."
          (cl-loop
           with prefixes = nil
@@ -12471,9 +12465,9 @@
        (defvar consult-org-capture-history+ nil)
        (defun consult--org-capture+ ()
          "Backend implementation for `consult-org-capture'."
-         (consult--read "Capture template: "
-                        (consult--with-increased-gc
-                         (consult-org-capture-candidate+s))
+         (consult--read (consult--with-increased-gc
+                         (consult-org-capture-candidates+))
+                        :prompt "Capture template: "
                         :lookup #'consult--lookup-cdr
                         :category 'org-capture
                         :require-match t
@@ -12562,8 +12556,8 @@
            (consult-xref-show-xrefs-goto-xref+
             buffer
             (consult--read
-             "xref: "
              cands
+             :prompt "xref: "
              :category 'xref-location
              :lookup #'consult-xref-show-xrefs-lookup+
              :require-match t
@@ -12611,8 +12605,8 @@
                                  (string-equal key (cdr cand)))
                                candidates))))
            (alist-get
-            (consult--read (format "BibTeX entries%s: " (if local-bib " (local)" ""))
-                           candidates
+            (consult--read candidates
+                           :prompt (format "BibTeX entries%s: " (if local-bib " (local)" ""))
                            :category 'bibtex-completion
                            :default preselect
                            :history '(:input consult-bibtex-history+))
@@ -12756,8 +12750,8 @@
 
          (let* ((buffer-undo-list t))                                                  ; Prevent querying user (and showing previews) from updating the undo-history
            (consult--read
-            "Choose a snippet: "
             (consult-yasnippet--candidates)
+            :prompt "Choose a snippet: "
             :lookup 'consult--lookup-cdr
             :require-match t
             :preview (consult-yasnippet--preview)
