@@ -4433,6 +4433,13 @@
 
 *** org-capture
     #+BEGIN_SRC emacs-lisp
+
+*** org-capture
+    :PROPERTIES:
+    :header-args+: :tangle lisp/+org-capture.el
+    :END:
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package doct
         :straight (doct :github github :repo "progfolio/doct")
         :after org-capture
@@ -4442,7 +4449,7 @@
         (setq doct-default-entry-type 'entry))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package org-capture
         :after org
         :defer t
@@ -4463,12 +4470,14 @@
          [remap evil-quit] 'org-capture-kill))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/+org-capture.el
+    Here's a helper method to jump directly to an org-heading or creat it if it
+    doesn't exist.
+
+    #+BEGIN_SRC emacs-lisp
       (defun org-capture-create-goto-heading-command (heading &optional heading-regexp)
-        "create a function to jump to HEADING, creating HEADING if it doesn't exist.
+        "Create a function to jump to HEADING, creating HEADING if it doesn't exist.
       This function also smartly reacts to headings containing [/]. By default, if
-      [/] has been updated to [0/1], then org is just unable to find it.
-      "
+      [/] has been updated to [0/1], then org is just unable to find it. "
         (unless heading-regexp
           (setq heading-regexp (regexp-quote heading))
 
@@ -4491,62 +4500,121 @@
               (goto-char (point-min))
               (save-excursion
                 (insert heading "\n"))))))
+    #+END_SRC
 
+    Here's another helper to prompt you for an org-link and then returns the final
+    result as a string (over inserting it into the current buffer).
+
+    #+BEGIN_SRC emacs-lisp
       (defun org-get-link+ ()
         "get the stringified result of `org-store-link'"
         (with-temp-buffer
           (org-insert-link-global)
           (buffer-substring (point-min) (point-max))))
+    #+END_SRC
 
-      ;; see also: https://www.gnu.org/software/emacs/manual/html_node/org/Template-expansion.html#Template-expansion
+    Here's the capture templates I use exclusively for projects/repos (through
+    projectile). See [[*projectile][projectile]] and [[*counsel-projectile][counsel-projectile]].
+
+    #+BEGIN_SRC emacs-lisp
       (setq
-       org-capture-templates
-       (doct `((:group "TODOs"
-                       :type entry
-                       :file ,org-default-notes-file
-                       :prepend     t
-                       :empty-lines 0
-                       :function ,(org-capture-create-goto-heading-command "* TODOs [/]")
-                       :before-finalize ,#'org-update-parent-todo-statistics
-                       :template ("* %{todo-state} %?"
-                                  "  %U")
-                       :todo-state "TODO"
-                       :children (("Todo" :keys "t")
-                                  ("Todo with Clipboard"
-                                   :keys "T"
-                                   :template ("* %{todo-state} %?"
-                                              "  %U"
-                                              "  %c"))
-                                  ("Itinerary"
-                                   :keys "d"
-                                   :prepend  nil
-                                   :function ,(org-capture-create-goto-heading-command "* Itinerary")
-                                   :template ("* %{todo-state} %?"))
-                                  ("Job Application"
-                                   :keys "j"
-                                   :function ,(org-capture-create-goto-heading-command "* Job Search [/]")
-                                   :template ("* %{todo-state} [#%^{Priority|A|B|C}] %(org-get-link+) - %^{Company}"
-                                              "  DEADLINE: %^{deadline}t"
-                                              "%^{LOCATION}p%^{DURATION}p"
-                                              "  %?"))))
-               (:group "education"
-                       :type entry
-                       :file "university/university.org"
-                       :empty-lines 1
-                       :children (("Lecture"
-                                   :keys "l"
-                                   :clock-in t
-                                   :template ("* [/] %^{title} %^g"
-                                              "  %?"))))))
-
-       ;; Templates for projectile-projects.
        projectile-org-capture-templates+
        (doct `(("[${name}] Task"
                 :keys "p"
                 :template ("* TODO %?"
                            "  %U")
                 :file ,(join-path org-projectile-projects-directory "${name}.org")))))
+    #+END_SRC
 
+    Finally here's all the capture templates for standalone capturing. See [[https://www.gnu.org/software/emacs/manual/html_node/org/Template-expansion.html#Template-expansion][syntax-docs]].
+
+    #+BEGIN_SRC emacs-lisp
+      (setq
+       org-capture-templates
+       (doct `((:group "Default"
+                :type entry
+                :file ,org-default-notes-file
+                :prepend     t
+                :empty-lines 0
+                :hook ,#'flyspell-mode
+                :before-finalize ,#'org-update-parent-todo-statistics
+                :children
+                ((:group "TODOs"
+                  :function ,(org-capture-create-goto-heading-command "* TODOs [/]")
+                  :todo-state "TODO"
+                  :template ("* %{todo-state} %?"
+                             "  %U")
+                  :children (("Todo" :keys "t")
+                             ("Todo with Clipboard"
+                              :keys "T"
+                              :template ("* %{todo-state} %?"
+                                         "  %U"
+                                         "  %c"))
+                             ("Itinerary"
+                              :keys "d"
+                              :prepend  nil
+                              :function ,(org-capture-create-goto-heading-command "* Itinerary")
+                              :template ("* %{todo-state} %?"))))
+                 ;; ("Note" :keys "n"
+                 ;;  :template ("* %?"
+                 ;;             "  %U"))
+                 ("Job Application"
+                   :keys "j"
+                   :function ,(org-capture-create-goto-heading-command "* Job Search [/]")
+                   :template ("* TODO [#%^{Priority|A|B|C}] %(org-get-link+) - %^{Company}"
+                              "  DEADLINE: %^{deadline}t"
+                              "%^{LOCATION}p%^{DURATION}p"
+                              "  %?"))))
+               ("BibTex"
+                :keys "b"
+                :type plain
+                :file ,(org! "bib/index.bib")
+                :template ("@%(completing-read \"Entry type: \" (mapcar #'car bibtex-entry-alist)) {%^{Key},"
+                           "  title = \"%^{Title}\","
+                           "  year  = \"%(format-time-string \"%Y\" (current-time))\","
+                           "  month = \"%(format-time-string \"%b\" (current-time))\","
+                           "  day   = %(format-time-string \"%d\" (current-time)),"
+                           "}")
+                :children (("Entry" :keys "e")
+                           ;; ("DOI" :keys "d"
+                           ;;  :template "%(progn (call-interactively 'doi-insert-bibtex) \"\")")
+                           ("Lecture" :keys "l"
+                            :file ,(org! "bib/uni.bib"))))
+               ("Education"
+                :keys "e"
+                :type plain
+                :hook ,#'flyspell-mode
+                :file (lambda ()
+                        (format-time-string (org! "notes/%Y%m%d%H%M%S.org")))
+                :children (("Agenda"
+                            :keys "a"
+                            :template ("#+title: Agenda for meeting to be held %^{deadline}t"
+                                       "#+date: %<%a %d %b %Y %I:%M %p>"
+                                       ""
+                                       "%?"))
+                           ("Meeting"
+                            :clock-in t
+                            :keys "m"
+                            :template ("#+title: Minutes for %^{Meeting}"
+                                       "#+date: %<%a %d %b %Y %I:%M %p>"
+                                       "#+chair: %^{Who is chairing this meeting}"
+                                       "#+format: %^{How was this meeting held}"
+                                       ""
+                                       "* Overview"
+                                       "  #+NAME: attendance-record"
+                                       "  - [X] %\\2"                                   ; Add remaining members and check if their present
+                                       "%?"
+                                       ))
+                           ("Lecture"
+                            :keys "l"
+                            :template ("#+title: %^{Title}"
+                                       "#+module: %^{Module}"
+                                       "#+record: %U"
+                                       ""
+                                       "%?")))))))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
       (provide '+org-capture)
     #+END_SRC
 
