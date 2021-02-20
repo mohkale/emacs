@@ -3,7 +3,7 @@
 #+TITLE: init.org
 #+STARTUP: content
 
-#+PROPERTY: header-args :tangle init.el :tangle-mode (identity #o544) :comments link :mkdirp yes :noweb yes :hlines no :shebang ";; -*- lexical-binding: t -*-"
+#+PROPERTY: header-args :tangle init.el :comments link :mkdirp yes :noweb yes :hlines no :shebang ";; -*- lexical-binding: t -*-"
 
 * Config
   Configure the desired optional components and experience of my Emacs configuration.
@@ -104,7 +104,7 @@
    one to one mapping with packages that're to be installed.
 
    #+NAME: config-modules
-   #+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp :tangle no
      (defvar +packages
        '(magit                                                             ; It's git... but magical  ,
          ;; ace-link                                                       ; Jump to links in the current buffer through an avy interface
@@ -227,7 +227,7 @@
 
 ** options
    #+NAME: config-options
-   #+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp :tangle no
      (defvar +sh-use-lsp nil
        "When true `sh-script-mode' and it's derivatives will use LSP when available")
 
@@ -252,6 +252,7 @@
                (and ".git" (zero-or-one "/") eol)
                (and ".elc" eol)
                (and ".bundle/")
+               (and "~" eol)
                (and (any ?. ?-) "lock" (zero-or-one ".json") eol))))
 
      (defvar +orderless-requires-prescient nil
@@ -339,7 +340,19 @@
    Create some macros/functions to ease the definitions of paths within my dotemacs
    home directory.
 
-   #+BEGIN_SRC emacs-lisp
+   Initialise shortcut functions for the following paths.
+
+   #+NAME: dotemacs-paths
+   | Name | Path |
+   |------+------|
+   | etc  | etc  |
+   | bin  | bin  |
+   | var  | var  |
+   | org  | org  |
+   | lisp | lisp |
+
+   #+NAME: setup-path-builders
+   #+BEGIN_SRC emacs-lisp :var paths=dotemacs-paths
      (if (version<= emacs-version "26.3")
          (require 'cl)
        (require 'cl-lib))
@@ -373,28 +386,14 @@
 
             (when (quote ,alias)
               (defalias (quote ,alias) (symbol-function (quote ,func-sym)))))))
-   #+END_SRC
 
-   Initialise shortcut functions for the following paths.
-
-   #+NAME: paths
-   | Name | Path |
-   |------+------|
-   | etc  | etc  |
-   | bin  | bin  |
-   | var  | var  |
-   | org  | org  |
-   | lisp | lisp |
-
-   #+BEGIN_SRC emacs-lisp :var paths=paths
-     (cl-loop
-      for (name path) in paths
-      collect (eval
-               `(dotemacs-initialise-path! ,(intern name) ,path)))
+     (cl-dolist (p paths)
+       (eval `(dotemacs-initialise-path! ,(intern (car p)) ,(nth 1 p))))
    #+END_SRC
 
    Now let's set the default paths for a bunch of emacs builtins, see [[https://github.com/emacscollective/no-littering/blob/master/no-littering.el][no-littering.el]].
 
+   #+NAME: setup-paths
    #+BEGIN_SRC emacs-lisp
      (with-no-warnings
        (setq
@@ -402,7 +401,6 @@
         package-user-dir                                   (lisp! "elpa")
         external-packages-directory                        (lisp! "pkgs")
 
-        abbrev-file-name                                   (etc! "abbrev.el")
         auto-insert-directory                              (etc! "auto-insert")
         auto-save-list-file-prefix                         (var! "auto-save" "sessions/")
         bookmark-default-file                              (etc! "bookmarks.el")
@@ -442,7 +440,6 @@
         org-preview-latex-image-directory                  (var! "org/latex")
         package-quickstart-file                            (var! "package-qs.el")
         recentf-save-file                                  (var! "recentf.el")
-        savehist-file                                      (var! "savehist.el")
         server-auth-dir                                    (var! "server/")
         ;; server-socket-dir                                  server-auth-dir
         shared-game-score-directory                        (var! "gamescore/")
@@ -450,6 +447,8 @@
         tramp-persistency-file-name                        (etc! "private/tramp/history.el")
         url-cache-directory                                (var! "url/cache/")
         url-configuration-directory                        (var! "url/configuration/")
+        comp-eln-load-path                                 (append (list (var! "eln-cache"))
+                                                                   (bound-and-true-p comp-eln-load-path))
 
         ;;; third party
         request-storage-directory                          (var! "requests")
@@ -601,6 +600,7 @@
 
    For my config I'll be using [[https://github.com/raxod502/straight.el][straight]], the modern package manager for emacs.
 
+   #+NAME: setup-straight-packages
    #+BEGIN_SRC emacs-lisp
      (with-no-warnings
        (defvaralias 'straight-base-dir 'dotemacs-lisp-path))
@@ -1149,6 +1149,7 @@
         "ap" "packages"
         "api" 'straight-use-package
         "apu" 'straight-pull-all
+        "apU" 'straight-pull-package-and-deps
         "apf" 'straight-fetch-all
         "apx" 'straight-prune-build
         "apr" 'straight-rebuild-all
@@ -1256,7 +1257,8 @@
        "C-M-|" 'shell-command-on-buffer
        "C-&"   'async-shell-command
        "M-&"   'async-shell-command-on-region
-       "C-M-&" 'async-shell-command-on-buffer)
+       "C-M-&" 'async-shell-command-on-buffer
+       "C-:" 'completion-at-point)
     #+END_SRC
 
     Shell compatibility with vim
@@ -1601,9 +1603,12 @@
               persistent-scratch-scratch-buffer-p-function #'multiscratch-scratch-buffer-p)
 
         ;; force restoration on initial movement to a scratch buffer.
-        (when (file-exists-p persistent-scratch-save-file)
-          (persistent-scratch-restore))
+        (add-hook 'emacs-startup-hook
+                  (lambda ()
+                    (when (file-exists-p persistent-scratch-save-file)
+                      (persistent-scratch-restore))))
 
+        :config
         (add-hook 'kill-emacs-hook #'persistent-scratch-save))
     #+END_SRC
 
@@ -1713,7 +1718,7 @@
       (defun +dot-goto-executable ()
         (interactive)
         "List and jump to an executable using [[https://github.com/mohkale/dotfiles/blob/master/bin/ls-exec][ls-exec]]."
-        (let ((cand (completing-read "Executable:"
+        (let ((cand (completing-read "Executable: "
                                      (apply #'process-lines +dot-goto-executable-command))))
           (find-file cand)))
     #+END_SRC
@@ -2069,9 +2074,12 @@
 
      (defun smart-buffer-file-name ()
        (or (buffer-file-name)
-           (cond
-            ((derived-mode-p 'dired-mode)
-             (string-trim-right (dired-current-directory) "/")))))
+           (and (derived-mode-p 'dired-mode)
+                (string-trim-right (dired-current-directory) "/"))
+           (and (boundp 'org-capture-mode)
+                (buffer-file-name (org-capture-get :buffer t)))
+           (and (boundp 'org-src-mode)
+                org-src-source-file-name)))
 
      (defmacro defun-show-and-copy-command (name &rest body)
        "Define a function which uses BODY to generate a string which is then shown and copied.
@@ -2167,7 +2175,13 @@
 
    So I enable displaying of trailing whitespace by default in every mode. That way you can
    see and remove it. If you'd like to disable whitespace display, then you'll have to append
-   to either of the following variables.
+   to either of the following variables or optionally attach the following hook
+   function.
+
+   #+BEGIN_SRC emacs-lisp
+     (defun +hide-trailing-whitespace-local ()
+       (setq-local show-trailing-whitespace nil))
+   #+END_SRC
 
    Here we define the configuration variables used for determining whether to enable
    visible whitespace or not.
@@ -3016,12 +3030,12 @@
          :general
          (:keymaps 'emacs-window-map
           "T"   'force-set-all-visible-windows-dedication
-          "o"   'display-last-buffer
-          "C-o" 'display-last-buffer
+          "O"   'display-last-buffer
+          "M-o" 'display-last-buffer
           "SPC" 'set-window-dedication
           "M-d" 'set-window-dedication
-          "O"   'vertical-display-last-buffer
-          "M-o" 'vertical-display-last-buffer))
+          "o"   'vertical-display-last-buffer
+          "C-o" 'vertical-display-last-buffer))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
@@ -3441,26 +3455,6 @@
 ** completion
    Assistance for various completion frameworks.
 
-*** flx
-    optimizes ivy search ordering for fuzzy searches.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package flx
-        :straight t
-        :defer  t)
-    #+END_SRC
-
-*** smex
-    show recently accessed commands at the top of M-x.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package smex
-        :straight t
-        :defer  t
-        :config
-        (setq smex-save-file (var! "smex-save.el")))
-    #+END_SRC
-
 *** orderless
     A package for building nicer matching regexps for completion using space
     seperated components. Atm it doesn't (and has no intentions for) ordering
@@ -3499,8 +3493,9 @@
       (use-package prescient
         :straight t
         :demand t
-        :init
-        (setq prescient-save-file (var! "prescient-history.el"))
+        :custom
+        (prescient-history-length 1000)
+        (prescient-save-file (var! "prescient-history.el"))
 
         :config
         (prescient-persist-mode +1))                                                  ; persist statistics between emacs sessions
@@ -3985,7 +3980,8 @@
         (:states '(insert emacs multiedit)
          "C-o" 'evil-copy-from-above
          "M-o" 'evil-copy-from-below
-         "C-c C-o" 'evil-execute-in-normal-state)
+         "C-c C-o" 'evil-execute-in-normal-state
+         "C-." 'evil-execute-in-normal-state)
         ("C->" 'evil-shift-right-line
          "C-<" 'evil-shift-left-line)
         (:states 'normal
@@ -4189,7 +4185,8 @@
         ;; source [[https://stackoverflow.com/questions/23378271/how-do-i-display-ansi-color-codes-in-emacs-for-any-mode][here]].
         (require 'ansi-color)
         (let ((inhibit-read-only (or inhibit-read-only
-                                     (y-or-n-p "buffer is read only, ignore: "))))
+                                     (and buffer-read-only
+                                          (y-or-n-p "Buffer is read only, ignore: ")))))
           (barf-if-buffer-read-only)
           (ansi-color-apply-on-region beg end)))
 
@@ -4379,11 +4376,25 @@
 *** org-bullets
     Better heading indicators in org buffers.
 
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package org-bullets
         :straight t
-        :defer  t
+        :defer t
         :hook (org-mode . org-bullets-mode))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package org-superstar-mode
+        :straight (org-superstar-mode :host github :repo "integral-dw/org-superstar-mode")
+        :defer t
+        :hook (org-mode . org-superstar-mode)
+        :custom
+        (org-superstar-todo-bullet-alist
+         '(("TODO" . 9744)
+           ("DONE" . 9745)))
+        (org-superstar-cycle-headline-bullets t)
+        (org-hide-leading-stars t)
+        (org-superstar-special-todo-items t))
     #+END_SRC
 
 *** org-link-edit
@@ -4411,7 +4422,7 @@
         (require 'org-eldoc)
         (org-eldoc-load)
 
-        (defun org-eldoc-get-link+ ()
+        (defun org-eldoc-get-link+ (&rest args)
           "When point is on a link, show the link destination in eldoc."
           (let ((ctx (org-element-lineage (org-element-context) '(link) t)))
             (org-element-property :path ctx)))
@@ -4668,9 +4679,7 @@
         (interactive)
         (cl-letf (((symbol-function 'evil-open)
                    (lambda () (call-interactively
-                          (if above
-                              'evil-open-above
-                            'evil-open-below))))
+                          (if above 'evil-open-above 'evil-open-below))))
                   ((symbol-function 'fallback-action)
                    (lambda (&optional interactive)
                      (when (and (line-empty-p)
@@ -4681,11 +4690,9 @@
                      (if (and interactive (not above))
                          (funcall-interactively
                           'newline-and-indent)
-                       (evil-open)
-                       ))))
+                       (evil-open)))))
           (if (and current-prefix-arg (listp current-prefix-arg))
-              ;; when called with simple prefix, goto
-              ;; fallaback action.
+          ;; When called with simple prefix, goto fallback action.
               (let ((current-prefix-arg nil))
                 (fallback-action))
             (cond ((org-table-p)
@@ -4715,7 +4722,7 @@
             (cons relative file))))
 
       (defun org-find-file (&optional arg initial-input)
-        "find an org file.
+        "Find an org file.
       By default this function simply finds the default notes file, as indicated
       by `org-default-notes-file'. When ARG is non-nil, you are instead prompted
       interactively with all org files known to emacs (through `dotemacs-org-path',
@@ -4724,14 +4731,18 @@
         (if (not arg)
             (find-file org-default-notes-file)
           (let ((cands (mapcar #'org-find-file--generate-candidate
-                               (cl-remove-if
-                                (apply-partially #'string-match-p +find-file-ignore-regexp)
-                                (cl-remove-duplicates
+                               (cl-remove-duplicates
+                                (cl-remove-if
+                                 (apply-partially #'string-match-p
+                                                  (rx (or (regexp +find-file-ignore-regexp)
+                                                          (and (eval f--path-separator)
+                                                               "brain"
+                                                               (eval f--path-separator)))))
                                  (append (file-expand-wildcards (org! "*.org"))
                                          (file-expand-wildcards (org! "**/*.org"))
-                                         org-agenda-files)
-                                 :test (lambda (x y) (or (null y) (equal x y)))
-                                 :from-end t)))))
+                                         org-agenda-files))
+                                :test (lambda (x y) (or (null y) (equal x y)))
+                                :from-end t))))
             (cond
              ((package! ivy)
               (ivy-read "Find file: " cands
@@ -4745,6 +4756,7 @@
                               :prompt "Find file: "
                               :require-match t
                               :category 'file
+                              :state (consult--file-preview)
                               :lookup #'consult--lookup-cdr)))
              (t (find-file
                  (alist-get (completing-read "Find file: " cands nil t initial-input)
@@ -4759,19 +4771,103 @@
 *** org-mode
     #+BEGIN_SRC emacs-lisp
       ;; See [[https://emacs.stackexchange.com/questions/58994/symbol-s-value-as-variable-is-void-org-priority-highest-using-org-agenda][here]].
-      (defvaralias 'org-priority-highest 'org-highest-priority)
-      (defvaralias 'org-priority-lowest  'org-lowest-priority)
+      (defvaralias 'org-highest-priority 'org-priority-highest)
+      (defvaralias 'org-lowest-priority 'org-priority-lowest)
+      (defvaralias 'org-default-priority 'org-priority-default)
 
       (use-package org
         :straight '(org :type built-in)
         :defer t
-        :hook (org-mode . display-line-numbers-mode)
+        :hook ((org-mode . display-line-numbers-mode)
+               (org-mode . auto-fill-mode))
         :commands (org-completing-goto+)
+        :custom
+        (org-src-tab-acts-natively nil)                                               ; native tabs are slow and unreliable... :sad:
+        (org-fontify-done-headline nil)
+        (org-src-window-setup 'current-window)
+        (org-archive-file-header-format "\
+      # -*- mode: org; coding: utf-8-unix -*-
+      ,#+TITLE: Archive
+      ,#+STARTUP: content")
+        (org-goto-interface 'outline-path-completion)
+        (org-log-done 'time)                                                          ; Record when a TODO item is done.
+        (org-outline-path-complete-in-steps nil)                                      ; Refile in a single go
+        (org-cycle-separator-lines 0)                                                 ; Prevents weird coloring of collapsed trees
+        (org-log-into-drawer "LOGBOOK")                                               ; Where org-add-note stores notes
+        (org-todo-keywords (list
+                            '(sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED")))
+        (org-refile-use-outline-path t)                                               ; Show full paths for refiling
+        (org-archive-location (concat (org! "archive.org") "::* %s"))                 ; Archive to the same file from everywhere
+        (org-confirm-babel-evaluate nil)
+        (org-refile-targets (list
+                             (cons nil '(:maxlevel . 2))
+                             (cons 'org-agenda-files '(:maxlevel . 9))))
+        (org-latex-default-class "article")
+        (org-export-with-toc nil)
+        (org-latex-classes
+         '(("article" "\\documentclass[11pt]{article} \\setlength{\\parindent}{0in} \\setlength{\\parskip}{\\baselineskip}"
+            ("\\section{%s}" . "\\section*{%s}")
+            ("\\subsection{%s}" . "\\subsection*{%s}")
+            ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+            ("\\paragraph{%s}" . "\\paragraph*{%s}")
+            ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))
+           ("report" "\\documentclass[11pt]{report}"
+            ("\\part{%s}" . "\\part*{%s}")
+            ("\\chapter{%s}" . "\\chapter*{%s}")
+            ("\\section{%s}" . "\\section*{%s}")
+            ("\\subsection{%s}" . "\\subsection*{%s}")
+            ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))
+           ("book" "\\documentclass[11pt]{book}"
+            ("\\part{%s}" . "\\part*{%s}")
+            ("\\chapter{%s}" . "\\chapter*{%s}")
+            ("\\section{%s}" . "\\section*{%s}")
+            ("\\subsection{%s}" . "\\subsection*{%s}")
+            ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
+
+        :config
+        (add-to-list 'org-latex-default-packages-alist '("" "babel" t nil) t)
+
+        (setq org-agenda-files
+              (cl-remove-if
+               (apply-partially #'string-match-p (rx (and "archive.org" eol)))
+               (cl-loop for path in (list (org! "*.org")
+                                          (org! "university/*.org")
+                                          (org! "notes/projects/*.org"))
+                        nconc (file-expand-wildcards path))))
+
+        :config
+        ;; Inspired by [[https://stackoverflow.com/a/25335933/6247387][this]] stack-overflow answer, the following advice tries to make
+        ;; `org-capture's window popup mechanism a lot less *forceful*.
+        (advice-add 'org-capture-place-template :around
+                    (defun org-capture-place-template-keep-windows+ (func &rest args)
+                      "Prevent `org-capture' from forcefully deleting my current window-config."
+                      (cl-letf (((symbol-function #'delete-other-windows)
+                                 (symbol-function #'ignore)))
+                        (apply func args))))
+
+        (advice-add 'org-capture :around
+                    (defun org-capture-open-in-current-window+ (func &rest args)
+                      "Make `org-capture' popups always open in the current window.
+      I find this a lot more predictable then randomly popping up here and there."
+                      (cl-letf (((symbol-function #'org-switch-to-buffer-other-window)
+                                 (symbol-function #'switch-to-buffer)))
+                        (apply func args))))
+
+        (advice-add 'org-capture-finalize :around
+                    (defun org-capture-keep-wconfig+ (func &rest args)
+                      "Prevent `org-capture-finalize' from resetting my window-configs"
+                      (cl-letf (((symbol-function #'set-window-configuration)
+                                 (symbol-function #'ignore)))
+                        (apply func args))))
+
         :init
         (add-hook 'org-mode-hook
-                  (lambda (&rest _)
+                  (defun org-mode-setup-syntax+ ()
+                    (setq electric-pair-preserve-balance t)
                     (modify-syntax-entry ?< "_" org-mode-syntax-table)
-                    (modify-syntax-entry ?> "_" org-mode-syntax-table)))
+                    (modify-syntax-entry ?> "_" org-mode-syntax-table)
+                    (modify-syntax-entry ?- "w" org-mode-syntax-table)
+                    (modify-syntax-entry ?_ "w" org-mode-syntax-table)))
 
         (advice-add 'evil-ret-gen :before-until
                     (defun evil-ret-open-org-links+ (&rest _)
@@ -4800,39 +4896,7 @@
         (put 'org-read-date-command 'lisp-indent-function 'defun)
 
         :config
-        (setq org-src-window-setup 'current-window
-              org-goto-interface 'outline-path-completion
-              org-todo-keywords '((sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED"))
-              org-refile-targets '((nil :maxlevel . 9)
-                                   (org-agenda-files :maxlevel . 9))
-              org-log-done 'time ; record when a TODO item is done.
-              org-outline-path-complete-in-steps nil ; refile in a single go
-              org-refile-use-outline-path t  ; show full paths for refiling
-              org-cycle-separator-lines 0 ; prevents weird coloring of collapsed trees
-              org-log-into-drawer "LOGBOOK" ; where org-add-note stores notes
-
-              ;; break org-cycle-seperator-lines from working automatically
-              ;; org-blank-before-new-entry '((heading . nil) (plain-list-item . auto))
-
-              ;; native tabs are slow and unreliable... :sad:
-              org-src-tab-acts-natively nil
-              org-fontify-done-headline nil
-
-              org-agenda-files (append
-                                (file-expand-wildcards (org! "*.org"))
-                                (file-expand-wildcards (org! "university/*.org")))
-
-              org-archive-location (concat (org! "archive.org") "::* %s"))
-
-        (setq org-archive-file-header-format
-              "# -*- mode: org; coding: utf-8-unix -*-
-      ,#+TITLE: Archive
-      ,#+STARTUP: content")
-
-        ;; Initialised here to prevent org from defining a bunch of keys I won't
-        ;; end up using :P
-        (setq org-read-date-minibuffer-local-map (make-sparse-keymap)
-              org-confirm-babel-evaluate nil)
+        (setq org-read-date-minibuffer-local-map (make-sparse-keymap))
         (set-keymap-parent org-read-date-minibuffer-local-map minibuffer-local-map)
 
         ;; switch to insert state when capturing org templates
@@ -4840,7 +4904,7 @@
 
         (advice-add 'org-edit-src-code :after
                     (lambda (&rest args)
-                      "prevents org mode from restoring the window config before
+                      "Prevents org mode from restoring the window config before
       source code edit. when you run `org-edit-src-code' the window configuration
       from before the edit is saved, and when you exit the session it's restored.
       Any windows/buffers you open while in an edit get erased. This prevents that
@@ -4975,6 +5039,7 @@
          "e"  "export"
          "ee" 'org-export-dispatch
          "eh" 'org-html-export-to-html
+         "ep" 'org-latex-export-to-pdf
 
          "h"  "headings"
          "hI" 'org-insert-heading
@@ -5105,7 +5170,8 @@
                                (org-metaleft)
                              (org-metaright)))
 
-         "C-." 'org-toggle-heading)
+         ;; "C-." 'org-toggle-heading
+         )
         ;; Most evil bindings taken from [[https://github.com/edwtjo/evil-org-mode][evil-org-mode]].
         (:keymaps 'org-mode-map
          :states '(normal visual)
@@ -5416,7 +5482,8 @@
         :defer t
         :diminish
         org-roam-mode
-        :hook (after-init . org-roam-mode)
+        :hook ((after-init . org-roam-mode)
+               (org-roam-file-setup . flyspell-mode))
         :commands org-roam-rg
         :init
         (setq org-roam-db-update-idle-seconds 2
@@ -5428,13 +5495,6 @@
         :config
         (require '+org-capture)
         (require 'org-roam-protocol)
-
-        (add-hook 'org-roam-file-setup-hook
-                  (defun +org-roam-setup-hook ()
-                    (when (featurep 'flyspell)
-                      (flyspell-mode +1))
-
-                    (auto-fill-mode +1)))
 
         ;; see [[https://github.com/progfolio/doct/issues/16][#16]].
         (defun doct-org-roam+ (groups)
@@ -5484,6 +5544,7 @@
          ;; open it instead of creating a capture session.
          "of" 'org-roam-find-file
          "op" 'org-roam-insert
+         "ok" 'org-roam-insert-immediate
          "or" 'org-roam
          ;; "og" 'org-roam-graph
          "os" 'org-roam-rg))
@@ -5503,6 +5564,7 @@
     to and open PDFs. I've removed all the pdftools specific stuff so this is just a
     generic configuration section for pdf related actions in org mode.
 
+    #+NAME: org-pdf-link
     #+BEGIN_SRC emacs-lisp
       (with-eval-after-load 'org
         (defun +org-pdf-complete-link (&optional arg)
@@ -5516,17 +5578,21 @@
               (concat "pdftools" ":")
               (org-link-complete-file arg))
              "::"
-             (read-from-minibuffer
-              "Page:"
-              "1"))))
+             (read-from-minibuffer "Page: " "1"))))
 
         (defun +org-pdf-open (link)
-          (message "%s" link)
           (save-match-data
-            (let* ((path (when (string-match
-                                "\\(.+\\)::.+" link)
-                           (match-string 1 link))))
-              (xopen-url+ (expand-file-name path)))))
+            (if (string-match (rx (group (one-or-more any))
+                                  "::"
+                                  (group (zero-or-more (any digit))))
+                              link)
+                (let ((path (expand-file-name (match-string 1 link)))
+                      (page (match-string 2 link)))
+                  (if (and (not (string-empty-p page))
+                           (executable-find "zathura"))
+                      (call-process "zathura" nil 0 nil path "--page" page)
+                    (xopen-url+ path)))
+              (warn "Failed to extract path/page from: %s" link))))
 
         (defun +org-pdf-export (link description format)
           "Export the pdfview LINK with DESCRIPTION for FORMAT from Org files."
@@ -5564,7 +5630,6 @@
                                  :export   #'+org-pdf-export))
     #+END_SRC
 
-
 *** org-ref
     Support citations, references and links in org mode documents.
 
@@ -5579,16 +5644,22 @@
         :leader
         (:mode 'org-mode
          "]" 'org-ref-insert-link)
+        ("ov" 'doi-utils-add-bibtex-entry-from-doi)
 
         :init
         (defvaralias 'reftex-default-bibliography 'bibtex-files)
+        (defvaralias 'org-ref-default-bibliography 'bibtex-files)
         (defvaralias 'org-ref-bibliography-notes 'bibtex-completion-notes-path)
+        (setq org-ref-pdf-directory (org! "docs/"))
 
         :config
         (setq org-ref-latex-bibliography-absolute-p t
               org-ref-pdf-directory (let ((path bibtex-completion-library-path))
                                       (if (listp path) (car path) path))
               org-ref-latex-bib-resolve-func #'expand-file-name))
+
+      (with-eval-after-load 'doi-utils
+        (require 'org-ref))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy bibtex)
@@ -5616,8 +5687,15 @@
        :delight
        company-mode
        global-company-mode
-       :init
+       :custom
+       ;; show the completion tooltip without any delay.
+       (company-tooltip-idle-delay nil)
+       (company-idle-delay 0.5)
+       (company-statistics-file (var! "company/statistics.el"))
+       (company-tooltip-align-annotations t)
+       (company-require-match nil)
 
+       :init
        (defvar company-menu-bindings+
          `(("C-1"   . company-complete-number)
            ("C-2"   . company-complete-number)
@@ -5636,8 +5714,8 @@
            ("C-l"   . company-complete-selection)
            ("C-h"   . company-show-doc-buffer)
            ("<tab>" . company-complete-common-or-cycle)
-           ("C-:"   . completion-at-point)
            ("RET"   . company-complete-selection)
+           ("C-:"   . completion-at-point)
            ("C-/"   . company-filter-candidates)
            ("C-s"   . company-filter-candidates)
            ("C-f"   . company-filter-candidates)
@@ -5650,10 +5728,6 @@
        (defalias 'case #'cl-case) ; TODO remove when company fixes cl issues.
 
        :config
-       (setq company-statistics-file         (var! "company/statistics.el")
-             company-tooltip-align-annotations t
-             company-require-match nil)
-
        ;; don't let display steal focus
        (advice-add 'company-show-location   :around 'restore-default-display-buffer-actions)
        (advice-add 'company-show-doc-buffer :around 'restore-default-display-buffer-actions)
@@ -6001,6 +6075,7 @@
                               ((all-the-icons-alltheicon . "script")           .    (all-the-icons-nerd-seti   . "html"))
                               ((all-the-icons-alltheicon . "swift")            .    (all-the-icons-nerd-dev    . "swift"))
                               ((all-the-icons-alltheicon . "terminal")         .    (all-the-icons-nerd-fa     . "terminal"))
+                              ((all-the-icons-fileicon   . "tex")              .    (all-the-icons-nerd-oct    . "text-size"))
                               ((all-the-icons-alltheicon . "test-ruby")        .    (all-the-icons-nerd-oct    . "ruby"))
                               ((all-the-icons-fileicon   . "cljs")             .    (all-the-icons-nerd-dev    . "clojure"))
                               ((all-the-icons-fileicon   . "docker")           .    (all-the-icons-nerd-linux  . "docker"))
@@ -6056,6 +6131,9 @@
            (setq url (if (eq major-mode 'dired-mode)
                          (dired-get-file-for-visit)
                        buffer-file-name)))
+
+         (when (string-prefix-p "~" url)
+           (setq url (expand-file-name url)))
 
          (let ((program (if arg
                             (read-shell-command "Open current file with: ")
@@ -6499,6 +6577,9 @@
    #+END_SRC
 
 ** page-break-lines
+   :PROPERTIES:
+   :ID:       1d272067-3aa0-4083-ba76-e408a5c9daa1
+   :END:
    display ^L lines as horizontal-rules. Like so:
 
 
@@ -6511,6 +6592,7 @@
               (help-mode                   . page-break-lines-mode)
               (outline-mode                . page-break-lines-mode)
               (emacs-lisp-compilation-mode . page-break-lines-mode))
+       :commands (page-break-lines-mode)
        :diminish
        page-break-lines-mode)
    #+END_SRC
@@ -6843,11 +6925,11 @@
        (advice-add 'delete-buffer-file :after (lambda (&rest _)
                                                 (when (projectile-project-p)
                                                   (call-interactively 'projectile-invalidate-cache))))
+
+       (defvaralias 'grep-regexp-history 'regexp-search-ring)
+
        :config
        (require '+projectile-project-types)
-
-       (with-no-warnings
-         (defvaralias 'grep-regexp-history 'regexp-search-ring))
 
        (defun projectile-ensure-no-trailing-slash-in-root (func &rest args)
          (cl-letf* (((symbol-function 'true-projectile-project-root)
@@ -6958,23 +7040,27 @@
                   ((package! selectrum) 'consult-org-capture+)
                   (t 'org-capture)))))
 
-       (defun projectile-org-project-file+ ()
-         (interactive)
+       (defun projectile-org-project-file+ (&optional arg)
+         (interactive "P")
          (find-file
           (if-let ((cands (let ((default-directory projectile-org-projects-directory+))
                             (cl-loop for file in (cl-remove-if
                                                   (apply-partially #'string-match-p +find-file-ignore-regexp)
-                                                  (append (file-expand-wildcards "*.org")
-                                                          (file-expand-wildcards "**/*.org")))
+                                                  (append (file-expand-wildcards "*.org")))
                                      collect (cons file (concat default-directory "/" file))))))
-              (alist-get
-               (completing-read
-                "Find file: " (lambda (string predicate action)
-                                (if (eq action 'metadata)
-                                    '(metadata (category . file))
-                                  (complete-with-action action cands string predicate)))
-                nil t)
-               cands nil nil #'string-equal)
+              (or (and (not arg)
+                       (when-let* ((current-project (projectile-project-name))
+                                   (current-project (unless (string-equal current-project "-")
+                                                      current-project)))
+                         (alist-get (concat current-project ".org") cands nil nil #'string-equal)))
+                  (alist-get
+                   (completing-read
+                    "Find file: " (lambda (string predicate action)
+                                    (if (eq action 'metadata)
+                                        '(metadata (category . file))
+                                      (complete-with-action action cands string predicate)))
+                    nil t)
+                   cands nil nil #'string-equal))
             (user-error "No project org files have been found at %s" projectile-org-projects-directory+))))
 
        :general
@@ -7476,8 +7562,9 @@
         (:keymaps 'yas-keymap
          "<C-return>" 'yas-next-field
          "<C-M-return>" 'yas-prev-field
-         "C-l" 'yas-next-field
-         "C-h" 'yas-prev-field))
+         ;; Prevent tab from expanding
+         "TAB"   'yas-next-field
+         "<tab>" 'yas-next-field))
     #+END_SRC
 
 *** licenses
@@ -7745,10 +7832,10 @@
         :straight t
         :defer  t
         :leader
-        ("iS"  "auto-yasnippet"
-         "iSc" 'aya-create
-         "iSe" 'aya-expand
-         "iSw" 'aya-persist-snippet)
+        ("is"  "auto-yasnippet"
+         "isc" 'aya-create
+         "ise" 'aya-expand
+         "isw" 'aya-persist-snippet)
 
         :general
         (:states 'insert
@@ -8212,6 +8299,11 @@
                   (lambda (buf &rest _)
                     (setq compilation-last-buffer buf)))
 
+        (defun kill-compilation-windows+ ()
+          (interactive)
+          (when compilation-last-buffer
+            (delete-windows-on compilation-last-buffer)))
+
         (defun compilation-colorize+ ()
           "Colorize from `compilation-filter-start' to `point'.
       Taken from [[https://emacs.stackexchange.com/a/38531][here]]."
@@ -8267,6 +8359,8 @@
 
         (+set-compilation-bindings 'compilation-mode 'compilation-mode-map)
 
+        :leader
+        ("cv" 'kill-compilation-windows+)
         :general
         (:states  'motion
          :keymaps 'compilation-mode-map
@@ -9443,6 +9537,17 @@
         (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold))
               ibuffer-title-face '(:inherit (font-lock-type-face)))
 
+        (advice-add #'ibuffer-visit-buffer-other-window :override
+                    (defun ibuffer-visit-buffer-other-window+ (&optional noselect)
+                      "Fixes `ibuffer-visit-buffer-other-window' doesn't always open in new window."
+                      (let ((buf (ibuffer-current-buffer t)))
+                        (bury-buffer (current-buffer))
+                        (if noselect
+                            (let ((curwin (selected-window)))
+                              (switch-to-buffer-other-window buf)
+                              (select-window curwin))
+                          (switch-to-buffer-other-window buf)))))
+
         (evil-set-initial-state 'ibuffer-mode 'motion)
 
         (leader/set-keys-for-major-mode 'ibuffer-mode
@@ -9601,6 +9706,7 @@
 
          "RET"   'ibuffer-visit-buffer
          "o"     'ibuffer-visit-buffer-other-window
+         "i"     'ibuffer-visit-buffer-other-window-noselect
          "M-RET" 'ibuffer-visit-buffer-other-window-noselect
          "S-DEL" 'ibuffer-bury-buffer
 
@@ -10497,8 +10603,7 @@
           (unless doom-modeline--limited-width-p
             (apply func args)))
 
-        (advice-add 'doom-modeline-segment--buffer-position :filter-return
-                    #'doom-modeline-truncate+)
+        (advice-add 'doom-modeline-segment--buffer-position :filter-return #'doom-modeline-truncate+)
 
         (advice-add 'doom-modeline-icon :filter-return #'all-the-icons-pad-on-tty-advice+)
 
@@ -10528,8 +10633,7 @@
            (doom-modeline-spc)
            (doom-modeline--buffer-mode-icon)
            (doom-modeline-spc)
-           (doom-modeline--buffer-name)
-           (doom-modeline-spc)))
+           (doom-modeline--buffer-name)))
 
         (advice-add #'doom-modeline--anzu             :filter-return #'doom-modeline-truncate+)
         (advice-add #'doom-modeline--iedit            :filter-return #'doom-modeline-truncate+)
@@ -10649,8 +10753,7 @@
                                          (doom-modeline-icon 'nerd-mdi "json" "{}" "{}" :face face))))
                          (doom-modeline-spc))))
             (unless (string-empty-p icons)
-              (concat ;; (doom-modeline-spc)
-                      icons))))
+              (concat icons (doom-modeline-spc)))))
 
         (defsubst doom-modeline--build-flychecker-section+ (stat-func)
           (when-let* ((stat (funcall stat-func
@@ -10680,19 +10783,17 @@
         (doom-modeline-def-segment checker+
           (when-let ((icon (cond ((and (bound-and-true-p flymake-mode)
                                        (bound-and-true-p flymake--backend-state)) ; only support 26+
-                                  doom-modeline--flymake-icon)
+                                  doom-modeline--flymake-icon)                    ;
                                  ((bound-and-true-p flycheck-mode)
                                   doom-modeline--flycheck-icon))))
             (concat
              (doom-modeline-spc)
-             (if (doom-modeline--active)
-                 icon
-               (doom-modeline-propertize-icon icon 'mode-line-inactive)))))
+             icon)))
 
         (doom-modeline-def-segment space+
           (doom-modeline-spc))
 
-        (advice-add #'doom-modeline-segment--buffer-encoding :filter-return #'doom-modeline-truncate-right+)
+        (advice-add #'doom-modeline-segment--buffer-encoding :filter-return #'doom-modeline-truncate+)
         (advice-add #'doom-modeline-segment--buffer-encoding :around #'doom-modeline-limited-width-hide+)
 
         (doom-modeline-def-modeline 'mohkale
@@ -11012,6 +11113,7 @@
        :defer t
        :config
        (evil-set-initial-state 'process-menu-mode 'motion)
+       (push 'process-menu-mode whitespace-exempt-modes)
 
        :general
        (:states  'motion
@@ -11735,7 +11837,7 @@
        :straight (vline :host github :repo "emacsmirror/vline")
        :defer t
        :leader
-       ("tv" 'vline-mode))
+       ("t'" 'vline-mode))
    #+END_SRC
 
 ** whitespace
@@ -11830,7 +11932,8 @@
 
 ** selectrum
    :PROPERTIES:
-   :header-args: :tangle (package-yes! selectrum)
+   :header-args+: :tangle (package-yes! selectrum)
+   :ID:       7cacf59f-957b-47f1-8bb6-f36a10af3aec
    :END:
 
 *** selectrum
@@ -11842,8 +11945,11 @@
         :commands (selectrum-preprocess+
                    selectrum-highlight+)
         :custom
-        (selectrum-num-candidates-displayed 15)
+        (selectrum-max-window-height 15)
         (selectrum-count-style 'current/matches)
+        (selectrum-preprocess-candidates-function #'selectrum-preprocess+)
+        (selectrum-highlight-candidates-function #'selectrum-highlight+)
+
         :config
       ;;; Sorting configuration and workarounds
         (defun selectrum-sort-cands+ (cands)
@@ -11964,7 +12070,8 @@
                                    (t selectrum--previous-input-string))))
             (push regexp regexp-search-ring)
             (when (boundp 'evil-ex-search-pattern)
-              (setq evil-ex-search-pattern (list regexp t t))
+              (setq evil-ex-search-pattern (list regexp t t)
+                    evil-ex-search-direction 'forward)
               (evil-ex-search-activate-highlight (list regexp t t)))))
 
         :leader
@@ -12070,6 +12177,14 @@
         (advice-add 'embark-collect-live     :around #'restore-default-display-buffer-actions)
         (advice-add 'embark-collect-snapshot :around #'restore-default-display-buffer-actions)
 
+        (defun embark-find-mkdir+ (dir)
+          "Mkdirectory and then find it."
+          (interactive (list (read-file-name "Directory")))
+          (if (file-exists-p dir)
+              (message "Warning path already exists: %s" dir)
+            (mkdir dir t))
+          (find-file dir))
+
         :general
         (:keymaps 'selectrum-minibuffer-map
          "<C-return>" 'embark-act
@@ -12091,7 +12206,10 @@
         (:keymaps 'embark-file-map
          "=" 'vdiff-files
          "W" nil
-         "Y" 'embark-save-relative-path)
+         "Y" 'embark-save-relative-path
+         "m" 'embark-find-mkdir+
+         "+" 'embark-find-mkdir+
+         "o" 'xopen-url+)
 
         :lazy-leader
         (:mode 'embark-collect-mode
@@ -12119,7 +12237,8 @@
       (use-package consult
         :straight t
         :defer  t
-        :commands (consult-ripgrep-no-project+
+        :commands (consult--read
+                   consult-ripgrep-no-project+
                    consult-grep-no-project+)
         :custom
         (consult-project-root-function #'projectile-project-root)
@@ -12134,7 +12253,9 @@
            (org-roam-rg :preview-key ,consult-manual-preview-key)
            (consult-ripgrep-no-project+ :preview-key ,consult-manual-preview-key)
            (consult-grep-no-project+ :preview-key ,consult-manual-preview-key)
+           (consult-recent-file :state nil)
            (consult-flyspell :sort nil)
+           (switch-to-scratch-buffer :state ,#'consult--buffer-state)
            (consult-find :initial ,(concat consult-async-default-split "*" consult-async-default-split))))
         (consult-imenu-config
          '((emacs-lisp-mode :toplevel "Functions"
@@ -12152,7 +12273,9 @@
                                 (?m "Method" font-lock-function-name-face)
                                 (?i "Module" font-lock-preprocessor-face)
                                 (?f "Function" font-lock-function-name-face)
-                                (?v "Variable" font-lock-variable-name-face)))))
+                                (?v "Variable" font-lock-variable-name-face)))
+           (sh-mode :types ((?f "Function" font-lock-function-name-face)
+                            (?v "Variable" font-lock-variable-name-face)))))
         :init
         ;; (with-no-warnings
         ;;   (defvaralias 'consult-line-history 'regexp-search-ring))
@@ -12303,7 +12426,6 @@
     #+BEGIN_SRC emacs-lisp :tangle (package-str! "init.el" selectrum)
       (dolist (cmd '(consult-evil-jumps+
                      consult-evil-marks+
-                     consult-unicode-char+
                      consult-xref-show-xrefs+
                      consult-xref-show-defs+
                      consult-org-capture+
@@ -12333,7 +12455,7 @@
 
       (general-define-key
        [remap org-capture] 'consult-org-capture+
-       [remap insert-char] 'consult-unicode-char+)
+       )
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
@@ -12370,45 +12492,8 @@
                      (?w . "Warning")
                      (?i . "Info"))
            :history '(:input consult--error-history)
-           :preview
-           (consult--preview-position 'consult-preview-error))))
-     #+END_SRC
-
-**** consult-unicode
-     Taken from [[https://github.com/abo-abo/swiper/blob/25439e26a67b54d1f8aab1cbc727228427692ec8/counsel.el#L5319][counsel.el]].
-
-     #+BEGIN_SRC emacs-lisp
-       (defun consult--unicode-names+ ()
-         "Return formatted and sorted list of `ucs-names'.
-       The result of `ucs-names' is mostly, but not completely, sorted,
-       so this function ensures lexicographic order."
-         (let* (cands
-                (table (ucs-names))            ; Either hash map or alist
-                (fmt (lambda (name code)       ; Common format function
-                       (let ((cand (format "%06X %-58s %c" code name code)))
-                         (put-text-property 0 1 'code code cand)
-                         (push cand cands)))))
-           (if (not (hash-table-p table))
-               ;; Support `ucs-names' returning an alist in Emacs < 26.
-               ;; The result of `ucs-names' comes pre-reversed so no need to repeat.
-               (dolist (entry table)
-                 (funcall fmt (car entry) (cdr entry)))
-             (maphash fmt table)
-             ;; Reverse to speed up sorting
-             (setq cands (nreverse cands)))
-           (sort cands #'string-lessp)))
-
-       (defvar consult--unicode-table+
-         (lazy-completion-table consult--unicode-table+ consult--unicode-names+)
-         "See `counsel--unicode-table'")
-
-       (defvar consult-unicode-char-history+ nil)
-       (defun consult-unicode-char+ (&optional count)
-         (interactive "p")
-         (let ((completions-detailed nil))
-           (when-let* ((char (completing-read "Unicode name: " consult--unicode-table+
-                                              nil nil nil 'consult-unicode-char-history+)))
-             (insert-char (get-text-property 0 'code char) count))))
+           :state
+           (consult--jump-state 'consult-preview-error))))
      #+END_SRC
 
 **** consult-evil-jumps
@@ -12454,7 +12539,7 @@
                       (consult--evil-jumps-get+)))
              :prompt "Evil jump: "
              :lookup #'consult--lookup-location
-             :preview (consult--preview-position)
+             :state (consult--preview-position)
              :require-match t
              :category 'consult-location
              :history '(:input consult--evil-jumps-history+)))))
@@ -12498,7 +12583,7 @@
                 :lookup #'consult--lookup-cdr
                 :history t ;; disable history
                 :add-history (thing-at-point 'symbol)
-                :preview (consult--preview-position))
+                :state (consult--preview-position))
              (user-error "No evil-marks active in the current buffer"))
            (when current-prefix-arg
              (prefix-numeric-value current-prefix-arg))))
@@ -12716,7 +12801,7 @@
 
        (embark-define-keymap embark-bibtex-completion-actions
          "Embark bindings for bibtex completion candidates."
-         ("p" consult-bibtex-open-pdf)
+         ("o" consult-bibtex-open-pdf)
          ("u" consult-bibtex-open-url-or-doi)
          ("c" consult-bibtex-insert-citation)
          ("r" consult-bibtex-insert-reference)
@@ -12826,7 +12911,7 @@
             :prompt "Choose a snippet: "
             :lookup 'consult--lookup-cdr
             :require-match t
-            :preview (consult-yasnippet--preview)
+            :state (consult-yasnippet--preview)
             :category 'yasnippet)))
 
        (defun consult-yasnippet-visit-snippet-file (template)
@@ -13118,7 +13203,7 @@
 
 *** ivy-orderless
     :PROPERTIES:
-    :header-args: :tangle (package-yes! ivy orderless)
+    :header-args+: :tangle (package-yes! ivy orderless)
     :END:
 
     Here's some helpers to setup and tear down orderless.
@@ -13812,6 +13897,26 @@
         :leader
         ("c SPC" 'helm-make-projectile
          "cm"    'helm-make))
+    #+END_SRC
+
+*** flx
+    optimizes ivy search ordering for fuzzy searches.
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package flx
+        :straight t
+        :defer  t)
+    #+END_SRC
+
+*** smex
+    Show recently accessed commands at the top of M-x.
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package smex
+        :straight t
+        :defer  t
+        :config
+        (setq smex-save-file (var! "smex-save.el")))
     #+END_SRC
 
 ** ace-link
@@ -14512,13 +14617,15 @@
        (eglot-autoreconnect nil)
        (eglot-stay-out-of '(company))                                                ; I'll set my backends myself, thank you.
        (eglot-ignored-server-capabilites '(:documentHighlightProvider))              ; Prevent eglot highlighting the symbol at point
-       (eglot-workspace-configuration
-        '((:pyls
-           (plugins
-            (pydocstyle (enabled . t))
-            (jedi_completion
-             (fuzzy . t)
-             (follow_builtin_imports . :json-false))))))
+       :init
+
+       (setq-default eglot-workspace-configuration
+                     '((:pyls
+                        (plugins
+                         (pydocstyle (enabled . t))
+                         (jedi_completion
+                          (fuzzy . t)
+                          (follow_builtin_imports . :json-false))))))
 
        :config
        (require 'yasnippet) ;; needed or else snippet expansion won't happen.
@@ -14880,6 +14987,7 @@
 
      (leader/set-keys "ses" 'engine-search+)
    #+END_SRC
+
 ** expand-region
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! expand-region)
      (use-package expand-region
@@ -15811,26 +15919,6 @@
                              display-buffer-pop-up-frame)))))
 
        :config
-       ;; Fix issues with the base ruby gem project skeleton. See [[https://github.com/chrisbarrett/skeletor.el/issues/45][#45]].
-       (skeletor-define-constructor "Ruby Gem"
-         :requires-executables '(("bundle" . "http://bundler.io"))
-         :no-license? t
-         :no-license? t
-         :initialise
-         (lambda (spec)
-           (let-alist spec
-             (let ((flags (list
-                           "--no-coc" ;; code of conduct
-                           (concat "--test=" (shell-quote-argument
-                                              (funcall skeletor-completing-read-function
-                                                       "Testing framework: " '("minitest" "rspec"))))
-                           (concat "--" (unless (yes-or-no-p "Apply an MIT License") "no-") "mit"))))
-               (skeletor-shell-command (format "bundle gem %s %s"
-                                               (string-truncate-right!
-                                                (cl-loop for f in flags concat f concat " "))
-                                               (shell-quote-argument .project-name))
-                                       .project-dir)))))
-
        (advice-add 'skeletor--initialize-git-repo :override
                    (defun skeletor--initialize-git-repo+  (dir)
                      "Override of `skeletor--initialize-git-repo' which produces only one initial commit."
@@ -17910,7 +17998,7 @@
    #+END_SRC
 
 *** company-cmake
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package company-cmake
         :straight (company-cmake :host github :fork "company-cmake")
         :after cmake
@@ -18073,10 +18161,10 @@
         "F"   'meghanada-search-everywhere-ex
         "d"   'meghanada-reference ;; documentation
         "g"   'meghanada-jump-declaration
-        "k"   'meghanada-server-kill
-        "n"   'meghanada-server-start
+        "x"   'meghanada-server-kill
+        "l"   'meghanada-server-start
         "p"   'meghanada-code-beautify
-        "r"   'meghanada-restart
+        "o"   'meghanada-restart
         "s"   'meghanada-show-project
         "f"   'meghanada-search-everywhere
         "y"   'meghanada-mode
@@ -18580,7 +18668,7 @@
        :straight t
        :defer  t
        :config
-       ;; only run when current buffer is in go-mode
+       ;; Only run when current buffer is in go-mode
        (add-hook 'before-save-hook 'gofmt-before-save)
 
        (add-hook 'go-mode-hook
@@ -18625,7 +18713,7 @@
         :init
         (add-hook 'go-guru-output-mode-hook
                   (defun go-guru-preserve-compilation-window+ ()
-                    "prevent my compilation-hook settings interfering with go-guru."
+                    "Prevent my `compilation-hook' settings interfering with go-guru."
                     (setq-local compilation-auto-kill-window nil)))
 
         :lazy-leader
@@ -18665,17 +18753,14 @@
      (use-package rustic
        :straight t
        :defer  t
+       :custom
+       (rustic-format-trigget 'on-save)
+       (rustic-lsp-client (cond
+                           ((package! eglot)    'eglot)
+                           ((package! lsp-mode) 'lsp-mode)))
        :config
-       (setq rustic-format-trigget 'on-save
-             rustic-lsp-client (cond
-                                ((package! eglot)    'eglot)
-                                ((package! lsp-mode) 'lsp-mode))
-             rustic-lsp-server (if (executable-find "rust-analyzer")
-                                   'rust-analyzer
-                                 'rls))
-
-       (advice-add 'rustic-popup :around
-                   #'restore-default-display-buffer-actions)
+       (setq rustic-lsp-server (if (executable-find "rust-analyzer") 'rust-analyzer 'rls))
+       (advice-add 'rustic-popup :around #'restore-default-display-buffer-actions)
 
        (push 'rustic-popup-mode whitespace-exempt-modes)
        (evil-set-initial-state 'rustic-popup-mode 'emacs)
@@ -18718,7 +18803,7 @@
    #+END_SRC
 
 *** compile
-    fix ~compilation-was-open-p~ isn't assigned when rustic compilation is begun.
+    Fix ~compilation-was-open-p~ isn't assigned when rustic compilation is begun.
 
     #+BEGIN_SRC emacs-lisp
       (advice-add 'rustic-compilation :before
@@ -18737,23 +18822,17 @@
 
 *** gitignore
     #+BEGIN_SRC emacs-lisp
-     (use-package gitignore-mode
-       :straight t
-       :defer  t)
+     (use-package gitignore-mode :straight t :defer t)
     #+END_SRC
 
 *** gitconfig
     #+BEGIN_SRC emacs-lisp
-     (use-package gitconfig-mode
-       :straight t
-       :defer  t)
+     (use-package gitconfig-mode :straight t :defer t)
     #+END_SRC
 
 *** gitattributes
     #+BEGIN_SRC emacs-lisp
-     (use-package gitattributes-mode
-       :straight t
-       :defer  t)
+     (use-package gitattributes-mode :straight t :defer t)
     #+END_SRC
 
 ** latex
@@ -18766,33 +18845,36 @@
        :defer t
        :hook ((latex-mode . display-line-numbers-mode)
               (latex-mode . flycheck-mode))
-       :init
-       (setq TeX-auto-save  t
-             TeX-parse-self t
-             TeX-source-correlate-start-server t
-             tex-print-file-extension ".pdf")
+       :custom
+       (TeX-electric-math '("$" . "$"))
+       (TeX-auto-save  t)
+       (TeX-parse-self t)
+       (TeX-source-correlate-start-server t)
+       (tex-print-file-extension ".pdf")
+       (TeX-auto-private (list (var! "auctex" "styles")))
 
+       :init
        (defvaralias 'LaTeX-mode-hook 'latex-mode-hook)
 
        (defvar latex-modes+ '(latex-mode tex-mode)
          "list of tex related modes. used for leader and pretty symbols.")
 
-       (push '(tex-mode   . 2) +indent-config)
-       (push '(latex-mode . 2) +indent-config)
+       (setq TeX-auto-local (var! "auctex" "auto"))                                  ; WARN this isn't supposed to be absolute
 
        :config
-       (push 'TeX-output-mode whitespace-exempt-modes)
+       (push '(tex-mode   . 4) +indent-config)
+       (push '(latex-mode . 4) +indent-config)
+
+       (push 'TeX-output-mode  whitespace-exempt-modes)
        (push 'TeX-special-mode whitespace-exempt-modes)
 
-       (add-hook 'plain-TeX-mode-hook
-                 (defun tex-update-electric-math+ (&rest _)
-                   (setq-local TeX-electric-math '("$" . "$"))))
+       (setq latex-standard-block-names (append latex-standard-block-names
+                                                (list "align")))
 
-       (add-hook 'LaTeX-mode-hook
-                 (defun latex-update-electric-math+ (&rest _)
-                   (setq-local TeX-electric-math '("\\(" . "\\)"))))
+       (unless (file-exists-p TeX-auto-local)
+         (mkdir TeX-auto-local t))
 
-       ;; show process output on error
+     ;; Show process output buffer on error
        (advice-add 'TeX-command-sentinel :after
                    (defun TeX-process-error-handler+ (p msg)
                      (unless (zerop (process-exit-status p))
@@ -18803,25 +18885,12 @@
                    (defun TeX-recenter-focus (&rest _)
                      (TeX-pop-to-buffer (TeX-active-buffer))))
 
+     ;;; Extend prettify-symbol symbols from `tex--prettify-symbols-alist'.
        (eval
         `(configure-presym! ',latex-modes+
            ,@(cl-loop
               for tuple in tex--prettify-symbols-alist
               append (list (car tuple) (cdr tuple)))))
-
-       ;; (defun latex/font-bold         () (interactive) (TeX-font nil ?\C-b))
-       ;; (defun latex/font-medium       () (interactive) (TeX-font nil ?\C-m))
-       ;; (defun latex/font-code         () (interactive) (TeX-font nil ?\C-t))
-       ;; (defun latex/font-emphasis     () (interactive) (TeX-font nil ?\C-e))
-       ;; (defun latex/font-italic       () (interactive) (TeX-font nil ?\C-i))
-       ;; (defun latex/font-clear        () (interactive) (TeX-font nil ?\C-d))
-       ;; (defun latex/font-calligraphic () (interactive) (TeX-font nil ?\C-a))
-       ;; (defun latex/font-small-caps   () (interactive) (TeX-font nil ?\C-c))
-       ;; (defun latex/font-sans-serif   () (interactive) (TeX-font nil ?\C-f))
-       ;; (defun latex/font-normal       () (interactive) (TeX-font nil ?\C-n))
-       ;; (defun latex/font-serif        () (interactive) (TeX-font nil ?\C-r))
-       ;; (defun latex/font-oblique      () (interactive) (TeX-font nil ?\C-s))
-       ;; (defun latex/font-upright      () (interactive) (TeX-font nil ?\C-u))
 
        :leader
        (:mode latex-modes+
@@ -18836,37 +18905,55 @@
     #+BEGIN_SRC emacs-lisp
       (use-package tex-site
         :straight auctex
-        :after  tex-mode
-        :defer  t
+        :defer t
         :hook ((latex-mode . TeX-fold-mode)
                (latex-mode . TeX-PDF-mode)
                (latex-mode . TeX-source-correlate-mode))
         :config
-        (defvar-local TeX-command-last nil
-          "the last command invoked by TeX in this buffer.")
+      ;;; Command to insert a math symbol at point
+        (defun latex-insert-math-candidates+ ()
+          "Adapted from `helm-insert-latex-math'."
+          (cl-labels ((latex--math-collect (L)
+                        (cond ((vectorp L)
+                               (list (cons (aref L 0) (aref L 1))))
+                              ((listp L)
+                               (cl-loop for a in L nconc
+                                        (latex--math-collect a))))))
+            (latex--math-collect LaTeX-math-menu)))
+
+        (defun latex-insert-math+ ()
+          (interactive)
+          (let* ((cands (latex-insert-math-candidates+))
+                 (cand (assoc (completing-read "Math symbol: " cands nil t) cands)))
+            (call-interactively (cdr cand))))
+
+      ;;; Make latex automatically repeat the last run command
+        (defvar-local TeX-command-last+ nil
+          "The last command invoked by TeX in this buffer.")
 
         (defun TeX-command-smart (&optional prompt override-confirm)
           "`TeX-command-master' but with memory.
       This function works like the master command, however by default it reruns
       the last run command instead of prompting to run the command. You can pass
-      a prefix arg to force the prompt to take place.
-      "
+      a prefix arg to force the prompt to take place."
           (interactive "P")
-          (unless TeX-command-last
-            (setq prompt t))
-
-          (let ((cmd (or (and prompt
-                              (TeX-command-query (TeX-master-file nil nil t)))
+          (let ((cmd (or (when (or (not TeX-command-last) prompt)
+                           (TeX-command-query (TeX-master-file nil nil t)))
                          TeX-command-last)))
-            (setq TeX-command-last cmd) ;; update command memory
+            (setq TeX-command-last+ cmd)                                               ; update command memory
             (TeX-command cmd 'TeX-master-file override-confirm)))
+
+      ;;; Automatically save the current buffer before running a command
+        (defvar TeX-auto-save-when-compile+ t
+          "When true don't prompt to save before running a TeX command.")
 
         (advice-add 'TeX-command :before
                     (defun TeX-command--prompt-to-save+ (&rest args)
-                      "ask to save modified tex buffers, before running commands on them."
+                      "Ask to save modified tex buffers, before running commands on them."
                       (when (and (buffer-modified-p)
                                  buffer-file-name
-                                 (yes-or-no-p (format "Save file %s?" buffer-file-name)))
+                                 (or TeX-auto-save-when-compile+
+                                     (yes-or-no-p (format "Save file %s?" buffer-file-name))))
                         (save-buffer))))
 
       ;;; Setup the view command for latex
@@ -18924,8 +19011,10 @@
          "RET" 'TeX-command-run-all
          "t" 'TeX-font
          "\\" 'TeX-insert-macro
+         "i" 'TeX-insert-macro
          "s" 'LaTeX-section
-         "m" 'LaTeX-mark-environment ;; or LaTeX-mark-section
+         "m" 'latex-insert-math+
+         "SPC" 'LaTeX-mark-environment                                                ; or LaTeX-mark-section
 
          ;; preview
          "p"   "preview"
@@ -18977,11 +19066,15 @@
         :general
         (:states 'motion
          :keymaps 'TeX-error-overview-mode-map
-         "RET" 'TeX-error-overview-goto-source
-         "j" 'TeX-error-overview-next-error
-         "k" 'TeX-error-overview-previous-error
-         "o" 'TeX-error-overview-jump-to-source
-         [remap quit-window] 'TeX-error-overview-quit))
+         "o" 'TeX-error-overview-goto-source
+         "gj" 'TeX-error-overview-next-error
+         "gk" 'TeX-error-overview-previous-error
+         "RET" 'TeX-error-overview-jump-to-source
+         [remap quit-window] 'TeX-error-overview-quit)
+        ;; (:states '(insert emacs)
+        ;;  :keymaps 'LaTeX-mode-map
+        ;;  "$" 'self-insert-command)
+        )
     #+END_SRC
 
 ** bibtex
@@ -18993,27 +19086,19 @@
      (use-package bibtex
        :defer t
        :hook (bibtex-mode . display-line-numbers-mode)
-       :init
-       (setq bibtex-files (directory-files (org! "bib") t ".bib")
-             bibtex-completion-library-path (list
-                                             (org! "docs/")
-                                             (org! "docs/unidocs/"))
-             bibtex-completion-notes-path (org! "notes"))
-
-       (with-no-warnings
-         (defvaralias 'bibtex-completion-bibliography 'bibtex-files))
+       :custom
+       (bibtex-align-at-equal-sign t)
+       (bibtex-include-OPTkey t)
+       (orhc-bibtex-cache-file (var! "orhc-bibtex-cache"))
+       (bibtex-autokey-titleword-length nil)                                         ; use all available words and be as long as needed
+       (bibtex-autokey-titlewords nil)
+       (bibtex-field-delimiters 'double-quotes)                                      ; what I can I say, this just makes sense
 
        :config
-       (setq bibtex-align-at-equal-sign t
-             bibtex-include-OPTkey t
-             orhc-bibtex-cache-file (var! "orhc-bibtex-cache")
-             ;; use all available words and be as long as needed
-             bibtex-autokey-titleword-length nil
-             bibtex-autokey-titlewords nil
-             ;; what I can I say, this just makes sense
-             bibtex-field-delimiters 'double-quotes)
+       (evil-set-initial-state 'bibtex-mode 'normal)
+       (setq bibtex-files (directory-files (org! "bib") t ".bib"))
 
-       ;; configure bibtex autokey structure: YEARauthor-paper-name
+     ;;; configure bibtex autokey structure: YEARauthor-paper-name
        (defvar bibtex-autokey-year-name-separator+ bibtex-autokey-name-year-separator
          "String to be put between year part and name part of key.
      See ‘bibtex-generate-autokey’ for details.")
@@ -19046,8 +19131,7 @@
                            (funcall bibtex-autokey-before-presentation-function autokey)
                          autokey))))
 
-       (evil-set-initial-state 'bibtex-mode 'normal)
-
+     ;;; Reset the annoying `fill-prefix' behaviour in bibtex.
        (add-hook 'bibtex-mode-hook
                  (defun bibtex-mode-setup+ ()
                    ;; 18 space indent... no thank you.
@@ -19138,6 +19222,13 @@
         :straight nil
         :defer  t
         :commands (bibtex-insert-pdftools-link+)
+        :init
+        (defvaralias 'bibtex-completion-bibliography 'bibtex-files)
+        (setq bibtex-completion-library-path (list
+                                              (org! "docs/")
+                                              (org! "docs/unidocs/"))
+              bibtex-completion-notes-path (org! "notes"))
+
         :config
         (setq bibtex-completion-pdf-extension '(".pdf" ".epub" ".pptx" ".doc" ".docx")
               bibtex-completion-pdf-open-function 'xopen-url+)
@@ -19165,7 +19256,7 @@
                          "[[pdftools:"
                          pdf
                          "::"
-                         (read-from-minibuffer "Page:" "1")
+                         (read-from-minibuffer "Page: " "1")
                          "]["
                          (read-string "Description: " nil nil pdf)
                          "]]")))))))
@@ -19861,6 +19952,16 @@
 
      ;;; marginalia
       `(marginalia-documentation ((,cls (:inherit font-lock-comment-face))))
+
+     ;;; term
+      `(term-color-black ((,cls (:foreground ,dark-grey :background ,dark-grey))))
+      `(term-color-red ((,cls (:foreground ,red :background ,red))))
+      `(term-color-cyan ((,cls (:foreground ,turquoise :background ,turquoise))))
+      `(term-color-blue ((,cls (:foreground ,blue :background ,blue))))
+      `(term-color-white ((,cls (:foreground ,white :background ,white))))
+      `(term-color-green ((,cls (:foreground ,green :background ,green))))
+      `(term-color-yellow ((,cls (:foreground ,yellow :background ,yellow))))
+      `(term-color-magenta ((,cls (:foreground ,purple :background ,purple))))
       )
 
       (custom-theme-set-variables 'an-old-hope
@@ -19885,7 +19986,9 @@
             ("FIXME"       ,orange)
             ("WARN"        ,orange)
             ("XXX+"        ,orange)
-            ("\\?\\?\\?+"  ,orange))))
+            ("\\?\\?\\?+"  ,orange)))
+        `(ansi-color-names-vector
+          '(,dark-grey ,red ,green ,yellow ,blue ,purple ,turquoise ,white)))
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
