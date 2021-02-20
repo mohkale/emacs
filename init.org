@@ -257,6 +257,10 @@
      (defvar +orderless-requires-prescient nil
        "When true, if `prescient' and `orderless' are both configured,
      when prescient is disabled orderless is also disabled.")
+
+     (defvar TeX-view-in-emacs+ nil
+       "When true, view latex documents in emacs PDFTools.
+     This variable should be set before requiring Auctex.")
    #+END_SRC
 
 * Setup
@@ -18769,33 +18773,7 @@
         :hook ((latex-mode . TeX-fold-mode)
                (latex-mode . TeX-PDF-mode)
                (latex-mode . TeX-source-correlate-mode))
-        :init
-        (defvar TeX-view-in-emacs+ nil
-          "when true, view latex documents in emacs PDFTools.
-      This variable should be set before requiring Auctex.")
-
         :config
-        ;; (with-eval-after-load 'tex
-        ;;   (when (executable-find "zathura")
-        ;;     (add-to-list 'TeX-view-program-selection
-        ;;                  '(output-pdf "Zathura"))
-
-        ;;     (let ((editor-command (concat "emacsclient --server-file "
-        ;;                                   (shell-quote-argument (join-path server-auth-dir "server"))
-        ;;                                   (when (unix-p)
-        ;;                                     (concat
-        ;;                                      " --socket-name "
-        ;;                                      (shell-quote-argument (join-path server-socket-dir "server")))))))
-        ;;       ;; emacs isn't using the path for my server file and there's no way to specify
-        ;;       ;; both the server TCP file and socket file, so let's just hack it into the editor
-        ;;       ;; command
-        ;;       (add-to-list 'TeX-view-program-list
-        ;;                    `("Zathura"
-        ;;                      ("zathura %o" (mode-io-correlate
-        ;;                                     ,(concat
-        ;;                                       " --synctex-forward %n:0:\"%b\" -x \"" editor-command  "  +%{line} %{input}\"")))
-        ;;                      "zathura")))))
-
         (defvar-local TeX-command-last nil
           "the last command invoked by TeX in this buffer.")
 
@@ -18823,23 +18801,41 @@
                                  (yes-or-no-p (format "Save file %s?" buffer-file-name)))
                         (save-buffer))))
 
+      ;;; Setup the view command for latex
         (when TeX-view-in-emacs+
-          (add-hook 'TeX-after-compilation-finished-functions
-                    #'TeX-revert-document-buffer))
+          (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer))
 
-        (setq TeX-view-program-selection
-              (delq nil
-                    `(((output-dvi style-pstricks)
-                       "dvips and start")
-                      ,(when TeX-view-in-emacs+
-                         '(output-pdf "PDF Tools"))
-                      ,(when (executable-find "zathura")
-                         '(output-pdf "Zathura"))
-                      (output-dvi "Yap")
-                      ,(when (executable-find "xdvi")
-                         '(output-pdf "xdvi"))
-                      (output-pdf "start")
-                      (output-html "start"))))
+        (with-eval-after-load 'tex
+          (setq TeX-view-program-selection
+                (append (delq nil (list (when TeX-view-in-emacs+
+                                          '(output-pdf "PDF Tools"))
+                                        (when (executable-find "zathura")
+                                          '(output-pdf "Zathura"))
+                                        '(output-html "xopen")))                      ; prefer over xdg-open
+                        TeX-view-program-selection)))
+
+      ;;; Fix annoying emacsclient issues with synctex
+        ;; emacs isn't using the path for my server file and there's no way to specify
+        ;; both the server TCP file and socket file, so let's just hack it into the editor
+        ;; command.
+        (with-eval-after-load 'tex
+          (push
+           `("Zathura"
+             ("zathura %o"
+              (mode-io-correlate
+               ,(concat " --synctex-forward %n:0:\"%b\" -x \""
+                        (concat "emacsclient "
+                                (cond ((unix-p)
+                                       (concat
+                                        " --socket-name "
+                                        (shell-quote-argument (join-path server-socket-dir "server"))))
+                                      ((windows-p)
+                                       (concat
+                                        "--server-file "
+                                        (shell-quote-argument (join-path server-auth-dir "server"))))))
+                        " +%{line} %{input}\"")))
+             "zathura")
+           TeX-view-program-list))
 
         :lazy-leader
         (:mode 'TeX-error-overview-mode
