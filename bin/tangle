@@ -246,7 +246,9 @@ def tangle_file(file, opts={})
       "yes", "yes", "|", "emacs", "--batch",
       "--eval", Shellwords.escape("(require (quote ob-tangle))"),
       "--eval", Shellwords.escape("(setq org-confirm-babel-evaluate nil
-                                         tangling+ t)"),
+                                         tangling+ t
+                                         create-lockfiles nil
+                                         make-backup-files nil)"),
       "--eval", Shellwords.escape("(org-babel-tangle-file \"#{file}\")"),
       "2>&1"
     ].join(" ")
