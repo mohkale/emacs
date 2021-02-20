@@ -69,9 +69,9 @@
         (cond
          ((and lsp eglot)
           (warn "you've enabled both lsp and eglot, defaulting to eglot.")
-          'eglot-ensure)
+          'eglot-ensure-maybe+)
          (lsp   'lsp)
-         (eglot 'eglot-ensure)))
+         (eglot 'eglot-ensure-maybe+)))
       "command used to start a language server.")
 
     nil
@@ -14435,7 +14435,9 @@
      (use-package eglot
        :straight t
        :defer  t
+       :commands (eglot-ensure-maybe+)
        :custom
+       (eglot-autoreconnect nil)
        (eglot-stay-out-of '(company))                                                ; I'll set my backends myself, thank you.
        (eglot-ignored-server-capabilites '(:documentHighlightProvider))              ; Prevent eglot highlighting the symbol at point
 
@@ -14460,6 +14462,42 @@
          ;; eglot doesn't have it's own company backend
          ;; it just extends capf with lsp completions :smile:.
          company-capf)
+
+       (defun eglot-server-exists-p+ (mode &optional all-workspaces)
+         "Assert whether a server exists in the current workspace for MODE.
+     When ALL-WORKSPACES is true we instead check for a server running in any
+     workspace."
+         (seq-find
+          (lambda (server)
+            (eq (eglot--major-mode server) managed-major-mode))
+          (if all-workspaces
+              (-flatten (hash-table-values eglot--servers-by-project))
+            (gethash (or (project-current) `(transient . ,default-directory))
+                     eglot--servers-by-project))))
+
+       (defun eglot-mode-server-p+ ()
+         (eglot-server-exists-p+ major-mode))
+
+       (defun eglot-mode-server-all-p+ ()
+         (eglot-server-exists-p+ major-mode t))
+
+       (defvar eglot-maybe-connect+ `((python-mode . eglot-mode-server-all-p+)
+                                      (sh-mode . t)
+                                      (t . eglot-mode-server-p+))
+         "Alist mapping major modes to conditions specifying whether we should connect
+     to servers or not. The format is (MODE . COND) where MODE can be a mode symbol or
+     true (as a fallback). COND can be a symbol (true to always connect, nil to never
+     connect) or a function which resolves to a symbol.")
+
+       (defun eglot-ensure-maybe+ ()
+         "Call `eglot-ensure' depending on `eglot-maybe-connect+'."
+         (when (let ((enable (or (alist-get major-mode eglot-maybe-connect+)
+                                 (alist-get t eglot-maybe-connect+))))
+                 (cond
+                  ((symbolp enable) enable)
+                  ((functionp enable) (funcall enable))
+                  (t nil)))
+           (eglot-ensure)))
 
        :lazy-leader
        (:mode 'eglot--managed-mode
