@@ -11208,6 +11208,18 @@
                                                (and "bzr_log." (one-or-more num)))))
    #+END_SRC
 
+** save-hist
+   #+BEGIN_SRC emacs-lisp
+     (use-package savehist
+       :straight (savehist :type built-in)
+       :hook (after-init . savehist-mode)
+       :custom
+       (savehist-file (var! "savehist.el"))
+       (savehist-additional-variables
+        '(kill-ring search-ring regexp-search-ring
+          consult--line-history evil-ex-history)))
+   #+END_SRC
+
 ** server
    #+BEGIN_SRC emacs-lisp
      (use-package server
