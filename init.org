@@ -8690,11 +8690,36 @@
         [remap quit-window] 'Custom-buffer-done))
    #+END_SRC
 
-** dabbrev
+** abbrev
    #+BEGIN_SRC emacs-lisp
-     (general-define-key
-      :prefix "C-x"
-      [C-i] 'dabbrev-expand)
+     (use-package abbrev
+       :hook ((org-mode . abbrev-mode)
+              (TeX-mode . abbrev-mode)
+              (LaTeX-mode . abbrev-mode)
+              (git-commit-mode . abbrev-mode)
+              (lisp-interaction-mode . abbrev-mode))
+       :custom
+       (abbrev-file-name (etc! "abbrev.el"))
+       (save-abbrevs 'silently)
+
+       ;; TODO: edit-abbrevs-mode
+
+       :config
+       (quietly-read-abbrev-file)
+
+       :leader
+       (:prefix "ip"
+        "" "abbrev"
+        "r" 'read-abbrev-file
+        "w" 'write-abbrev-file
+        "e" 'edit-abbrevs
+        "a" 'add-mode-abbrev
+        "g" 'add-global-abbrev
+        "l" 'list-abbrevs)
+       ;; :general
+       ;; (:prefix "C-x"
+       ;;  [C-i] 'dabbrev-expand)
+       )
    #+END_SRC
 
 ** debugger
