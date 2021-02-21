@@ -14613,7 +14613,8 @@
      (use-package eglot
        :straight t
        :defer  t
-       :commands (eglot-ensure-maybe+)
+       :commands (eglot-ensure-maybe+
+                  eglot-create-local-command+)
        :custom
        (eglot-autoreconnect nil)
        (eglot-stay-out-of '(company))                                                ; I'll set my backends myself, thank you.
@@ -14671,6 +14672,36 @@
                   ((functionp enable) (funcall enable))
                   (t nil)))
            (eglot-ensure)))
+
+       (defmacro eglot-create-local-command+ (name conf &rest cmd)
+         "Generate a function from CONF that checks for a project-local language \
+     server to run with eglot.
+     CONF is an alist matching file-names to executables which can take care of
+     setting up the PATH configuration (or if necessary installation) needed to
+     run CMD. When no entry in CONF is found relative to the current project root
+     we return CMD as is, otherwise we preppend the cdr of CONF entry that does
+     exist. "
+         (declare (indent 2))
+         `(defun ,(intern (concat "eglot-local-server-" (symbol-name name) "+")) (&optional _interactive)
+            (append
+             (when-let ((default-directory (projectile-project-root)))
+               (cl-loop for (file . cmds) in ,conf
+                        when (file-exists-p file)
+                        return cmds))
+             (list ,@cmd))))
+
+       (push (cons '(js-mode typescript-mode)
+                   (eglot-create-local-command+ node
+                       '(("package-lock.json" "npx")
+                         ("yarn.lock" "yarn" "run"))
+                     "typescript-language-server" "--stdio"))
+             eglot-server-programs)
+
+       (push (cons 'ruby-mode
+                   (eglot-create-local-command+ ruby
+                       '(("Gemfile.lock" "bundle" "exec"))
+                     "solargraph" "socket" "--port" :autoport))
+             eglot-server-programs)
 
        :lazy-leader
        (:mode 'eglot--managed-mode
