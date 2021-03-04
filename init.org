@@ -208,6 +208,7 @@
          ;; jupyter
          ;; kotlin
          ;; glsl
+         log
          latex
          makefile
          markdown
@@ -17765,6 +17766,113 @@
         "gk" 'ssh-config-host-prev))
    #+END_SRC
 
+** logging
+   #+BEGIN_SRC emacs-lisp :tangle (package-yes! log)
+     (use-package logview
+       :straight t
+       :defer t
+       :hook ((logview-mode . read-only-mode)
+              (logview-mode . auto-revert-tail-mode))
+       :config
+       (push '("python" . ((format . "LEVEL:NAME:MESSAGE")
+                           (levels . "RFC 5424")))
+             logview-additional-submodes)
+
+       (setq logview-mode-map (make-sparse-keymap))
+
+       :general
+       (:keymaps 'logview-mode-map
+        :states 'motion
+        [remap evil-goto-first-line] 'logview-first-entry
+        [remap evil-goto-line] 'logview-last-entry
+        [remap revert-buffer] 'logview-revert-buffer
+        [remap evil-next-line] 'logview-next-entry
+        [remap evil-previous-line] 'logview-previous-entry
+        "TAB" 'logview-go-to-message-beginning
+        [C-i] 'logview-go-to-message-beginning
+        "gj" 'logview-next-as-important-entry
+        "gk" 'logview-previous-as-important-entry)
+
+       :lazy-leader
+       (:mode 'logview-mode
+        "," 'logview-choose-submode
+        "[" 'logview-narrow-from-this-entry
+        "]" 'logview-narrow-up-to-this-entry
+        "l" 'logview-refresh-buffer-as-needed
+        "w" 'widen
+
+        "t" "toggles"
+        "t." 'logview-toggle-show-ellipses
+        "tm" 'logview-toggle-search-only-in-messages
+        "tD" 'logview-toggle-details-globally
+        "td" 'logview-toggle-entry-details
+        "tv" 'logview-toggle-region-entry-details
+        "ta" 'auto-revert-mode
+        "tA" 'auto-revert-tail-mode
+        "th" 'logview-toggle-copy-visible-text-only
+        "tg" 'logview-change-target-gap-length
+
+        "s" "show"
+        "se" 'logview-show-entries
+        "sa" 'logview-reset-all-filters
+        "sA" 'logview-reset-all-filters-restrictions-and-hidings
+        "sv" 'logview-show-region-entries
+        "sl" "levels"
+        "sle" 'logview-show-only-errors
+        "slw" 'logview-show-errors-and-warnings
+        "sli" 'logview-show-errors-warnings-and-information
+        "sld" 'logview-show-errors-warnings-information-and-debug
+        "sla" 'logview-show-all-levels
+        "sl0" 'logview-disable-unconditional-show
+        "slE" 'logview-always-show-errors
+        "slW" 'logview-always-show-errors-and-warnings
+        "slI" 'logview-always-show-errors-warnings-and-information
+        "slD" 'logview-always-show-errors-warnings-information-and-debug
+
+        "f" "filter"
+        "fh" 'logview-hide-entry
+        "fv" 'logview-hide-region-entries
+        "fm" 'logview-add-include-message-filter
+        "fM" 'logview-add-exclude-message-filter
+        "ft" 'logview-add-include-thread-filter
+        "fT" 'logview-add-exclude-thread-filter
+        "fa" 'logview-add-include-name-filter
+        "fA" 'logview-add-exclude-name-filter
+        "f>" 'logview-show-only-as-important
+        "fe" 'logview-edit-filters
+
+        "v" "view"
+        "vj" 'logview-next-navigation-view-entry
+        "vk" 'logview-previous-navigation-view-entry
+        "vv" 'logview-switch-to-view
+        "vs" 'logview-save-filters-as-view-for-submode
+        "vS" 'logview-save-filters-as-global-view
+        "ve" 'logview-edit-submode-views
+        "vE" 'logview-edit-all-views
+        "vh" 'logview-highlight-view-entries
+        "vu" 'logview-unhighlight-view-entries
+        "vx" 'logview-delete-view
+        "vi" 'logview-assign-quick-access-index
+        "vn" 'logview-set-navigation-view
+
+        ;; zA logview-forget-difference-base-entries
+        ;; zN logview-next-timestamp-gap-in-this-thread
+        ;; zP logview-previous-timestamp-gap-in-this-thread
+        ;; zT logview-forget-thread-difference-base-entry
+        ;; za logview-difference-to-current-entry
+        ;; zg logview-change-target-gap-length
+        ;; zn logview-next-timestamp-gap
+        ;; zp logview-previous-timestamp-gap
+        ;; zt logview-thread-difference-to-current-entry
+        ;; zz logview-go-to-difference-base-entry
+        )
+
+       :lazy-leader
+       (:mode 'logview-filter-edit-mode
+        "," 'logview-filter-edit-save
+        "q" 'logview-filter-edit-cancel))
+   #+END_SRC
+
 ** makefile
    :PROPERTIES:
    :header-args+: :tangle (package-yes! makefile)
@@ -20057,6 +20165,21 @@
       `(term-color-green ((,cls (:foreground ,green :background ,green))))
       `(term-color-yellow ((,cls (:foreground ,yellow :background ,yellow))))
       `(term-color-magenta ((,cls (:foreground ,purple :background ,purple))))
+
+     ;;; logview-mode
+      `(logview-pulse ((,cls (:inherit highlight))))
+      `(logview-highlight ((,cls (:inherit evil-ex-lazy-highlight))))
+      `(logview-level-trace ((,cls (:inherit font-lock-comment-face))))
+      `(logview-level-debug ((,cls (:inherit font-lock-function-name-face))))
+      `(logview-level-information ((,cls (:inherit font-lock-keyword-face))))
+      `(logview-level-warning ((,cls (:foreground ,orange-int))))
+      `(logview-level-error ((,cls (:inherit font-lock-type-face))))
+
+      `(logview-trace-entry ((,cls (:inherit default))))
+      `(logview-debug-entry ((,cls (:inherit default))))
+      `(logview-information-entry ((,cls (:inherit default))))
+      `(logview-warning-entry ((,cls (:inherit default))))
+      `(logview-error-entry ((,cls (:inherit default))))
       )
 
       (custom-theme-set-variables 'an-old-hope
