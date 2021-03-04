@@ -18643,18 +18643,24 @@
      (use-package typescript-mode
        :straight t
        :defer  t
-       :mode ("\\.tsx" . typescript-mode)
+       :commands (typescriptreact-mode)
+       :mode ("\\.tsx" . typescriptreact-mode)
        :hook (typescript-mode . javascript-enable-lsp-in-projects)
        :general
        (:keymaps 'typescript-mode-map
-        [remap indent-new-comment-line] 'js-jsdoc-return+))
+        [remap indent-new-comment-line] 'js-jsdoc-return+)
+       :config
+       (define-derived-mode typescriptreact-mode typescript-mode
+         "TypescriptReact"))
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
      (when +lsp-command
-       (add-hook 'typescript-mode-hook  +lsp-command))
+       (add-hook 'typescript-mode-hook  +lsp-command)
+       (add-hook 'typescriptreact-mode-hook  +lsp-command))
 
      (push '(typescript-mode . 2) +indent-config)
+     (push '(typescriptreact-mode . 2) +indent-config)
      (add-hook 'typescript-mode-hook
                (defun ts-setup-tsx ()
                  (when (string-suffix-p ".tsx"
