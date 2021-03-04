@@ -12035,8 +12035,8 @@
                        for len = (length cand)
                        if (and (> len 0)
                                (eq (aref cand (1- len)) ?/))
-                       collect (selectrum--add-face cand 'dired-directory)
-                       else
+                       do (add-face-text-property 0 (length cand) 'dired-directory 'append cand)
+                       end
                        collect cand)
             cands))
 
@@ -12079,28 +12079,28 @@
                    end
                    do (setq last-face current-face)))
 
-        (advice-add 'selectrum--add-face :before-until
-                    (defun selectrum-override-current-candidate-face+ (str face)
+        (advice-add 'selectrum--selection-highlight :before-until
+                    (defun selectrum-override-current-candidate-face+ (str)
                       "Use `selectrum-current-candidate' but keep match highlighting.
       This is a workaround until [[https://github.com/raxod502/selectrum/issues/353][#353]] gets resolved."
-                      (when (and (eq face 'selectrum-current-candidate)
-                                 (not (eq selectrum--last-command #'describe-face)))
-                        (setq copied (copy-sequence str))
-                        (if (version< emacs-version "27")
-                            (font-lock-prepend-text-property 0 end 'face face copied)
-                          (add-face-text-property 0 (length copied) face nil copied))
+                      (unless (eq selectrum--last-command #'describe-face)
+                        (let ((face 'selectrum-current-candidate)
+                              (copied (copy-sequence str)))
+                          (if (version< emacs-version "27")
+                              (font-lock-prepend-text-property 0 end 'face face copied)
+                            (add-face-text-property 0 (length copied) face nil copied))
 
-                        (dolist (seq (selectrum-override-current-candidate-face-face-range+
-                                      str '(orderless-match-face-0
-                                            orderless-match-face-1
-                                            orderless-match-face-2
-                                            orderless-match-face-3)))
-                          (cl-destructuring-bind (face . (start . end))
-                              seq
-                            (if (version< emacs-version "27")
-                                (font-lock-prepend-text-property start end 'face face copied)
-                              (add-face-text-property start (1+ end) face nil copied))))
-                        copied)))
+                          (dolist (seq (selectrum-override-current-candidate-face-face-range+
+                                        str '(orderless-match-face-0
+                                              orderless-match-face-1
+                                              orderless-match-face-2
+                                              orderless-match-face-3)))
+                            (cl-destructuring-bind (face . (start . end))
+                                seq
+                              (if (version< emacs-version "27")
+                                  (font-lock-prepend-text-property start end 'face face copied)
+                                (add-face-text-property start (1+ end) face nil copied))))
+                          copied))))
 
         (defun selectrum-update-regexp-search-ring+ (&rest _args)
           "Update search rings based on the last `selectrum-read' command.
@@ -12169,7 +12169,10 @@
     #+BEGIN_SRC emacs-lisp
       (defun selectrum-setup-orderless+ ()
         (setq selectrum-refine-candidates-function #'orderless-filter
-              selectrum-highlight-candidates-function #'selectrum-highlight+))
+              selectrum-highlight-candidates-function #'selectrum-highlight+
+              ;; completion-styles '(orderless)
+              ;; orderless-skip-highlighting (lambda () selectrum-is-active)
+              ))
 
       (defun selectrum-teardown-orderless+ ()
         (warn "ivy-teardown-orderless: Not yet implemented"))
