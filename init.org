@@ -111,6 +111,7 @@
          link-hint                                                         ; Jump to links in the current buffer through an avy interface
          ;; adaptive-wrap                                                  ; Visually wrap long lines. doesn't alter what you write.
          anzu                                                              ; Show the number of search results incrementally
+         ;; beacon                                                         ; Highlight suddens jumps (changes in point) using a beacon
          ;; auto-highlight-symbol                                          ; Automatically highlight the symbol at point
          browser-edit                                                      ; Interface emacs with [[https://www.chromium.org/][chromium]]
          ;; command-log-mode                                               ; Echo commands as you enter them
@@ -14103,6 +14104,14 @@
        :general
        ("M-n" 'ahs-forward
         "M-p" 'ahs-backward))
+   #+END_SRC
+
+** beacon
+   #+BEGIN_SRC emacs-lisp :tangle (package-yes! beacon)
+     (use-package beacon
+       :straight t
+       :defer t
+       :hook (emacs-startup . beacon-mode))
    #+END_SRC
 
 ** bufler
