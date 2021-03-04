@@ -150,7 +150,7 @@
  ("ruby-tools.el" . "6b97066b58a4f82eb2ecea6434a0a7e981aa4c18")
  ("rustic" . "61d600e5598a37034b8b539bd50966c3eb557f10")
  ("s.el" . "43ba8b563bee3426cead0e6d4ddc09398e1a349d")
- ("selectrum" . "338279bb74b41f235c37640f079ffdaf8332166e")
+ ("selectrum" . "1be3e7e17bcc40c9db4e61cc31b03df391d4cf2c")
  ("shrink-path.el" . "c14882c8599aec79a6e8ef2d06454254bb3e1e41")
  ("shut-up" . "081d6b01e3ba0e60326558e545c4019219e046ce")
  ("skeletor.el" . "f6e560a0bfe459e0b8a268047920ce1148f2ebf6")

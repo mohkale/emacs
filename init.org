@@ -1843,19 +1843,6 @@
             (setcdr tail ls2)))
         ls1))
 
-    (defmacro with-no-write-file-messages (&rest body)
-      "execute BODY while supressing \"Wrote: file\" messages"
-      `(let ((save-silently t))
-         ;; replace the VISIT argument of write-region with something
-         ;; that'll supress the write message
-         (cl-letf* (((symbol-function 'actual-write-region)
-                     (symbol-function 'write-region))
-                    ((symbol-function 'write-region)
-                     (lambda (a b c &optional d &rest args)
-                       (apply #'actual-write-region a b c d 'nomsg (cdr args)))))
-           ,@body)))
-    (put 'with-no-write-file-messages 'lisp-indent-function 'defun)
-
     (defun inhibit-messages-wrapper (func &rest args)
       (let ((inhibit-message t))
         (apply func args)))
@@ -4649,6 +4636,11 @@
         :leader
         ("oo" 'org-find-file)
 
+        :init
+        (defvar org-clever-return--insert-headings nil
+          "When true, returning from the end of a heading
+      inserts a heading.")
+
         :general
         (:keymaps 'org-mode-map
          :states 'insert
@@ -4661,9 +4653,10 @@
         "when at a heading, move to parent
       otherwise move to current heading."
         (interactive)
-        (call-interactively (if (org-at-heading-p)
-                                'outline-up-heading
-                              'outline-previous-heading)))
+        (call-interactively
+         (if (org-at-heading-p)
+             'outline-up-heading
+           'outline-previous-heading)))
 
       (defun org-openable-p ()
         (org-element-lineage
@@ -4676,55 +4669,57 @@
            timestamp)
          t))
 
-      (defvar org-clever-return--insert-headings nil
-        "when true, returning from the end of a heading
-      inserts a heading.")
+      ;;; `org-clever-return'
+      (defun org-clever-return--open-line (above)
+        (call-interactively
+         (if above 'evil-open-above 'evil-open-below)))
+
+      (defun org-clever-return--default-action (above interactive)
+        (when (and (line-empty-p)
+                   (not (zerop (column-number (point)))))
+          ;; don't leave a trailing indent on current line unecessarily
+          (remove-all-trailing-whitespace (line-beginning-position)
+                                          (line-end-position)))
+
+        (if (and interactive (not above))
+            (funcall-interactively 'newline-and-indent)
+          (org-clever-return--open-line above)))
 
       (defun org-clever-return (&optional above)
-        "depending on the local state, inserts a heading, a table row an item or newline.
+        "Smartly enter a newline in an org-mode buffer.
+
+      Depending on the local state, inserts a heading, a table row an item or newline.
       this function is functionally similair to the result of evil-org-eol-call-anon, but
       instead of checking the line after moving to the end of it (which doesn't work for
       folded lines, such as headings), it checks before moving and then inserts the right
       items depending on how things looked where you were."
         (interactive)
-        (cl-letf (((symbol-function 'evil-open)
-                   (lambda () (call-interactively
-                          (if above 'evil-open-above 'evil-open-below))))
-                  ((symbol-function 'fallback-action)
-                   (lambda (&optional interactive)
-                     (when (and (line-empty-p)
-                                (not (zerop (column-number (point)))))
-                       ;; don't leave a trailing indent on current line unecessarily
-                       (remove-all-trailing-whitespace (line-beginning-position)
-                                                       (line-end-position)))
-                     (if (and interactive (not above))
-                         (funcall-interactively
-                          'newline-and-indent)
-                       (evil-open)))))
-          (if (and current-prefix-arg (listp current-prefix-arg))
-          ;; When called with simple prefix, goto fallback action.
-              (let ((current-prefix-arg nil))
-                (fallback-action))
-            (cond ((org-table-p)
-                   (org-table-insert-row (not above))
-                   (evil-insert nil))
+        (cond ((and current-prefix-arg
+                    (listp current-prefix-arg))
+               (let (current-prefix-arg)
+                 (org-clever-return--default-action above (called-interactively-p))))
 
-                  ((and org-clever-return--insert-headings
-                        (org-at-heading-p))
-                   (evil-open)
-                   (org-insert-heading))
+              ((org-table-p)
+               (org-table-insert-row (not above))
+               (evil-insert nil))
 
-                  ((org-at-item-p)
-                   ;; position of cursor dictates where new point goes
-                   (if above
-                       (goto-char (line-beginning-position))
-                     (goto-char (line-end-position)))
-                   (org-insert-item)
-                   (evil-append nil))
+              ((and org-clever-return--insert-headings
+                    (org-at-heading-p))
+               (org-clever-return--open-line above)
+               (org-insert-heading))
 
-                  (t (fallback-action (called-interactively-p)))))))
+              ((org-at-item-p)
+               ;; position of cursor dictates where new point goes
+               (goto-char (if above
+                              (line-beginning-position)
+                            (line-end-position)))
+               (org-insert-item)
+               (evil-append nil))
 
-      ;;; org-find-file
+              (t
+               (org-clever-return--default-action above (called-interactively-p)))))
+
+      ;;; `org-find-file'
       (defun org-find-file--generate-candidate (file)
         (let ((relative (file-relative-name file dotemacs-org-path)))
           (if (string-prefix-p ".." relative)
@@ -6968,19 +6963,7 @@
          ;; projectiles fault... who knows. also exclude special emacs backup files from search results.
          (setq projectile-generic-command "find . -type f -not -iname '#*#' -print | cut -c3- | tr '\\n' '\\0'"))
 
-       (defun projectile-cleanup--shut-up-please (func &rest args)
-         "I don't need to know when you've done nothing... thnx tho :P"
-         (cl-letf* (((symbol-function 'actual-message)
-                     (symbol-function 'message))
-                    ((symbol-function 'message)
-                     (lambda (format &rest args)
-                       (if (string-equal format
-                                         "No projects needed to be removed.")
-                           (apply 'format format args)
-                         (apply 'actual-message format args)))))
-           (apply func args)))
-
-       (advice-add 'projectile-cleanup-known-projects :around #'projectile-cleanup--shut-up-please)
+       (advice-add 'projectile-cleanup-known-projects :around #'inhibit-messages-wrapper)
 
        (defun projectile-compile--double-prefix-means-run-comint (func &optional args)
          "allow running compilation interactively when multiple prefixes are given.
@@ -7329,7 +7312,8 @@
 
        (advice-add 'undo-tree-save-history :around
                    (defun undo-tree-save-history--suppress-message+ (func &rest args)
-                     (with-no-write-file-messages (apply func args))))
+                     (let ((message-log-max nil))
+                       (apply func args))))
 
        (defun undo-tree-visualizer-set-and-exit-selection-mode ()
          (interactive)
@@ -9478,6 +9462,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package flyspell
        :hook (git-commit-mode . flyspell-mode)
+       :delight (flyspell-mode " Fly")
        :init
        (evil-ex-define-cmd "spell" #'flyspell-buffer)
 
@@ -12108,11 +12093,11 @@
           "Update search rings based on the last `selectrum-read' command.
       This works for isearch and evil and can automatically detect and compile
       regexp when an external package (eg. orderless) is used."
-          (when-let ((regexp (cond ((eq selectrum-refine-candidates-function
+          (when-let ((input selectrum--last-input)
+                     (regexp (cond ((eq selectrum-refine-candidates-function
                                         'orderless-filter)
                                     (eval
-                                     `(rx (or ,@(cl-loop for regexp in (funcall orderless-pattern-compiler
-                                                                                selectrum--previous-input-string)
+                                     `(rx (or ,@(cl-loop for regexp in (funcall orderless-pattern-compiler input)
                                                          collect `(regexp ,regexp))))))
                                    (t selectrum--previous-input-string))))
             (push regexp regexp-search-ring)
@@ -19962,6 +19947,7 @@
       `(doom-modeline-info ((,cls (:inherit compilation-mode-line-exit))))
 
       `(doom-modeline-buffer-minor-mode ((,cls (:foreground ,purple))))
+      `(doom-modeline-panel ((,cls (:foreground ,very-dark-grey))))
 
      ;;; evil
       `(vimish-fold-overlay ((,cls (:background ,dark-grey :foreground ,green))))
@@ -20061,8 +20047,11 @@
       `(hydra-posframe-border-face ((,cls (:inherit internal-border))))
 
      ;;; selectrum
+      ;; TODO: Remove non-prescient variants
       `(selectrum-current-candidate ((,cls (:foreground ,very-dark-grey :weight bold :inherit highlight))))
       `(selectrum-primary-highlight ((,cls (:background "#555555"))))
+      `(selectrum-prescient-current-candidate ((,cls (:foreground ,very-dark-grey :weight bold :inherit highlight))))
+      `(selectrum-prescient-primary-highlight ((,cls (:background "#555555"))))
       `(selectrum-secondary-highlight ((,cls (:background "#7777FF")))) ;; #8A498A
 
      ;;; consult
