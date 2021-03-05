@@ -37,7 +37,7 @@ config file, try:
 The script depends on ruby and automatically tangles an org file (and any
 other dependent org files) when one of their tangle targets are out of date.
 
-## Features
+## Screenshots
 I like to tinker with everything I use, so my emacs does everything I do. For an
 abridged list of supported features, see my entry-point [config](./init.org#config).
 Some **cool** features include:
@@ -45,23 +45,26 @@ Some **cool** features include:
 
 <div>
   <div>
+    <a href="./.github/dired.png" target="_blank">
+      <img alt="dired" src="./.github/dired.png" title="dired" />
+    </a>
+  </div>
+
+  <div>
     <a href="./.github/magit.png" target="_blank">
       <img alt="magit" src="./.github/magit.png" title="magit" />
     </a>
-    <p align="center"><b>Magit</b></p>
   </div>
 
   <div>
     <a href="./.github/ivy.png" target="_blank">
       <img alt="ivy" src="./.github/ivy.png" title="ivy" />
     </a>
-    <p align="center"><b>ivy</b></p>
   </div>
 
   <div>
     <a href="./.github/rust.png" target="_blank">
       <img alt="rust" src="./.github/rust.png" title="rust" />
     </a>
-    <p align="center"><b>rust</b></p>
   </div>
 </div>
