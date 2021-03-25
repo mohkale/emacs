@@ -16101,6 +16101,18 @@
                                    .project-dir))))
    #+END_SRC
 
+   Classic python using elegent poetry for dependency management.
+
+   #+BEGIN_SRC emacs-lisp
+     (skeletor-define-template "python-poetry"
+       :title "Python [poetry]"
+       :requires-executables '(("python3" . "https://www.python.org/")
+                               ("poetry" . "https://python-poetry.org/"))
+       :after-creation
+       (lambda (dir)
+         (skeletor-shell-command "poetry init --no-interaction --no-ansi --dev-dependence pytest" dir)))
+   #+END_SRC
+
    The recommended golang package structure with sub-packages for commands.
 
    #+BEGIN_SRC emacs-lisp
