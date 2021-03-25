@@ -37,6 +37,9 @@ $(TARGET_BIN): $(OBJ)
 	@echo LINK $@
 	$(CC) $(LDFLAGS) -o $@ $^
 
+dump/$(SRC_DIR)/%.cc: $(OBJ_DIR)/%.o
+	objdump -d -M att -Sl --no-show-raw-insn $<
+
 clean:
 	@echo "CLEAN $(OBJ_DIR)"
 	rm -f main $(OBJ_DIR)/*
