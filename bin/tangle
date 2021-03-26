@@ -244,11 +244,13 @@ def tangle_file(file, opts={})
 
     "bash", "-c", [
       "yes", "yes", "|", "emacs", "--batch",
-      "--eval", Shellwords.escape("(require (quote ob-tangle))"),
       "--eval", Shellwords.escape("(setq org-confirm-babel-evaluate nil
                                          tangling+ t
                                          create-lockfiles nil
+                                         comp-eln-load-path (append (list (concat user-emacs-directory \"eln-cache\"))
+                                                                    (bound-and-true-p comp-eln-load-path))
                                          make-backup-files nil)"),
+      "--eval", Shellwords.escape("(require (quote ob-tangle))"),
       "--eval", Shellwords.escape("(org-babel-tangle-file \"#{file}\")"),
       "2>&1"
     ].join(" ")
@@ -271,7 +273,9 @@ def compile_files(init_file, files, opts={})
 ;; byte-compilation are available. We essentially just spawn a headless
 ;; emacs instance to byte-compile all out of date files.
 
-(setq load-prefer-newer t)
+(setq load-prefer-newer t
+      comp-eln-load-path (append (list (concat user-emacs-directory \"eln-cache\"))
+                                 (bound-and-true-p comp-eln-load-path)))
 
 (load "#{Shellwords.escape(init_file)}")
 
