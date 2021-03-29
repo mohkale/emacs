@@ -298,7 +298,7 @@
        "When true, if `prescient' and `orderless' are both configured,
      when prescient is disabled orderless is also disabled.")
 
-     (defvar TeX-view-in-emacs+ nil
+     (defvar +TeX-view-in-emacs nil
        "When true, view latex documents in emacs PDFTools.
      This variable should be set before requiring Auctex.")
 
@@ -20199,12 +20199,12 @@
                         (save-buffer))))
 
       ;;; Setup the view command for latex
-        (when TeX-view-in-emacs+
+        (when +TeX-view-in-emacs
           (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer))
 
         (with-eval-after-load 'tex
           (setq TeX-view-program-selection
-                (append (delq nil (list (when TeX-view-in-emacs+
+                (append (delq nil (list (when +TeX-view-in-emacs
                                           '(output-pdf "PDF Tools"))
                                         (when (executable-find "zathura")
                                           '(output-pdf "Zathura"))
