@@ -5743,12 +5743,15 @@
        :custom
        ;; show the completion tooltip without any delay.
        (company-tooltip-idle-delay nil)
-       (company-idle-delay 0.5)
+       (company-idle-delay 0.2)
+       (company-minimum-prefix-length 2)
        (company-statistics-file (var! "company/statistics.el"))
        (company-tooltip-align-annotations t)
        (company-require-match nil)
 
        :init
+       (defalias 'case #'cl-case) ; TODO remove when company fixes cl issues.
+
        (defvar company-menu-bindings+
          `(("C-1"   . company-complete-number)
            ("C-2"   . company-complete-number)
@@ -5766,19 +5769,18 @@
            ("C-u"   . company-previous-page)
            ("C-l"   . company-complete-selection)
            ("C-h"   . company-show-doc-buffer)
+           ("C-p"   . company-show-location)
            ("<tab>" . company-complete-common-or-cycle)
            ("RET"   . company-complete-selection)
            ("C-:"   . completion-at-point)
            ("C-/"   . company-filter-candidates)
            ("C-s"   . company-filter-candidates)
            ("C-f"   . company-filter-candidates)
-           ("C-o"   . company-last-candidate+)
-           ("M-o"   . company-first-candidate+))
+           ("C-o"   . company-select-last)
+           ("M-o"   . company-select-first))
          "Bindings which override any local bindings while the company popup is active.
      DO NOT alter this (by setting a new value) while the popup is active, or be prepared
      to restart emacs.")
-
-       (defalias 'case #'cl-case) ; TODO remove when company fixes cl issues.
 
        :config
        ;; don't let display steal focus
@@ -5786,14 +5788,6 @@
        (advice-add 'company-show-doc-buffer :around 'restore-default-display-buffer-actions)
 
        (global-company-mode +1)
-
-       (defun company-first-candidate+ ()
-         (interactive)
-         (company-set-selection 0))
-
-       (defun company-last-candidate+ ()
-         (interactive)
-         (company-set-selection (max 0 (1- company-candidates-length))))
 
        (defun company-complete-next-char+ (&optional count)
          "insert the next COUNT characters from the current candidate."
@@ -5863,8 +5857,8 @@
         "C-p"    'company-search-repeat-backward
         "ESC"    'company-search-abort)
        (:keymaps 'company-active-map
-        "C-w" nil ;; was company-show-location
-        "C-p" 'company-show-location))
+        "C-w"   nil                                                                  ; was company-show-location
+        "ESC"   nil))
    #+END_SRC
 
 *** configure-mode
@@ -5997,6 +5991,67 @@
         :hook (company-mode . company-prescient-mode))
     #+END_SRC
 
+*** company-all-the-icons
+    #+BEGIN_SRC emacs-lisp
+      (defface company-icon+ `((t (:inherit company-tooltip)))
+        "Face for the margin icon in the `company-mode' tooltip."
+        :group 'company-faces)
+
+      (defface company-current-icon+ `((t (:inherit company-tooltip-selection)))
+        "Face for the margin icon for the current candidate in the `company-mode' tooltip."
+        :group 'company-faces)
+
+      (with-eval-after-load 'company
+        (with-eval-after-load 'all-the-icons
+          ;; Default icons adapted from [[https://github.com/onsails/lspkind-nvim/blob/953ca895203c095e13f97a8ece790bf546c82d1c/lua/lspkind/init.lua#L6][lspkind-nvim]].
+          (defconst all-the-icons-lsp-kinds+
+            (apply
+             #'cons
+             (cl-loop
+              for parent-face in '(company-icon+ company-current-icon+)
+              collect `((text        . ,(all-the-icons-nerd-seti "text"                       :face parent-face))
+                        (method      . ,(propertize "ƒ"                                       'face `(:inherit (an-old-hope-yellow-int ,parent-face))))
+                        (function    . ,(all-the-icons-nerd-mdi "function"                    :face `(:inherit (an-old-hope-yellow-int ,parent-face))))
+                        (constructor . ,(all-the-icons-nerd-mdi "dna"                         :face parent-face))
+                        (field       . ,(all-the-icons-nerd-mdi "code-parentheses"            :face parent-face))
+                        (variable    . ,(all-the-icons-nerd-mdi "cube-outline"                :face parent-face))
+                        (class       . ,(all-the-icons-nerd-mdi "code-braces"                 :face `(:inherit (an-old-hope-red ,parent-face))))
+                        (interface   . ,(all-the-icons-nerd-mdi "arrow-down-bold-box-outline" :face parent-face))
+                        (module      . ,(all-the-icons-nerd-mdi "package-variant-closed"      :face parent-face))
+                        (property    . ,(all-the-icons-nerd-oct "code"                        :face parent-face))
+                        (unit        . ,(all-the-icons-nerd-mdi "code-brackets"               :face parent-face))
+                        (value       . ,(all-the-icons-nerd-mdi "numeric"                     :face parent-face))
+                        (enum        . ,(all-the-icons-nerd-fa  "sort-alpha-asc"              :face `(:inherit (an-old-hope-orange ,parent-face))))
+                        (keyword     . ,(all-the-icons-nerd-mdi "apple-keyboard-shift"        :face parent-face))
+                        (snippet     . ,(all-the-icons-nerd-mdi "subdirectory-arrow-left"     :face parent-face))
+                        (color       . ,(all-the-icons-nerd-mdi "palette"                     :face parent-face))
+                        (file        . ,(all-the-icons-nerd-mdi "file"                        :face parent-face))
+                        (reference   . ,(all-the-icons-nerd-mdi "format-list-bulleted"        :face parent-face)))))
+            "Association between `eglot' LSP kinds and annotation icons for `company-mode'.
+      To reduce the amount of redundant processing in the margin function, this is defined
+      as a cons cell of icon alists, with the car alist being for regular candidates in the
+      company popup and the cdr alist for the current-candidate.")
+
+          (defconst all-the-icons-default-completion-icon+
+            (cons (all-the-icons-nerd-oct "file" :face 'company-icon+)
+                  (all-the-icons-nerd-oct "file" :face 'company-current-icon+)))
+
+          (setq company-format-margin-function
+                (defun company-format-margin-function+ (candidate selected)
+                  (concat
+                   (make-string company-tooltip-margin ? )
+                   (all-the-icons-pad+
+                    (or
+                     (when-let ((kind (company-call-backend 'kind candidate)))
+                       (alist-get kind
+                                  (if selected
+                                      (cdr all-the-icons-lsp-kinds+)
+                                    (car all-the-icons-lsp-kinds+))))
+                     (if selected
+                         (cdr all-the-icons-default-completion-icon+)
+                       (car all-the-icons-default-completion-icon+)))))))))
+    #+END_SRC
+
 ** all-the-icons
    provides some fonts for rendering graphical icons within emacs; alongside a set
    of functions to make retrieving appropriate functions for appropriate purposes.
@@ -6011,16 +6066,18 @@
         "xI" 'all-the-icons-insert-all-icons)
 
        :init
+       (defsubst all-the-icons-pad+ (icon &optional suffix)
+         (let ((props (text-properties-at 0 icon)))
+           (apply 'propertize
+                  (concat (substring-no-properties icon) (or suffix " "))
+                  props)))
+
        (defun all-the-icons-pad-on-tty-advice+ (value)
          ":filter-return advice for all-the-icons functions which appends
      an extra space to the icon when displaying icons on the tty."
          (if (and (not (display-graphic-p))
                   value)
-             (let ((props (text-properties-at 0 value)))
-               (apply 'propertize
-                      (concat (substring-no-properties value)
-                              " ")
-                      props))
+             (all-the-icons-pad+ value)
            value))
 
        :config
@@ -14700,10 +14757,6 @@
         (with-no-warnings
           (defvaralias 'counsel-find-file-ignore-regexp '+find-file-ignore-regexp))
 
-        (with-eval-after-load 'company
-          (when-let ((cell (rassoc 'completion-at-point company-menu-bindings+)))
-            (setcdr cell 'counsel-company)))
-
         (with-eval-after-load 'esh-mode
           (leader/set-keys-for-major-mode 'eshell-mode
             "TAB" 'counsel-esh-history))
@@ -14791,6 +14844,7 @@
          "x" 'counsel-wmctrl
          "C-x" 'counsel-wmctrl)
         (:keymaps 'counsel-mode-map
+         [remap completion-at-point] 'counsel-company
          [remap insert-char] 'counsel-unicode-char
          [remap describe-face] 'counsel-faces
          [remap package-install] 'counsel-package
@@ -20868,6 +20922,37 @@
    #+HEADER: :var             debug=aoh-gen-color(hue=198, sat=91,  light=13)               debug-256="#00005f"
    #+HEADER: :var rainbow-delimeters-colors=(list "#E6B422" "#C70067" "#00A960" "#FC7482")
    #+BEGIN_SRC emacs-lisp :results silent
+     (defface an-old-hope-very-light-grey `((,tru (:foreground ,very-light-grey)) (,cls (:foreground ,very-light-grey-256))) "")
+     (defface an-old-hope-light-grey      `((,tru (:foreground ,light-grey))      (,cls (:foreground ,light-grey-256)))      "")
+     (defface an-old-hope-grey            `((,tru (:foreground ,grey))            (,cls (:foreground ,grey-256)))            "")
+     (defface an-old-hope-dark-grey       `((,tru (:foreground ,dark-grey))       (,cls (:foreground ,dark-grey-256)))       "")
+     (defface an-old-hope-very-dark-grey  `((,tru (:foreground ,very-dark-grey))  (,cls (:foreground ,very-dark-grey-256)))  "")
+     (defface an-old-hope-red             `((,tru (:foreground ,red))             (,cls (:foreground ,red-256)))             "")
+     (defface an-old-hope-red-dim         `((,tru (:foreground ,red-dim))         (,cls (:foreground ,red-dim-256)))         "")
+     (defface an-old-hope-red-int         `((,tru (:foreground ,red-int))         (,cls (:foreground ,red-int-256)))         "")
+     (defface an-old-hope-orange          `((,tru (:foreground ,orange))          (,cls (:foreground ,orange-256)))          "")
+     (defface an-old-hope-orange-dim      `((,tru (:foreground ,orange-dim))      (,cls (:foreground ,orange-dim-256)))      "")
+     (defface an-old-hope-orange-int      `((,tru (:foreground ,orange-int))      (,cls (:foreground ,orange-int-256)))      "")
+     (defface an-old-hope-yellow          `((,tru (:foreground ,yellow))          (,cls (:foreground ,yellow-256)))          "")
+     (defface an-old-hope-yellow-dim      `((,tru (:foreground ,yellow-dim))      (,cls (:foreground ,yellow-dim-256)))      "")
+     (defface an-old-hope-yellow-int      `((,tru (:foreground ,yellow-int))      (,cls (:foreground ,yellow-int-256)))      "")
+     (defface an-old-hope-green           `((,tru (:foreground ,green))           (,cls (:foreground ,green-256)))           "")
+     (defface an-old-hope-green-int       `((,tru (:foreground ,green-int))       (,cls (:foreground ,green-int-256)))       "")
+     (defface an-old-hope-green-dim       `((,tru (:foreground ,green-dim))       (,cls (:foreground ,green-dim-256)))       "")
+     (defface an-old-hope-blue            `((,tru (:foreground ,blue))            (,cls (:foreground ,blue-256)))            "")
+     (defface an-old-hope-blue-dim        `((,tru (:foreground ,blue-dim))        (,cls (:foreground ,blue-dim-256)))        "")
+     (defface an-old-hope-blue-int        `((,tru (:foreground ,blue-int))        (,cls (:foreground ,blue-int-256)))        "")
+     (defface an-old-hope-purple          `((,tru (:foreground ,purple))          (,cls (:foreground ,purple-256)))          "")
+     (defface an-old-hope-purple-dim      `((,tru (:foreground ,purple-dim))      (,cls (:foreground ,purple-dim-256)))      "")
+     (defface an-old-hope-purple-int      `((,tru (:foreground ,purple-int))      (,cls (:foreground ,purple-int-256)))      "")
+     (defface an-old-hope-turquoise       `((,tru (:foreground ,turquoise))       (,cls (:foreground ,turquoise-256)))       "")
+     (defface an-old-hope-turquoise-dim   `((,tru (:foreground ,turquoise-dim))   (,cls (:foreground ,turquoise-dim-256)))   "")
+     (defface an-old-hope-turquoise-int   `((,tru (:foreground ,turquoise-int))   (,cls (:foreground ,turquoise-int-256)))   "")
+     (defface an-old-hope-black           `((,tru (:foreground ,black))           (,cls (:foreground ,black-256)))           "")
+     (defface an-old-hope-black-dim       `((,tru (:foreground ,black-dim))       (,cls (:foreground ,black-dim-256)))       "")
+     (defface an-old-hope-black-int       `((,tru (:foreground ,black-int))       (,cls (:foreground ,black-int-256)))       "")
+     (defface an-old-hope-white           `((,tru (:foreground ,white))           (,cls (:foreground ,white-256)))           "")
+
      (custom-theme-set-faces 'an-old-hope
      ;;; defaults
       `(default
@@ -20918,6 +21003,7 @@
       `(vertical-border ((,cls (:foreground ,grey))))
       `(internal-border ((,cls (:foreground ,white :background ,white))))
       `(minibuffer-prompt ((,cls (:foreground ,yellow-256 :weight bold))))
+      `(tooltip ((,cls (:background ,dark-grey :foreground ,very-light-grey))))
 
       `(highlight ((,cls (:foreground ,very-dark-grey :background ,blue
                           :distant-foreground ,blue :inherit bold))))
@@ -21056,25 +21142,29 @@
       `(company-template-field ((,cls (:foreground ,turquoise-int))))
 
       ;; scrollbar
-      `(company-scrollbar-bg ((,cls (:background ,very-light-grey :foreground ,very-light-grey))))
-      `(company-scrollbar-fg ((,cls (:background ,dark-grey       :foreground ,dark-grey))))
+      `(company-scrollbar-bg ((,cls (:background ,line-highlight-bg :foreground ,very-light-grey))))
+      `(company-scrollbar-fg ((,cls (:background ,red               :foreground ,dark-grey))))
 
       `(company-preview ((,cls (:foreground ,blue-int :weight bold :inherit hl-line))))
       `(company-preview-common ((,cls (:inherit company-preview))))
       `(company-preview-search ((,cls (:foreground ,orange-int :weight normal :inherit company-preview))))
 
       ;; NOTE tooltip is the drop down menu which shows up when multiple results exist
-      `(company-tooltip ((,cls (:inherit bold :background ,very-light-grey :foreground ,very-dark-grey))))
-      `(company-tooltip-selection ((,cls (:foreground ,very-light-grey :background ,blue-int))))
-      `(company-tooltip-common ((,cls (:foreground ,blue-int :inherit company-tooltip))))
-      `(company-tooltip-common-selection ((,cls (:foreground ,very-dark-grey :background ,blue-int :inherit company-tooltip-common))))
-      `(company-tooltip-search ((,cls (:foreground ,orange :inherit company-tooltip))))
+      `(company-tooltip ((,cls (:background ,black-dim :inherit tooltip))))
+      `(company-tooltip-common ((,cls (:foreground ,red-int :inherit (company-tooltip bold)))))
+      `(company-tooltip-search ((,cls (:foreground ,blue-int :inherit company-tooltip))))
       `(company-tooltip-search-common ((,cls (:inherit company-tooltip-search))))
-      `(company-tooltip-search-selection ((,cls (:background ,blue-int :inherit company-tooltip-search))))
+
+      `(company-tooltip-selection ((,cls (:background ,dark-grey :inherit (company-tooltip bold)))))
+      `(company-tooltip-common-selection ((,cls (:background ,dark-grey :inherit company-tooltip-common))))
+      `(company-tooltip-search-selection ((,cls (:background ,dark-grey :inherit (company-tooltip-search)))))
+
+      `(company-icon+ ((,cls (:weight normal :inherit company-tooltip))))
+      `(company-current-icon+ ((,cls (:weight normal :inherit company-tooltip-selection))))
 
       ;; NOTE annotations are extra information in the tooltip
       `(company-tooltip-annotation ((,cls (:weight bold :foreground ,grey))))
-      `(company-tooltip-annotation-selection ((,cls (:foreground ,turquoise-int :background ,blue-int :inherit company-tooltip-annotation))))
+      `(company-tooltip-annotation-selection ((,cls (:inherit company-tooltip-annotation))))
 
       `(popup ((,cls (:inherit popup-face))))
 
