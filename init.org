@@ -134,7 +134,7 @@
   overview of all the files emacs requires. It's helpful for figuring out what's
   forcing a deferred package to be loaded.
 
-  #+BEGIN_SRC emacs-lisp
+  #+BEGIN_SRC emacs-lisp :tangle no
     (defvar +require-tree nil)
     (advice-add 'require :around
                 (defun require--advice (orig-fun feature &rest args)
@@ -336,7 +336,7 @@
      out exec error... my loathing towards windows grows :P.")
 
      (defvar +lsp-maybe-connect `((python-mode . :global)
-                                  (sh-mode . t)
+                                  (sh-mode . nil)
                                   (t . :local))
        "Alist configuring whether we should connect a buffer to an LSP server or not.
      The format is (MODE . COND) where mode is a `major-mode' for the buffer and COND
@@ -764,6 +764,7 @@
              completion-ignore-case t                                               ; make completion case insensitive, holding down shift is annoying.
              completions-detailed t                                                 ; show annotations for certain completion candidates
              Man-notify-method 'pushy                                               ; Open manual buffer in the current window
+             confirm-nonexistent-file-or-buffer nil                                 ; Don't require confirmation when creating a new file
              recenter-positions '(top middle bottom))
      #+END_SRC
 
@@ -2068,8 +2069,7 @@
                (save-window-excursion
                  (find-dotemacs-org-file)
                  (cons (buffer-file-name)
-                       (when-let ((cand (car (cl-assoc "Config" (imenu--make-index-alist t) :test #'string-equal))))
-                         (get-text-property 0 'org-imenu-marker cand)))))
+                       (cdr (cl-assoc "* Config" (imenu--make-index-alist t) :test #'string-equal)))))
          (if file
              (progn
                (find-file file)
@@ -5744,7 +5744,8 @@
       `org-link-minor-mode' enabled won't (eg: scratch)."
                     (add-hook 'text-mode-hook #'enable-org-link-minor-mode)
                     (add-hook 'prog-mode-hook #'enable-org-link-minor-mode)
-                    (add-hook 'conf-mode-hook #'enable-org-link-minor-mode)))
+                    (add-hook 'conf-mode-hook #'enable-org-link-minor-mode)
+                    (add-hook 'magit-revision-mode-hook #'enable-org-link-minor-mode)))
 
         :config
         (when-let ((scratch (get-buffer scratch-buffer-name)))
@@ -6028,7 +6029,7 @@
                   all-the-icons-family+)
        :leader
        ("xi" 'all-the-icons-insert
-        "xI" 'all-the-icons-insert-all-icons)
+        "xI" 'all-the-icons-insert-all)
 
        :init
        (defsubst all-the-icons-pad+ (icon &optional suffix)
@@ -6049,6 +6050,13 @@
        (setq inhibit-compacting-font-caches t)
        (push '(rustic-mode all-the-icons-alltheicon "rust") all-the-icons-mode-icon-alist)
        (push '(web-mode    all-the-icons-faicon     "html5") all-the-icons-mode-icon-alist)
+
+       (defun all-the-icons-insert-all ()
+         (interactive)
+         (cl-loop for family in all-the-icons-font-families
+                  with icons = nil
+                  do (cl-loop for (name . icon) in (funcall (all-the-icons--data-name family))
+                              do (insert "\n" icon "  " (symbol-name family) " - " name))))
 
        (defun all-the-icons-insert-all-icons ()
          (interactive)
@@ -8219,6 +8227,7 @@
        (defun projectile-org-capture+ ()
          "`org-capture' wrapper which includes project specific capture templates."
          (interactive)
+         (require 'org-capture)
          (let* ((root (ignore-errors (projectile-project-root)))
                 (name (projectile-project-name))
                 (org-capture-templates-contexts
@@ -10663,6 +10672,13 @@
         "o" 'flymake-show-diagnostic))
    #+END_SRC
 
+*** flymake-diagnostics-at-point
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package flymake-diagnostic-at-point
+        :straight t
+        :hook (flymake-mode . flymake-diagnostic-at-point-mode))
+    #+END_SRC
+
 ** flyspell
    On the fly spell checker. Spawns an aspell subprocess and passes any words you write
    to it; any mispellings or unknown words will be highlighted to indicate they're mispelled.
@@ -10853,9 +10869,7 @@
          ;; ibuffer-do-isearch
          ;; ibuffer-do-isearch-regexp
 
-         "TAB"       'ibuffer-forward-filter-group
-         "<S-tab>"   'ibuffer-backward-filter-group
-         "<backtab>" 'ibuffer-backward-filter-group
+         [C-m] "RET"
 
          ;; "D" 'ibuffer-mark-for-delete-backwards
          "D" 'ibuffer-do-delete
@@ -10874,11 +10888,11 @@
          "gu"                  'ibuffer-do-revert
          "gw"                  'ibuffer-do-save
 
-                ;;; marking
+      ;;; marking
          "m" 'ibuffer-mark-forward
          "r" 'ibuffer-change-marks
 
-                ;;; sorting
+      ;;; sorting
          "S"  'ibuffer-toggle-sorting-mode
          "sa" 'ibuffer-do-sort-by-alphabetic
          "sf" 'ibuffer-do-sort-by-filename/process
@@ -10887,13 +10901,19 @@
          "sm" 'ibuffer-do-sort-by-major-mode
          "ss" 'ibuffer-do-sort-by-size
          "sr" 'ibuffer-do-sort-by-recency
-
          "("   'ibuffer-switch-format
-                ;;; movement
-         "C-j" 'ibuffer-forward-line
-         "C-k" 'ibuffer-backward-line
-         "gj"  'ibuffer-forward-next-marked
-         "gk"  'ibuffer-backwards-next-marked
+
+      ;;; movement
+         "TAB"       'ibuffer-forward-filter-group
+         "gj"        'ibuffer-forward-filter-group
+         "gk"        'ibuffer-backward-filter-group
+         "<S-tab>"   'ibuffer-backward-filter-group
+         "<backtab>" 'ibuffer-backward-filter-group
+
+         [remap evil-next-line] 'ibuffer-forward-line
+         [remap evil-previous-line] 'ibuffer-backward-line
+         "C-j"  'ibuffer-forward-next-marked
+         "C-k"  'ibuffer-backwards-next-marked
 
          "p"   'ibuffer-yank
          "C-y" 'ibuffer-yank
@@ -11038,9 +11058,10 @@
         (setq ibuffer-projectile-prefix
               (if +icons-available
                   (concat
-                   (all-the-icons-octicon "file-directory"
-                                          :face ibuffer-filter-group-name-face
-                                          :v-adjust -0.05)
+                   (all-the-icons-pad-on-tty-advice+
+                    (all-the-icons-nerd-oct "file-directory"
+                                            :face ibuffer-filter-group-name-face
+                                            :v-adjust -0.05))
                    " ")
                 "Project: "))
 
@@ -11245,6 +11266,15 @@
       (add-hook 'minibuffer-setup-hook #'defer-garbage-collection+)
       (add-hook 'minibuffer-exit-hook #'restore-garbage-collection+)
     #+END_SRC
+
+** minibuffer-depth-indication
+   #+BEGIN_SRC emacs-lisp
+     (use-package mb-depth
+       :demand t
+       :defer 50
+       :config
+       (minibuffer-depth-indicate-mode))
+   #+END_SRC
 
 ** macros
    emacs macro facilities configuration.
@@ -16355,14 +16385,19 @@
         "g" 'magit-dispatch
         "s" 'magit-status
         "u" 'magit-unstage-file
-        "h" 'magit-log-buffer-file)
+        "h" 'magit-log-buffer-file
+        "b" 'magit-blame)
 
        :lazy-leader
        (:mode 'magit-status-mode
         "z" 'magit-jump-to-stashes
         "u" 'magit-jump-to-unstaged
         "s" 'magit-jump-to-staged
-        "f" 'magit-jump-to-untracked)
+        "f" 'magit-jump-to-untracked
+        "r" 'magit-show-refs
+        "y" "copy"
+        "ys" 'magit-copy-section-value
+        "yr" 'magit-copy-buffer-revision)
        (:mode 'magit-log-select-mode
         "," 'magit-log-select-pick
         "q" 'magit-log-select-quit)
@@ -16536,36 +16571,50 @@
          (transient-append-suffix 'magit-dispatch "!"
            '("@" "Forge" forge-dispatch)))
 
-       (evil-define-operator evil-collection-magit-yank-whole-line
-         (beg end type register yank-handler)
-         "Yank whole line."
-         :motion evil-line-or-visual-line
-         (interactive "<R><x>")
-         (evil-yank beg end type register yank-handler))
-
        :general
        (:keymaps 'magit-mode-map
         :states '(motion visual)
-                                                "g"   nil
-        "C-j"   'magit-section-forward          "n"   nil
-        "gj"    'magit-section-forward-sibling  "M-n" nil
-        "]"     'magit-section-forward-sibling  "M-n" nil
-        "C-k"   'magit-section-backward         "p"   nil
-        "gk"    'magit-section-backward-sibling "M-p" nil
-        "["     'magit-section-backward-sibling "M-p" nil
-        "gr"    'magit-refresh                  "g"   nil
-        "gR"    'magit-refresh-all              "G"   nil
-        "x"     'magit-delete-thing             "k"   nil
-        "X"     'magit-file-untrack             "K"   nil
-        "-"     'magit-revert-no-commit         "v"   nil
-        "_"     'magit-revert                   "V"   nil
-        "p"     'magit-push                     "P"   nil
-        "o"     'magit-reset-quickly            "x"   nil
-        "O"     'magit-reset                    "X"   nil
-        "|"     'magit-git-command              ":"   nil
-        "'"     'magit-submodule                "o"   nil
-        "\""    'magit-subtree                  "O"   nil
-        "="     'magit-diff-less-context        "-"   nil
+        "g"     nil
+        "n"     nil                                                                  ; magit-section-forward
+        "M-n"   nil                                                                  ; magit-section-forward-sibling
+        "M-n"   nil                                                                  ; magit-section-forward-sibling
+        "p"     nil                                                                  ; magit-section-backward
+        "M-p"   nil                                                                  ; magit-section-backward-sibling
+        "M-p"   nil                                                                  ; magit-section-backward-sibling
+        "g"     nil                                                                  ; magit-refresh
+        "G"     nil                                                                  ; magit-refresh-all
+        "k"     nil                                                                  ; magit-delete-thing
+        "K"     nil                                                                  ; magit-file-untrack
+        "v"     nil                                                                  ; magit-revert-no-commit
+        "V"     nil                                                                  ; magit-revert
+        "P"     nil                                                                  ; magit-push
+        "x"     nil                                                                  ; magit-reset-quickly
+        "X"     nil                                                                  ; magit-reset
+        ":"     nil                                                                  ; magit-git-command
+        "o"     nil                                                                  ; magit-submodule
+        "O"     nil                                                                  ; magit-subtree
+        "-"     nil                                                                  ; magit-diff-less-context
+        "SPC"   nil                                                                  ; magit-diff-show-or-scroll-up
+        "DEL"   nil                                                                  ; magit-diff-show-or-scroll-down
+        "C-j"   'magit-section-forward
+        "gj"    'magit-section-forward-sibling
+        "]"     'magit-section-forward-sibling
+        "C-k"   'magit-section-backward
+        "gk"    'magit-section-backward-sibling
+        "["     'magit-section-backward-sibling
+        "gr"    'magit-refresh
+        "gR"    'magit-refresh-all
+        "x"     'magit-delete-thing
+        "X"     'magit-file-untrack
+        "-"     'magit-revert-no-commit
+        "_"     'magit-revert
+        "p"     'magit-push
+        "o"     'magit-reset-quickly
+        "O"     'magit-reset
+        "|"     'magit-git-command
+        "'"     'magit-submodule
+        "\""    'magit-subtree
+        "="     'magit-diff-less-context
         "@"     'forge-dispatch
         "j"     'evil-next-line
         "k"     'evil-previous-line
@@ -16576,9 +16625,8 @@
         "C-b"   'evil-scroll-page-up
         ":"     'evil-ex
         "q"     'magit-mode-bury-buffer
-
-        "S-SPC" 'magit-diff-show-or-scroll-up   "SPC" nil
-        "S-DEL" 'magit-diff-show-or-scroll-down "DEL" nil)
+        "S-SPC" 'magit-diff-show-or-scroll-up
+        "S-DEL" 'magit-diff-show-or-scroll-down)
        (:keymaps 'magit-mode-map
         :states 'motion
         evil-toggle-key #'evil-emacs-state
@@ -16616,17 +16664,22 @@
        (:keymaps 'magit-mode-map
         :states '(motion visual)
         "C-u" 'evil-scroll-up)
+
        ;; evil-collection-magit-use-y-for-yank
        (:keymaps 'magit-mode-map
         :states '(motion visual)
         "v"    'evil-visual-line
-        "V"    'evil-visual-line
-        ;; "C-w"  'evil-window-map
-        "y"    nil
-        "yy"   'evil-collection-magit-yank-whole-line
-        "yr"   'magit-show-refs
-        "ys"   'magit-copy-section-value
-        "yb"   'magit-copy-buffer-revision)
+        "V"    'evil-visual-line)
+       ;; (:keymaps 'magit-status-mode-map
+       ;;  :states 'motion
+       ;;  "y" (general-key-dispatch 'evil-yank
+       ;;        "y" 'evil-line-or-visual-line
+       ;;        "j" 'evil-next-visual-line
+       ;;        "k" 'evil-previous-visual-line))
+       (:keymaps 'magit-status-mode-map
+        :states '(visual normal)
+        "y" 'evil-yank)
+
        (:keymaps 'magit-mode-map
         :states 'visual
         "y" 'magit-copy-section-value)
@@ -17203,7 +17256,7 @@
                          (read-string "Entry point [main]: " nil nil "main")))
          ("__CCLD__" . (lambda ()
                        (funcall skeletor-completing-read-function "Compiler: "
-                                '("clang" "gcc" "g++"))))))
+                                '("clang" "clang++" "gcc" "g++"))))))
    #+END_SRC
 
    The same as a makefile project but using cmake instead of make. This is pretty
@@ -18335,6 +18388,8 @@
                (when (project-has-file-p "Gemfile")
                  :local)))
        +lsp-maybe-connect)
+
+      (add-hook +ruby-mode-hook +lsp-command)
     #+END_SRC
 
 *** inferiror-ruby
@@ -19311,7 +19366,8 @@
        :hook ((c-mode   . flycheck-mode)
               (c++-mode . flycheck-mode))
        :config
-       (c-toggle-auto-newline  +1)
+       (add-transient-hook! c-mode-hook #'c-toggle-auto-newline)
+       (add-transient-hook! c++-mode-hook #'c-toggle-auto-newline)
        ;; WARN never do this, it breaks commenting in
        ;;      weird places.
        ;; (c-toggle-comment-style +1)
@@ -19712,25 +19768,27 @@
    #+BEGIN_SRC emacs-lisp
      (use-package typescript-mode
        :straight t
-       :commands (typescriptreact-mode)
-       :mode ("\\.tsx" . typescriptreact-mode)
+       :commands (typescript-react-mode)
+       :mode ("\\.tsx" . typescript-react-mode)
        :hook (typescript-mode . javascript-enable-lsp-in-projects)
        :general
        (:keymaps 'typescript-mode-map
         [remap indent-new-comment-line] 'js-jsdoc-return+)
        :config
-       (define-derived-mode typescriptreact-mode typescript-mode
-         "TypescriptReact"))
+       (define-derived-mode typescript-react-mode typescript-mode
+         "TypescriptReact")
+
+       (put 'typescript-react-mode 'eglot-language-id "typescriptreact"))
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
      (when +lsp-command
        (add-hook 'typescript-mode-hook       +lsp-command)
-       (add-hook 'typescriptreact-mode-hook  +lsp-command))
+       (add-hook 'typescript-react-mode-hook +lsp-command))
 
      (push '(typescript-mode      . 2) +indent-config)
-     (push '(typescriptreact-mode . 2) +indent-config)
-     (add-hook 'typescriptreact-mode-hook
+     (push '(typescript-react-mode . 2) +indent-config)
+     (add-hook 'typescript-react-mode-hook
                (defun typescriptreact-setup-tsx+ ()
                  (emmet-mode +1)
                  (setq-local emmet-expand-jsx-className? t)))
@@ -20957,6 +21015,7 @@
       `(vertical-border ((,cls (:foreground ,grey))))
       `(internal-border ((,cls (:foreground ,white :background ,white))))
       `(minibuffer-prompt ((,cls (:foreground ,yellow-256 :weight bold))))
+      `(minibuffer-depth-indicator ((,cls (:foreground ,yellow-256 :weight bold))))
       `(tooltip ((,cls (:background ,dark-grey :foreground ,very-light-grey))))
 
       `(highlight ((,cls (:foreground ,very-dark-grey :background ,blue
