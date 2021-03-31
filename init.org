@@ -59,6 +59,9 @@
     (defmacro package-yes! (&rest pkgs)
       `(if (package! ,@pkgs) "yes" "no"))
 
+    (defmacro package-no! (&rest pkgs)
+      `(if (package! ,@pkgs) "no" "yes"))
+
     (defmacro package-str! (str &rest pkgs)
       `(if (package! ,@pkgs) ,str "no"))
 
@@ -174,6 +177,7 @@
          ;; realgud                                                        ; The quintessential debugger package for emacs
          rainbow-mode                                                      ; Automatically color/highlight css color names
          skeletor                                                          ; Project skeleton generator package
+         undo-tree                                                         ; Undo system based on vim with tree like visualiser
          ;; rake                                                           ; Run rake tasks
          ;; vi-tilde-fringe                                                ; Show tildes at the end of the buffer
          ;; vlc-rc                                                         ; Control [[https://www.videolan.org/vlc/index.en-GB.html][VLC]] from emacs
@@ -861,6 +865,26 @@
                                               ".elc"
                                               (and "tmp." (+ (not (any "/" "\\")))))
                                           eol)))))
+   #+END_SRC
+
+   #+BEGIN_SRC emacs-lisp
+     (defvar undo-skip-autosave-regex+
+       (rx
+        (or
+         ;; match extensions in filename
+         (and (or ".pdf" ".log") eol)
+         ;; match exact file paths
+         (and
+          (or
+           ;; wildcard regexp match. any match is a valid match.
+           (and "[*Org Src")
+           ;; match from the beginning of the line
+           (and bol (or
+                     (eval dotemacs-var-path)
+                     (eval (concat straight-base-dir "straight/"))
+                     (eval package-user-dir)
+                     (eval +dashboard-banners-directory)))))))
+       "Skip undo backups for files matching this regexp")
    #+END_SRC
 
     load any variables in my ~custom.el~ file
@@ -3522,7 +3546,6 @@
      (use-package evil
        :straight t
        :custom
-       (evil-undo-system 'undo-tree)
        (evil-cross-lines t)
        (evil-default-state 'motion)
        (evil-want-C-i-jump nil)
@@ -8485,10 +8508,15 @@
    #+END_SRC
 
 ** undo-tree
-   #+BEGIN_SRC emacs-lisp
+   #+BEGIN_SRC emacs-lisp :tangle (package-yes! undo-tree)
      (use-package undo-tree
        :straight t
        :diminish
+       :custom
+       (evil-undo-system 'undo-tree)
+       (undo-tree-auto-save-history t)
+       (undo-tree-history-directory-alist `(("." . ,(var! "undo-tree"))))
+
        :init
        (global-undo-tree-mode +1)
 
@@ -8496,36 +8524,12 @@
        (push 'undo-tree-visualizer-mode
               whitespace-exempt-modes)
 
-       (setq undo-tree-auto-save-history t)
-
-       ;;; where do undo-tree auto-saves go.
-       (setq undo-tree-history-directory-alist
-             `(("." . ,(var! "undo"))))
-
-       (defvar undo-tree-skip-autosave-regex+
-         (rx
-          (or
-           ;; match extensions in filename
-           (and (or ".pdf" ".log") eol)
-           ;; match exact file paths
-           (and
-            (or
-             ;; wildcard regexp match. any match is a valid match.
-             (and "[*Org Src")
-             ;; match from the beginning of the line
-             (and bol (or
-                       (eval dotemacs-var-path)
-                       (eval (concat straight-base-dir "straight/"))
-                       (eval package-user-dir)
-                       (eval +dashboard-banners-directory)))))))
-         "Skip undo-tree backups for files matching this regexp")
-
        (advice-add 'undo-tree-save-history :around
                    (defun undo-tree-save-history--respect-ignore+ (func &rest args)
-                     "respect `undo-tree-skip-autosave-regex+'.
+                     "respect `undo-skip-autosave-regex+'.
      also suppresses undo-tree messages relating to saving files."
-                     (when (and undo-tree-skip-autosave-regex+
-                                (not (string-match-p undo-tree-skip-autosave-regex+
+                     (when (and undo-skip-autosave-regex+
+                                (not (string-match-p undo-skip-autosave-regex+
                                                      buffer-file-name)))
                        (apply func args))))
 
@@ -8575,6 +8579,26 @@
         "h" 'undo-tree-visualizer-select-left
         "l" 'undo-tree-visualizer-select-right
         "d" 'undo-tree-visualizer-selection-toggle-diff))
+   #+END_SRC
+
+** undo-fu
+   #+BEGIN_SRC emacs-lisp :tangle (package-no! undo-tree)
+     (use-package undo-fu
+       :straight t
+       :custom
+       (evil-undo-system 'undo-fu)
+
+       :general
+       (:states 'normal
+        "u" 'undo-fu-only-undo
+        "C-r" 'undo-fu-only-redo))
+
+     (use-package undo-fu-session
+       :straight t
+       :hook (after-init-hook . global-undo-fu-session-mode)
+       :custom
+       (undo-fu-session-directory (var! "undo-fu"))
+       (undo-fu-session-incompatible-files (list undo-skip-autosave-regex+)))
    #+END_SRC
 
 ** uuidgen
