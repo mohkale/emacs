@@ -13166,211 +13166,210 @@
    :ID:       7cacf59f-957b-47f1-8bb6-f36a10af3aec
    :END:
 
-*** selectrum
-    #+BEGIN_SRC emacs-lisp
-      (use-package selectrum
-        :straight t
-        :hook (after-init . selectrum-mode)
-        :commands (selectrum-preprocess+
-                   selectrum-highlight+
-                   selectrum-smart-backward-kill-word+)
-        :custom
-        (selectrum-max-window-height 15)
-        (selectrum-count-style 'current/matches)
-        (selectrum-preprocess-candidates-function #'selectrum-preprocess+)
-        (selectrum-highlight-candidates-function #'selectrum-highlight+)
+   #+BEGIN_SRC emacs-lisp
+     (use-package selectrum
+       :straight t
+       :hook (after-init . selectrum-mode)
+       :commands (selectrum-preprocess+
+                  selectrum-highlight+
+                  selectrum-smart-backward-kill-word+)
+       :custom
+       (selectrum-max-window-height 15)
+       (selectrum-count-style 'current/matches)
+       (selectrum-preprocess-candidates-function #'selectrum-preprocess+)
+       (selectrum-highlight-candidates-function #'selectrum-highlight+)
 
-        :config
-      ;;; Sorting configuration and workarounds
-        (defun selectrum-sort-cands+ (cands)
-          (cond
-           ;; Finding file-names should sort directories first.
-           ((eq minibuffer-completion-table 'read-file-name-internal)
-              ;; Only sort based on filename, with directories being first :-)
-              (sort cands
-                    (lambda (x y)
-                      (let ((x-dir (eq (aref x (- (length x) 1)) ?/))
-                            (y-dir (eq (aref y (- (length y) 1)) ?/)))
-                        (cond
-                         ((and x-dir y-dir)
-                         (string< (directory-file-name x) (directory-file-name y)))
-                         (x-dir t)
-                         (y-dir nil)
-                         (t (string< x y)))))))))
+       :config
+     ;;; Sorting configuration and workarounds
+       (defun selectrum-sort-cands+ (cands)
+         (cond
+          ;; Finding file-names should sort directories first.
+          ((eq minibuffer-completion-table 'read-file-name-internal)
+             ;; Only sort based on filename, with directories being first :-)
+             (sort cands
+                   (lambda (x y)
+                     (let ((x-dir (eq (aref x (- (length x) 1)) ?/))
+                           (y-dir (eq (aref y (- (length y) 1)) ?/)))
+                       (cond
+                        ((and x-dir y-dir)
+                        (string< (directory-file-name x) (directory-file-name y)))
+                        (x-dir t)
+                        (y-dir nil)
+                        (t (string< x y)))))))))
 
-        (defun selectrum-preprocess+ (cands)
-          (when selectrum-should-sort
-            (setq cands
-                  (or (selectrum-sort-cands+ cands)
-                      (when (bound-and-true-p selectrum-prescient-mode)
-                        (selectrum-prescient--preprocess cands))
-                      (selectrum-default-candidate-preprocess-function cands)
-                      cands)))
-          cands)
+       (defun selectrum-preprocess+ (cands)
+         (when selectrum-should-sort
+           (setq cands
+                 (or (selectrum-sort-cands+ cands)
+                     (when (bound-and-true-p selectrum-prescient-mode)
+                       (selectrum-prescient--preprocess cands))
+                     (selectrum-default-candidate-preprocess-function cands)
+                     cands)))
+         cands)
 
-      ;;; Update highlighting for certain completions
-        (defun selectrum-highlight-candidates+ (input cands)
-          (if (eq 'file (completion-metadata-get
-                         (completion-metadata
-                          input
-                          minibuffer-completion-table
-                          minibuffer-completion-predicate)
-                         'category))
-              (cl-loop for cand in cands
-                       for len = (length cand)
-                       if (and (> len 0)
-                               (eq (aref cand (1- len)) ?/))
-                       do (add-face-text-property 0 (length cand) 'font-lock-function-name-face 'append cand)
-                       end
-                       collect cand)
-            cands))
+     ;;; Update highlighting for certain completions
+       (defun selectrum-highlight-candidates+ (input cands)
+         (if (eq 'file (completion-metadata-get
+                        (completion-metadata
+                         input
+                         minibuffer-completion-table
+                         minibuffer-completion-predicate)
+                        'category))
+             (cl-loop for cand in cands
+                      for len = (length cand)
+                      if (and (> len 0)
+                              (eq (aref cand (1- len)) ?/))
+                      do (add-face-text-property 0 (length cand) 'font-lock-function-name-face 'append cand)
+                      end
+                      collect cand)
+           cands))
 
-        (defun selectrum-highlight+ (input cands)
-          (cl-reduce (lambda (cands func)
-                       (funcall func input cands))
-                     (delq nil (list #'selectrum-highlight-candidates+
-                                     (cond ((eq (bound-and-true-p selectrum-refine-candidates-function)
-                                                #'orderless-filter)
-                                            #'orderless-highlight-matches)
-                                           ((bound-and-true-p selectrum-prescient-mode)
-                                            #'selectrum-prescient--highlight)
-                                           (t #'selectrum-candidates-identity))))
-                     :initial-value cands))
+       (defun selectrum-highlight+ (input cands)
+         (cl-reduce (lambda (cands func)
+                      (funcall func input cands))
+                    (delq nil (list #'selectrum-highlight-candidates+
+                                    (cond ((eq (bound-and-true-p selectrum-refine-candidates-function)
+                                               #'orderless-filter)
+                                           #'orderless-highlight-matches)
+                                          ((bound-and-true-p selectrum-prescient-mode)
+                                           #'selectrum-prescient--highlight)
+                                          (t #'selectrum-candidates-identity))))
+                    :initial-value cands))
 
-        (defun selectrum-override-current-candidate-face-face-range+ (str overriding-faces)
-          (cl-loop for i from 0 to (length str)
-                   with last-face = nil
-                   with current-face = nil
-                   do (setq current-face
-                            (when-let ((face (get-text-property i 'face str)))
-                              (if (listp face) (car face) face)))
-                   with seq-range = nil
-                   when (and current-face (member current-face overriding-faces))
-                     when seq-range
-                       when (eq current-face last-face)
-                         ;; Incremenet existing sequence
-                         do (setcdr seq-range i)
-                       else
-                         ;; Finished previous sequence and started a new one
-                         collect (cons last-face seq-range)
-                         and do (setq seq-range (cons i i))
-                       end
-                     else
-                       do (setq seq-range (cons i i))
-                     end
-                   else when seq-range
-                     collect (cons last-face seq-range)
-                     and do (setq seq-range nil)
-                   end
-                   do (setq last-face current-face)))
+       (defun selectrum-override-current-candidate-face-face-range+ (str overriding-faces)
+         (cl-loop for i from 0 to (length str)
+                  with last-face = nil
+                  with current-face = nil
+                  do (setq current-face
+                           (when-let ((face (get-text-property i 'face str)))
+                             (if (listp face) (car face) face)))
+                  with seq-range = nil
+                  when (and current-face (member current-face overriding-faces))
+                    when seq-range
+                      when (eq current-face last-face)
+                        ;; Incremenet existing sequence
+                        do (setcdr seq-range i)
+                      else
+                        ;; Finished previous sequence and started a new one
+                        collect (cons last-face seq-range)
+                        and do (setq seq-range (cons i i))
+                      end
+                    else
+                      do (setq seq-range (cons i i))
+                    end
+                  else when seq-range
+                    collect (cons last-face seq-range)
+                    and do (setq seq-range nil)
+                  end
+                  do (setq last-face current-face)))
 
-        (advice-add 'selectrum--selection-highlight :before-until
-                    (defun selectrum-override-current-candidate-face+ (str)
-                      "Use `selectrum-current-candidate' but keep match highlighting.
-      This is a workaround until [[https://github.com/raxod502/selectrum/issues/353][#353]] gets resolved."
-                      (unless (eq selectrum--last-command #'describe-face)
-                        (let ((face 'selectrum-current-candidate)
-                              (copied (copy-sequence str)))
-                          (if (version< emacs-version "27")
-                              (font-lock-prepend-text-property 0 (length copied) 'face face copied)
-                            (add-face-text-property 0 (length copied) face nil copied))
+       (advice-add 'selectrum--selection-highlight :before-until
+                   (defun selectrum-override-current-candidate-face+ (str)
+                     "Use `selectrum-current-candidate' but keep match highlighting.
+     This is a workaround until [[https://github.com/raxod502/selectrum/issues/353][#353]] gets resolved."
+                     (unless (eq selectrum--last-command #'describe-face)
+                       (let ((face 'selectrum-current-candidate)
+                             (copied (copy-sequence str)))
+                         (if (version< emacs-version "27")
+                             (font-lock-prepend-text-property 0 (length copied) 'face face copied)
+                           (add-face-text-property 0 (length copied) face nil copied))
 
-                          (dolist (seq (selectrum-override-current-candidate-face-face-range+
-                                        str '(orderless-match-face-0
-                                              orderless-match-face-1
-                                              orderless-match-face-2
-                                              orderless-match-face-3)))
-                            (cl-destructuring-bind (face . (start . end))
-                                seq
-                              (if (version< emacs-version "27")
-                                  (font-lock-prepend-text-property start end 'face face copied)
-                                (add-face-text-property start (1+ end) face nil copied))))
-                          copied))))
+                         (dolist (seq (selectrum-override-current-candidate-face-face-range+
+                                       str '(orderless-match-face-0
+                                             orderless-match-face-1
+                                             orderless-match-face-2
+                                             orderless-match-face-3)))
+                           (cl-destructuring-bind (face . (start . end))
+                               seq
+                             (if (version< emacs-version "27")
+                                 (font-lock-prepend-text-property start end 'face face copied)
+                               (add-face-text-property start (1+ end) face nil copied))))
+                         copied))))
 
-        (defun selectrum-update-regexp-search-ring+ (&rest _args)
-          "Update search rings based on the last `selectrum-read' command.
-      This works for isearch and evil and can automatically detect and compile
-      regexp when an external package (eg. orderless) is used."
-          (when-let ((input selectrum--last-input)
-                     (regexp (cond ((eq selectrum-refine-candidates-function
-                                        'orderless-filter)
-                                    (eval
-                                     `(rx (or ,@(cl-loop for regexp in (funcall orderless-pattern-compiler input)
-                                                         collect `(regexp ,regexp))))))
-                                   (t selectrum--previous-input-string))))
-            (push regexp regexp-search-ring)
-            (when (boundp 'evil-ex-search-pattern)
-              (setq evil-ex-search-pattern (list regexp t t)
-                    evil-ex-search-direction 'forward)
-              (evil-ex-search-activate-highlight (list regexp t t)))))
+       (defun selectrum-update-regexp-search-ring+ (&rest _args)
+         "Update search rings based on the last `selectrum-read' command.
+     This works for isearch and evil and can automatically detect and compile
+     regexp when an external package (eg. orderless) is used."
+         (when-let ((input selectrum--last-input)
+                    (regexp (cond ((eq selectrum-refine-candidates-function
+                                       'orderless-filter)
+                                   (eval
+                                    `(rx (or ,@(cl-loop for regexp in (funcall orderless-pattern-compiler input)
+                                                        collect `(regexp ,regexp))))))
+                                  (t selectrum--previous-input-string))))
+           (push regexp regexp-search-ring)
+           (when (boundp 'evil-ex-search-pattern)
+             (setq evil-ex-search-pattern (list regexp t t)
+                   evil-ex-search-direction 'forward)
+             (evil-ex-search-activate-highlight (list regexp t t)))))
 
-        (defvar selectrum-backward-kill-word-kills-basename nil
-          "When t trying to kill backwards in `find-file' kills the entire basename")
+       (defvar selectrum-backward-kill-word-kills-basename nil
+         "When t trying to kill backwards in `find-file' kills the entire basename")
 
-        (defun selectrum-smart-backward-kill-word+ ()
-          "A smart variant of `backward-kill-word' for selectrum."
-          (interactive)
-          (if (eq selectrum--last-command 'find-file)
-              (let ((input (substitute-in-file-name selectrum--last-input))
-                    (last-command (if (eq last-command 'selectrum-smart-backward-kill-word+)
-                                      'kill-region
-                                    last-command)))
-                (if (eq input "/")
-                    (kill-region (point-max) (- (point-max) 1))
-                  (let* ((dirname (or (file-name-directory input) ""))
-                         (basename (file-name-nondirectory input))
-                         (trailing-slash-p (string-suffix-p "/" dirname)))
-                    (when trailing-slash-p
-                      (setq dirname (s-chop-suffix "/" dirname)))
-                    (cond
-                     ((not (string-empty-p basename))
-                      (if selectrum-backward-kill-word-kills-basename
-                          (kill-region (point-max) (- (point-max) (length basename)))
-                        (call-interactively #'backward-kill-word)))
-                     ;; Handle edge cases with last directory or magic tilde.
-                     ((string-equal dirname "~")
-                      (kill-region (point-max)
-                                   (- (point-max) 1 (if trailing-slash-p 1 0)))
-                      (insert (file-name-directory (expand-file-name "~"))))
-                     ;; Kill from EOL to the cut off point for the previous directory.
-                     (t
-                      (kill-region (point-max)
-                                   (- (point-max)
-                                      (-
-                                       (length dirname)
-                                       (length (or (file-name-directory dirname) ""))
-                                       (if trailing-slash-p -1 0)))))))))
-            (call-interactively #'backward-kill-word)))
+       (defun selectrum-smart-backward-kill-word+ ()
+         "A smart variant of `backward-kill-word' for selectrum."
+         (interactive)
+         (if (eq selectrum--last-command 'find-file)
+             (let ((input (substitute-in-file-name selectrum--last-input))
+                   (last-command (if (eq last-command 'selectrum-smart-backward-kill-word+)
+                                     'kill-region
+                                   last-command)))
+               (if (eq input "/")
+                   (kill-region (point-max) (- (point-max) 1))
+                 (let* ((dirname (or (file-name-directory input) ""))
+                        (basename (file-name-nondirectory input))
+                        (trailing-slash-p (string-suffix-p "/" dirname)))
+                   (when trailing-slash-p
+                     (setq dirname (s-chop-suffix "/" dirname)))
+                   (cond
+                    ((not (string-empty-p basename))
+                     (if selectrum-backward-kill-word-kills-basename
+                         (kill-region (point-max) (- (point-max) (length basename)))
+                       (call-interactively #'backward-kill-word)))
+                    ;; Handle edge cases with last directory or magic tilde.
+                    ((string-equal dirname "~")
+                     (kill-region (point-max)
+                                  (- (point-max) 1 (if trailing-slash-p 1 0)))
+                     (insert (file-name-directory (expand-file-name "~"))))
+                    ;; Kill from EOL to the cut off point for the previous directory.
+                    (t
+                     (kill-region (point-max)
+                                  (- (point-max)
+                                     (-
+                                      (length dirname)
+                                      (length (or (file-name-directory dirname) ""))
+                                      (if trailing-slash-p -1 0)))))))))
+           (call-interactively #'backward-kill-word)))
 
-        :leader
-        ("RET" 'selectrum-repeat)
+       :leader
+       ("RET" 'selectrum-repeat)
 
-        :general
-        (:keymaps 'selectrum-minibuffer-map
-         "C-j" 'next-line
-         "C-k" 'previous-line
-         "C-h" 'backward-char
-         "C-q" 'selectrum-quick-select
-         "M-q" 'selectrum-quick-insert
-         "C-l" (defun selectrum-forward-char-or-exit+ ()
-                 (interactive)
-                 (call-interactively (if (eolp)
-                                         'selectrum-select-current-candidate
-                                       'forward-char)))
-         "M-j" 'next-history-element
-         "M-k" 'previous-history-element
-         "C-r" 'next-matching-history-element
-         "C-s" 'previous-matching-history-element
-         [C-i] 'selectrum-insert-current-candidate
-         "C-i" 'selectrum-insert-current-candidate
-         "C-o" 'end-of-buffer
-         "M-o" 'beginning-of-buffer
-         "C-d" 'scroll-up-command
-         "C-u" 'scroll-down-command
-         "C-w" 'selectrum-smart-backward-kill-word+
-         "M-i" 'selectrum-insert-current-candidate
-         "<S-return>" 'selectrum-submit-exact-input))
-    #+END_SRC
+       :general
+       (:keymaps 'selectrum-minibuffer-map
+        "C-j" 'next-line
+        "C-k" 'previous-line
+        "C-h" 'backward-char
+        "C-q" 'selectrum-quick-select
+        "M-q" 'selectrum-quick-insert
+        "C-l" (defun selectrum-forward-char-or-exit+ ()
+                (interactive)
+                (call-interactively (if (eolp)
+                                        'selectrum-select-current-candidate
+                                      'forward-char)))
+        "M-j" 'next-history-element
+        "M-k" 'previous-history-element
+        "C-r" 'next-matching-history-element
+        "C-s" 'previous-matching-history-element
+        [C-i] 'selectrum-insert-current-candidate
+        "C-i" 'selectrum-insert-current-candidate
+        "C-o" 'end-of-buffer
+        "M-o" 'beginning-of-buffer
+        "C-d" 'scroll-up-command
+        "C-u" 'scroll-down-command
+        "C-w" 'selectrum-smart-backward-kill-word+
+        "M-i" 'selectrum-insert-current-candidate
+        "<S-return>" 'selectrum-submit-exact-input))
+   #+END_SRC
 
 *** selectrum-prescient
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! selectrum prescient)
@@ -14120,217 +14119,216 @@
 
    A clean, elegent, completion framework for emacs.
 
-*** ivy
-    #+BEGIN_SRC emacs-lisp
-      (use-package ivy
-        :straight t
-        :diminish ivy-mode
-        :commands (ivy-toggle-mark)
-        :hook (after-init . ivy-mode)
-        :config
-        (with-eval-after-load 'magit
-          (setq magit-completing-read-function 'ivy-completing-read))
+   #+BEGIN_SRC emacs-lisp
+     (use-package ivy
+       :straight t
+       :diminish ivy-mode
+       :commands (ivy-toggle-mark)
+       :hook (after-init . ivy-mode)
+       :config
+       (with-eval-after-load 'magit
+         (setq magit-completing-read-function 'ivy-completing-read))
 
-        (setq ivy-height 15
-              ivy-use-virtual-buffers t
-              projectile-completion-system 'ivy
-              ivy-magic-tilde nil)
+       (setq ivy-height 15
+             ivy-use-virtual-buffers t
+             projectile-completion-system 'ivy
+             ivy-magic-tilde nil)
 
-        (when (emacs>= "27")
-          ;; see issue: https://github.com/abo-abo/swiper/issues/2397
-          (setq ivy-read-action-function #'ivy-hydra-read-action))
+       (when (emacs>= "27")
+         ;; see issue: https://github.com/abo-abo/swiper/issues/2397
+         (setq ivy-read-action-function #'ivy-hydra-read-action))
 
-        (push 'ivy-occur-mode whitespace-exempt-modes)
+       (push 'ivy-occur-mode whitespace-exempt-modes)
 
-        (setq ivy-preferred-re-builders
-              '((ivy--regex-plus         . "ivy")
-                (ivy--regex-ignore-order . "order")
-                (ivy--regex-fuzzy        . "fuzzy")
-                (regexp-quote            . "literal"))
+       (setq ivy-preferred-re-builders
+             '((ivy--regex-plus         . "ivy")
+               (ivy--regex-ignore-order . "order")
+               (ivy--regex-fuzzy        . "fuzzy")
+               (regexp-quote            . "literal"))
 
-              ;; store as unique variable because counsel
-              ;; will just end up adding to it anyways.
-              ivy-default-initial-inputs-alist+
-              '((counsel-minor . "^+")
-                ;; (counsel-package . "^+")
-                ;; (org-refile . "^")
-                (org-agenda-refile . "^")
-                (org-capture-refile . "^")
-                ;; (counsel-M-x . "^")
-                ;; (counsel-describe-function . "^")
-                ;; (counsel-describe-variable . "^")
-                ;; (counsel-org-capture . "^")
-                ;; (org-refile . "^")
-                ;; (org-agenda-refile . "^")
-                ;; (org-capture-refile . "^")
-                ;; (Man-completion-table . "^")
-                ;; (woman . "^")
-                )
+             ;; store as unique variable because counsel
+             ;; will just end up adding to it anyways.
+             ivy-default-initial-inputs-alist+
+             '((counsel-minor . "^+")
+               ;; (counsel-package . "^+")
+               ;; (org-refile . "^")
+               (org-agenda-refile . "^")
+               (org-capture-refile . "^")
+               ;; (counsel-M-x . "^")
+               ;; (counsel-describe-function . "^")
+               ;; (counsel-describe-variable . "^")
+               ;; (counsel-org-capture . "^")
+               ;; (org-refile . "^")
+               ;; (org-agenda-refile . "^")
+               ;; (org-capture-refile . "^")
+               ;; (Man-completion-table . "^")
+               ;; (woman . "^")
+               )
 
-              ivy-initial-inputs-alist ivy-default-initial-inputs-alist+)
+             ivy-initial-inputs-alist ivy-default-initial-inputs-alist+)
 
-        (defvar ivy-actions-done-hook+ nil
-          "hook run after ivy has completed a set of actions.
-      this could be when `ivy-done' is invoked, or when `ivy-call'
-      has been invoked.")
+       (defvar ivy-actions-done-hook+ nil
+         "hook run after ivy has completed a set of actions.
+     this could be when `ivy-done' is invoked, or when `ivy-call'
+     has been invoked.")
 
-        (defun ivy-run-actions-done-hook+ (func &rest args)
-          (unwind-protect
-              (apply func args)
-            (run-hooks 'ivy-actions-done-hook+)))
+       (defun ivy-run-actions-done-hook+ (func &rest args)
+         (unwind-protect
+             (apply func args)
+           (run-hooks 'ivy-actions-done-hook+)))
 
-        (advice-add 'ivy-done :around #'ivy-run-actions-done-hook+)
-        (advice-add 'ivy-call :around #'ivy-run-actions-done-hook+)
+       (advice-add 'ivy-done :around #'ivy-run-actions-done-hook+)
+       (advice-add 'ivy-call :around #'ivy-run-actions-done-hook+)
 
-        (defun ivy-kill-line-backward ()
-          (interactive)
-          (delete-region (minibuffer-prompt-end) (point)))
+       (defun ivy-kill-line-backward ()
+         (interactive)
+         (delete-region (minibuffer-prompt-end) (point)))
 
-        (defun ivy-forward-char-or-partial-or-done ()
-          "move forward a character or complete selection
-      completes selection when there's no characters left to
-      move forward."
-          (interactive)
-          (call-interactively (if (eolp)
-                                  'ivy-alt-done
-                                'forward-char)))
+       (defun ivy-forward-char-or-partial-or-done ()
+         "move forward a character or complete selection
+     completes selection when there's no characters left to
+     move forward."
+         (interactive)
+         (call-interactively (if (eolp)
+                                 'ivy-alt-done
+                               'forward-char)))
 
-        (defun ivy-toggle-mark ()
-          (interactive)
-          (if (ivy--marked-p)
-              (when (ivy--marked-p)
-                (ivy--unmark (ivy-state-current ivy-last)))
-            (unless (ivy--marked-p)
-              (ivy--mark (ivy-state-current ivy-last)))))
+       (defun ivy-toggle-mark ()
+         (interactive)
+         (if (ivy--marked-p)
+             (when (ivy--marked-p)
+               (ivy--unmark (ivy-state-current ivy-last)))
+           (unless (ivy--marked-p)
+             (ivy--mark (ivy-state-current ivy-last)))))
 
-        (with-eval-after-load "persp-mode"
-          ;; thanks [[https://gist.github.com/Bad-ptr/1aca1ec54c3bdb2ee80996eb2b68ad2d#file-persp-ivy-el][Bad-ptr]].
-          (add-hook 'ivy-ignore-buffers
-                    (lambda (b)
-                      (when persp-mode
-                        (let ((persp (get-current-persp)))
-                          (if persp
-                              (not (persp-contain-buffer-p b persp))
-                            nil)))))
+       (with-eval-after-load "persp-mode"
+         ;; thanks [[https://gist.github.com/Bad-ptr/1aca1ec54c3bdb2ee80996eb2b68ad2d#file-persp-ivy-el][Bad-ptr]].
+         (add-hook 'ivy-ignore-buffers
+                   (lambda (b)
+                     (when persp-mode
+                       (let ((persp (get-current-persp)))
+                         (if persp
+                             (not (persp-contain-buffer-p b persp))
+                           nil)))))
 
-          (setq ivy-sort-functions-alist
-                (append ivy-sort-functions-alist
-                        '((persp-kill-buffer   . nil)
-                          (persp-remove-buffer . nil)
-                          (persp-add-buffer    . nil)
-                          (persp-switch        . nil)
-                          (persp-window-switch . nil)
-                          (persp-frame-switch  . nil)))))
+         (setq ivy-sort-functions-alist
+               (append ivy-sort-functions-alist
+                       '((persp-kill-buffer   . nil)
+                         (persp-remove-buffer . nil)
+                         (persp-add-buffer    . nil)
+                         (persp-switch        . nil)
+                         (persp-window-switch . nil)
+                         (persp-frame-switch  . nil)))))
 
-        :lazy-leader
-        ("bb" 'ivy-switch-buffer
-         "SPC" 'counsel-M-x
-         "RET" 'ivy-resume)
-        (:mode '(ivy-occur-mode ivy-occur-grep-mode)
-         ;; 'ivy-wgrep-change-to-wgrep-mode
-         "SPC" 'ivy-occur-read-action
-         "m"   'ivy-occur-toggle-calling)
+       :lazy-leader
+       ("bb" 'ivy-switch-buffer
+        "SPC" 'counsel-M-x
+        "RET" 'ivy-resume)
+       (:mode '(ivy-occur-mode ivy-occur-grep-mode)
+        ;; 'ivy-wgrep-change-to-wgrep-mode
+        "SPC" 'ivy-occur-read-action
+        "m"   'ivy-occur-toggle-calling)
 
-        :general
-        (:keymaps 'ivy-minibuffer-map
-         "C-j"   nil                                                                 ; was ivy-alt-done
-         "M-j"   nil                                                                 ; was ivy-yank-word
-         "M-v"   nil                                                                 ; was ivy-scroll-down-command
-         "C-M-y" nil                                                                 ; was ivy-insert-current-full
+       :general
+       (:keymaps 'ivy-minibuffer-map
+        "C-j"   nil                                                                 ; was ivy-alt-done
+        "M-j"   nil                                                                 ; was ivy-yank-word
+        "M-v"   nil                                                                 ; was ivy-scroll-down-command
+        "C-M-y" nil                                                                 ; was ivy-insert-current-full
 
-         "C-r" 'evil-paste-from-register
-         "C-s" 'ivy-reverse-i-search
+        "C-r" 'evil-paste-from-register
+        "C-s" 'ivy-reverse-i-search
 
-         "C-v"      'quoted-insert                                                   ; was ivy-scroll-up-command
-         "<return>" 'ivy-alt-done                                                    ; also supports tramp expansion
-         "RET"      'ivy-alt-done
+        "C-v"      'quoted-insert                                                   ; was ivy-scroll-up-command
+        "<return>" 'ivy-alt-done                                                    ; also supports tramp expansion
+        "RET"      'ivy-alt-done
 
-      ;;; misc
-         "C-?" 'describe-mode
-         "M-d" 'kill-ring-save                                                       ; save all candidates to kill ring
-         "S-SPC" 'ivy-restrict-to-matches                                            ; erase input, but start filtering from current candidates
+     ;;; misc
+        "C-?" 'describe-mode
+        "M-d" 'kill-ring-save                                                       ; save all candidates to kill ring
+        "S-SPC" 'ivy-restrict-to-matches                                            ; erase input, but start filtering from current candidates
 
-      ;;; marking
-         "C-SPC"         'ivy-mark
-         "M-SPC"         'ivy-toggle-mark
-         "C-M-SPC"       'ivy-toggle-marks
-         "<S-backspace>" 'ivy-unmark-backward
+     ;;; marking
+        "C-SPC"         'ivy-mark
+        "M-SPC"         'ivy-toggle-mark
+        "C-M-SPC"       'ivy-toggle-marks
+        "<S-backspace>" 'ivy-unmark-backward
 
-      ;;; selection execution
-         "<S-return>"   'ivy-immediate-done                                           ; exit with current input, not selection
-         "C-c <return>" 'ivy-immediate-done
-         "<C-return>" 'ivy-dispatching-done                                           ; prompt for action, then done
-         "M-RET" 'ivy-call                                                            ; invoke default action'but exit the minibuffer
-         "C-M-<return>" 'ivy-dispatching-call                                         ; prompt for action, then call
-         "C-M-j" 'ivy-next-line-and-call                                              ; move down, then call default action
-         "C-M-k" 'ivy-previous-line-and-call                                          ; move down, then call default action
-         "<escape>" 'minibuffer-keyboard-quit
+     ;;; selection execution
+        "<S-return>"   'ivy-immediate-done                                           ; exit with current input, not selection
+        "C-c <return>" 'ivy-immediate-done
+        "<C-return>" 'ivy-dispatching-done                                           ; prompt for action, then done
+        "M-RET" 'ivy-call                                                            ; invoke default action'but exit the minibuffer
+        "C-M-<return>" 'ivy-dispatching-call                                         ; prompt for action, then call
+        "C-M-j" 'ivy-next-line-and-call                                              ; move down, then call default action
+        "C-M-k" 'ivy-previous-line-and-call                                          ; move down, then call default action
+        "<escape>" 'minibuffer-keyboard-quit
 
-      ;;; movement commands
-         "C-a" 'move-beginning-of-line
-         "C-e" 'move-end-of-line
-         "C-h" 'backward-char
-         "C-l" 'ivy-forward-char-or-partial-or-done
-         "C-j" 'next-line
-         "C-k" 'previous-line
-         "M-j" 'ivy-next-history-element
-         "M-k" 'ivy-previous-history-element
-         "M-u" 'ivy-occur
-         ;; arrow key variants
-         "<left>"  'backward-char
-         "<right>" 'forward-char
-         "<up>"    'previous-line
-         "<down>"  'next-line
+     ;;; movement commands
+        "C-a" 'move-beginning-of-line
+        "C-e" 'move-end-of-line
+        "C-h" 'backward-char
+        "C-l" 'ivy-forward-char-or-partial-or-done
+        "C-j" 'next-line
+        "C-k" 'previous-line
+        "M-j" 'ivy-next-history-element
+        "M-k" 'ivy-previous-history-element
+        "M-u" 'ivy-occur
+        ;; arrow key variants
+        "<left>"  'backward-char
+        "<right>" 'forward-char
+        "<up>"    'previous-line
+        "<down>"  'next-line
 
-         ;; suprisingly enough, these are bound correctly
-         "C-d" 'scroll-up-command
-         "C-u" 'scroll-down-command
+        ;; suprisingly enough, these are bound correctly
+        "C-d" 'scroll-up-command
+        "C-u" 'scroll-down-command
 
-         ;; Taken from helm, shadows hydra-ivy/body
-         "M-o" 'beginning-of-buffer
-         "C-o" 'end-of-buffer
+        ;; Taken from helm, shadows hydra-ivy/body
+        "M-o" 'beginning-of-buffer
+        "C-o" 'end-of-buffer
 
-      ;;; insertion/deletion
-         [C-i] 'ivy-insert-current                                                    ; complete current selection into minibuffer leave prompt active to build on it.
-         "TAB" 'ivy-insert-current
+     ;;; insertion/deletion
+        [C-i] 'ivy-insert-current                                                    ; complete current selection into minibuffer leave prompt active to build on it.
+        "TAB" 'ivy-insert-current
 
-         "M-i" 'ivy-yank-word
-         "C-DEL" 'evil-delete-backward-word
-         ;; pull word in from point at buffer
-         "M-y" 'ivy-yank-word
-         "C-w" 'backward-kill-word
-         ;; operate on entire input
-         "M-w" 'ivy-kill-line-backward
-         "M-W" 'kill-line ;; kill forward
-         "M-DEL" 'kill-whole-line
+        "M-i" 'ivy-yank-word
+        "C-DEL" 'evil-delete-backward-word
+        ;; pull word in from point at buffer
+        "M-y" 'ivy-yank-word
+        "C-w" 'backward-kill-word
+        ;; operate on entire input
+        "M-w" 'ivy-kill-line-backward
+        "M-W" 'kill-line ;; kill forward
+        "M-DEL" 'kill-whole-line
 
-      ;;; history - (C-r/C-s still work fine)
-         "<S-up>"    'ivy-previous-history-element
-         "<S-down>"  'ivy-next-history-element)
-        (:keymaps 'ivy-switch-buffer-map
-         "C-k" 'previous-line
-         "M-d" 'ivy-switch-buffer-kill)
-        (:keymaps 'ivy-reverse-i-search-map
-         "C-k" 'previous-line
-         "C-d" 'ivy-reverse-i-search-kill)
-        (:keymaps '(ivy-occur-mode-map
-                    ivy-occur-grep-mode-map)
-         :states 'motion
-         "q" nil
-         "RET" 'ivy-occur-press-and-switch
-         "M-RET" 'ivy-occur-press
-         "<C-return>" 'ivy-occur-dispatch
-         "gj" 'ivy-occur-next-line
-         "gk" 'ivy-occur-previous-line
-         "}" 'ivy-occur-next-line
-         "{" 'ivy-occur-previous-line
-         ;; TODO make d an evil operator
-         "d" 'ivy-occur-delete-candidate
-         "x" 'ivy-occur-delete-candidate
-         "o" 'compilation-display-error
+     ;;; history - (C-r/C-s still work fine)
+        "<S-up>"    'ivy-previous-history-element
+        "<S-down>"  'ivy-next-history-element)
+       (:keymaps 'ivy-switch-buffer-map
+        "C-k" 'previous-line
+        "M-d" 'ivy-switch-buffer-kill)
+       (:keymaps 'ivy-reverse-i-search-map
+        "C-k" 'previous-line
+        "C-d" 'ivy-reverse-i-search-kill)
+       (:keymaps '(ivy-occur-mode-map
+                   ivy-occur-grep-mode-map)
+        :states 'motion
+        "q" nil
+        "RET" 'ivy-occur-press-and-switch
+        "M-RET" 'ivy-occur-press
+        "<C-return>" 'ivy-occur-dispatch
+        "gj" 'ivy-occur-next-line
+        "gk" 'ivy-occur-previous-line
+        "}" 'ivy-occur-next-line
+        "{" 'ivy-occur-previous-line
+        ;; TODO make d an evil operator
+        "d" 'ivy-occur-delete-candidate
+        "x" 'ivy-occur-delete-candidate
+        "o" 'compilation-display-error
 
-         "gr" 'ivy-occur-revert-buffer))
-    #+END_SRC
+        "gr" 'ivy-occur-revert-buffer))
+   #+END_SRC
 
 *** ivy-prescient
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy prescient ivy-prescient)
