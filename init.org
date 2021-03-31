@@ -5758,52 +5758,24 @@
 ** company
    #+BEGIN_SRC emacs-lisp
      (use-package company
-       :straight t
+       :straight (company :files (:defaults "icons"))
        :defer  2
+       ;; :hook (company-mode . company-tng-mode)
        :delight
        company-mode
        global-company-mode
        :custom
        ;; show the completion tooltip without any delay.
        (company-tooltip-idle-delay nil)
-       (company-idle-delay 0.2)
+       (company-idle-delay 0.4)
        (company-minimum-prefix-length 2)
        (company-statistics-file (var! "company/statistics.el"))
        (company-tooltip-align-annotations t)
        (company-require-match nil)
+       (company-tooltip-limit 12)
 
        :init
        (defalias 'case #'cl-case) ; TODO remove when company fixes cl issues.
-
-       (defvar company-menu-bindings+
-         `(("C-1"   . company-complete-number)
-           ("C-2"   . company-complete-number)
-           ("C-3"   . company-complete-number)
-           ("C-4"   . company-complete-number)
-           ("C-5"   . company-complete-number)
-           ("C-6"   . company-complete-number)
-           ("C-7"   . company-complete-number)
-           ("C-8"   . company-complete-number)
-           ("M-l"   . company-complete-common-or-next-char+)
-           ("<C-i>" . company-complete-common)
-           ("C-j"   . company-select-next)
-           ("C-k"   . company-select-previous)
-           ("C-d"   . company-next-page)
-           ("C-u"   . company-previous-page)
-           ("C-l"   . company-complete-selection)
-           ("C-h"   . company-show-doc-buffer)
-           ("C-p"   . company-show-location)
-           ("<tab>" . company-complete-common-or-cycle)
-           ("RET"   . company-complete-selection)
-           ("C-:"   . completion-at-point)
-           ("C-/"   . company-filter-candidates)
-           ("C-s"   . company-filter-candidates)
-           ("C-f"   . company-filter-candidates)
-           ("C-o"   . company-select-last)
-           ("M-o"   . company-select-first))
-         "Bindings which override any local bindings while the company popup is active.
-     DO NOT alter this (by setting a new value) while the popup is active, or be prepared
-     to restart emacs.")
 
        :config
        ;; don't let display steal focus
@@ -5839,26 +5811,6 @@
                (company-complete-next-char+ count)
              (company--insert-candidate company-common))))
 
-       ;; use transient bindings inside the completion menu
-       (defun company-set-bindings+ (&rest _)
-         (apply
-          'general-define-key
-          :keymaps 'override
-          :states  'insert
-          (cl-loop for (key . value) in company-menu-bindings+
-                   collect key collect value)))
-
-       (defun company-unset-bindings+ (&rest _)
-         (apply 'general-define-key
-                :keymaps 'override
-                :states  'insert
-                (cl-loop for (key . -) in company-menu-bindings+
-                         collect key collect nil)))
-
-       (add-hook 'company-completion-started-hook   'company-set-bindings+)
-       (add-hook 'company-completion-finished-hook  'company-unset-bindings+)
-       (add-hook 'company-completion-cancelled-hook 'company-unset-bindings+)
-
        :general
        (:keymaps 'company-mode-map
         :states 'insert
@@ -5873,117 +5825,103 @@
         "C-7"    'company-complete-number
         "C-8"    'company-complete-number
         "C-9"    'company-complete-number
-        "C-f"    'company-search-toggle-filtering ; show filtered/all
+        "C-f"    'company-search-toggle-filtering                                    ; show filtered/all
         "C-s"    'company-search-repeat-forward
         "C-r"    'company-search-repeat-backward
         "C-n"    'company-search-repeat-forward
         "C-p"    'company-search-repeat-backward
         "ESC"    'company-search-abort)
        (:keymaps 'company-active-map
-        "C-w"   nil                                                                  ; was company-show-location
-        "ESC"   nil))
+        "<override-state>" 'all
+        "C-w"    nil                                                                 ; was company-show-location
+        "ESC"    nil
+        "C-1"    'company-complete-number
+        "C-2"    'company-complete-number
+        "C-3"    'company-complete-number
+        "C-4"    'company-complete-number
+        "C-5"    'company-complete-number
+        "C-6"    'company-complete-number
+        "C-7"    'company-complete-number
+        "C-8"    'company-complete-number
+        "M-l"    'company-complete-common-or-next-char+
+        "C-j"    'company-select-next
+        "C-k"    'company-select-previous
+        "C-d"    'company-next-page
+        "C-u"    'company-previous-page
+        "C-l"    'company-complete-selection
+        "C-h"    'company-show-doc-buffer
+        "C-p"    'company-show-location
+        "<tab>"  'company-complete-common-or-cycle
+        "RET"    'company-complete-selection
+        "C-:"    'completion-at-point
+        "C-/"    'company-filter-candidates
+        "C-s"    'company-filter-candidates
+        "C-f"    'company-filter-candidates
+        "C-o"    'company-select-last
+        "M-o"    'company-select-first))
    #+END_SRC
 
-*** configure-mode
-    configure company backends on a mode by mode basis.
+*** company-set-backends
+    A helper for configuring ~company-backends~ adapted from [[https://github.com/hlissner/doom-emacs/blob/ce65645fb87ed1b24fb1a46a33f77cf1dcc1c0d5/modules/completion/company/autoload.el#L1][doom]].
 
     #+BEGIN_SRC emacs-lisp
-      (defvar universal-company-backends+
-        '(company-capf company-semantic company-files)
-        "backends that you should always use with `company/configure-mode'")
+      (setq-default company-backends '(company-capf))
 
-      (defvar company-backends-alist+ nil
-        "alist of mode to backend associations.
-      DO NOT assign or modify this list directly, you should interact
-      with it using `company/configure-mode'.")
+      (defvar company-backend-alist+
+        '((text-mode (:separate company-dabbrev company-yasnippet company-ispell))
+          (lisp-interaction-mode (:separate company-capf company-yasnippet company-abbrev company-ispell))
+          (prog-mode (company-capf company-yasnippet))
+          (conf-mode company-capf company-dabbrev-code company-yasnippet))
+        "An alist matching modes to company backends. The backends for any mode is
+      built from this.")
 
-      (defvar company-configured-mode-stack+ nil
-        "modes for which company has been configured in this buffer.")
-      (make-variable-buffer-local 'company-configured-mode-stack+)
+      (defun set-company-backend! (modes &rest backends)
+        (declare (indent defun))
+        (unless (listp modes)
+          (setq modes (list modes)))
+        (dolist (mode modes)
+          (if (null (car backends))
+              (setq company-backend-alist+
+                    (delq (assq mode company-backend-alist+)
+                          company-backend-alist+))
+            (setf (alist-get mode company-backend-alist+)
+                  backends))))
 
-      (defun company/configure-mode--push-backends+ (mode backends)
-        "push backends for MODE into `company-backends'"
-        (when (member :universal backends)
-          (setq backends (append (delete :universal backends)
-                                 universal-company-backends+)))
+      (defun company-backends+ ()
+        "Get the list of company backends for the current mode based on `company-backend-alist+'."
+        (let (backends
+              (mode major-mode)
+              (modes (list major-mode)))
+          (while (setq mode (get mode 'derived-mode-parent))
+            (push mode modes))
+          (dolist (mode modes)
+            (dolist (backend (append (cdr (assq mode company-backend-alist+))
+                                     (default-value 'company-backends)))
+              (push backend backends)))
+          (delete-dups
+           (append (cl-loop for (mode . backends) in company-backend-alist+
+                            if (or (eq major-mode mode)  ; major modes
+                                   (and (boundp mode)
+                                        (symbol-value mode))) ; minor modes
+                            append backends)
+                   (nreverse backends)))))
 
-        (let ((backends-exist (local-variable-p 'company-backends)))
-          (unless backends-exist
-            (setq-local company-backends nil))
+      (defsubst temp-buffer-p+ (buf)
+        (equal (substring (buffer-name buf) 0 1) " "))
 
-          (condition-case err
-              (setq company-backends (remove-duplicates
-                                      (append backends
-                                              company-backends)))
-            (error
-             (unless backends-exist
-               (kill-local-variable 'company-backends))
-             (signal (car err) (cdr err)))))
-
-        (push mode company-configured-mode-stack+))
-
-      (defun company/configure-mode--pop-backends+ (mode)
-        "pop configured company backends for MODE.
-      replacing the default backend list when MODE is the last
-      mode for which backends were configured."
-        ;; should be an always correct check, but just in case.
-        (when (member mode company-configured-mode-stack+)
-          (if (eq 1 (length company-configured-mode-stack+))
-              ;; erase company backends and configuration stack
-              (progn
-                (kill-local-variable 'company-backends)
-                (setq company-configured-mode-stack+ nil))
-            ;; remove backends for current mode, but replace with
-            ;; every other mode in the configured mode stack.
-            (setq company-configured-mode-stack+
-                  (remove mode company-configured-mode-stack+))
-            (let ((remaining-backends (-flatten
-                                       (mapcar
-                                        (lambda (mode)
-                                          (cdr (assoc mode company-backends-alist+)))
-                                        company-configured-mode-stack+))))
-              (when (member :universal remaining-backends)
-                (setq remaining-backends (append (delete :universal remaining-backends)
-                                                 universal-company-backends+)))
-              (setq-local company-backends (remove-duplicates remaining-backends))))))
-
-      (add-hook 'change-major-mode-hook
-                (defun configure-company--pop-for-major-mode+ ()
-                  "pop configured company backends for the current MAJOR-MODE"
-                  (company/configure-mode--pop-backends+ major-mode)))
-
-      ;; inspired by this issue: https://github.com/company-mode/company-mode/issues/839
-      (cl-defmacro company/configure-mode ((mode &key major (use-universal t) predicate) &rest backends)
-        "configure company backends for a given mode
-      MODE can be a major or a minor mode & activation can be predicated using PREDICATE.
-      backends are passed as the remaining argument list after the mode declaration.
-      when USE-UNIVERSAL is true, `universal-company-backends+' will be appended to
-      the list of backends supplied. "
-        (when backends
-          (let ((func-name (intern (concat "company/configure-" (symbol-name mode))))
-                (mode-hook (intern (concat (symbol-name mode) "-hook")))
-                (backends (if use-universal
-                              (push :universal backends)
-                            backends))
-                ;; convert predicate to a callable
-                (predicate (cond
-                            ((and (listp predicate)
-                                  (eq (car predicate)
-                                      'lambda))
-                             predicate)
-                            (t (eval `(lambda () ,(or predicate t)))))))
-            (push (cons mode backends) company-backends-alist+)
-            `(add-hook ',mode-hook
-                       (if ,major
-                           (defun ,func-name ()
-                             (when (funcall ,predicate)
-                               (company/configure-mode--push-backends+ ',mode ',backends)))
-                         (defun ,func-name ()
-                           (if ,mode
-                               (when (funcall ,predicate)
-                                 (company/configure-mode--push-backends+ ',mode ',backends))
-                             (company/configure-mode--pop-backends+ ',mode))))))))
-      (put 'company/configure-mode 'lisp-indent-function 'defun)
+      (add-hook 'after-change-major-mode-hook
+                (defun company-setup-backends+ ()
+                  "Set `company-backends' for the current buffer."
+                  (interactive)
+                  (if (or (memq major-mode '(fundamental-mode special-mode))
+                          buffer-read-only
+                          (temp-buffer-p+ (or (buffer-base-buffer) (current-buffer))))
+                      (when (called-interactively-p 'interactive)
+                        (user-error "Current buffer isn't the kind we set `company-backends' in."))
+                    (progn
+                      (setq-local company-backends (company-backends+))
+                      (when (called-interactively-p 'interactive)
+                        (message "Set company backends to %s" company-backends))))))
     #+END_SRC
 
 *** company-quickhelp
@@ -6053,7 +5991,11 @@
             "Association between `eglot' LSP kinds and annotation icons for `company-mode'.
       To reduce the amount of redundant processing in the margin function, this is defined
       as a cons cell of icon alists, with the car alist being for regular candidates in the
-      company popup and the cdr alist for the current-candidate.")
+      company popup and the cdr alist for the current-candidate.
+
+      This structure means you don't have to do any processing, or propertising to pick an
+      icon for a candidate. A simple alist lookup is all you need... it might be worth
+      turning this into a hashset.")
 
           (defconst all-the-icons-default-completion-icon+
             (cons (all-the-icons-nerd-oct "file" :face 'company-icon+)
@@ -6371,14 +6313,16 @@
         "Y" 'emojify-description-copy-emoji))
    #+END_SRC
 
-*** company
+*** company-emojify
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! company-emoji)
       (use-package company-emoji
         :straight t
-        :after  emojify
+        :demand t
+        :after emojify
         :init
-        (company/configure-mode (emojify-mode)
-          company-emoji)
+        (if-let ((cell (assoc 'text-mode company-backend-alist+)))
+            (setcdr (cdr cell) (append cell '(company-emoji)))
+          (set-company-backend! 'text-mode 'company-emoji))
 
         :config
         ;; never insert emojis as their unicode symbols.
@@ -15781,9 +15725,6 @@
        :config
        (require 'yasnippet)                                                          ; needed or else snippet expansion won't happen.
 
-       (company/configure-mode (eglot--managed-mode)
-         company-capf)
-
        (defun eglot-eldoc-toggle-order+ ()
          "Toggle the precedence of flymake notifications in eldoc."
          (interactive)
@@ -17844,8 +17785,9 @@
         :demand t
         :after (company ycmd)
         :init
-        (company/configure-mode (ycmd-mode)
-          company-ycmd))
+        (setq-default
+         company-backends
+         (append 'company-ycmd (default-value 'company-backends))))
     #+END_SRC
 
 *** flycheck-ycmd
@@ -17953,8 +17895,8 @@
         :after  restclient
         :commands (company-restclient)
         :init
-        (company/configure-mode (restclient-mode :major t)
-          company-restclient))
+        (set-company-backend! 'restclient-mode
+          'company-restclient))
     #+END_SRC
 
 *** org-babel-restclient
@@ -18263,8 +18205,8 @@
          :straight t
          :after  anaconda-mode
          :init
-         (company/configure-mode (anaconda-mode)
-           company-anaconda))
+         (set-company-backend! 'anaconda-mode
+           'company-anaconda))
      #+END_SRC
 
 *** pyimport
@@ -18647,8 +18589,8 @@
         :straight t
         :after  web-mode
         :config
-        (company/configure-mode (web-mode :major t)
-          company-web-html company-yasnippet))
+        (set-company-backend! 'web-mode
+          'company-web-html))
     #+END_SRC
 
 *** web-beautify
@@ -18900,8 +18842,8 @@
         :straight t
         :after  sh-mode
         :config
-        (company/configure-mode (sh-mode :major t)
-          company-shell company-shell-env))
+        (set-company-backend! 'sh-mode
+          'company-shell 'company-shell-env))
     #+END_SRC
 
 ** ssh
@@ -19355,8 +19297,8 @@
         :straight (company-cmake :host github :fork "company-cmake")
         :after cmake
         :init
-        (company/configure-mode (cmake-mode :major t)
-          company-cmake))
+        (set-company-backend! 'cmake-mode
+          'company-cmake))
     #+END_SRC
 
 ** c/cpp
@@ -19378,9 +19320,6 @@
        ;; (c-toggle-comment-style +1)
 
        (setq c-default-style "stroustrup")
-
-       ;; (company/configure-mode ((c-mode c++-mode) :major t :predicate ycmd-mode)
-       ;;   company-ycmd company-c-headers)
 
        (defun cc-mode-set-bindings+ (mode)
          (leader/set-keys-for-major-mode mode
@@ -19475,8 +19414,8 @@
        :config
        (require 'yasnippet)
 
-       (company/configure-mode (meghanada-mode)
-         company-meghanada)
+       (set-company-backend! 'java-mode
+         'company-meghanada)
 
        (setq meghanada-map+ (make-sparse-keymap))
 
@@ -19809,8 +19748,8 @@
     #+BEGIN_SRC emacs-lisp
       (use-package css-mode
         :config
-        (company/configure-mode (css-mode :major t)
-          company-css)
+        (set-company-backend! 'css-mode
+          'company-css)
 
         :lazy-leader
         (:mode '(less-css-mode css-mode)
@@ -19830,8 +19769,8 @@
     #+BEGIN_SRC emacs-lisp
       (use-package less-css-mode
         :config
-        (company/configure-mode (less-css-mode :major t)
-          company-css)
+        (set-company-backend! 'less-css-mode
+          'company-css)
 
         :lazy-leader
         (:mode 'less-css-mode
@@ -19856,8 +19795,8 @@
         :straight t
         :after haskell-mode
         :init
-        (company/configure-mode (haskell-cabal-mode :major t)
-          company-cabal))
+        (set-company-backend! 'haskell-cabal-mode
+          'company-cabal))
     #+END_SRC
 
 *** flycheck-haskell
