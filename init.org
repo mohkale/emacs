@@ -10684,16 +10684,6 @@
        :init
        (evil-ex-define-cmd "spell" #'flyspell-buffer)
 
-       :config
-       ;; I've only tested this on window/cygwin but aspell appears to be quite broken :P
-       ;;   * I can't specify a path to any directory not within my home directory.
-       ;;   * I can't specify any absolute path, even when that path is within my home directory.
-       ;;   * If I want to reference a file in a subdirectory of my home directory, the
-       ;;     path must begin with a slash.
-       ;; THIS IS WAY TOO UNINTUITIVE.
-       (setq ispell-personal-dictionary
-             (file-relative-name (etc! "/ispell/dict.txt") "~"))
-
        :lazy-leader
        (:mode 'flyspell-mode
         :minor t
@@ -10718,6 +10708,10 @@
 *** ispell
    #+BEGIN_SRC emacs-lisp
      (use-package ispell
+       :custom
+       (ispell-personal-dictionary (etc! "ispell/spellings.txt"))
+       (ispell-alternate-dictionary (etc! "ispell" "english-words.txt"))
+
        :config
        (defun ispell--prevent-absolute-path (func &rest args)
          (cl-letf (((symbol-function 'expand-file-name)
