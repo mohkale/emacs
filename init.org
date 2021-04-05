@@ -378,13 +378,20 @@
    so that we can speed up startup times. Source [[https://github.com/hlissner/doom-emacs/issues/310][doom]].
 
    #+BEGIN_SRC emacs-lisp
-     (defconst default-gc-cons-threshold 16777216 ; 16mb
-       "my default desired value of `gc-cons-threshold'
+     (defconst default-gc-cons-threshold 100000000 ; 100mb
+       "My default desired value of `gc-cons-threshold'
      during normal emacs operations.")
 
      ;; make garbage collector less invasive
      (setq gc-cons-threshold  most-positive-fixnum
            gc-cons-percentage 0.6)
+   #+END_SRC
+
+   Also raise the maximum chunk of output we choose to read from a subprocess.
+   Should vastly speed up performance with [[https://emacs-lsp.github.io/lsp-mode/page/performance/][language-servers]].
+
+   #+BEGIN_SRC emacs-lisp
+     (setq read-process-output-max (* 1024 1024)) ;; 1mb
    #+END_SRC
 
    Let's disable some of the unecessary GUI enhancements, you can re-enable them at
@@ -4436,7 +4443,6 @@
     #+END_SRC
 
 *** org-contrib
-
     #+BEGIN_SRC emacs-lisp
       (use-package org-contribdir
         :straight (org-plus-contrib)
@@ -7808,7 +7814,9 @@
        :hook ((org-mode                    . page-break-lines-mode)
               (help-mode                   . page-break-lines-mode)
               (outline-mode                . page-break-lines-mode)
-              (emacs-lisp-compilation-mode . page-break-lines-mode))
+              (emacs-lisp-compilation-mode . page-break-lines-mode)
+              (lisp-interaction-mode       . page-break-lines-mode)
+              (emacs-lisp-mode             . page-break-lines-mode))
        :commands (page-break-lines-mode)
        :diminish
        page-break-lines-mode)
@@ -13127,7 +13135,7 @@
      (use-package vline
        :straight (vline :host github :repo "emacsmirror/vline")
        :leader
-       ("t'" 'vline-mode))
+       ("tv" 'vline-mode))
    #+END_SRC
 
 ** whitespace
@@ -15475,6 +15483,10 @@
                 (lambda () (switch-to-buffer dashboard-buffer-name))))
         (dashboard-setup-startup-hook)
 
+        ;; When agenda has been loaded include it in the dashboard.
+        (with-eval-after-load 'org-agenda
+          (add-to-list 'dashboard-items '(agenda . 5) t))
+
         ;; determine the appropriate banner to display on the dashboard
         (defun dashboard-select-random-banner+ (&optional arg)
           "Toggle another banner to be used on the dashboard."
@@ -16260,19 +16272,17 @@
                   lsp-mode-server-all-p+)
        :custom
        (lsp-auto-guess-root t)
-       (lsp-prefer-flymake nil)
        (lsp-enable-snippet t)
        ;; (lsp-auto-configure nil)
        (lsp-modeline-diagnostics-enable nil)
        (lsp-enable-symbol-highlighting nil)
-       (lsp-eldoc-render-all t)
+       (lsp-eldoc-render-all nil)
        (lsp-enable-xref t)
        (lsp-headerline-breadcrumb-enable nil)
        (lsp-session-file (var! "lsp/session"))
        (lsp-server-install-dir (var! "lsp/servers"))
 
        :config
-       (setq lsp-map+ (make-sparse-keymap))
        (defun lsp-mode-server-exists-p+ (mode &optional all-workspaces)
          (when (buffer-file-name) ; Needed for lsp--matching-clients?
            (let ((major-mode mode))
@@ -16291,25 +16301,25 @@
        (defun lsp-mode-server-all-p+ (mode)
          (lsp-mode-server-exists-p+ mode t))
 
-       :general
-       (:keymaps 'lsp-mode-map
-        [remap display-local-help] 'lsp-describe-thing-at-point)
+       :leader
+       ("ll" 'lsp)
 
        :lazy-leader
        (:mode 'lsp-mode
         :minor t
         "jy" 'lsp-goto-type-definition
         "jY" 'lsp-goto-implementation)
+
        (:mode 'lsp-mode
         :minor t
         :prefix leader-server-leader-prefix
         "" "server"
 
-        "?"   'lsp-describe-session
-        "|"   'lsp-describe-thing-at-point
-        "a"   'lsp-execute-code-action
-        "h"   'lsp-document-highlight
-        "DEL" 'lsp-disconnect
+        "?" 'lsp-describe-session
+        "a" 'lsp-execute-code-action
+        "s" 'lsp-document-highlight
+        "h" 'lsp-describe-thing-at-point
+        "x" 'lsp-disconnect
 
         "w"  "workspace"
         "wR" 'lsp-restart-workspace
@@ -17706,7 +17716,8 @@
        :leader
        ("av" '("vterm" . vterm-toggle)
         "at" '("vterm-new" . vterm-toggle-new-buffer+)
-        "tv" '("toggle-vterm-fullscreen" . vterm-toggle-fullscreen))
+        ;; "tv" '("toggle-vterm-fullscreen" . vterm-toggle-fullscreen)
+        )
 
        :general
        (:keymaps 'vterm-mode-map
