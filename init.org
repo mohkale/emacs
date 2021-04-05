@@ -69,8 +69,8 @@
     (defvar +ruby-mode-hook (intern (concat (symbol-name +ruby-mode)    "-hook")))
 
     (defun +lsp-should-connect (mode check-workspace check-all-workspaces)
-      (let ((enable (or (alist-get mode +lsp-maybe-connect)
-                        (alist-get t    +lsp-maybe-connect))))
+      (when-let ((enable (alist-get mode +lsp-maybe-connect
+                                    (alist-get t +lsp-maybe-connect))))
         (when (functionp enable)
           (setq enable (funcall enable)))
 
@@ -95,12 +95,15 @@
                  (eglot-ensure))))
 
             ((package! lsp-mode)
-             (warn "lsp-mode doesn't respect `+lsp-should-connect' [yet].")
-             ;; (defun +lsp-connect ()
-             ;;   "LSP connector for lsp-mode"
-             ;;   (when (+lsp-should-connect major-mode #'lsp-server-exists-p+)
-             ;;     (lsp)))
-             #'lsp))
+             (defun +lsp-connect ()
+               "LSP connector for lsp-mode"
+               (when (+lsp-should-connect
+                      major-mode
+                      #'lsp-mode-server-p+
+                      #'lsp-mode-server-all-p+)
+                 (lsp-deferred)))
+
+             #'+lsp-connect))
       "Command used to start a language server.
     Can be attached as a mode-hook and will decide how best to start a language
     server in the current mode.")
@@ -16252,6 +16255,9 @@
    #+BEGIN_SRC emacs-lisp
      (use-package lsp-mode
        :straight t
+       :commands (lsp-mode-server-exists-p+
+                  lsp-mode-server-p+
+                  lsp-mode-server-all-p+)
        :custom
        (lsp-auto-guess-root t)
        (lsp-prefer-flymake nil)
@@ -16267,6 +16273,23 @@
 
        :config
        (setq lsp-map+ (make-sparse-keymap))
+       (defun lsp-mode-server-exists-p+ (mode &optional all-workspaces)
+         (when (buffer-file-name) ; Needed for lsp--matching-clients?
+           (let ((major-mode mode))
+             (seq-intersection
+              (lsp--filter-clients #'lsp--matching-clients?)
+              (when-let ((workspaces
+                          (if all-workspaces
+                              (-flatten (hash-table-values (lsp-session-folder->servers (lsp-session))))
+                            (gethash (lsp-workspace-root) (lsp-session-folder->servers (lsp-session))))))
+                (mapcar #'lsp--workspace-client workspaces))
+              #'equal))))
+
+       (defun lsp-mode-server-p+ (mode)
+         (lsp-mode-server-exists-p+ mode))
+
+       (defun lsp-mode-server-all-p+ (mode)
+         (lsp-mode-server-exists-p+ mode t))
 
        :general
        (:keymaps 'lsp-mode-map
