@@ -374,6 +374,19 @@
        (load (concat user-emacs-directory "early-init.el")))
    #+END_SRC
 
+   Prevent the new [[https://akrl.sdf.org/gccemacs.html][gccemacs]] native-compile feature from infesting my home-directory.
+   This needs to be done early (and for extra thoroughness I've removed the existing
+   eln path) to prevent the directory being made and then removed.
+
+   NOTE: Technically this should be first thing in my config but seeing as
+   ~early-init.el~ is loaded before my actual config and gccemacs is only relevent in
+   versions after which ~early-init~ is supported, I can put it here with no troubles.
+
+   #+BEGIN_SRC emacs-lisp
+     (setq comp-eln-load-path (append (list (concat user-emacs-directory "var/eln-cache"))
+                                      (cdr (bound-and-true-p comp-eln-load-path))))
+   #+END_SRC
+
    Let's give the garbage collector free reign to take up as much memory as it needs
    so that we can speed up startup times. Source [[https://github.com/hlissner/doom-emacs/issues/310][doom]].
 
@@ -490,8 +503,6 @@
                                                                                       "~/.config/")
                                                                                   "authinfo"))
                                                                  (bound-and-true-p auth-sources))
-      comp-eln-load-path                                 (append (list (var! "eln-cache"))
-                                                                 (bound-and-true-p comp-eln-load-path))
       custom-file                                        (etc! "custom.el")
       custom-theme-directory                             (etc! "themes")
       ;; eww-bookmarks-directory                            (var! "eww/")
