@@ -9521,14 +9521,19 @@
    #+END_SRC
 
 ** compile
-    setup some custom bindings and assign a post compilation hook which will
+    Setup some custom bindings and assign a post compilation hook which will
     automatically kill the compilation window.
 
     #+BEGIN_SRC emacs-lisp
       (use-package compile
         :straight t
+        :hook (next-error . recenter)
         :commands (display-compilation-buffer
                    +set-compilation-bindings)
+        :custom
+        (compilation-skip-threshold 0)
+        (next-error-verbose nil)
+
         :config
         (push 'compilation-mode whitespace-exempt-modes)
 
@@ -9612,7 +9617,7 @@
          [remap revert-buffer] 'emacs-lisp-compilation-recompile))
     #+END_SRC
 
-*** auto-kill
+*** compilation-auto-kill
     #+BEGIN_SRC emacs-lisp
       (defvar compilation-auto-kill-window+ 2
         "If non-nil, after a successfull compilation the compilation
@@ -9621,11 +9626,11 @@
       If set to a numerical value, window will be deleted after that many
       seconds.")
 
-      (defvar compilation-auto-kill-ignore-modes nil
-        "major modes spawned by `compile' for which auto-kill doesn't take place.")
+      (defvar compilation-auto-kill-ignore-modes+ nil
+        "Major modes spawned by `compile' for which auto-kill doesn't take place.")
 
-      (defvar compilation-dont-auto-kill-window-when '(warnings focus)
-        "specify not to kill the window when warning, error or info given.
+      (defvar compilation-dont-auto-kill-window-when+ '(warnings focus)
+        "Specify not to kill the window when warning, error or info given.
       a list which can take in any symbol from (errors infos warnings).
 
       you can also specify a symbol, focus, to cancel window killing when
@@ -9659,12 +9664,12 @@
           (quit-windows-on buffer)))
 
       (defun compilation-cancel-auto-kill-p+ ()
-        "whether to cancel compilation window auto-kill due to `compilation-dont-auto-kill-window-when'."
+        "whether to cancel compilation window auto-kill due to `compilation-dont-auto-kill-window-when+'."
         (let ((associations '((errors   . compilation-num-errors-found)
                               (warnings . compilation-num-warnings-found)
                               (infos    . compilation-num-infos-found))))
           (cl-loop for (name . var) in associations
-                   when (and (member name compilation-dont-auto-kill-window-when)
+                   when (and (member name compilation-dont-auto-kill-window-when+)
                              (not (zerop (eval var))))
                    collect (symbol-name name))))
 
@@ -9680,14 +9685,13 @@
                                             (zero-or-more any))
                                         str))
                    (not (apply 'derived-mode-p
-                               compilation-auto-kill-ignore-modes)))
+                               compilation-auto-kill-ignore-modes+)))
           (let* ((terminate-window t))
-            (let ((notifications (compilation-cancel-auto-kill-p+)))
-              (when notifications
-                (when debug-on-error
-                  (message "window kill suspended due to encountering: %s"
-                           (combine-and-quote-strings notifications)))
-                (setq terminate-window nil)))
+            (when-let ((notifications (compilation-cancel-auto-kill-p+)))
+              (when debug-on-error
+                (message "Window kill suspended due to encountering: %s"
+                         (combine-and-quote-strings notifications)))
+              (setq terminate-window nil))
 
             (when terminate-window
               (if (numberp compilation-auto-kill-window+) ;; kill after delay
@@ -12548,7 +12552,8 @@
        (savehist-file (var! "savehist.el"))
        (savehist-additional-variables
         '(kill-ring search-ring regexp-search-ring
-          consult--line-history evil-ex-history)))
+          consult--line-history evil-ex-history
+          projectile-project-command-history)))
    #+END_SRC
 
 ** server
@@ -15545,7 +15550,7 @@
                     'official                                                         ; prefer official cover.
                   (seq-random-elt
                    (or (file-expand-wildcards
-                        (concat +dashboard-banners-directory "*"))
+                        (concat +dashboard-banners-directory "*.txt"))
                        '(1 2 3))))))
 
         ;; For some reason, the font-lock rules for the dashboard don't seem to
@@ -16100,8 +16105,12 @@
      (use-package flycheck
        :straight t
        :diminish flycheck-mode
+       :custom
+       (flycheck-markdown-mdl-style (expand-file-name "~/.config/mdlstyle.rb"))
+       (flycheck-python-pycompile-executable "python3")
+
        :config
-       (setq flycheck-python-pycompile-executable "python3")
+       (evil-set-initial-state 'flycheck-error-message-mode 'motion)
        (setq-default flycheck-disabled-checkers '(emacs-lisp-checkdoc))
 
        (flycheck-define-error-level 'error
@@ -20158,8 +20167,8 @@
        (push 'rustic-popup-mode whitespace-exempt-modes)
        (evil-set-initial-state 'rustic-popup-mode 'emacs)
 
-       ;; (push 'rustic-compilation-mode compilation-auto-kill-ignore-modes)
-       (push 'rustic-cargo-test-mode compilation-auto-kill-ignore-modes)
+       ;; (push 'rustic-compilation-mode compilation-auto-kill-ignore-modes+)
+       (push 'rustic-cargo-test-mode compilation-auto-kill-ignore-modes+)
 
        (with-eval-after-load 'projectile
          (assoc-pop! 'rust-cargo projectile-project-types)
@@ -20888,7 +20897,7 @@
      See `an-old-hope-theme' for why this is necessary.")
    #+END_SRC
 
-** an old hope
+** an-old-hope
    :PROPERTIES:
    :header-args+: :tangle etc/themes/an-old-hope-theme.el
    :END:

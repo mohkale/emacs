@@ -224,10 +224,18 @@
    #+END_SRC
 
 * org-mode
+** bold
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/bold
+      # name: bold
+      # key: b
+      # --
+      *$1*$0
+   #+END_SRC
+
 ** quote
    #+BEGIN_SRC snippet :tangle snippets/org-mode/quote
       # name: quote
-      # key: <q
+      # key: <Q
       # --
       #+begin_quote
       $0
@@ -340,6 +348,16 @@
      ,#+END_SRC
    #+END_SRC
 
+** latex
+   #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/latex
+     # name: latex
+     # key: <l
+     # --
+     ,#+BEGIN_SRC latex
+     $0
+     ,#+END_SRC
+   #+END_SRC
+
 ** C
    #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/C
      # name: C
@@ -368,6 +386,14 @@
      ,#+roam_tags: $0
    #+END_SRC
 
+** roam_alias
+   #+BEGIN_SRC snippet :tangle snippets/org-mode/roam_alias
+     # name: roam_alias
+     # key: ra
+     # --
+     ,#+roam_alias: $0
+   #+END_SRC
+
 ** roam_key
    #+BEGIN_SRC snippet :tangle snippets/org-mode/roam_key
      # name: roam_key
@@ -385,7 +411,7 @@
 ** pry
    #+BEGIN_SRC snippet :tangle snippets/ruby-mode/pry
      # name: binding.pry
-     # key: pry
+     # key: dbg
      # --
      require 'pry'; binding.pry$0
    #+END_SRC
@@ -1215,7 +1241,7 @@
 ** from
    #+BEGIN_SRC snippet :tangle snippets/python-mode/from
       # name: from
-      # key: from
+      # key: f
       # group : general
       # --
       from ${1:lib} import ${2:funs}
@@ -1279,11 +1305,20 @@
 ** import
    #+BEGIN_SRC snippet :tangle snippets/python-mode/import
       # name: import
-      # key: imp
+      # key: i
       # group : general
       # --
-      import ${1:lib}${2: as ${3:alias}}
-      $0
+      import ${1:lib}$0
+   #+END_SRC
+
+** import-as
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/import-as
+     # name: import-as
+     # key: ias
+     # group : general
+     # --
+     import ${1:lib} as ${3:alias}
+     $0
    #+END_SRC
 
 ** pl
@@ -1357,21 +1392,30 @@
 
 ** main
    #+BEGIN_SRC snippet :tangle snippets/python-mode/main
-      # name: main
-      # key: main
-      # --
-      def main():
-          $0
+     # name: main
+     # key: main
+     # --
+     if __name__ == '__main__':
+         $0
    #+END_SRC
 
 ** arg
    #+BEGIN_SRC snippet :tangle snippets/python-mode/arg
-      # name: arg
-      # key: arg
+     # name: arg
+     # key: arg
+     # group: argparser
+     # --
+     parser.add_argument(${1:'-$2', }${3:'--$4',}
+                         $0)
+   #+END_SRC
+
+** arg_positional
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/arg_positional
+      # name: arg_positional
+      # key: argp
       # group: argparser
       # --
-      parser.add_argument('-$1', '--$2',
-                          $0)
+      parser.add_argument('${1:varname}', $0)
    #+END_SRC
 
 ** deftest
@@ -1765,15 +1809,6 @@
           ${1:main()}
    #+END_SRC
 
-** arg_positional
-   #+BEGIN_SRC snippet :tangle snippets/python-mode/arg_positional
-      # name: arg_positional
-      # key: argp
-      # group: argparser
-      # --
-      parser.add_argument('${1:varname}', $0)
-   #+END_SRC
-
 ** scls
    #+BEGIN_SRC snippet :tangle snippets/python-mode/scls
       # name: subclass
@@ -2038,10 +2073,10 @@
           return type.__new__(mcs, name, bases, dct)
    #+END_SRC
 
-** debug
-   #+BEGIN_SRC snippet :tangle snippets/python-mode/debug
-      # name: debug
-      # key: debug
+** breakpoint
+   #+BEGIN_SRC snippet :tangle snippets/python-mode/breakpoint
+      # name: breakpoint
+      # key: dbg
       # --
       breakpoint()
    #+END_SRC
@@ -2049,22 +2084,23 @@
 ** script
    #+BEGIN_SRC snippet :tangle snippets/python-mode/script
      # name: script
-     # key: script
+     # key: sc
      # --
+     def main(args, vargs, parser):
+         pass
+
+
      if __name__ == '__main__':
          import argparse
 
-         def parse_args():
-             parser = argparse.ArgumentParser()
+         parser = argparse.ArgumentParser()
 
-             $0
+         $0
 
-             args  = parser.parse_args()
-             vargs = vars(args)
+         args  = parser.parse_args()
+         vargs = vars(args)
 
-             return args, vargs, parser
-
-         args, vargs, parser = parse_args()
+         main(args, vargs, parser)
    #+END_SRC
 
 ** self
@@ -2233,8 +2269,7 @@
      # name: require
      # key: req
      # --
-     (require '$1)
-     $0
+     (require '$1)$0
    #+END_SRC
 
 ** provide
@@ -2348,7 +2383,7 @@
       # key: up
       # --
       (use-package ${1:package-name}
-      :ensure t$0)
+      :straight t$0)
    #+END_SRC
 
 ** with-current-buffer
@@ -2386,15 +2421,13 @@
    #+END_SRC
 
 * latex-mode
-** alertblock
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/alertblock
+** abs
+   #+BEGIN_SRC snippet :tangle snippets/latex-mode/abs
       # -*- mode: snippet -*-
-      # name: alertblock
-      # key: al
+      # name: abs
+      # key: abs
       # --
-      \begin{alertblock}{$2}
-              $0
-      \end{alertblock}
+      |$1|$0
    #+END_SRC
 
 ** acronym
@@ -2406,29 +2439,13 @@
       \newacronym{${1:label}}{${1:$(upcase yas-text)}}{${2:Name}}
    #+END_SRC
 
-** alg
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/alg
+** add
+   #+BEGIN_SRC snippet :tangle snippets/latex-mode/add
       # -*- mode: snippet -*-
-      # name: alg
-      # key: alg
+      # name: add
+      # key: a
       # --
-      \begin{algorithmic}
-      $0
-      \end{algorithmic}
-
-   #+END_SRC
-
-** align
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/align
-      # -*- mode: snippet -*-
-      # name: align
-      # key: ali
-      # --
-      \begin{align}
-      \label{$0}
-      $1
-      \end{align}
-
+      $1 + $0
    #+END_SRC
 
 ** article
@@ -2445,17 +2462,6 @@
       $0
       \end{document}
 
-   #+END_SRC
-
-** begin
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/begin
-      # -*- mode: snippet -*-
-      # name: begin
-      # key: begin
-      # --
-      \begin{${1:environment}}
-      $0
-      \end{$1}
    #+END_SRC
 
 ** bigcap
@@ -2485,17 +2491,6 @@
       \binom{${1:n}}{${2:k}}$0
    #+END_SRC
 
-** block
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/block
-      # -*- mode: snippet -*-
-      # name: block
-      # key: bl
-      # --
-      \begin{block}{$1}
-              $0
-      \end{block}
-   #+END_SRC
-
 ** capgls
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/capgls
       # -*- mode: snippet -*-
@@ -2523,28 +2518,6 @@
       \cite{$1} $0
    #+END_SRC
 
-** code
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/code
-      # -*- mode: snippet -*-
-      # name: code
-      # key: code
-      # --
-      \begin{lstlisting}
-      $0
-      \end{lstlisting}
-   #+END_SRC
-
-** description
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/description
-      # -*- mode: snippet -*-
-      # name: description
-      # key: desc
-      # --
-      \begin{description}
-      \item[$1] $0
-      \end{description}
-   #+END_SRC
-
 ** columns
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/columns
       # -*- mode: snippet -*-
@@ -2560,50 +2533,6 @@
 
         \end{column}
       \end{columns}
-   #+END_SRC
-
-** documentclass
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/documentclass
-      # -*- mode: snippet -*-
-      # name: documentclass
-      # key: doc
-      # --
-      \documentclass[${1:options}]{$2}
-      $0
-
-   #+END_SRC
-
-** enumerate
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/enumerate
-      # -*- mode: snippet -*-
-      # name: enumerate
-      # key: enum
-      # --
-      \begin{enumerate}
-      \item $0
-      \end{enumerate}
-   #+END_SRC
-
-** equation
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/equation
-      # -*- mode: snippet -*-
-      # name: equation
-      # key: eq
-      # --
-      \begin{equation}
-      \label{$0}
-      $1
-      \end{equation}
-
-   #+END_SRC
-
-** emph
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/emph
-      # -*- mode: snippet -*-
-      # name: emph
-      # key: e
-      # --
-      \emph{$1}$0
    #+END_SRC
 
 ** figure
@@ -2632,49 +2561,13 @@
       \end{frame}
    #+END_SRC
 
-** german-quotes
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/german-quotes
-      # -*- mode: snippet -*-
-      # name: German quotes
-      # key: gqq
-      # --
-      \glqq{}$0\grqq{}
-   #+END_SRC
-
 ** frac
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/frac
       # -*- mode: snippet -*-
       # name: frac
-      # key: frac
+      # key: f
       # --
       \frac{${1:numerator}}{${2:denominator}}$0
-   #+END_SRC
-
-** german-quotes-single
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/german-quotes-single
-      # -*- mode: snippet -*-
-      # name: German single quotes
-      # key: gq
-      # --
-      \glq{}$0\grq{}
-   #+END_SRC
-
-** gls
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/gls
-      # -*- mode: snippet -*-
-      # name: gls
-      # key: g
-      # --
-      \gls{${1:label}}
-   #+END_SRC
-
-** glspl
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/glspl
-      # -*- mode: snippet -*-
-      # name: glspl
-      # key: gp
-      # --
-      \glspl{${1:label}}
    #+END_SRC
 
 ** if
@@ -2699,51 +2592,13 @@
       \includegraphics${1:[$2]}{$0}
    #+END_SRC
 
-** int
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/int
-      # -*- mode: snippet -*-
-      # name: int
-      # key: int
-      # --
-      \int_{$1}^{$2}$0
-   #+END_SRC
-
 ** item
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/item
       # -*- mode: snippet -*-
       # name: item
-      # key: -
-      # --
-      \item $0
-   #+END_SRC
-
-** itemize
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/itemize
-      # -*- mode: snippet -*-
-      # name: itemize
       # key: it
       # --
-      \begin{itemize}
       \item $0
-      \end{itemize}
-   #+END_SRC
-
-** label
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/label
-      # -*- mode: snippet -*-
-      # name: label
-      # key: lab
-      # --
-      \label{$0}
-   #+END_SRC
-
-** labelcref
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/labelcref
-      # -*- mode: snippet -*-
-      # name: labelcref
-      # key: lref
-      # --
-      \labelcref{$0}
    #+END_SRC
 
 ** left-right
@@ -2753,26 +2608,6 @@
       # key: lr
       # --
       \left( $0 \right)
-   #+END_SRC
-
-** moderncv
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/moderncv
-      # -*- mode: snippet -*-
-      # name: full template of moderncv class
-      # key: moderncv
-      # --
-      \documentclass[${1:options}]{moderncv}
-
-      \firstname{$3}
-      \familyname{$4}
-
-      \moderncvstyle{${5:casual}}
-      \moderncvcolor{${6:blue}}
-
-      \begin{document}
-      $0
-      \end{document}
-
    #+END_SRC
 
 ** listing
@@ -2786,70 +2621,22 @@
       \end{lstlisting}
    #+END_SRC
 
-** moderncv-cvcomputer
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/moderncv-cvcomputer
-      # -*- mode: snippet -*-
-      # name: moderncv-cvcomputer
-      # key: cvcomp
-      # --
-      \cvcomputer{${1:category}}{${2:programs}}{${3:category}}{${3:programs}}
-      $0
-
+** math
+   #+BEGIN_SRC snippet :tangle snippets/latex-mode/math
+     # -*- mode: snippet -*-
+     # name: math
+     # key: m
+     # --
+     \\( $1 \\)$0
    #+END_SRC
 
-** moderncv-cventry
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/moderncv-cventry
+** math-displayed
+   #+BEGIN_SRC snippet :tangle snippets/latex-mode/math-displayed
       # -*- mode: snippet -*-
-      # name: moderncv-cventry
-      # key: cventry
+      # name: math-displayed
+      # key: M
       # --
-      \cventry{${1:year}}{${2:job}}{${3:employer}}{${4:city}}{${5:description}}
-      $0
-
-   #+END_SRC
-
-** moderncv-cvlanguage
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/moderncv-cvlanguage
-      # -*- mode: snippet -*-
-      # name: moderncv-cvlanguage
-      # key: cvlang
-      # --
-      \cvlanguage{${1:language}}{${2:skill-level}}{${3:comment}}
-      $0
-
-   #+END_SRC
-
-** moderncv-cvline
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/moderncv-cvline
-      # -*- mode: snippet -*-
-      # name: moderncv-cvline
-      # key: cvline
-      # --
-      \cvline{${1:hobby}}{${2:Description}}
-      $0
-
-   #+END_SRC
-
-** moderncv-cvlistdoubleitem
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/moderncv-cvlistdoubleitem
-      # -*- mode: snippet -*-
-      # name: moderncv-cvlistdoubleitem
-      # key: cvditem
-      # --
-      \cvlistdoubleitem{${1:item}}{${2:item}}
-      $0
-
-   #+END_SRC
-
-** moderncv-cvlistitem
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/moderncv-cvlistitem
-      # -*- mode: snippet -*-
-      # name: moderncv-cvlistitem
-      # key: cvitem
-      # --
-      \cvlistitem{${1:item}}
-      $0
-
+      \[ $1 \]$0
    #+END_SRC
 
 ** movie
@@ -2870,24 +2657,6 @@
       \movieref[rate=0.2]{test}{Play Slow}
       \movieref[resume]{test}{Pause/Resume}
 
-   #+END_SRC
-
-** newcommand
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/newcommand
-      # -*- mode: snippet -*-
-      # name: newcommand
-      # key: cmd
-      # --
-      \newcommand{\\${1:name}}${2:[${3:0}]}{$0}
-   #+END_SRC
-
-** newglossaryentry
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/newglossaryentry
-      # -*- mode: snippet -*-
-      # name: newglossaryentry
-      # key: gl
-      # --
-      \newglossaryentry{${1:AC}}{name=${2:Andrea Crotti}${3:, description=${4:description}}}
    #+END_SRC
 
 ** note
@@ -2912,21 +2681,12 @@
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/python
       # -*- mode: snippet -*-
       # name: python
-      # key: py
+      # key: <p
       # --
       \lstset{language=python}
       \begin[language=python]{lstlisting}
       $0
       \end{lstlisting}
-   #+END_SRC
-
-** question
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/question
-      # -*- mode: snippet -*-
-      # name: question
-      # key: q
-      # --
-      \question{$0}
    #+END_SRC
 
 ** section
@@ -2951,6 +2711,24 @@
         \label{fig:${2:label}}
         \includegraphics[width=.${3:3}\textwidth]{${4:path}}}
       $0
+   #+END_SRC
+
+** superscript
+   #+BEGIN_SRC snippet :tangle snippets/latex-mode/superscript
+      # -*- mode: snippet -*-
+      # name: superscript
+      # key: su
+      # --
+      {$1}^{$2}$0
+   #+END_SRC
+
+** subscript
+   #+BEGIN_SRC snippet :tangle snippets/latex-mode/subscript
+      # -*- mode: snippet -*-
+      # name: subscript
+      # key: sb
+      # --
+      {$1}_{$2}$0
    #+END_SRC
 
 ** subfigure
@@ -2983,31 +2761,13 @@
       $0
    #+END_SRC
 
-** sum
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/sum
-      # -*- mode: snippet -*-
-      # name: sum
-      # key: sum
-      # --
-      \sum_{$1}^{$2}$0
-   #+END_SRC
-
-** textbf
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/textbf
-      # -*- mode: snippet -*-
-      # name: textbf
-      # key: b
-      # --
-      \textbf{$1}$0
-   #+END_SRC
-
-** usepackage
-   #+BEGIN_SRC snippet :tangle snippets/latex-mode/usepackage
-      # -*- mode: snippet -*-
-      # name: usepackage
-      # key: pkg
-      # --
-      \usepackage{$0}
+** sigma
+   #+BEGIN_SRC snippet :tangle snippets/latex-mode/sigma
+     # -*- mode: snippet -*-
+     # name: sigma
+     # key: sum
+     # --
+     \sum${1:_\{$2\}}${3:^\{$4\}}$0
    #+END_SRC
 
 * c-lang-common
@@ -3413,6 +3173,15 @@
       this
    #+END_SRC
 
+** return
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/return
+      # -*- mode: snippet -*-
+      # name: return
+      # key: ret
+      # --
+      return $0
+   #+END_SRC
+
 # ** test_suite
 #    #+BEGIN_SRC snippet :tangle snippets/c++-mode/test_suite
 #       # -*- mode: snippet -*-
@@ -3624,7 +3393,7 @@
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/member_function
      # -*- mode: snippet -*-
      # name: member_function
-     # key: mf
+     # key: fund
      # --
      ${1:type} ${2:Name}::${3:name}(${4:args})${5: const} {
          $0
@@ -3640,11 +3409,11 @@
       inline $0
    #+END_SRC
 
-** fun_declaration
-   #+BEGIN_SRC snippet :tangle snippets/c++-mode/fun_declaration
+** function
+   #+BEGIN_SRC snippet :tangle snippets/c++-mode/function
       # -*- mode: snippet -*-
-      # name: fun_declaration
-      # key: f
+      # name: function
+      # key: fun
       # --
       ${1:type} ${2:name}(${3:args})${4: const};
    #+END_SRC
@@ -3861,8 +3630,7 @@
       # name: class
       # key: cls
       # --
-      class ${1:Name}
-      {
+      class ${1:Name} {
       public:
           ${1:$(yas-c++-class-name yas-text)}();
           ${2:virtual ~${1:$(yas-c++-class-name yas-text)}();}
@@ -3897,4 +3665,22 @@
       # key: ass
       # --
       assert($0);
+   #+END_SRC
+
+* bibtex
+** Entry
+   #+BEGIN_SRC snippet :tangle snippets/bibtex-mode/entry
+     # contributer: mohkale <mohkale@kisara.moe>
+     # name: bib-entry
+     # key: <e
+     # expand-env: ((yas-indent-line 'fixed) (now (current-time)))
+     # --
+
+     @${1:Unpublished}{${2:key},
+       title = "${3:${2:$(capitalize yas-text)}}",
+       date  = `(format-time-string "%Y" now)`,
+       month = `(format-time-string "%b" now)`,
+       day   = `(format-time-string "%d" now)`,
+     }
+     $0
    #+END_SRC
