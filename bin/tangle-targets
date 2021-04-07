@@ -1,5 +1,6 @@
-#!/bin/sh
-":"; exec emacs --quick --script "$0" -- "$@" # -*- mode: emacs-lisp; lexical-binding: t; -*-
+#!/usr/bin/env -S emacs --no-site-file --script
+;; -*- mode: emacs-lisp -*- vim: syntax=lisp filetype=lisp
+;;
 ;; A script to open and attempt to tangle an org-mode file but instead of
 ;; tangling the files it instead lists each file that would be tangled too
 ;; in newline delimited output.
@@ -7,18 +8,22 @@
 ;; This script was mostly adapted from `org-babel-tangle', advised to not
 ;; perform any actual tangling.
 
+;; Remove manual interaction needed to get emacs to continue working.
+(setq org-confirm-babel-evaluate nil
+      ;; See [[file:~/.config/emacs/init.org::setup-paths][setup-paths]].
+      comp-eln-load-path (append (list (concat user-emacs-directory "var/eln-cache"))
+                                 (cdr (bound-and-true-p comp-eln-load-path)))
+      checking-tangle-targets+ t
+      create-lockfiles nil
+      make-backup-files nil
+      comp-deferred-compilation nil)
+
 (require 'cl-lib)
 
 (require 'org)
 (require 'ob-tangle)
 
-;; Remove manual interaction needed to get emacs to continue working.
-(setq org-confirm-babel-evaluate nil
-      checking-tangle-targets+   t
-      create-lockfiles nil
-      make-backup-files nil)
-
-(defun true () t)
+(defun true (&rest args) t)
 (defalias #'yes-or-no-p #'true)
 (defalias #'y-or-n-p    #'true)
 
@@ -68,7 +73,6 @@
                      (org-babel-tangle-collect-blocks lang-re tangle-file))
                     (mapcar #'car path-collector))))))
 
-;; Redirect all intermediate output to stderr, just cuase
 (let ((standard-output 'external-debugging-output)
       (config-file (expand-file-name
                     (if (> (length argv) 1)
@@ -76,3 +80,5 @@
                       (concat user-emacs-directory "init.org")))))
   (message "Checking tangle-targets: %s" config-file)
   (org-babel-tangle-file config-file))
+
+(setq argv nil) ;; unset argv to prevent `normal-top-level' from crashing.

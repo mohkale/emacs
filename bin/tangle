@@ -247,8 +247,7 @@ def tangle_file(file, opts={})
       "--eval", Shellwords.escape("(setq org-confirm-babel-evaluate nil
                                          tangling+ t
                                          create-lockfiles nil
-                                         comp-eln-load-path (append (list (concat user-emacs-directory \"eln-cache\"))
-                                                                    (bound-and-true-p comp-eln-load-path))
+                                         comp-deferred-compilation nil
                                          make-backup-files nil)"),
       "--eval", Shellwords.escape("(require (quote ob-tangle))"),
       "--eval", Shellwords.escape("(org-babel-tangle-file \"#{file}\")"),
@@ -266,27 +265,27 @@ end
 
 def compile_files(init_file, files, opts={})
   file = Tempfile.new('emacs-bytecomp')
-  file.write <<EOF
-;; -*- lexical-binding: t -*-
-;;
-;; Needed to make sure package locations and other settings needed for
-;; byte-compilation are available. We essentially just spawn a headless
-;; emacs instance to byte-compile all out of date files.
+  file.write <<~END_OF_SCRIPT
+    ;; -*- lexical-binding: t -*-
+    ;;
+    ;; Needed to make sure package locations and other settings needed for
+    ;; byte-compilation are available. We essentially just spawn a headless
+    ;; emacs instance to byte-compile all out of date files.
 
-(setq load-prefer-newer t
-      comp-eln-load-path (append (list (concat user-emacs-directory \"eln-cache\"))
-                                 (bound-and-true-p comp-eln-load-path)))
+    (setq load-prefer-newer t
+          comp-deferred-compilation nil)
 
-(load "#{Shellwords.escape(init_file)}")
+    (load "#{Shellwords.escape(init_file)}")
 
-;; (defvar tangle-byte-compile-failed nil)
-;; (advice-add #'byte-compile-file :after
-;;             (defun +finish (&rest _)
-;;               (with-current-buffer \"*Compile-Log*\"
-;;                 (when (and (bound-and-true-p compilation-num-errors-found)
-;;                            (> compilation-num-errors-found 0))
-;;                   (setq tangle-byte-compile-failed t)))))
-EOF
+    ;; (defvar tangle-byte-compile-failed nil)
+    ;; (advice-add #'byte-compile-file :after
+    ;;             (defun +finish (&rest _)
+    ;;               (with-current-buffer \"*Compile-Log*\"
+    ;;                 (when (and (bound-and-true-p compilation-num-errors-found)
+    ;;                            (> compilation-num-errors-found 0))
+    ;;                   (setq tangle-byte-compile-failed t)))))
+  END_OF_SCRIPT
+
   file.write("\n")
   files.each do |f|
     file.write <<EOF
