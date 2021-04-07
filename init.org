@@ -506,7 +506,6 @@
       custom-file                                        (etc! "custom.el")
       custom-theme-directory                             (etc! "themes")
       ;; eww-bookmarks-directory                            (var! "eww/")
-      ;; gamegrid-user-score-file-directory                 (var! "gamegrid/")
       ;; ido-save-directory-list-file                       (var! "ido-save-directory-list.el")
       ;; image-dired-db-file                                (var! "image-dired" "db.el") ; tag associations
       ;; image-dired-dir                                    (var! "image-dired/")
@@ -10802,6 +10801,13 @@
        :config
        ;; once was enough, stop repeating the same message please :P
        (advice-add 'help-window-display-message :around #'ignore))
+   #+END_SRC
+
+** gamegrid
+   #+BEGIN_SRC emacs-lisp
+     (use-package gamegrid
+       :custom
+       (gamegrid-user-score-file-directory (var! "gamegrid/")))
    #+END_SRC
 
 ** hl-line
