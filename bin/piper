@@ -3,7 +3,7 @@
 
 print_usage() { echo "usage: $0 [-h|-?] [-k] [-c] SCRIPT [SCRIPT...]"; }
 
-temp_dir=~/.emacs.d/var/piper/
+temp_dir=$HOME/.emacs.d/var/piper/
 
 while getopts h?ck option; do
     case "$option" in
@@ -11,7 +11,7 @@ while getopts h?ck option; do
               exit 0
               ;;
         c)  # clear temporary script files
-            find $temp_dir -type f -exec rm -f '{}' +
+            find "$temp_dir" -type f -exec rm -f '{}' +
             exit $? # exit code from last cmd
             ;;
         k) keep_temp_file=1
@@ -19,23 +19,23 @@ while getopts h?ck option; do
     esac
 done
 
-shift $(($OPTIND - 1))
+shift $((OPTIND-1))
 
 if [ $# -eq 0 ]; then print_usage >&2; exit 1; fi
 
 failed=0 # false
 for file in "$@"; do
-    if [ ! -f $file ]; then
+    if [ ! -f "$file" ]; then
         echo "piper: unable to find script file: $file" >&2
         failed=1
     fi
 done
 
-[ $failed -eq 0 ] || exit 1
+[ "$failed" -eq 0 ] || exit 1
 
 # make temporary files directory
 if [ ! -d "$temp_dir" ]; then
-    if ! mkdir -p $temp_dir; then
+    if ! mkdir -p "$temp_dir"; then
         echo "piper: unable to create temporary scripts directory: $temp_dir" >&2
         exit 1
     fi
@@ -43,7 +43,7 @@ fi
 
 script_file=$(mktemp "piper.XXXXXXXXXXX" -u -p"$temp_dir")
 
-cat - "$@" >$script_file <<EOF
+cat - "$@" >"$script_file" <<EOF
 #!/usr/bin/emacs --script
 
 (setq package-user-dir "~/.emacs.d/bin/elpa/")
@@ -53,11 +53,11 @@ cat - "$@" >$script_file <<EOF
 
 EOF
 
-/usr/bin/emacs --script $script_file
+/usr/bin/emacs --script "$script_file"
 exit_code=$?
 
-if [ ! ${keep_temp_file:-0} -eq 1 ]; then
-    rm -f $script_file >/dev/null 2>&1
+if [ ! "${keep_temp_file:-0}" -eq 1 ]; then
+    rm -f "$script_file" >/dev/null 2>&1
 fi
 
-exit $exit_code
+exit "$exit_code"

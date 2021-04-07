@@ -1,4 +1,6 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
+
 # TODO: Minimise file system lookups.
 
 require 'set'
@@ -19,20 +21,22 @@ rescue LoadError
   # pretty printing unavailable :(
   # just define some dummy methods
   class String
-    ignore = ->(*args) { self } # do nothing
+    ignore = proc { self } # do nothing
 
-    [
-      :default,
-      :colorize,
-      :black,  :light_black,
-      :red,    :light_red,
-      :green,  :light_green,
-      :yellow, :light_yellow,
-      :blue,   :light_blue,
-      :magenta,:light_magenta,
-      :cyan,   :light_cyan,
-      :white,  :light_white
+    # rubocop:disable Layout/SpaceInsideArrayPercentLiteral
+    %i[
+      default
+      colorize
+      black   light_black
+      red     light_red
+      green   light_green
+      yellow  light_yellow
+      blue    light_blue
+      magenta light_magenta
+      cyan    light_cyan
+      white   light_white
     ].each { |name| define_method(name, ignore) }
+    # rubocop:enable Layout/SpaceInsideArrayPercentLiteral
   end
 end
 
@@ -46,15 +50,15 @@ end
 
 opts = {
   file: 'init.org',
-  compile: false,
+  compile: false
 }
 
-parser = OptionParser.new do |it|
-  it.banner = "Usage: tangle [options]"
+OptionParser.new do |it|
+  it.banner = 'Usage: tangle [options]'
 
   it.on('-f', '--file=FILE', 'Tangle FILE')
   it.on('-l', '--logfile=FILE', 'Log to FILE, defaults to null or STDERR') do |file|
-    file == '-' ? STDERR : File.open(file, 'a')
+    file == '-' ? $stderr : File.open(file, 'a')
   end
 
   it.on('-d', '--dependency=FILE', 'add FILE as a tangle dependency') do |file|
@@ -69,20 +73,23 @@ parser = OptionParser.new do |it|
   it.on('-c', '--[no-]compile', 'Force byte-compilation of tangled elisp files')
 
   it.on('-v', '--[no-]verbose', 'Raise verbosity of program output')
-  it.on("-h", "--help", "Print this help message") { puts it; exit 0 }
+  it.on('-h', '--help', 'Print this help message') do
+    puts it
+    exit 0
+  end
 end.parse!(into: opts)
 
 # force interactive execution
 unless opts[:interactive].nil?
-  STDOUT.sync = opts[:interactive]
+  $stdout.sync = opts[:interactive]
 end
 
 unless opts[:logfile]
-  opts[:logfile] = (STDOUT.isatty || opts[:interactive]) ? File.open(File::NULL, 'w') : STDERR
+  opts[:logfile] = $stdout.isatty || opts[:interactive] ? File.open(File::NULL, 'w') : $stderr
 end
 
 # only print indicator lines when stderr isn't active
-opts[:indicator] = opts[:logfile] != STDERR
+opts[:indicator] = opts[:logfile] != $stderr
 
 logger = Logger.new(opts[:logfile])
 logger.level = Logger::DEBUG if opts[:verbose]
@@ -99,7 +106,7 @@ end
 
 # provides an incremental iterator over chars using counter
 ProgressIterator = Struct.new(:chars, :counter) do
-  def get_char(increment=true)
+  def get_char(increment: true)
     char = chars[counter] # current character in iteration
     self.counter = (counter + 1) % chars.length if increment
 
@@ -107,6 +114,7 @@ ProgressIterator = Struct.new(:chars, :counter) do
   end
 end
 
+# Indicator class which dumps status to stdout/err on a separate thread.
 class Indicator
   # Indicator States
   DOING  = 0
@@ -117,24 +125,26 @@ class Indicator
 
   attr_writer :state
 
-  def initialize(opts={})
+  def initialize(opts = {})
     @logger = opts[:logger]
     @delay = opts.fetch :delay, 1
     @lock = Mutex.new
     @state = SETUP
     spinner_chars = opts.fetch :spinner, %w[| / - \\]
     @spinner = ProgressIterator.new spinner_chars, 0
-    @stream = opts[:indicator] ? STDOUT : devnull
+    @stream = opts[:indicator] ? $stdout : devnull
 
     # prevent long lines staying behind
     @last_output_length = 0
   end
 
   def stringify
+    # rubocop:disable Style/StringConcatenation
     str = "[#{stringify_state}] #{@spinner.get_char}"
     str += ' ' + @message if @message
     str += ' ' * @last_output_length
     @last_output_length = @message.length if @message
+    # rubocop:enable Style/StringConcatenation
     str
   end
 
@@ -142,11 +152,11 @@ class Indicator
     @logger ||= null_logger
   end
 
-  def wrap(leave_break=true, &block)
+  def wrap(leave_break: true, &block)
     running = true
     thread = Thread.new do
       while running
-        print stringify + "\r"
+        print "#{stringify}\r"
         sleep(@delay)
       end
 
@@ -181,12 +191,8 @@ class Indicator
     when OK
       ' OK '.green
     when DOING
-      str = if @spinner.counter % 2 == 0
-              '<~<~'
-            else
-              '~<~<'
-            end
-      "#{str.light_blue}"
+      str = @spinner.counter.even? ? '<~<~' : '~<~<'
+      str.light_blue
     end
   end
 
@@ -201,11 +207,11 @@ class Indicator
   # also synchronising with indicator output
   #
   def puts(*args)
-    @lock.synchronize {
+    @lock.synchronize do
       # ensure no indicator line remains out
       clear_stream
       @stream.puts(*args)
-    }
+    end
   end
 
   ##
@@ -213,57 +219,58 @@ class Indicator
   # synchronising the indicator output
   #
   def print(*args)
-    @lock.synchronize { @stream.print(*args)}
+    @lock.synchronize { @stream.print(*args) }
   end
 end
 
-def tangle_dependencies(file, opts={}, &block)
+def tangle_dependencies(file, opts = {}, &block)
   cmd = [
     File.join(File.dirname(__FILE__), 'tangle-targets'),
     file
   ]
 
   logger.info "Finding tangle targets for: #{file}"
-  stream = opts[:indicator] ? devnull : STDOUT
-  Open3.popen3(cmd) do |sin, sout, serr, wait|
+  stream = opts[:indicator] ? devnull : $stdout
+  Open3.popen3(cmd) do |_sin, sout, serr, wait|
     # process stderr first, then stdout cause it's going to be smaller
     serr.each_line { |line| stream.puts line }
     sout.each_line do |line|
       src, dest = line.chomp.split(':')
-      block.call(src, dest) if block
+      block&.call(src, dest)
     end
     wait.value.success?
   end
 end
 
-def tangle_file(file, opts={})
+def tangle_file(file, opts = {})
   cmd = [
     # why not popen emacs directly... turns out emacs doesn't like
     # cygwin & displays errors due to missing linux character set
     # files only when not running from bash. DAMN YOU WINDOWS!
 
-    "bash", "-c", [
-      "yes", "yes", "|", "emacs", "--batch",
-      "--eval", Shellwords.escape("(setq org-confirm-babel-evaluate nil
+    'bash', '-c', [
+      'yes', 'yes', '|', 'emacs', '--batch',
+      '--eval', Shellwords.escape("(setq org-confirm-babel-evaluate nil
                                          tangling+ t
                                          create-lockfiles nil
                                          comp-deferred-compilation nil
                                          make-backup-files nil)"),
-      "--eval", Shellwords.escape("(require (quote ob-tangle))"),
-      "--eval", Shellwords.escape("(org-babel-tangle-file \"#{file}\")"),
-      "2>&1"
-    ].join(" ")
+      '--eval', Shellwords.escape('(require (quote ob-tangle))'),
+      '--eval', Shellwords.escape("(org-babel-tangle-file \"#{file}\")"),
+      '2>&1'
+    ].join(' ')
   ]
 
-  stream = opts[:indicator] ? devnull : STDOUT
-  IO.popen(cmd, "w+", :external_encoding=>"utf-8") do |io|
+  stream = opts[:indicator] ? devnull : $stdout
+  IO.popen(cmd, 'w+', external_encoding: 'utf-8') do |io|
     io.each_line { |line| stream.puts line }
   end
 
   $?.success?
 end
 
-def compile_files(init_file, files, opts={})
+# rubocop:disable Metrics/MethodLength
+def compile_files(init_file, files, opts = {})
   file = Tempfile.new('emacs-bytecomp')
   file.write <<~END_OF_SCRIPT
     ;; -*- lexical-binding: t -*-
@@ -288,25 +295,22 @@ def compile_files(init_file, files, opts={})
 
   file.write("\n")
   files.each do |f|
-    file.write <<EOF
-(message "Byte compiling file: #{Shellwords.escape(f)}")
-(byte-compile-file "#{Shellwords.escape(f)}")
-EOF
+    file.write <<~END_OF_FILE_COMPILE
+      (message "Byte compiling file: #{Shellwords.escape(f)}")
+      (byte-compile-file "#{Shellwords.escape(f)}")
+    END_OF_FILE_COMPILE
   end
-  file.write <<EOF
-;; (message "Value is: %s" tangle-byte-compile-failed)
-EOF
   file.flush
 
   logger.info "Running byte-compilation script at #{file.path}"
   cmd = [
-    "bash", "-c", [
-      "yes", "yes", "|", "emacs", "--batch", "--script", file.path, "2>&1"
-    ].join(" ")
+    'bash', '-c', [
+      'yes', 'yes', '|', 'emacs', '--batch', '--script', file.path, '2>&1'
+    ].join(' ')
   ]
 
-  stream = opts[:indicator] ? devnull : STDOUT
-  IO.popen(cmd, "w+", :external_encoding=>"utf-8") do |io|
+  stream = opts[:indicator] ? devnull : $stdout
+  IO.popen(cmd, 'w+', external_encoding: 'utf-8') do |io|
     io.each_line { |line| stream.puts line }
   end
 
@@ -315,10 +319,12 @@ ensure
   file.close
   file.unlink
 end
+# rubocop:enable Metrics/MethodLength
 
+# rubocop:disable Metrics/BlockLength
 Indicator.new(opts).wrap do |it|
   it.message = "Checking source file: #{opts[:file]}"
-  default_target = opts[:file].ext + '.el'
+  default_target = "#{opts[:file].ext}.el"
 
   unless File.exist? opts[:file]
     it.state = Indicator::FAILED
@@ -329,10 +335,12 @@ Indicator.new(opts).wrap do |it|
   Dir.chdir File.dirname(opts[:file])
 
   it.state = Indicator::DOING
-  it.message = "Checking tangle targets"
+  it.message = 'Checking tangle targets'
 
-  all_compile = Set.new                                                         # List of compilation targets tied to the main tangle target
-  to_compile, to_tangle = Set.new, Set.new
+  # List of compilation targets tied to the main tangle target
+  all_compile = Set.new
+  to_compile = Set.new
+  to_tangle = Set.new
   opts.fetch(:dependency, []).each do |dep|
     if File.exist?(dep) && FileUtils.uptodate?(dep, [default_target])
       to_tangle  << opts[:file]
@@ -351,12 +359,12 @@ Indicator.new(opts).wrap do |it|
       elsif opts[:compile] &&
             File.extname(dest) == '.el' &&
             !File.basename(dest).start_with?('.') &&
-            !FileUtils.uptodate?(dest[0...-3] + '.elc', [dest])
+            !FileUtils.uptodate?("#{dest[0...-3]}.elc", [dest])
         logger.info("File #{dest} needs to be compiled")
         to_compile << dest
       end
     end
-    if !tangle_res
+    unless tangle_res
       it.state = Indicator::FAILED
       it.message = 'Failed to determine tangle targets'
       exit 1
@@ -373,33 +381,34 @@ Indicator.new(opts).wrap do |it|
 
   if to_tangle.empty? && to_compile.empty?
     it.state = Indicator::OK
-    it.message = "Everything is up to date"
-    return
+    it.message = 'Everything is up to date'
+    return # rubocop:disable Lint/NonLocalExitFromIterator
   end
 
   to_tangle.each do |file|
     it.state = Indicator::DOING
     it.message = "Tangling file #{file}"
 
-    if !tangle_file(file, opts)
+    unless tangle_file(file, opts) # rubocop:disable Style/Next
       it.state = Indicator::FAILED
       it.message = "Failed to tangle file #{file}"
       exit 1
     end
   end
 
-  if to_compile.length > 0
+  if to_compile.length.positive?
     it.state = Indicator::DOING
-    it.message = "Byte-compiling files"
-    if !compile_files(default_target, to_compile, opts)
+    it.message = 'Byte-compiling files'
+    unless compile_files(default_target, to_compile, opts)
       it.state = Indicator::FAILED
-      it.message = "Failed to byte-compile files"
+      it.message = 'Failed to byte-compile files'
       exit 1
     end
   end
 
   it.state = Indicator::DONE
-  it.message = "Tangled " + (opts[:compile] ? "and compiled " : '') + opts[:file]
+  it.message = "Tangled#{opts[:compile] ? ' and compiled' : ''} #{opts[:file]}"
 end
+# rubocop:enable Metrics/BlockLength
 
 logger.close
