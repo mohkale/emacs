@@ -1544,29 +1544,86 @@
     #+END_SRC
 
 *** display-buffer
-    Customise display-buffer-alist to prioritise switching focus to displayed
-    buffers, instead of showing them and then making me have to switch to them
-    and then exit.
+    Customizes how popup windows are shown/represented by emacs.
+
+    Firstly lets add some display-buffer commands to show a window to the left/right
+    of the current window.
+
+    These functions have been adapted from [[https://stackoverflow.com/a/21544307/6247387][this]] stackoverflow answer.
 
     #+BEGIN_SRC emacs-lisp
-      (add-hook 'emacs-startup-hook
-                (lambda () (require '+display-buffer-focus)))
+      (defun display-buffer-left (buffer alist)
+        "display a buffer to the left of the current buffer.
+      (1) If `buffer` is already displayed, then display it again in the same window.
+      (2) If `buffer` is not already displayed, and if there is a window to the left,
+          then display that `buffer` in said window.
+      (3) If `buffer` is not already displayed, and if there is a window to the right, then
+          use the selected window.
+      (4) If all else fails, then create a new window to the left and display `buffer` there.
+      (5) Select the target window which displays `buffer`."
+        (let ((window
+               (cond
+                ((get-buffer-window buffer (selected-frame)))
+                ;; ((window-in-direction 'above))
+                ((window-in-direction 'left))
+                ((window-in-direction 'right)
+                 (selected-window))
+                (t
+                 (split-window (selected-window) nil 'left)))))
+          (window--display-buffer buffer window 'window alist)))
+
+      (defun display-buffer-right (buffer alist)
+        "display a buffer to the right of the current buffer.
+      (1) If `buffer` is already displayed, then display it again in the same window.
+      (2) If `buffer` is not already displayed, and if there is a window to the right,
+          then display that `buffer` in said window.
+      (3) If `buffer` is not already displayed, and if there is a window to the left, then
+          use the selected window.
+      (4) If all else fails, then create a new window to the right and display `buffer` there.
+      (5) Select the target window which displays `buffer`."
+        (let ((window
+               (cond
+                ((get-buffer-window buffer (selected-frame)))
+                ;; ((window-in-direction 'above))
+                ((window-in-direction 'right))
+                ((window-in-direction 'left)
+                 (selected-window))
+                (t
+                 (split-window (selected-window) nil 'right)))))
+          (window--display-buffer buffer window 'window alist)))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/+display-buffer-focus.el
-      ;; frankly, display buffers alist is badly documented.
-      ;; there's a quick and simple article exploring how it
-      ;; works [[https://www.simplify.ba/articles/2016/01/25/display-buffer-alist/][here]]
-      ;;
-      ;; in the meantime, the following is a breif~er~ summary
-      ;;   1. the car of each entry should be a regex matching a buffer
-      ;;      name or a function taking a buffer and an action argument.
-      ;;   2. the second item (car (cdr list)) should be a list of or a
-      ;;      single display handler function which takes a buffer and
-      ;;      an alist as an argument. Each entry in the list is invoked
-      ;;      until one which returns non nil is encountered.
-      ;;   3. the remaining list items should be an alists providing options.
+    Now lets add variants of all the builtin display-buffer commands to switch
+    focus to windows after displaying-them. Personally I prefer this because it
+    makes quitting windows easier (often just ~q~ after it pops up).
 
+    NOTE: You can also get this affect by simply setting
+    ~(body-function . select-window)~ in the configuration alist for a display-buffer
+    action, but these give you the flexibility to select with one action or not select
+    with another.
+
+    #+BEGIN_SRC emacs-lisp
+      (defmacro display-buffer-create-focus-method+ (func)
+        `(defun ,(intern (concat (symbol-name func) "-and-focus")) (buffer alist)
+           (when-let ((window (,func buffer alist)))
+             (select-window window))))
+
+      (display-buffer-create-focus-method+ display-buffer--maybe-same-window)
+      (display-buffer-create-focus-method+ display-buffer-reuse-window)
+      (display-buffer-create-focus-method+ display-buffer--maybe-pop-up-frame-or-window)
+      (display-buffer-create-focus-method+ display-buffer-in-previous-window)
+      (display-buffer-create-focus-method+ display-buffer-in-side-window)
+      (display-buffer-create-focus-method+ display-buffer-use-some-window)
+      (display-buffer-create-focus-method+ display-buffer-pop-up-frame)
+      (display-buffer-create-focus-method+ display-buffer-below-selected)
+
+      (display-buffer-create-focus-method+ display-buffer-left)
+      (display-buffer-create-focus-method+ display-buffer-right)
+    #+END_SRC
+
+    By default I'd rather switch focus so lets enable it.
+
+    #+BEGIN_SRC emacs-lisp
       ;; changing at startup messes up the display of the dashboard :(
       (defconst default-display-buffer-action
         display-buffer-fallback-action
@@ -1578,27 +1635,16 @@
                default-display-buffer-action))
           (apply func args)))
 
-      (setq display-buffer-fallback-action
-            ;; by default, focus on displayed windows
-            '((display-buffer--maybe-same-window-and-focus
-               display-buffer-reuse-window-and-focus
-               display-buffer--maybe-pop-up-frame-or-window-and-focus
-               display-buffer-in-previous-window-and-focus
-               display-buffer-use-some-window-and-focus
-               display-buffer-pop-up-frame-and-focus)))
+      (setq default-display-buffer-base-actions
+            '((body-function . select-window)))
+    #+END_SRC
 
-      (push `(,(rx
-                (or "*Async Shell Command*"
-                    "*compilation*"
-                    "*rustic-compilation*"
-                    "*cargo-test*"))
-              (display-buffer-reuse-window
-               display-buffer--maybe-pop-up-frame-or-window-and-focus
-               display-buffer-in-side-window-and-focus)
-              (side          . bottom)
-              (window-height . 0.5))
-            display-buffer-alist)
+    Firstly lets disable automatic selection for any buffers matching the following
+    pattern. In some cases it makes sense to not select popups, such as popups that're
+    automatically shown (example: /flycheck-error-messages/) and will automatically
+    close themselves.
 
+    #+BEGIN_SRC emacs-lisp
       (push `(,(rx
                 (or "*image-dired-display-image*"
                     "*Anaconda*"
@@ -1607,10 +1653,56 @@
                     "*HTTP Response*"
                     "*Compile-Log*"
                     (and "*eglot-help for " (+ any) "*")))
-              ,@default-display-buffer-action)
+              ,@display-buffer-fallback-action
+              (body-function . nil))
             display-buffer-alist)
+    #+END_SRC
 
-      (provide '+display-buffer-focus)
+    Make compilation buffers take focus *unless* they're already open, in which case
+    just keep them where they are. This lets me re-run compilations without constantly
+    switching to the compilation-buffer.
+
+    #+BEGIN_SRC emacs-lisp
+      (push `(,(rx
+                (or "*Async Shell Command*"
+                    "*compilation*"
+                    "*rustic-compilation*"
+                    "*cargo-test*"))
+              (display-buffer-reuse-window
+               display-buffer--maybe-pop-up-frame-or-window-and-focus
+               display-buffer-in-side-window-and-focus)
+              (side . bottom)
+              (window-height . 0.5)
+              (reusable-frames . t))
+            display-buffer-alist)
+    #+END_SRC
+
+    Some commands like ~next-error~ rely on the compilation-buffer being open and
+    visilbe so they try to display them, but don't account for the buffer being
+    open in a separate window.
+
+    #+BEGIN_SRC emacs-lisp
+      ;; Nice way to keep the compilation buffer open in a separate
+      ;; frame but still update it as you move forward or back with
+      ;; `next-error' and `previous-error'.
+      (push `(,(defun next-error-hide-compilation-buffer+ (_buffer _action)
+                 "Make `next-error' work when the compilation buffer is hidden
+            or open in separate frame.
+            By default `next-error' and it's derivatives pop open a compilation
+            buffer or have this annoying bug where they keep showing the same
+            buffer in new windows if the compilation-buffer isn't visible."
+                 (member this-command '(next-error
+                                        previous-error
+                                        first-error
+                                        compile-goto-error)))
+              (display-buffer--maybe-same-window
+               display-buffer-reuse-window
+               display-buffer-no-window)
+              ;; Allow reuse-window to check other [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Buffer-Display-Action-Functions.html][frames]] and don't
+              ;; switch frames by default.
+              (reusable-frames . t)
+              (inhibit-switch-frame . t))
+            display-buffer-alist)
     #+END_SRC
 
 *** uniarg
@@ -2600,68 +2692,6 @@
        (advice-add 'evil-visual-paste :after #'evil-visual-paste--auto-indent)
        (advice-add 'evil-paste-after  :after #'evil-visual-paste--auto-indent)
        (advice-add 'evil-paste-before :after #'evil-visual-paste--auto-indent))
-   #+END_SRC
-
-** display-buffer
-   #+BEGIN_SRC emacs-lisp
-     (defmacro display-buffer--create-focus-method (func)
-       `(defun ,(intern (concat (symbol-name func) "-and-focus")) (buffer alist)
-          (let ((window (,func buffer alist)))
-            (when window
-              (select-window window)))))
-
-     (display-buffer--create-focus-method display-buffer--maybe-same-window)
-     (display-buffer--create-focus-method display-buffer-reuse-window)
-     (display-buffer--create-focus-method display-buffer--maybe-pop-up-frame-or-window)
-     (display-buffer--create-focus-method display-buffer-in-previous-window)
-     (display-buffer--create-focus-method display-buffer-in-side-window)
-     (display-buffer--create-focus-method display-buffer-use-some-window)
-     (display-buffer--create-focus-method display-buffer-pop-up-frame)
-     (display-buffer--create-focus-method display-buffer-below-selected)
-
-     ;; See also: [[https://stackoverflow.com/questions/21542914/make-buffer-list-always-appear-in-horizontal-split/21544307#21544307][here]].
-     (defun display-buffer-left (buffer alist)
-       "display a buffer to the left of the current buffer.
-     (1) If `buffer` is already displayed, then display it again in the same window.
-     (2) If `buffer` is not already displayed, and if there is a window to the left,
-         then display that `buffer` in said window.
-     (3) If `buffer` is not already displayed, and if there is a window to the right, then
-         use the selected window.
-     (4) If all else fails, then create a new window to the left and display `buffer` there.
-     (5) Select the target window which displays `buffer`."
-       (let ((window
-              (cond
-               ((get-buffer-window buffer (selected-frame)))
-               ;; ((window-in-direction 'above))
-               ((window-in-direction 'left))
-               ((window-in-direction 'right)
-                (selected-window))
-               (t
-                (split-window (selected-window) nil 'left)))))
-         (window--display-buffer buffer window 'window alist)))
-
-     (defun display-buffer-right (buffer alist)
-       "display a buffer to the right of the current buffer.
-     (1) If `buffer` is already displayed, then display it again in the same window.
-     (2) If `buffer` is not already displayed, and if there is a window to the right,
-         then display that `buffer` in said window.
-     (3) If `buffer` is not already displayed, and if there is a window to the left, then
-         use the selected window.
-     (4) If all else fails, then create a new window to the right and display `buffer` there.
-     (5) Select the target window which displays `buffer`."
-       (let ((window
-              (cond
-               ((get-buffer-window buffer (selected-frame)))
-               ;; ((window-in-direction 'above))
-               ((window-in-direction 'right))
-               ((window-in-direction 'left)
-                (selected-window))
-               (t
-                (split-window (selected-window) nil 'right)))))
-         (window--display-buffer buffer window 'window alist)))
-
-     (display-buffer--create-focus-method display-buffer-left)
-     (display-buffer--create-focus-method display-buffer-right)
    #+END_SRC
 
 ** fonts-emojis
@@ -9534,11 +9564,11 @@
                       (get-buffer
                        (if compilation-buffer-name-function
                            (funcall compilation-buffer-name-function "compilation")
-                         "*compilation*"))))
-                 (window (if (not buffer)
-                             (user-error "compilation buffer doesn't exist")
-                           (display-buffer buffer))))
-            (select-window window t)))
+                         "*compilation*")))))
+            (if (not buffer)
+                (user-error "Compilation buffer doesn't exist")
+              (display-buffer buffer '((reusable-frames . nil)
+                                       (body-function . select-window))))))
 
         (defun +set-compilation-bindings (mode map)
           (leader/set-keys-for-major-mode mode
@@ -9585,8 +9615,8 @@
 
 *** auto-kill
     #+BEGIN_SRC emacs-lisp
-      (defvar compilation-auto-kill-window 2
-        "if non-nil, after a successfull compilation the compilation
+      (defvar compilation-auto-kill-window+ 2
+        "If non-nil, after a successfull compilation the compilation
       window, if open, will automatically be deleted.
 
       If set to a numerical value, window will be deleted after that many
@@ -9603,8 +9633,10 @@
       the compilation window was already open when the compilation was
       started.")
 
-      (defvar compilation-was-open-p nil
-        "true whether the compilation window was visible when compilation began.")
+      ;; WARN: Making buffer-local prevents persistance after compilation.
+      ;; WARN: Not thread-safe, will only work for the last set compilation buffer.
+      (defvar compilation-was-open-p+ nil
+        "True whether the compilation window was visible when compilation began.")
 
       (advice-add 'compilation-start :before
                   (defun compilation-check-window-was-open+ (_command &optional mode name-function _highlight-regexp)
@@ -9613,12 +9645,12 @@
                            (name-of-mode (if (eq mode t)
                                              "compilation"
                                            (replace-regexp-in-string "-mode\\'" "" (symbol-name mode))))
-                           (buf-name (compilation-buffer-name name-of-mode mode name-function))
-                           buf)
-                      (setq compilation-was-open-p
-                            (and (setq buf (get-buffer buf-name))
-                                 (get-buffer-window buf)
-                                 t)))))
+                           (buf-name (compilation-buffer-name name-of-mode mode name-function)))
+                      (when-let* ((buf (get-buffer buf-name)))
+                        (with-current-buffer buf
+                          (setq compilation-was-open-p+
+                                (when (get-buffer-window buf 'visible)
+                                  t)))))))
 
       (defun compilation-safely-close-window+ (buffer)
         (when (and buffer
@@ -9639,9 +9671,10 @@
 
       (defun compilation-finish-function+ (buf str)
         "hook to automatically hide compilation output."
-        (when (and compilation-auto-kill-window
-                   (and (member 'focus compilation-dont-auto-kill-window-when)
-                        (not compilation-was-open-p))
+        (when (and compilation-auto-kill-window+
+                   (and (member 'focus compilation-dont-auto-kill-window-when+)
+                        (not (with-current-buffer buf
+                               compilation-was-open-p+)))
                    ;; an abnormal exit automatically cancels window kill
                    (not (string-match-p (rx (zero-or-more any)
                                             "exited abnormally"
@@ -9658,8 +9691,8 @@
                 (setq terminate-window nil)))
 
             (when terminate-window
-              (if (numberp compilation-auto-kill-window) ;; kill after delay
-                  (run-at-time (concat (number-to-string compilation-auto-kill-window)
+              (if (numberp compilation-auto-kill-window+) ;; kill after delay
+                  (run-at-time (concat (number-to-string compilation-auto-kill-window+)
                                        " sec")
                                nil 'compilation-safely-close-window+ buf)
                 (compilation-safely-close-window+ buf))))))
@@ -20069,7 +20102,7 @@
         (add-hook 'go-guru-output-mode-hook
                   (defun go-guru-preserve-compilation-window+ ()
                     "Prevent my `compilation-hook' settings interfering with go-guru."
-                    (setq-local compilation-auto-kill-window nil)))
+                    (setq-local compilation-auto-kill-window+ nil)))
 
         :lazy-leader
         (:mode 'go-mode
@@ -20157,16 +20190,18 @@
    #+END_SRC
 
 *** rust-compile
-    Fix ~compilation-was-open-p~ isn't assigned when rustic compilation is begun.
+    Fix ~compilation-was-open-p+~ isn't assigned when rustic compilation is begun.
 
     #+BEGIN_SRC emacs-lisp
       (advice-add 'rustic-compilation :before
                   (defun rustic-compilation-check-window-was-open-p+ (_command &rest args)
                     ;; copied from `rustic-compilation'.
-                    (let ((buf (get-buffer
-                                (or (plist-get args :buffer) rustic-compilation-buffer-name))))
-                      (setq compilation-was-open-p
-                            (and buf (get-buffer-window buf) t)))))
+                    (when-let ((buf (get-buffer
+                                     (or (plist-get args :buffer)
+                                         rustic-compilation-buffer-name))))
+                      (with-current-buffer buf
+                        (setq compilation-was-open-p+ (when (get-buffer-window buf t)
+                                                        t))))))
     #+END_SRC
 
 ** git
