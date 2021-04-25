@@ -522,7 +522,7 @@
       org-id-locations-file                              (var! "org/id-locations.el")
       org-publish-timestamp-directory                    (var! "org/timestamps/")
       org-registry-file                                  (var! "org/registry.el")
-      org-default-notes-file                             (org! "notes.org")
+      org-default-notes-file                             (org! "notes/index.org")
       projectile-org-projects-directory+                 (org! "notes/projects/")
       org-projectile-projects-directory                  projectile-org-projects-directory+
       org-projectile-projects-file                       (org! "notes/projects/global.org")
@@ -669,7 +669,8 @@
            use-package-always-ensure       nil
            use-package-always-defer        t
            straight-allow-recipe-inheritance t
-           straight-process-buffer " *straight*")
+           straight-process-buffer " *straight*"
+           straight-check-for-modifications '(check-on-save find-when-checking))
    #+END_SRC
 
    For my config I'll be using [[https://github.com/raxod502/straight.el][straight]], the modern package manager for emacs.
@@ -1456,30 +1457,6 @@
        "S-M-SPC" (defun-save-excursion-insert-char space ? ))
     #+END_SRC
 
-*** syntax
-    Adjust the syntax entries for the given modes so that functions like evil word
-    skip over them.
-
-    TODO switch to a macro.
-
-    #+NAME: underscore-supported-modes
-    - c++
-    - c
-    - markdown
-    - lisp
-    - shell
-    - enh-ruby
-
-    #+BEGIN_SRC emacs-lisp :var modes=underscore-supported-modes
-      (defun adjust-syntax-entry! ()
-        "includes underscores in the syntax entry"
-        (modify-syntax-entry ?_ "w"))
-
-      (dolist (mode modes)
-        (let ((hook-name (concat (car mode) "-mode-hook")))
-          (add-hook (intern hook-name) #'adjust-syntax-entry!)))
-    #+END_SRC
-
 *** hooks
     Run a hook on buffer change
 
@@ -1892,12 +1869,12 @@
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
-      (defconst +dot-goto-repo-command '("ls-repos"))
+      (defconst +dot-goto-repo-command '("ls-projects"))
 
       (defvar +dot-goto-repo-history nil)
       (defun +dot-goto-repo ()
         (interactive)
-        "List repositories using my [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-repos][ls-repos]] script and ask for one to jump to."
+        "List repositories using my [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-repos][ls-projects]] script and ask for one to jump to."
         (let ((repo (completing-read "Repo: "
                                      (apply #'process-lines +dot-goto-repo-command)
                                      nil t nil '+dot-goto-repo-history)))
@@ -4489,6 +4466,7 @@
         (advice-add 'org-eldoc-documentation-function :before-until #'org-eldoc-get-link+)
 
       ;;; org-man
+        (require 'ol-man)
         (setq org-man-command +man-command))
     #+END_SRC
 
@@ -4607,15 +4585,20 @@
     #+BEGIN_SRC emacs-lisp
       (setq
        org-capture-templates
-       (doct `((:group "Default"
+       (doct `(;; The group for org-mode files generally used for notes or records.
+               ;; With support for word-checking and other writing helpers.
+               (:group "Default"
                 :type entry
-                :file ,org-default-notes-file
-                :prepend     t
-                :empty-lines 0
                 :hook ,#'flyspell-mode
-                :before-finalize ,#'org-update-parent-todo-statistics
+                :file ,org-default-notes-file
+                :prepend t
+                :empty-lines 0
                 :children
-                ((:group "TODOs"
+                (;; Group for TODO lists or completion goals. These are generally org
+                 ;; headings with a todo-state, a marking timestamp and some description
+                 ;; about the goal.
+                 (:group "TODOs"
+                  :before-finalize ,#'org-update-parent-todo-statistics
                   :function ,(org-capture-create-goto-heading-command "* TODOs [/]")
                   :todo-state "TODO"
                   :template ("* %{todo-state} %?"
@@ -4630,64 +4613,49 @@
                               :keys "d"
                               :prepend  nil
                               :function ,(org-capture-create-goto-heading-command "* Itinerary")
-                              :template ("* %{todo-state} %?"))))
-                 ;; ("Note" :keys "n"
-                 ;;  :template ("* %?"
-                 ;;             "  %U"))
-                 ("Job Application"
-                   :keys "j"
-                   :function ,(org-capture-create-goto-heading-command "* Job Search [/]")
-                   :template ("* TODO [#%^{Priority|A|B|C}] %(org-get-link+) - %^{Company}"
-                              "  DEADLINE: %^{deadline}t"
-                              "%^{LOCATION}p%^{DURATION}p"
-                              "  %?"))))
+                              :template ("* %{todo-state} %?"))
+                             ("Job Application"
+                              :keys "j"
+                              :function ,(org-capture-create-goto-heading-command "* Job Search [/]")
+                              :template ("* TODO [#%^{Priority|A|B|C}] %(org-get-link+) - %^{Company}"
+                                         "  DEADLINE: %^{deadline}t"
+                                         "%^{LOCATION}p%^{DURATION}p"
+                                         "  %?"))))
+                 (;; Group for notes. These are entire org-mode files containing detailed
+                  ;; notes isolated to a specific topic for example a lecture or some agenda.
+                  ;; Notes that go into here are often bisected and moved into my [[file:init.org::*org-roam][org-brain]].
+                  "Notes"
+                  :keys "n"
+                  :type plain
+                  :file (lambda ()
+                          (format-time-string (org! "notes/%Y%m%d%H%M%S.org")))
+                  :title-format "%^{Title}"
+                  :template ("#+title: %{title-format}"
+                             "#+stamp: %U"
+                             ""
+                             "%?")
+                  :children (("Note" :keys "n")
+                             ("Agenda"
+                              :keys "a"
+                              :title-format "Agenda for meeting to be held %^{deadline}t")
+                             ("Lecture"
+                              :keys "l"
+                              :template ("#+title: %{title-format}"
+                                         "#+module: %^{Module}"
+                                         "#+stamp: %U"
+                                         ""
+                                         "%?"))))))
                ("BibTex"
                 :keys "b"
                 :type plain
                 :file ,(org! "bib/index.bib")
-                :template ("@%(completing-read \"Entry type: \" (mapcar #'car bibtex-entry-alist)) {%^{Key},"
+                :template ("@%(completing-read \"Entry type: \" (mapcar #'car bibtex-entry-alist)){%^{Key},"
                            "  title = \"%^{Title}\","
-                           "  year  = \"%(format-time-string \"%Y\" (current-time))\","
-                           "  month = \"%(format-time-string \"%b\" (current-time))\","
-                           "  day   = %(format-time-string \"%d\" (current-time)),"
+                           "  DATE_ADDED = \"%<%a %b %d %H:%M:%S %Y>\","
                            "}")
                 :children (("Entry" :keys "e")
-                           ;; ("DOI" :keys "d"
-                           ;;  :template "%(progn (call-interactively 'doi-insert-bibtex) \"\")")
                            ("Lecture" :keys "l"
-                            :file ,(org! "bib/uni.bib"))))
-               ("Education"
-                :keys "e"
-                :type plain
-                :hook ,#'flyspell-mode
-                :file (lambda ()
-                        (format-time-string (org! "notes/%Y%m%d%H%M%S.org")))
-                :children (("Agenda"
-                            :keys "a"
-                            :template ("#+title: Agenda for meeting to be held %^{deadline}t"
-                                       "#+date: %<%a %d %b %Y %I:%M %p>"
-                                       ""
-                                       "%?"))
-                           ("Meeting"
-                            :clock-in t
-                            :keys "m"
-                            :template ("#+title: Minutes for %^{Meeting}"
-                                       "#+date: %<%a %d %b %Y %I:%M %p>"
-                                       "#+chair: %^{Who is chairing this meeting}"
-                                       "#+format: %^{How was this meeting held}"
-                                       ""
-                                       "* Overview"
-                                       "  #+NAME: attendance-record"
-                                       "  - [X] %\\2"                                   ; Add remaining members and check if their present
-                                       "%?"
-                                       ))
-                           ("Lecture"
-                            :keys "l"
-                            :template ("#+title: %^{Title}"
-                                       "#+module: %^{Module}"
-                                       "#+record: %U"
-                                       ""
-                                       "%?")))))))
+                            :file ,(org! "bib/uni.bib")))))))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
@@ -4871,8 +4839,9 @@
         (org-archive-location (concat (org! "archive.org") "::* %s"))                 ; Archive to the same file from everywhere
         (org-confirm-babel-evaluate nil)
         (org-refile-targets (list
-                             (cons nil '(:maxlevel . 2))
-                             (cons 'org-agenda-files '(:maxlevel . 9))))
+                             (cons (join-path user-emacs-directory "init.org") '(:maxlevel . 1))
+                             (cons nil '(:maxlevel . 9))
+                             (cons 'org-agenda-files '(:maxlevel . 2))))
         (org-latex-default-class "article")
         (org-export-with-toc nil)
         (org-latex-classes
@@ -4901,9 +4870,8 @@
         (setq org-agenda-files
               (cl-remove-if
                (apply-partially #'string-match-p (rx (and "archive.org" eol)))
-               (cl-loop for path in (list (org! "*.org")
-                                          (org! "university/*.org")
-                                          (org! "notes/projects/*.org"))
+               (cl-loop for path in (list org-default-notes-file
+                                          (concat projectile-org-projects-directory+ "*.org"))
                         nconc (file-expand-wildcards path))))
 
         :config
@@ -5060,6 +5028,7 @@
          "#" 'org-priority
          "`" 'org-toggle-latex-fragment
          "^" 'org-sort
+         "\\" 'org-match-sparse-tree
          "A" 'org-agenda
          "a" 'org-archive-subtree
          "b" 'org-tree-to-indirect-buffer
@@ -5565,7 +5534,7 @@
                                           (t 'default)))
 
         :leader
-        ("od" 'org-roam-capture
+        ("ox" 'org-roam-capture
          ;; same as `org-roam-capture' except if the candidate already exists
          ;; open it instead of creating a capture session.
          "of" 'org-roam-find-file
@@ -8183,6 +8152,18 @@
 
        (defvaralias 'grep-regexp-history 'regexp-search-ring)
 
+       :custom
+       (projectile-project-search-path (seq-filter
+                                        #'file-directory-p
+                                        (list (join-path (or (getenv "XDG_DEV_HOME")
+                                                             (expand-file-name "~/prog"))
+                                                         "repos/"))))
+       (projectile-tags-backend 'xref) ;; opt into gtags
+       (projectile-indexing-method 'alien) ;; never use native
+       (projectile-tags-command "ctags -Re -f \"%s\" %s \"%s\"")
+       (projectile-cache-file (var! "projectile/cache.el"))
+       (projectile-known-projects-file (var! "projectile/known-projects.el"))
+
        :config
        (require '+projectile-project-types)
 
@@ -8195,15 +8176,6 @@
                        (string-remove-suffix "/"
                                              (apply 'true-projectile-project-root args)))))
            (apply func args)))
-
-       (setq projectile-project-search-path (cl-loop for fp in '("~/prog/repos/")
-                                                     if (file-directory-p fp)
-                                                     collect fp)
-             projectile-tags-backend 'xref ;; opt into gtags
-             projectile-indexing-method 'alien ;; never use native
-             projectile-tags-command "ctags -Re -f \"%s\" %s \"%s\""
-             projectile-cache-file (var! "projectile/cache.el")
-             projectile-known-projects-file (var! "projectile/known-projects.el"))
 
        (advice-add 'projectile-regenerate-tags :around #'projectile-ensure-no-trailing-slash-in-root)
 
@@ -10740,6 +10712,9 @@
        :init
        (evil-ex-define-cmd "spell" #'flyspell-buffer)
 
+       :config
+       (add-hook 'org-mode-hook 'flyspell-mode)
+
        :lazy-leader
        (:mode 'flyspell-mode
         :minor t
@@ -12501,8 +12476,11 @@
        :config
        (dolist (func '(perform-replace
                        query-replace))
-         (advice-add func :around
-                     #'restore-default-display-buffer-actions)))
+         (advice-add func :around #'restore-default-display-buffer-actions))
+
+       :leader
+       ("bf" 'flush-lines
+        "bd" 'keep-lines))
    #+END_SRC
 
 ** save-place
@@ -13286,6 +13264,7 @@
        :custom
        (selectrum-max-window-height 15)
        (selectrum-count-style 'current/matches)
+       (selectrum-files-select-input-dirs t)
        (selectrum-preprocess-candidates-function #'selectrum-preprocess+)
        (selectrum-highlight-candidates-function #'selectrum-highlight+)
 
@@ -13397,7 +13376,7 @@
                          copied))))
 
        (defun selectrum-update-regexp-search-ring+ (&rest _args)
-         "Update search rings based on the last `selectrum-read' command.
+         "Update search rings based on the last `selectrum--read' command.
      This works for isearch and evil and can automatically detect and compile
      regexp when an external package (eg. orderless) is used."
          (when-let ((input selectrum--last-input)
@@ -13777,7 +13756,7 @@
          "psv" 'consult-git-grep
          "psg" 'consult-grep
          "psi" 'consult-project-imenu)
-        (:mode 'org-mode
+        (:mode '(org-mode outline-mode)
          "g" 'consult-outline)
         (:minor t :mode 'flymake-mode  "je" 'consult-flymake)
 
@@ -13791,7 +13770,7 @@
          [remap isearch-forward] 'consult-line
          [remap keep-lines] 'consult-keep-lines
          [remap load-theme] 'consult-theme
-         [remap flush-lines] 'consult-flush-lines
+         ;; [remap flush-lines] 'consult-flush-lines
          ;; [remap man] 'consult-man
          ;; [remap woman] 'consult-man
          "C-M-y" 'consult-yank-pop
@@ -15523,9 +15502,16 @@
         :config
         (require 'all-the-icons)
 
-        (setq initial-buffer-choice
-              (when (< (length command-line-args) 2)
-                (lambda () (switch-to-buffer dashboard-buffer-name))))
+        (advice-add #'goto-home-buffer+ :override
+                    (defun goto-dashboard+ ()
+                      (or (get-buffer dashboard-buffer-name)
+                          (and
+                           ;; creates dashboard buffer as well
+                           (dashboard-insert-startupify-lists)))
+                      (switch-to-buffer dashboard-buffer-name)))
+
+        (setq initial-buffer-choice (when (< (length command-line-args) 2)
+                                      #'goto-dashboard+))
         (dashboard-setup-startup-hook)
 
         ;; When agenda has been loaded include it in the dashboard.
@@ -15556,14 +15542,6 @@
                     (lambda (&rest _)
                       (dashboard-select-random-banner+)))
         (dashboard-select-random-banner+)                                             ; choose initial banner
-
-        ;; goto home buffer, or recreate the home buffer, when appropriate.
-        (advice-add #'goto-home-buffer+ :before
-                    (defun dashboard-ensure-exists+ (&rest _)
-                      (or (get-buffer dashboard-buffer-name)
-                          (and
-                           ;; creates dashboard buffer as well
-                           (dashboard-insert-startupify-lists)))))
 
         ;; set the navigator button
         (setq dashboard-navigator-buttons
@@ -15889,7 +15867,7 @@
              (when-let ((default-directory (projectile-project-root)))
                (cl-loop for (file . cmds) in ,conf
                         when (file-exists-p file)
-                        return cmds))
+                          return cmds))
              (list ,@cmd))))
 
        (push (cons '(js-mode typescript-mode)
@@ -16096,7 +16074,7 @@
        :straight t
        :diminish flycheck-mode
        :custom
-       (flycheck-markdown-mdl-style (expand-file-name "~/.config/mdlstyle.rb"))
+       (flycheck-markdown-mdl-style (join-path (xdg-config-home) "mdlstyle.rb"))
        (flycheck-python-pycompile-executable "python3")
 
        :config
@@ -17255,7 +17233,7 @@
 
        :custom
        (skeletor-user-directory (etc! "skeletor"))
-       (skeletor-project-directory (expand-file-name  "~/prog/repos"))
+       (skeletor-project-directory (car (bound-and-true-p projectile-project-search-path)))
        (skeletor-completing-read-function 'completing-read
         "Make skeletor defer to the current completion framework.")
        (skeletor-show-project-command
@@ -17399,7 +17377,7 @@
                                ("poetry" . "https://python-poetry.org/"))
        :after-creation
        (lambda (dir)
-         (skeletor-shell-command "poetry init --no-interaction --no-ansi --dev-dependence pytest" dir)))
+         (skeletor-shell-command "poetry init --no-interaction --no-ansi --dev-dependency pytest" dir)))
    #+END_SRC
 
    The recommended golang package structure with sub-packages for commands.
@@ -18058,6 +18036,9 @@
         (add-hook 'emacs-lisp-mode-hook #'electric-pair-mode)
 
         :config
+        (modify-syntax-entry ?_ "w" lisp-mode-syntax-table)
+        (modify-syntax-entry ?- "w" lisp-mode-syntax-table)
+
         ;; show lambda as an actual lambda symbol... pretty cool, if I do say
         ;; so myself.
         (configure-presym! '(lisp-interaction-mode emacs-lisp-mode org-mode)
@@ -18926,12 +18907,6 @@
    :header-args+: :tangle (package-yes! sh-script)
    :END:
 
-   Enable the bash language server when it's on my system.
-
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! sh-script :lsp)
-     (add-hook 'sh-mode-hook +lsp-command)
-   #+END_SRC
-
     #+BEGIN_SRC emacs-lisp
       (use-package sh-script
         :hook ((sh-mode . electric-pair-mode)
@@ -18971,6 +18946,13 @@
          "TAB =" 'sh-set-indent
          "TAB |" 'sh-learn-buffer-indent
          "TAB ?" 'sh-show-indent))
+    #+END_SRC
+
+*** sh-lsp
+    Enable the bash language server when it's on my system.
+
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! sh-script :lsp)
+      (add-hook 'sh-mode-hook +lsp-command)
     #+END_SRC
 
 *** company-shell
@@ -19188,6 +19170,8 @@
         (markdown-fontify-code-blocks-natively t)
 
         :config
+        (modify-syntax-entry ?_ "w" markdown-mode-syntax-table)
+
         (advice-add 'markdown-insert-list-item :before
                     (defun markdown-insert-list-item--adjust-line+ (&rest args)
                       "by default, inserting a new list item goes below the current item."
@@ -19461,6 +19445,9 @@
        ;;      weird places.
        ;; (c-toggle-comment-style +1)
 
+       (modify-syntax-entry ?_ "w" c-mode-syntax-table)
+       (modify-syntax-entry ?_ "w" c++-mode-syntax-table)
+
        (setq c-default-style "stroustrup")
 
        (defun cc-mode-set-bindings+ (mode)
@@ -19499,10 +19486,6 @@
    :header-args+: :tangle (package-yes! kotlin)
    :END:
 
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! kotlin :lsp)
-     (add-hook 'kotlin-mode-hook +lsp-command)
-   #+END_SRC
-
    #+BEGIN_SRC emacs-lisp
      (use-package kotlin-mode
        :straight t
@@ -19523,6 +19506,11 @@
         "eR"    'kotlin-send-region-and-focus
         "eB"    'kotlin-send-buffer-and-focus))
    #+END_SRC
+
+*** kotlin-lsp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! kotlin :lsp)
+      (add-hook 'kotlin-mode-hook +lsp-command)
+    #+END_SRC
 
 ** java
    :PROPERTIES:
@@ -19875,7 +19863,7 @@
        (add-hook 'typescript-mode-hook       +lsp-command)
        (add-hook 'typescript-react-mode-hook +lsp-command))
 
-     (push '(typescript-mode      . 2) +indent-config)
+     (push '(typescript-mode       . 2) +indent-config)
      (push '(typescript-react-mode . 2) +indent-config)
      (add-hook 'typescript-react-mode-hook
                (defun typescriptreact-setup-tsx+ ()
@@ -20623,7 +20611,7 @@
         (setq bibtex-completion-library-path (list
                                               (org! "docs/")
                                               (org! "docs/unidocs/"))
-              bibtex-completion-notes-path (org! "notes"))
+              bibtex-completion-notes-path (org! "notes/bibnotes"))
 
         :config
         (setq bibtex-completion-pdf-extension '(".pdf" ".epub" ".pptx" ".doc" ".docx")
@@ -21191,7 +21179,6 @@
           (,cls (:foreground ,very-light-grey-256))))
 
       `(italic ((,cls (:italic t :inherit default))))
-      `(underline ((,cls (:inherit default))))
       `(shadow ((,cls (:foreground ,light-grey))))
       `(hl-line ((,cls (:background ,line-highlight-bg))))
 
@@ -21479,6 +21466,7 @@
      ;;; org-mode
       `(org-link ((,cls (:inherit (link bold)))))
       `(org-footnote ((,cls (:foreground ,blue))))
+      `(org-tag ((,cls (:foreground ,purple-int :inherit bold))))
 
       ;; Overridden by hl-todo-keyword-faces
       `(org-todo ((,cls (:foreground ,purple-int :inherit bold))))
@@ -21579,6 +21567,9 @@
 
      ;;; xref
       `(xref-match ((,cls (:foreground ,red :inherit bold))))
+
+     ;;; help
+      `(help-key-binding ((,cls (:foreground ,turquoise))))
       )
 
       (custom-theme-set-variables 'an-old-hope
