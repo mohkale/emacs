@@ -1,6 +1,16 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
-
+#
+# Check whether an org-mode file and all of it's tangle-targets are
+# upto date. If they aren't then tangle the file and optionally byte-
+# compile any elisp files after tangling.
+#
+# I've found using `M-x org-babel-tangle` from within emacs itself is
+# incredibly slow, especially as the size of org file is very large
+# (currently mine is 21693 LOC not including my snippets file which
+# also needs to be tangled). This script can make tangling which can
+# take upto 10 minutes on emacs itself take only 30 seconds.
+#
 # TODO: Minimise file system lookups.
 
 require 'set'

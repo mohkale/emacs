@@ -539,19 +539,13 @@
      ;;; third party
       request-storage-directory                          (var! "requests")
       )
-   #+END_SRC
 
-   #+BEGIN_SRC emacs-lisp
      (defconst +org-pdf-directory (org! "docs/")
        "default directory for `org-pdftools-complete-link'.
      See [[*org-pdftools][org-pdftools]].")
 
      (defconst +dashboard-banners-directory (etc! "banners/"))
-   #+END_SRC
 
-   Update load path so emacs can quickly lookup require targets.
-
-   #+BEGIN_SRC emacs-lisp
      (add-to-list 'load-path dotemacs-lisp-path)
      (add-to-list 'load-path (lisp! "core"))
    #+END_SRC
@@ -638,15 +632,6 @@
 ** packages
    Let's setup the packages needed to bootstrap my dotfiles, we're gonna need:
 
-   #+NAME: setup-packages-list
-   - use-package
-   - general
-   - delight
-   - diminish
-   - dash
-   - s
-   - f
-
    ~package.el~, [[https://github.com/hlissner/doom-emacs/blob/develop/docs/faq.org#how-does-doom-start-up-so-quickly][not on my watch, criminal scum!]].
 
    #+BEGIN_SRC emacs-lisp
@@ -689,7 +674,7 @@
 
    For my config I'll be using [[https://github.com/raxod502/straight.el][straight]], the modern package manager for emacs.
 
-   #+NAME: setup-straight-packages
+   #+NAME: setup-straight-pacman
    #+BEGIN_SRC emacs-lisp
      (with-no-warnings
        (defvaralias 'straight-base-dir 'dotemacs-lisp-path))
@@ -710,12 +695,17 @@
 
    Finally, install base packages +took you long enough :tongue:.
 
-   #+BEGIN_SRC emacs-lisp :var to-install=setup-packages-list
-     (dolist (package to-install)
-       (setq package (intern (car package)))
-
-       (straight-use-package package)
-       (require package))
+   #+NAME: setup-packages
+   #+BEGIN_SRC emacs-lisp
+     (dolist (pkg '(use-package
+                    general
+                    delight
+                    diminish
+                    dash
+                    s
+                    f))
+       (straight-use-package pkg)
+       (require pkg))
    #+END_SRC
 
 *** use-package-extensions
@@ -5766,7 +5756,7 @@
        <<org-export-options>>
        <<org-pdf-link>>
 
-       <<setup-straight-packages>>
+       <<setup-straight-pacman>>
        (straight-use-package 'org-ref)
      #+END_SRC
 
@@ -20845,6 +20835,91 @@
          "o" 'ebib-quit-entry-buffer
          "q" 'ebib-quit-entry-buffer))
     #+END_SRC
+
+* Script
+  :PROPERTIES:
+  :header-args+: :shebang "#!/usr/bin/env emacs-script\n;; -*- mode: emacs-lisp; lexical-binding: t -*-"
+  :END:
+
+  Quick init is a minimalist emacs start-up config that makes sure some sane defaults
+  (such as path configurations are setup). It's useful as an alternative to =init.el=
+  when trying to debug a package. You can run it using:
+  =emacs -Q --load $EMACS_HOME/quick-init.el=.
+
+  #+NAME: quick-init
+  #+BEGIN_SRC emacs-lisp :tangle quick-init.el :shebang ";; -*- lexical-binding: t -*-"
+    (let ((early-init (concat user-emacs-directory "early-init.el")))
+      (load early-init t t))
+
+    <<setup-path-builders>>
+    <<setup-paths>>
+    <<setup-straight-pacman>>
+    <<setup-packages>>
+  #+END_SRC
+
+  Script init is an extension to quick-init that sets up an environment for command
+  line based emacs scripts. This essentially replaces the lacklustre completing-read
+  interface in command-line scripts with =fzf=, disables some unnecessary warnings and
+  adds some useful packages for scripts.
+
+  #+NAME: script-init
+  #+BEGIN_SRC emacs-lisp :tangle no
+    <<quick-init>>
+
+    ;; fixes annoying issues with :leader
+    (setq use-package-ignore-unknown-keywords t)
+    (setq warning-minimum-log-level :emergency)
+
+    ;; Allow scripts to defer to fzf for completing-read like selection.
+    (defvar fzf-cmd '("fzf"))
+
+    (defun fzf--base (cands &rest fzf-args)
+      (with-temp-buffer
+        (insert (s-join "\n" cands))
+        (let* ((temp (make-temp-file "emacs-fzf-"))
+               (fzf-cmd (concat (s-join " " (mapcar #'shell-quote-argument
+                                                    (delq nil (append fzf-cmd fzf-args))))
+                                " > "
+                                (shell-quote-argument temp))))
+          (unwind-protect
+              (progn
+                (when (eq 0 (call-process-region
+                             (point-min) (point-max) "sh" nil
+                             `((:file "/dev/stdout")
+                               "/dev/stderr")
+                             nil "-c" fzf-cmd)))
+                (with-current-buffer (find-file temp)
+                  (s-split "\n" (string-remove-suffix "\n" (buffer-substring (point-min) (point-max))))))
+            (delete-file temp)))))
+
+    (defun fzf (cands &rest fzf-args)
+      (car (apply #'fzf--base cands fzf-args)))
+
+    (defun fzf-multi (cands &rest fzf-args)
+      (apply #'fzf--base cands "--multi" fzf-args))
+
+    (defvar fzf-silent-p t)
+
+    (defun fzf-completing-read--base (fzf-function prompt collection &optional
+                                                   predicate _require-match initial-input
+                                                   hist def _inherit-input-method)
+      (let* ((collection (if predicate
+                             (seq-filter predicate collection)
+                           collection))
+             (args `("--prompt" ,(concat prompt) ,@(and initial-input
+                                                        (list "--query" initial-input))))
+             (choice (or (apply fzf-function collection args)
+                         def)))
+        (unless fzf-silent-p
+          (message "%s%s" prompt choice))
+        choice))
+
+    (setq completing-read-function (apply-partially #'fzf-completing-read--base #'fzf))
+    (advice-add #'completing-read-multiple :override (apply-partially #'fzf-completing-read--base #'fzf-multi))
+
+    ;; A command line [[https://github.com/rejeep/commander.el][parser]] designed for emacs lisp
+    (use-package commander :straight t :demand t)
+  #+END_SRC
 
 * Themes
   #+BEGIN_SRC emacs-lisp

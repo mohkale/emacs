@@ -1,0 +1,16 @@
+#!/bin/sh
+# A tiny proxy script for starting headless emacs script files. Normally
+# you'd use [[man:env][env]] to target emacs wherever it is installed on your system
+# and then add some configuration options (eg: --no-site-file) but emacs
+# uses -- to differentiate emacs options from script options and env has
+# no way to pass the script that's to be run distinct from any optional
+# arguments after that script.
+
+if [ "$#" -eq 0 ]; then
+    echo "Usage: emacs-script SCRIPT [OPTIONS]" >&2
+    exit 0
+fi
+
+script="$1"
+shift
+/usr/bin/env -S emacs --no-site-file --script "$script" -- "$@"
