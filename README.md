@@ -31,7 +31,7 @@ If you're hardware is having a hard time tangling my ~~admittedly massive~~
 config file, try:
 
 ```bash
-./bin/tangle -i -d hydras.org -d etc/snippets.org'
+./bin/emacs-tangle -i -d lisp/+config.el
 ```
 
 The script depends on ruby and automatically tangles an org file (and any

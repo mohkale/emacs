@@ -72,6 +72,8 @@ OptionParser.new do |it|
   it.on('-i', '--[no-]interactive', 'Force treatment of STDOUT as terminal or not')
   it.on('-c', '--[no-]compile', 'Force byte-compilation of tangled elisp files')
 
+  it.on('--cd=DIR', 'Change to DIR before tangling') { |dir| Dir.chdir(dir) }
+
   it.on('-v', '--[no-]verbose', 'Raise verbosity of program output')
   it.on('-h', '--help', 'Print this help message') do
     puts it
@@ -225,7 +227,7 @@ end
 
 def tangle_dependencies(file, opts = {}, &block)
   cmd = [
-    File.join(File.dirname(__FILE__), 'tangle-targets'),
+    File.join(File.dirname(__FILE__), 'emacs-tangle-targets'),
     file
   ]
 
