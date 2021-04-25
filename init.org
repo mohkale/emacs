@@ -17245,6 +17245,7 @@
 
    Project skeleton [[https://github.com/chrisbarrett/skeletor.el][unpacker]] in emacs-lisp.
 
+   #+NAME: package-skeletor
    #+BEGIN_SRC emacs-lisp
      (use-package skeletor
        :straight t
@@ -17265,6 +17266,9 @@
                              display-buffer--maybe-pop-up-frame-or-window
                              display-buffer-use-some-window
                              display-buffer-pop-up-frame)))))
+       :init
+       (with-eval-after-load 'skeletor
+         (require '+skeletor-templates))
 
        :config
        (advice-add 'skeletor--initialize-git-repo :override
@@ -17291,8 +17295,8 @@
                                  ;; around it.
                                  (let ((cwd (string-trim-right default-directory "/")))
                                    (read-directory-name "Project directory: "
-                                                        (path-dirname cwd)
-                                                        (path-basename cwd)))
+                                                        (file-name-directory cwd)
+                                                        (file-name-nondirectory cwd)))
                                (read-directory-name "Project directory: ")))))
          (setq dir (string-trim-right dir
                                       (rx (one-or-more (eval (f-path-separator))))))
@@ -17300,13 +17304,16 @@
          (let* ((is-empty (and (not current-prefix-arg)
                                (or (not (file-directory-p dir))
                                    (directory-empty-p dir))))
-                ;; A project directory needs to empty before generation... so if
-                ;; the input directory isn't then prompt for a project-name within
-                ;; it.
-                (name (if is-empty (path-basename dir) (skeletor--read-project-name)))
-                (dir (if is-empty (path-dirname dir) dir)))
-           (cl-letf (((symbol-function 'skeletor--read-project-name)
-                      (lambda () name)))
+                (basename (file-name-nondirectory dir))
+                (dir (if is-empty (file-name-directory dir) dir)))
+           ;; A project directory needs to empty before generation... so if
+           ;; the input directory isn't then prompt for a project-name within
+           ;; it.
+           (cl-letf* (((symbol-function 'skeletor--actual-read-project-name)
+                       (symbol-function 'skeletor--read-project-name))
+                      ((symbol-function 'skeletor--read-project-name)
+                       (lambda () (if is-empty basename
+                               (skeletor--actual-read-project-name)))))
              (skeletor-create-project-at dir skeleton)))))
    #+END_SRC
 
@@ -17314,11 +17321,6 @@
    :PROPERTIES:
    :header-args+: :tangle (package-str! "lisp/+skeletor-templates.el" skeletor)
    :END:
-
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! skeletor)
-     (with-eval-after-load 'skeletor
-       (require '+skeletor-templates))
-   #+END_SRC
 
    Firstly lets remove all the builtin skeletor project types because they're like a
    decade old and some just don't work for some reason :/.
@@ -19004,6 +19006,10 @@
        :straight t
        :hook ((logview-mode . read-only-mode)
               (logview-mode . auto-revert-tail-mode))
+       :custom
+       (logview-views-file (var! "logview.views"))
+       (logview-cache-filename (var! "logview-cache.extmap"))
+
        :config
        (push '("python" . ((format . "LEVEL:NAME:MESSAGE")
                            (levels . "RFC 5424")))
@@ -20883,13 +20889,14 @@
                                 (shell-quote-argument temp))))
           (unwind-protect
               (progn
-                (when (eq 0 (call-process-region
-                             (point-min) (point-max) "sh" nil
-                             `((:file "/dev/stdout")
-                               "/dev/stderr")
-                             nil "-c" fzf-cmd)))
-                (with-current-buffer (find-file temp)
-                  (s-split "\n" (string-remove-suffix "\n" (buffer-substring (point-min) (point-max))))))
+                (if (eq 0 (call-process-region
+                           (point-min) (point-max) "sh" nil
+                           `((:file "/dev/stdout")
+                             "/dev/stderr")
+                           nil "-c" fzf-cmd))
+                    (with-current-buffer (find-file temp)
+                      (s-split "\n" (string-remove-suffix "\n" (buffer-substring (point-min) (point-max)))))
+                  (error "fzf exited with non-zero exit-code")))
             (delete-file temp)))))
 
     (defun fzf (cands &rest fzf-args)
@@ -20920,6 +20927,47 @@
     ;; A command line [[https://github.com/rejeep/commander.el][parser]] designed for emacs lisp
     (use-package commander :straight t :demand t)
   #+END_SRC
+
+** bin/skeletor
+   #+BEGIN_SRC emacs-lisp :tangle bin/skeletor
+     <<script-init>>
+     <<package-skeletor>>
+
+     (require 'skeletor)
+
+     (defvar dest-dir default-directory)
+     (setq fzf-silent-p t)
+
+     (defun list-skeletor-projects ()
+       (princ (concat
+               (string-join (->> skeletor--project-types
+                                 (-map 'SkeletorProjectType-title)
+                                 (-sort 'string<))
+                            "\n")
+               "\n")))
+
+     (defun create-skeletor-project (&optional project)
+       (if-let ((skeleton (if project
+                              (--first (equal project (SkeletorProjectType-title it))
+                                       skeletor--project-types)
+                            (skeletor--read-project-type))))
+           (skeletor-expand-project+ skeleton dest-dir)
+         (error "Failed to find project type %s" project)))
+
+     (condition-case err
+         (commander
+          (description "Generate project directories from skeletor templates")
+          (option "--help, -h" "Show usage information" commander-print-usage)
+          (command "list" "Show a list of all known skeletons" list-skeletor-projects)
+          (command "create [project]"
+                   "Create a new project from a template"
+                   create-skeletor-project nil)
+          (option "--output, -o <dir>" "Create project in DIR instead of: %s"
+                  (lambda (arg) (setq dest-dir (file-truename arg)))))
+       (error (progn
+                (message "error: %s" err)
+                (kill-emacs 1))))
+   #+END_SRC
 
 * Themes
   #+BEGIN_SRC emacs-lisp
