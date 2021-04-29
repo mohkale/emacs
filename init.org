@@ -2699,6 +2699,29 @@
         do (set-fontset-font "fontset-default" (cons x y) emoji-font-family)))
    #+END_SRC
 
+** syntax-tables
+   #+BEGIN_SRC emacs-lisp
+     (cl-defsubst modify-syntax! (syntax &optional syntax-table)
+       "Helper for `modify-syntax-entry' which modifies in mass.
+          SYNTAX should be an alist of conses of (CHAR . SYNTAX).
+          You can optionally specify a SYNTAX-TABLE to modify with SYNTAX."
+       (declare (indent defun))
+       (cl-loop for (char . type) in syntax
+                do (modify-syntax-entry char type syntax-table)))
+
+     (defmacro modify-syntax-hook! (mode syntax)
+       "Helper for `modify-syntax!' which modifes syntax on a hook.
+          Useful for certain major modes that seem to reset their syntax-tables
+          everytime their initialised."
+       (declare (indent defun))
+       (let* ((mode (eval mode))
+              (mode-name (symbol-name mode)))
+         `(progn
+            (add-hook ',(intern (concat mode-name "-hook"))
+                      (defun ,(intern (concat mode-name "-setup-syntax+")) (&optional syntax-table)
+                        (modify-syntax! ,syntax syntax-table))))))
+   #+END_SRC
+
 ** library
    #+BEGIN_SRC emacs-lisp
      (add-to-list 'load-path (lisp! "lib"))
@@ -4885,6 +4908,16 @@
 
         :config
         (add-to-list 'org-latex-default-packages-alist '("" "babel" t nil) t)
+        :init
+        (modify-syntax-hook! 'org-mode
+          '((?< . "_")
+            (?> . "_")
+            (?- . "w")
+            (?_ . "w")))
+
+        (add-hook 'org-mode-hook
+                  (defun org-disable-electric-balance+ ()
+                    (setq electric-pair-preserve-balance t)))
 
         (setq org-agenda-files
               (cl-remove-if
@@ -4919,13 +4952,6 @@
                         (apply func args))))
 
         :init
-        (add-hook 'org-mode-hook
-                  (defun org-mode-setup-syntax+ ()
-                    (setq electric-pair-preserve-balance t)
-                    (modify-syntax-entry ?< "_" org-mode-syntax-table)
-                    (modify-syntax-entry ?> "_" org-mode-syntax-table)
-                    (modify-syntax-entry ?- "w" org-mode-syntax-table)
-                    (modify-syntax-entry ?_ "w" org-mode-syntax-table)))
 
         (advice-add 'evil-ret-gen :before-until
                     (defun evil-ret-open-org-links+ (&rest _)
@@ -18070,8 +18096,11 @@
         (add-hook 'emacs-lisp-mode-hook #'electric-pair-mode)
 
         :config
-        (modify-syntax-entry ?_ "w" lisp-mode-syntax-table)
-        (modify-syntax-entry ?- "w" lisp-mode-syntax-table)
+        (modify-syntax!
+          '((?_ . "w")
+            (?- . "w")
+            (?! . "w"))
+          emacs-lisp-mode-syntax-table)
 
         ;; show lambda as an actual lambda symbol... pretty cool, if I do say
         ;; so myself.
@@ -18242,6 +18271,7 @@
         :config
         (evil-set-initial-state 'inferior-python-mode 'emacs)
         (setq python-prettify-symbols-alist nil)
+        (modify-syntax! '((?_ . "w")) python-mode-syntax-table)
 
         (add-to-list 'python-shell-completion-native-disabled-interpreters "python3")
 
@@ -18429,6 +18459,9 @@
       (use-package ruby-mode
         :mode ("\\.rb$" . ruby-mode)
         :interpreter "ruby"
+        :config
+        (modify-syntax! '((?_ . "w")) ruby-mode-syntax-table)
+
         :lazy-leader
         (:mode 'ruby-mode
          "'" 'ruby-toggle-string-quotes
@@ -19204,7 +19237,7 @@
         (markdown-fontify-code-blocks-natively t)
 
         :config
-        (modify-syntax-entry ?_ "w" markdown-mode-syntax-table)
+        (modify-syntax! '((?_ . "w")) markdown-mode-syntax-table)
 
         (advice-add 'markdown-insert-list-item :before
                     (defun markdown-insert-list-item--adjust-line+ (&rest args)
@@ -19479,8 +19512,9 @@
        ;;      weird places.
        ;; (c-toggle-comment-style +1)
 
-       (modify-syntax-entry ?_ "w" c-mode-syntax-table)
-       (modify-syntax-entry ?_ "w" c++-mode-syntax-table)
+       (dolist (tbl (list c-mode-syntax-table
+                          c++-mode-syntax-table))
+         (modify-syntax! '((?_ . "w")) tbl))
 
        (setq c-default-style "stroustrup")
 
