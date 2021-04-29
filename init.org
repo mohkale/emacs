@@ -13551,6 +13551,7 @@
         "M-o" 'beginning-of-buffer
         "C-d" 'scroll-up-command
         "C-u" 'scroll-down-command
+        "M-u" 'universal-argument
         "C-w" 'selectrum-smart-backward-kill-word+
         "M-i" 'selectrum-insert-current-candidate
         "<S-return>" 'selectrum-submit-exact-input))
@@ -13706,6 +13707,8 @@
         (consult-ripgrep-command                                                      ; Variant command which disregards no-matches
          "ignore-exit 1 rg --null --line-buffered --color=always --max-columns=500 --smart-case --no-heading --line-number . -e OPTS ARG")
         (consult-async-refresh-delay 0.05)
+        (consult-narrow-key (kbd "M-SPC"))
+        (consult-widen-key (kbd "S-SPC"))
         (xref-show-xrefs-function #'consult-xref)
         (xref-show-definitions-function #'consult-xref)
         (consult-config
@@ -13880,6 +13883,17 @@
         :straight t
         :leader
         (:minor t :mode 'flycheck-mode "je" 'consult-flycheck))
+    #+END_SRC
+
+*** consult-lsp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! selectrum lsp-mode)
+      (use-package consult-lsp
+        :straight t
+        :leader
+        (:mode 'lsp-mode
+         :minor t
+         :prefix leader-server-leader-prefix
+         "j" 'consult-lsp-symbols))
     #+END_SRC
 
 *** consult-extensions
@@ -14293,6 +14307,154 @@
        (add-to-list 'embark-keymap-alist '(yasnippet . embark-yasnippet-completion-actions))
      #+END_SRC
 
+**** consult-eglot
+     :PROPERTIES:
+     :header-args+: :tangle (package-str! "lisp/+consult-eglot.el" selectrum eglot)
+     :END:
+
+     #+BEGIN_SRC emacs-lisp :tangle (package-str! "yes" selectrum eglot)
+       (autoload 'consult-eglot-symbols "+consult-eglot.el" nil t)
+
+       (general-define-key
+        :keymaps 'eglot-mode-map
+        [remap xref-find-references] 'consult-eglot-symbols)
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp
+       (require 'eglot)
+
+       (defcustom consult-eglot--symbols--narrow
+         '(;; Lowercase classes
+           (?c . "Class")
+           (?f . "Function")
+           (?e . "Enum")
+           (?i . "Interface")
+           (?m . "Module")
+           (?n . "Namespace")
+           (?p . "Package")
+           (?s . "Struct")
+           (?t . "Type Parameter")
+           (?v . "Variable")
+
+           ;; Uppercase classes
+           (?A . "Array")
+           (?B . "Boolean")
+           (?C . "Constant")
+           (?E . "Enum Member")
+           (?F . "Field")
+           (?M . "Method")
+           (?N . "Number")
+           (?O . "Object")
+           (?P . "Property")
+           (?S . "String")
+
+           ;; Other. Any which aren't above are taken from here
+           (?o . "Other"))
+         "Narrow key configuration used with `consult-eglot-symbols'.
+       For the format see `consult--read', for the value types see the
+       values in `eglot--symbol-kind-names'.")
+
+       (defun consult-eglot--symbols--make-async-source (async server)
+         "Pipe a `consult--read' compatible async-source ASYNC to search for symbols in WORKSPACES."
+         (lambda (action)
+           (pcase-exhaustive action
+             ((or 'setup (pred stringp))
+              (let ((query (if (stringp action) action "")))
+                (jsonrpc-async-request
+                 server
+                 :workspace/symbol
+                 `(:query ,query)
+                 :success-fn
+                 (lambda (resp)
+                   (funcall async 'flush)
+                   (funcall async (append resp nil)))
+                 :error-fn
+                 (eglot--lambda ((ResponseError) code message)
+                   (message "%s: %s" code message))
+                 :timeout-fn
+                 (lambda ()
+                   (message "error: request timed out")))
+                (funcall async action)))
+             (_ (funcall async action)))))
+
+       (defun consult-eglot--symbols--transformer (symbol-info)
+         "Default transformer to produce a completion candidate from SYMBOL-INFO.
+       The produced candidate follows the same form as `consult--grep' however it
+       contains the SYMBOL-INFO as the second field instead of the file URI."
+         (eglot--dbind ((SymbolInformation) name kind location)
+             symbol-info
+           (eglot--dbind ((Location) uri range) location
+             (let* ((line (1+ (plist-get (plist-get range :start) :line)))
+                    (kind-name (alist-get kind eglot--symbol-kind-names))
+                    (uri-path (eglot--uri-to-path uri))
+                    (res (propertize
+                          (format "%-7s %s %s"
+                                  kind-name
+                                  name
+                                  (consult--format-location
+                                   ;; If the src is relative to our project directory then use
+                                   ;; the path from there, otherwise use the absolute file path.
+                                   (let ((relative-uri-path (file-relative-name uri-path)))
+                                     (if (string-prefix-p ".." relative-uri-path)
+                                         (abbreviate-file-name uri-path)
+                                       relative-uri-path))
+                                   line))
+                          'consult--type (or (car (rassoc kind-name consult-eglot--symbols--narrow))
+                                             (car (rassoc "Other" consult-eglot--symbols--narrow)))
+                          'consult--candidate symbol-info)))
+               res))))
+
+       (defun consult-eglot--symbol-information-to-grep-params (symbol-info)
+         (eglot--dbind ((SymbolInformation) location) symbol-info
+           (eglot--dbind ((Location) uri range) location
+             (list
+              (eglot--uri-to-path uri)                           ; URI
+              (1+ (plist-get (plist-get range :start) :line))    ; Line number
+              0                                                  ; Column number
+              )))
+         )
+
+       (defun consult-eglot--symbols--state ()
+         (let ((grep (consult--grep-state)))
+           (lambda (cand restore)
+             (cond
+              (restore (funcall grep nil restore))
+              (cand (funcall grep
+                             (consult-eglot--symbol-information-to-grep-params cand)
+                             restore))))))
+
+       (defun consult-eglot-symbols (server)
+         (interactive (list (eglot--current-server-or-lose)))
+         ;; Set `default-directory' here so we can show file names
+         ;; relative to the project root.
+         (let ((default-directory (or (cdr (eglot--project server))
+                                      default-directory)))
+           (cl-destructuring-bind (path line col)
+               (consult-eglot--symbol-information-to-grep-params
+                (consult--read
+                 (thread-first
+                     (consult--async-sink)
+                   (consult--async-refresh-immediate)
+                   (consult--async-map #'consult-eglot--symbols--transformer)
+                   (consult-eglot--symbols--make-async-source server)
+                   (consult--async-throttle)
+                   (consult--async-split))
+                 :require-match t
+                 :history t
+                 :require-match t
+                 :prompt "LSP Symbols: "
+                 :initial consult-async-default-split
+                 :category 'consult-lsp-symbols
+                 :lookup #'consult--lookup-candidate
+                 :title (consult--type-title consult-eglot--symbols--narrow)
+                 :narrow (consult--type-narrow consult-eglot--symbols--narrow)
+                 :state (consult-eglot--symbols--state)))
+             (find-file path)
+             (goto-line line)
+             (run-hooks 'consult-after-jump-hook))))
+
+       (provide 'consult-eglot)
+     #+END_SRC
 **** consult-extensions-eob
      #+BEGIN_SRC emacs-lisp
        (provide '+consult-custom)
