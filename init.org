@@ -108,6 +108,25 @@
     Can be attached as a mode-hook and will decide how best to start a language
     server in the current mode.")
 
+    (defun +repo-path (repo-path)
+      "Parse REPO-PATH into a list of paths.
+    The output will be a collection of conses of the form (PATH . DEPTH)
+    specifying we want to look in any directory upto DEPTH paths down in
+    PATH. The result of this can be set to `magit-repository-directories'."
+      (cl-loop for path in (split-string repo-path ":")
+               with depth = nil
+               do (setq depth 0)
+               if (string-suffix-p "/" path)
+                 do (setq depth 1)
+                 and do (while (string-suffix-p "/*/" path)
+                          (setq depth (1+ depth)
+                                path (substring path 0 -2)))
+               unless (string-empty-p path)
+                 collect (cons (string-remove-suffix "/" path) depth)))
+
+    (defconst repo-path
+      "Parse the repo-path environment variable into")
+
     nil
   #+END_SRC
 
@@ -8153,16 +8172,28 @@
        (defvaralias 'grep-regexp-history 'regexp-search-ring)
 
        :custom
-       (projectile-project-search-path (seq-filter
-                                        #'file-directory-p
-                                        (list (join-path (or (getenv "XDG_DEV_HOME")
-                                                             (expand-file-name "~/prog"))
-                                                         "repos/"))))
        (projectile-tags-backend 'xref) ;; opt into gtags
        (projectile-indexing-method 'alien) ;; never use native
        (projectile-tags-command "ctags -Re -f \"%s\" %s \"%s\"")
        (projectile-cache-file (var! "projectile/cache.el"))
        (projectile-known-projects-file (var! "projectile/known-projects.el"))
+
+       :config
+       ;; `projectile-project-search-path' is just a basic PATH like variable
+       ;; that checks each directory in the PATH for a project. This doesn't
+       ;; pair well with $REPO_PATH so for now I try to deconstruct it here
+       ;; into a PATH like variable.
+       (setq projectile-project-search-path
+             (cl-loop for (path . depth) in (+repo-path (getenv "REPO_PATH"))
+                      if (eq depth 0)
+                        do (projectile-add-known-project path)
+                      else if (eq depth 1)
+                        collect path
+                      else
+                        append (-filter
+                                #'file-directory-p
+                                (file-expand-wildcards
+                                 (apply #'join-path path (-repeat (- depth 1) "*"))))))
 
        :config
        (require '+projectile-project-types)
@@ -16413,6 +16444,9 @@
        (setq magit-revision-show-gravatars  '("^Author:     " . "^Commit:     ")
              ;; show magit status in a full screen window.
              magit-display-buffer-function 'magit-display-buffer-fullframe-status-v1)
+
+       :config
+       (setq magit-repository-directories (+repo-path (getenv "REPO_PATH")))
 
        :config
        (add-hook 'magit-mode-hook
