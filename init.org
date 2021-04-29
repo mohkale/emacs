@@ -4528,7 +4528,19 @@
       (use-package orgit
         :straight (orgit :build (:not autoloads))
         :demand t
-        :after (org magit))
+        :after (org magit)
+        :hook (git-commit-post-finish . orgit-store-after-commit)
+        :custom
+        (orgit-store-repository-id t)
+        :config
+        (defun orgit-store-after-commit ()
+          "Store orgit-link for latest commit after commit message editor is finished."
+          (let* ((repo (orgit--current-repository))
+                 (rev (magit-git-string "rev-parse" "HEAD"))
+                 (link (format "orgit-rev:%s::%s" repo rev))
+                 (summary (substring-no-properties (magit-format-rev-summary rev)))
+                 (desc (format "%s (%s)" summary repo)))
+            (push (list link desc) org-stored-links))))
     #+END_SRC
 
 *** org-capture
@@ -4863,6 +4875,7 @@
                (org-mode . auto-fill-mode))
         :commands (org-completing-goto+)
         :custom
+        (org-clock-idle-time 15)
         (org-src-tab-acts-natively nil)                                               ; native tabs are slow and unreliable... :sad:
         (org-fontify-done-headline nil)
         (org-src-window-setup 'current-window)
@@ -4906,8 +4919,6 @@
             ("\\subsection{%s}" . "\\subsection*{%s}")
             ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
 
-        :config
-        (add-to-list 'org-latex-default-packages-alist '("" "babel" t nil) t)
         :init
         (modify-syntax-hook! 'org-mode
           '((?< . "_")
@@ -4919,6 +4930,7 @@
                   (defun org-disable-electric-balance+ ()
                     (setq electric-pair-preserve-balance t)))
 
+        :config
         (setq org-agenda-files
               (cl-remove-if
                (apply-partially #'string-match-p (rx (and "archive.org" eol)))
@@ -4926,32 +4938,8 @@
                                           (concat projectile-org-projects-directory+ "*.org"))
                         nconc (file-expand-wildcards path))))
 
-        :config
-        ;; Inspired by [[https://stackoverflow.com/a/25335933/6247387][this]] stack-overflow answer, the following advice tries to make
-        ;; `org-capture's window popup mechanism a lot less *forceful*.
-        (advice-add 'org-capture-place-template :around
-                    (defun org-capture-place-template-keep-windows+ (func &rest args)
-                      "Prevent `org-capture' from forcefully deleting my current window-config."
-                      (cl-letf (((symbol-function #'delete-other-windows)
-                                 (symbol-function #'ignore)))
-                        (apply func args))))
-
-        (advice-add 'org-capture :around
-                    (defun org-capture-open-in-current-window+ (func &rest args)
-                      "Make `org-capture' popups always open in the current window.
-      I find this a lot more predictable then randomly popping up here and there."
-                      (cl-letf (((symbol-function #'org-switch-to-buffer-other-window)
-                                 (symbol-function #'switch-to-buffer)))
-                        (apply func args))))
-
-        (advice-add 'org-capture-finalize :around
-                    (defun org-capture-keep-wconfig+ (func &rest args)
-                      "Prevent `org-capture-finalize' from resetting my window-configs"
-                      (cl-letf (((symbol-function #'set-window-configuration)
-                                 (symbol-function #'ignore)))
-                        (apply func args))))
-
         :init
+        (push '(org-mode . 2) +indent-config)
 
         (advice-add 'evil-ret-gen :before-until
                     (defun evil-ret-open-org-links+ (&rest _)
@@ -5042,6 +5030,34 @@
         (evil-set-command-property 'org-forward-heading-same-level :jump t)
         (evil-set-command-property 'org-backward-heading-same-level :jump t)
         (evil-set-command-property 'org-next-visible-heading :jump t)
+
+        :config
+        (add-to-list 'org-latex-default-packages-alist '("" "babel" t nil) t)
+
+        :config
+        ;; Inspired by [[https://stackoverflow.com/a/25335933/6247387][this]] stack-overflow answer, the following advice tries to make
+        ;; `org-capture's window popup mechanism a lot less *forceful*.
+        (advice-add 'org-capture-place-template :around
+                    (defun org-capture-place-template-keep-windows+ (func &rest args)
+                      "Prevent `org-capture' from forcefully deleting my current window-config."
+                      (cl-letf (((symbol-function #'delete-other-windows)
+                                 (symbol-function #'ignore)))
+                        (apply func args))))
+
+        (advice-add 'org-capture :around
+                    (defun org-capture-open-in-current-window+ (func &rest args)
+                      "Make `org-capture' popups always open in the current window.
+      I find this a lot more predictable then randomly popping up here and there."
+                      (cl-letf (((symbol-function #'org-switch-to-buffer-other-window)
+                                 (symbol-function #'switch-to-buffer)))
+                        (apply func args))))
+
+        (advice-add 'org-capture-finalize :around
+                    (defun org-capture-keep-wconfig+ (func &rest args)
+                      "Prevent `org-capture-finalize' from resetting my window-configs"
+                      (cl-letf (((symbol-function #'set-window-configuration)
+                                 (symbol-function #'ignore)))
+                        (apply func args))))
 
         :leader
         ("o"  "org"
@@ -5523,7 +5539,8 @@
         :diminish
         org-roam-mode
         :hook ((org-roam-file-setup . flyspell-mode))
-        :commands org-roam-rg
+        :commands (org-roam
+                   org-roam-rg)
         :init
         (setq org-roam-db-update-idle-seconds 2
               org-roam-db-location (var! "org-roam.db")
@@ -8191,6 +8208,15 @@
        (add-hook 'persp-after-load-state-functions #'layouts//load-eyebrowse-after-perspective-load))
    #+END_SRC
 
+** project
+   The [[info:emacs#Projects][built in]] project management library.
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package project
+       :custom
+       (project-list-file (var! "projects.el")))
+   #+END_SRC
+
 ** projectile
    project management in style.
 
@@ -8199,7 +8225,9 @@
        :straight t
        :defer  10
        :delight ""
-       :hook (prog-mode . projectile-mode)
+       :config
+       (projectile-mode +1)
+
        :init
        (advice-add 'delete-buffer-file :after
                    (defun projectile-invalidate-cache-on-file-delete+ (&rest _)
@@ -15876,6 +15904,7 @@
                      '((:pyls
                         (plugins
                          (pydocstyle (enabled . t))
+                         (pylint (enabled . t))
                          (jedi_completion
                           (fuzzy . t)
                           (follow_builtin_imports . :json-false))))))
@@ -16142,7 +16171,9 @@
        :straight t
        :diminish flycheck-mode
        :custom
-       (flycheck-markdown-mdl-style (join-path (xdg-config-home) "mdlstyle.rb"))
+       (flycheck-markdown-mdl-style (join-path (or (getenv "XDG_CONFIG_HOME")
+                                                   "~/.config/")
+                                               "mdlstyle.rb"))
        (flycheck-python-pycompile-executable "python3")
 
        :config
@@ -16510,7 +16541,6 @@
 
        :leader
        (:prefix "g"
-        ""  "magit"
         "$" 'magit-process-buffer
         "!" 'magit-run
         "g" 'magit-dispatch
@@ -16521,6 +16551,7 @@
 
        :lazy-leader
        (:mode 'magit-status-mode
+        "d" 'magit-list-repositories
         "z" 'magit-jump-to-stashes
         "u" 'magit-jump-to-unstaged
         "s" 'magit-jump-to-staged
@@ -16539,6 +16570,8 @@
         "d"  'magit-diff-while-committing
         "j"  'git-commit-next-message
         "k"  'git-commit-prev-message
+        "r"  'magit-pop-revision-stack
+        "a"  'git-commit-insert-pseudo-header
 
         "i"  "insert"
         "ia" 'git-commit-ack ;; knowledgement
@@ -17410,11 +17443,13 @@
          (cl-destructuring-bind (c . cxx)
              (assoc (alist-get "__TOOLCHAIN__" (assoc 'repls skeletor-project-spec) nil nil #'string-equal)
                     '(("clang" . "clang++") ("gcc" . "g++")) #'string-equal)
+           (skeletor--log-info "Initialising project using cmake with %s" c)
            (skeletor-shell-command (format "CC=%s CXX=%s cmake -B build"
                                            (shell-quote-argument c)
                                            (shell-quote-argument cxx))
                                          dir))
          (let ((default-directory dir))
+           (skeletor--log-note "Creating link to compile_commands.json")
            (make-symbolic-link "./build/compile_commands.json" "compile_commands.json" t))))
    #+END_SRC
 
@@ -17422,7 +17457,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (skeletor-define-constructor "rust-cargo"
-       :title "rust [cargo]"
+       :title "Rust [cargo]"
        :requires-executables '(("rustc" . "https://www.rust-lang.org/")
                                ("cargo" . "https://doc.rust-lang.org/book/ch01-03-hello-cargo.html"))
        :initialise
@@ -18298,14 +18333,15 @@
         :custom
         (python-indent-guess-indent-offset-verbose nil
          "Disable annoying notification when indent guess fails")
+        (python-prettify-symbols-alist nil)
+
         :init
         (defalias 'python-repl 'run-python)
 
         :config
-        (evil-set-initial-state 'inferior-python-mode 'emacs)
-        (setq python-prettify-symbols-alist nil)
         (modify-syntax! '((?_ . "w")) python-mode-syntax-table)
 
+        (evil-set-initial-state 'inferior-python-mode 'emacs)
         (add-to-list 'python-shell-completion-native-disabled-interpreters "python3")
 
         (configure-presym! 'python-mode
@@ -18363,7 +18399,8 @@
 
 *** python-lsp
     Your going to need a python language server, I recommend [[https://github.com/palantir/python-language-server][this]] one that's based on
-    [[https://github.com/davidhalter/jedi][jedi]]. There's also a microsoft based [[https://github.com/microsoft/python-language-server][server]], and the newer/faster [[https://github.com/microsoft/pyright][pyright]].
+    [[https://github.com/davidhalter/jedi][jedi]]. There's also a microsoft based [[https://github.com/microsoft/python-language-server][server]], and the newer/faster [[https://github.com/microsoft/pyright][pyright]] (but be
+    forewarned, there be [[https://github.com/microsoft/pylance-release/issues/4][dragons]] there).
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! python :lsp :not anaconda)
       (add-hook 'python-mode-hook +lsp-command)
@@ -18491,6 +18528,7 @@
     #+BEGIN_SRC emacs-lisp :tangle (if (eq +ruby-package 'ruby) "yes" "no")
       (use-package ruby-mode
         :mode ("\\.rb$" . ruby-mode)
+        :hook (ruby-mode . flycheck-mode)
         :interpreter "ruby"
         :config
         (modify-syntax! '((?_ . "w")) ruby-mode-syntax-table)
@@ -18827,7 +18865,9 @@
 ** HAML
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! haml)
      (use-package haml-mode
-       :straight t)
+       :straight t
+       :init
+       (push '(haml-mode . 2) +indent-config))
    #+END_SRC
 
 ** JSON
@@ -19720,8 +19760,7 @@
       (use-package js2-mode
         :straight t
         :mode (rx ".js")
-        :hook ((js2-mode . flycheck-mode)
-               (js2-mode . javascript-enable-lsp-in-projects))
+        :hook ((js2-mode . flycheck-mode))
         :commands (js-jsdoc-return+)
         :config
         (setq js2-mode-show-parse-errors      nil
@@ -19948,7 +19987,6 @@
        :straight t
        :commands (typescript-react-mode)
        :mode ("\\.tsx" . typescript-react-mode)
-       :hook (typescript-mode . javascript-enable-lsp-in-projects)
        :general
        (:keymaps 'typescript-mode-map
         [remap indent-new-comment-line] 'js-jsdoc-return+)
@@ -21027,6 +21065,10 @@
      (defvar dest-dir default-directory)
      (setq fzf-silent-p t)
 
+     (advice-add #'skeletor--insert-shell-command-arrow :before
+                 (lambda (dir cmd)
+                   (message "--> [%s]: %s" (f-short dir) cmd)))
+
      (defun list-skeletor-projects ()
        (princ (concat
                (string-join (->> skeletor--project-types
@@ -21046,7 +21088,10 @@
      (condition-case err
          (commander
           (description "Generate project directories from skeletor templates")
-          (option "--help, -h" "Show usage information" commander-print-usage)
+          (option "--help, -h" "Show usage information"
+                  (lambda ()
+                    (commander-print-usage)
+                    (kill-emacs 0)))
           (command "list" "Show a list of all known skeletons" list-skeletor-projects)
           (command "create [project]"
                    "Create a new project from a template"
