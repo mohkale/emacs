@@ -13853,7 +13853,7 @@
          "psg" 'consult-grep
          "psi" 'consult-project-imenu)
         (:mode '(org-mode outline-mode)
-         "g" 'consult-outline)
+         "g" 'consult-org-heading)
         (:minor t :mode 'flymake-mode  "je" 'consult-flymake)
 
         :general
@@ -13866,6 +13866,7 @@
          [remap isearch-forward] 'consult-line
          [remap keep-lines] 'consult-keep-lines
          [remap load-theme] 'consult-theme
+         [remap org-agenda] 'consult-org-agenda
          ;; [remap flush-lines] 'consult-flush-lines
          ;; [remap man] 'consult-man
          ;; [remap woman] 'consult-man
@@ -13909,8 +13910,7 @@
        "C-M-i" 'consult-yasnippet)
 
       (general-define-key
-       [remap org-capture] 'consult-org-capture+
-       )
+       [remap org-capture] 'consult-org-capture+)
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
@@ -13925,14 +13925,18 @@
      #+BEGIN_SRC emacs-lisp
        (defvar consult--evil-jumps-history+ nil)
 
-       (defun consult--evil-jumps-get+ ()
-         (cl-remove-duplicates
-          (evil--jumps-savehist-sync)
-          :test (lambda (a b)
-                  (and
-                   (equal (car a) (car b))
-                   (string-equal (car (cdr a))
-                                 (car (cdr b)))))))
+       (defun consult--evil-jumps-candidates+ (arg)
+         (-filter
+          (lambda (a)
+            (or (not arg)
+                (string-equal (cadr a) (smart-buffer-file-name))))
+          (cl-remove-duplicates
+           (evil--jumps-savehist-sync)
+           :test (lambda (a b)
+                   (and
+                    (equal (car a) (car b))
+                    (string-equal (car (cdr a))
+                                  (car (cdr b))))))))
 
        (cl-defun consult--evil-jumps-format+ (open (point file))
          (with-current-buffer (funcall open file)
@@ -13941,59 +13945,56 @@
                (widen)
                (ignore-errors
                  (goto-char point))
-               (let* ((marker (point-marker))
-                      (line (line-number-at-pos point consult-line-numbers-widen))
-                      (begin (line-beginning-position))
-                      (end (line-end-position)))
-                 (concat
-                  (propertize
-                   (consult--encode-location marker)
-                   'invisible t
-                   'consult-location (cons marker line))
-                  (consult--region-with-cursor begin end marker)))))))
+               (let* ((line (line-number-at-pos point consult-line-numbers-widen))
+                      (beg (line-beginning-position))
+                      (end (line-end-position))
+                      (cand (concat
+                             (concat (propertize file 'face 'consult-file) ":"
+                                     (propertize (number-to-string line) 'face 'consult-location)
+                                     " ")
+                             (consult--region-with-cursor beg end (point-marker)))))
+                 (put-text-property 0 1 'consult--grep-file file cand)
+                 `(,cand ,file ,line 0))))))
 
-       (defun consult-evil-jumps+ ()
-         (interactive)
-         (consult--with-file-preview (open)
-           (consult--jump
-            (consult--read
-             (consult--with-increased-gc
-              (mapcar (apply-partially #'consult--evil-jumps-format+ open)
-                      (consult--evil-jumps-get+)))
-             :prompt "Evil jump: "
-             :lookup #'consult--lookup-location
-             :state (consult--preview-position)
-             :require-match t
-             :category 'consult-location
-             :history '(:input consult--evil-jumps-history+)))))
+       (defun consult-evil-jumps+ (arg)
+         "Jump to an evil-mode jump.
+       When ARG is given only jump to marks in the current buffer."
+         (interactive "P")
+         (let* ((open (consult--temporary-files))
+                (cands (consult--with-increased-gc
+                        (mapcar (apply-partially #'consult--evil-jumps-format+ open)
+                                (consult--evil-jumps-candidates+ arg)))))
+           (funcall open nil) ;; Clear temporarily opened files, `consult--grep-state' will reopen them.
+           (consult--read
+            cands
+            :prompt "Evil jump: "
+            :lookup #'consult--lookup-cdr
+            :category 'consult-location
+            :sort nil
+            :title #'consult--grep-title
+            :require-match t
+            :history '(:input consult--line-history)
+            :add-history (thing-at-point 'symbol)
+            :state (consult--grep-state))))
      #+END_SRC
 
 **** consult-evil-marks
      Taken from [[https://github.com/abo-abo/swiper/blob/25439e26a67b54d1f8aab1cbc727228427692ec8/counsel.el#L4198][counsel.el]].
 
      #+BEGIN_SRC emacs-lisp
-       (defsubst consult--evil-marks-candidates+ ()
+       (defun consult--evil-marks-candidates+ ()
          "Convert all evil-marks in the current buffer to mark candidates.
-       A mark is a register which points to a location in the current buffer.
-
-       NOTE: evil doesn't provide a standalone method to access the list of
-       marks in the current buffer, as it does with registers.
-       "
-         (when (fboundp 'evil-register-list)
-           (let* ((markers
-                   (append
-                    (cl-remove-if (lambda (m)
-                                    (or (evil-global-marker-p (car m))
-                                        (not (markerp (cdr m)))))
-                                  evil-markers-alist)
-                    (cl-remove-if (lambda (m)
-                                    (or (not (evil-global-marker-p (car m)))
-                                        (not (markerp (cdr m)))))
-                                  (default-value 'evil-markers-alist)))))
-             (cl-loop for reg in markers
-                      collect (cons (consult--register-format reg) (cdr reg))))))
+       A mark is a register which points to a location in the current buffer."
+         (cl-loop for (char . data) in (when (bound-and-true-p evil-markers-alist)
+                                         (append
+                                          evil-markers-alist
+                                          (default-value 'evil-markers-alist)))
+                  if (or (not (evil-global-marker-p char))
+                         (markerp data))
+                  collect (cons (consult-register-format (cons char data)) data)))
 
        (defun consult-evil-marks+ (&optional marker bol)
+         "Jump to an evil-mark in the current buffer."
          (interactive
           (list
            (if-let ((marks (consult--with-increased-gc (consult--evil-marks-candidates+))))
@@ -14006,7 +14007,7 @@
                 :lookup #'consult--lookup-cdr
                 :history t ;; disable history
                 :add-history (thing-at-point 'symbol)
-                :state (consult--preview-position))
+                :state (consult--jump-preview))
              (user-error "No evil-marks active in the current buffer"))
            (when current-prefix-arg
              (prefix-numeric-value current-prefix-arg))))
