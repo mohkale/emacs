@@ -3560,6 +3560,8 @@
       (use-package orderless
         :straight t
         :demand t
+        :custom
+        (completion-styles '(orderless))
         :config
         (defun flex-if-twiddle (pattern _index _total)
           "Glob when trailing tilde."
@@ -13404,7 +13406,7 @@
                       for len = (length cand)
                       if (and (> len 0)
                               (eq (aref cand (1- len)) ?/))
-                      do (add-face-text-property 0 (length cand) 'font-lock-function-name-face 'append cand)
+                        do (add-face-text-property 0 (length cand) 'font-lock-function-name-face 'append cand)
                       end
                       collect cand)
            cands))
@@ -13413,8 +13415,7 @@
          (cl-reduce (lambda (cands func)
                       (funcall func input cands))
                     (delq nil (list #'selectrum-highlight-candidates+
-                                    (cond ((eq (bound-and-true-p selectrum-refine-candidates-function)
-                                               #'orderless-filter)
+                                    (cond ((member 'orderless completion-styles)
                                            #'orderless-highlight-matches)
                                           ((bound-and-true-p selectrum-prescient-mode)
                                            #'selectrum-prescient--highlight)
@@ -13463,7 +13464,12 @@
                                        str '(orderless-match-face-0
                                              orderless-match-face-1
                                              orderless-match-face-2
-                                             orderless-match-face-3)))
+                                             orderless-match-face-3
+                                             ;; For some reason `consult' async commands and some regular
+                                             ;; commnads such as `completion-in-region' don't use orderless
+                                             ;; highlighting.
+                                             selectrum-prescient-primary-highlight
+                                             selectrum-prescient-secondary-highlight)))
                            (cl-destructuring-bind (face . (start . end))
                                seq
                              (if (version< emacs-version "27")
@@ -13476,10 +13482,9 @@
      This works for isearch and evil and can automatically detect and compile
      regexp when an external package (eg. orderless) is used."
          (when-let ((input selectrum--last-input)
-                    (regexp (cond ((eq selectrum-refine-candidates-function
-                                       'orderless-filter)
+                    (regexp (cond ((member 'orderless completion-styles)
                                    (eval
-                                    `(rx (or ,@(cl-loop for regexp in (funcall orderless-pattern-compiler input)
+                                    `(rx (or ,@(cl-loop for regexp in (orderless-pattern-compiler input)
                                                         collect `(regexp ,regexp))))))
                                   (t selectrum--previous-input-string))))
            (push regexp regexp-search-ring)
@@ -13565,40 +13570,10 @@
         :hook ((selectrum-mode . selectrum-prescient-mode))
         :init
         (add-hook 'selectrum-prescient-mode-hook
-                  (lambda ()
-                    ;; override highlight functions
+                  (defun selectrum-prescient-reset-conf+ ()
                     (setq selectrum-preprocess-candidates-function #'selectrum-preprocess+
                           selectrum-highlight-candidates-function #'selectrum-highlight+))))
     #+END_SRC
-
-*** selectrum-orderless
-    :PROPERTIES:
-    :header-args+: :tangle (package-yes! selectrum orderless)
-    :END:
-
-    #+BEGIN_SRC emacs-lisp
-      (defun selectrum-setup-orderless+ ()
-        (setq selectrum-refine-candidates-function #'orderless-filter
-              selectrum-highlight-candidates-function #'selectrum-highlight+
-              ;; completion-styles '(orderless)
-              ;; orderless-skip-highlighting (lambda () selectrum-is-active)
-              ))
-
-      (defun selectrum-teardown-orderless+ ()
-        (warn "ivy-teardown-orderless: Not yet implemented"))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp
-      (if (package! prescient)
-          (add-hook 'selectrum-prescient-mode-hook
-                    (defun selectrum-prescient-setup-orderless+ ()
-                      (cond ((bound-and-true-p selectrum-prescient-mode)
-                             (selectrum-setup-orderless+))
-                            (+orderless-requires-prescient
-                             (selectrum-teardown-orderless+)))))
-        (add-hook 'selectrum-mode-hook #'selectrum-setup-orderless+))
-    #+END_SRC
-
 
 *** marginalia
     #+BEGIN_SRC emacs-lisp
