@@ -2247,14 +2247,15 @@
 
              (kill-buffer buffer)))))
 
-     (defun smart-buffer-file-name ()
-       (or (buffer-file-name)
-           (and (derived-mode-p 'dired-mode)
-                (string-trim-right (dired-current-directory) "/"))
-           (and (boundp 'org-capture-mode)
-                (buffer-file-name (org-capture-get :buffer t)))
-           (and (boundp 'org-src-mode)
-                (bound-and-true-p org-src-source-file-name))))
+     (defun smart-buffer-file-name (&optional buffer)
+       (with-current-buffer (or buffer (current-buffer))
+         (or (buffer-file-name)
+             (and (derived-mode-p 'dired-mode)
+                  (string-trim-right (dired-current-directory) "/"))
+             (and (boundp 'org-capture-mode)
+                  (buffer-file-name (org-capture-get :buffer t)))
+             (and (boundp 'org-src-mode)
+                  (bound-and-true-p org-src-source-file-name)))))
 
      (defmacro defun-show-and-copy-command (name &rest body)
        "Define a function which uses BODY to generate a string which is then shown and copied.
@@ -12626,18 +12627,150 @@
    #+BEGIN_SRC emacs-lisp
      (use-package server
        :demand t
+       :commands (find-client-buffer+
+                  next-client-buffer+
+                  prev-client-buffer+
+                  server-abort
+                  server-edit-mode+)
        :custom
        (server-client-instructions nil)
-       :config
-       ;; see [[http://emacshorrors.com/posts/determining-if-the-server-is-started-or-the-wonders-of-server-running-p.html][emacs-horrors]] for why this is sometimes useless :(
-       (when (windows-p)
-         (or (server-running-p)
-             (server-start)))
 
+       :config
        (advice-add 'server-edit :before
                    (defun server-edit--auto-save-on-exit (&rest _args)
-                     "Automatically save file before server exit"
+                     "Automatically save file before server exit."
                      (save-buffer)))
+
+       :config
+       (defun server-client-buffers+ (&optional all-frames)
+         "List buffers being visited by emacs-client in the current frame.
+     With ALL-FRAMES use all frames known to the current emacs session."
+         (remove-duplicates
+          (cl-loop for frame in (if all-frames (frame-list) (list (selected-frame)))
+                   append (when-let ((proc (frame-parameter frame 'client)))
+                            (process-get proc 'buffers)))))
+
+       (defvar move-client-buffers-wrap-around+ t
+         "When t attempting to run `next-client-buffer' in the last client buffer
+     wraps back round to the first client buffer.")
+
+       (defun next-client-buffer+ (arg)
+         "Switch to the next buffer being visited by an emacsclient in the current frame.
+     With ARG this function acts on clients from all-frames not just the current frame."
+         (interactive "P")
+         (if-let* ((buffers (server-client-buffers+ arg))
+                   (mark (1+ (or (seq-position buffers (current-buffer)) -1)))
+                   (mark (if (eq mark (length buffers))
+                             (if move-client-buffers-wrap-around+
+                                 0
+                               (user-error "No next client buffer to switch to"))
+                           mark))
+                   (buffer (nth mark buffers)))
+             (progn
+               (message "%d/%d: %s"
+                        (1+ mark)
+                        (length buffers)
+                        (abbreviate-file-name
+                         (smart-buffer-file-name buffer)))
+               (switch-to-buffer buffer))
+           (user-error "No client buffers found")))
+
+       (defun prev-client-buffer+ (arg)
+         "Switch to the previous buffer being visited by an emacsclient in the current frame.
+     With ARG this function acts on clients from all-frames not just the current frame."
+         (interactive "P")
+         (if-let* ((buffers (server-client-buffers+ arg))
+                   (mark (- (or (seq-position buffers (current-buffer)) 0) 1))
+                   (mark (if (< mark 0)
+                             (if move-client-buffers-wrap-around+
+                                 (- (length buffers) 1)
+                               (user-error "No previous client buffer to switch to"))
+                           mark))
+                   (buffer (nth mark buffers)))
+             (progn
+               (message "%d/%d: %s"
+                        (1+ mark)
+                        (length buffers)
+                        (abbreviate-file-name
+                         (smart-buffer-file-name buffer)))
+               (switch-to-buffer buffer))
+           (user-error "No client buffers found")))
+
+       (defun find-client-buffer+ (arg)
+         "Completing read a buffer from the list of emasclient buffers."
+         (interactive "P")
+         (switch-to-buffer
+          (if-let* ((client-buffers (cl-loop for buf in (server-client-buffers+ arg)
+                                             collect (cons (abbreviate-file-name (smart-buffer-file-name buf))
+                                                           buf)))
+                    (cands (mapcar #'car client-buffers)))
+              (cond
+               ((package! selectrum)
+                ;; Gives us previews and nicer formatting but may not be available.
+                (consult--read client-buffers
+                               :prompt "Client buffer: "
+                               :category 'buffer
+                               :require-match t
+                               :default (car cands)
+                               :lookup #'consult--lookup-cdr
+                               :state (consult--buffer-state)))
+               (t
+                (cdr
+                 (assoc
+                  (completing-read "Client buffer: "
+                                   (lambda (str pred action)
+                                     (if (eq action 'metadata)
+                                         `((category . buffer))
+                                       (complete-with-action action cands str pred)))
+                                   nil t nil nil (car cands))
+                  client-buffers))))
+            (user-error "No client buffers found"))))
+
+       :init
+       (defvar server-edit-ignore-modes+
+         '(with-editor-mode)
+         "modes (minor or major) in which `server-edit-mode+' is disabled.")
+
+       (add-hook 'server-visit-hook
+                 (defun server-switch-enable-server-edit-mode+ ()
+                   (unless (or (apply #'derived-mode-p
+                                      server-edit-ignore-modes+)
+                               (cl-some (lambda (mode)
+                                          (and (boundp mode)
+                                               (eval mode)))
+                                        server-edit-ignore-modes+))
+                     (server-edit-mode+ +1))))
+
+       (add-hook 'server-done-hook
+                 (defun server-done-quit-server-edit-mode+ ()
+                   (server-edit-mode+ -1)))
+
+       :config
+       ;; see [[https://superuser.com/questions/295156/how-to-set-the-exit-status-for-emacsclienti][here]].
+       (defun server-abort (&optional prefix)
+         "Sends error exit command to every client for the current buffer."
+         (interactive "P")
+         (if (not server-buffer-clients)
+             (error "current buffer has no server clients")
+           (dolist (proc server-buffer-clients)
+             (server-send-string proc "-error die"))
+           (unless prefix (kill-buffer))))
+
+       ;; add ,, and ,q like bindings in server edit sessions, like org-edit-src-code
+       (define-minor-mode server-edit-mode+
+         "A dummy minor mode for files being edited by `server'.
+     makes it easier to bind keys (& leaders :grinning: for them)."
+         nil
+         " ServerEdit"
+         '(;; ([remap evil-write] . server-edit)
+           ([remap evil-save-and-close] . server-edit)
+           ([remap evil-quit-all-with-error-code] . server-abort)))
+
+       :leader
+       ("f SPC" 'server-start
+        "fen" 'next-client-buffer+
+        "fep" 'prev-client-buffer+
+        "feb" 'find-client-buffer+)
 
        :lazy-leader
        (:mode 'server-edit-mode+
@@ -12646,72 +12779,6 @@
         "," 'server-edit
         "q" 'server-abort))
    #+END_SRC
-
-*** server-commands
-    #+BEGIN_SRC emacs-lisp
-      (use-package +server-commands
-        :commands (find-client-buffer
-                   server-abort
-                   toggle-client-headers
-                   toggle-client-headers-local
-                   server-edit-mode+)
-        :init
-        (defvar server-edit-ignore-modes+
-          '(with-editor-mode)
-          "modes (minor or major) in which `server-edit-mode+' is disabled.")
-
-        (add-hook 'server-switch-hook
-                  (lambda ()
-                    (when server-buffer-clients
-                      (unless (or (apply #'derived-mode-p
-                                         server-edit-ignore-modes+)
-                                  (cl-some (lambda (mode)
-                                             (and (boundp mode)
-                                                  (eval mode)))
-                                           server-edit-ignore-modes+))
-                        (server-edit-mode+ +1)))))
-
-        (add-hook 'server-done-hook
-                  (lambda ()
-                    (server-edit-mode+ -1)))
-
-        :leader
-        ("t1" 'toggle-client-headers
-         "t2" 'toggle-client-headers-local
-         "fes" 'find-client-buffer))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle lisp/+server-commands.el
-      (defun find-client-buffer ()
-        (interactive)
-        (switch-to-buffer
-         (read-buffer "Client buffers: " nil t
-                      (lambda (b)
-                        (with-current-buffer (cdr b)
-                          server-buffer-clients)))))
-
-      ;; see [[https://superuser.com/questions/295156/how-to-set-the-exit-status-for-emacsclienti][here]].
-      (defun server-abort (&optional prefix)
-        "Sends error exit command to every client for the current buffer."
-        (interactive "P")
-        (if (not server-buffer-clients)
-            (error "current buffer has no server clients")
-          (dolist (proc server-buffer-clients)
-            (server-send-string proc "-error die"))
-          (unless prefix (kill-buffer))))
-
-      ;; add ,, and ,q like bindings in server edit sessions, like org-edit-src-code
-      (define-minor-mode server-edit-mode+
-        "a dummy minor mode for files being edited by `server'.
-      makes it easier to bind keys (& leaders :grinning: for them)."
-        nil
-        " ServerEdit"
-        '(;; ([remap evil-write] . server-edit)
-          ([remap evil-save-and-close] . server-edit)
-          ([remap evil-quit-all-with-error-code] . server-abort)))
-
-      (provide '+server-commands)
-    #+END_SRC
 
 ** simple
    #+BEGIN_SRC emacs-lisp
