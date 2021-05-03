@@ -3588,6 +3588,10 @@
           (when (string-suffix-p "~" pattern)
             `(orderless-flex . ,(substring pattern 0 -1))))
 
+        (defun literal-if-equals (pattern _index _totle)
+          (when (string-prefix-p "=" pattern)
+            `(orderless-literal . ,(substring pattern 1))))
+
         (defun without-if-bang (pattern _index _total)
           "Exclude literal when leading punctuation-mark."
           (when (string-prefix-p "!" pattern)
@@ -3595,6 +3599,7 @@
 
         (setq orderless-matching-styles '(orderless-regexp)
               orderless-style-dispatchers '(flex-if-twiddle
+                                            literal-if-equals
                                             without-if-bang)))
     #+END_SRC
 
@@ -13651,6 +13656,8 @@
         :after prescient
         :straight t
         :hook ((selectrum-mode . selectrum-prescient-mode))
+        :custom
+        (selectrum-prescient-enable-filtering nil)
         :init
         (add-hook 'selectrum-prescient-mode-hook
                   (defun selectrum-prescient-reset-conf+ ()
