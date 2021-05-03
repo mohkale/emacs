@@ -215,10 +215,6 @@
          prescient                                                         ; Sorting/Filtering based on frequency and proximity.
          orderless                                                         ; Blazingly fast completion regexp generator using space seperated patterns
 
-     ;;; Mode lines
-         doom-modeline                                                     ; A fast and feature-full mode-line package based on [[https://github.com/hlissner/doom-emacs][doom]]!
-         ;; spaceline                                                      ; The same mode-line package as [[https://github.com/syl20bnr/spacemacs][spacemacs]].
-
      ;;; Buffer Menus
          ;; buffer-menu                                                    ; The (default) builtin buffer menu
          ibuffer                                                           ; An improved buffer menu
@@ -11486,807 +11482,678 @@
    Here we define customization options and other helpers for building mode-lines.
 
    #+BEGIN_SRC emacs-lisp
-     (defvar +modeline-buffer-id-max-length 25
-       "Truncate the buffer-id when it's larger than this many characters.
-     Set to nil to disable buffer-name truncation.")
+     (defface +mode-line-major-mode
+       `((t (:inherit bold)))
+       ""
+       :group '+mode-line)
 
-     (defvar +modeline-buffer-id-ellipses "..."
-       "Suffix to be attached to truncated buffer names.")
+     (defface +mode-line-buffer-name
+       `((t (:inherit bold)))
+       ""
+       :group '+mode-line)
+
+     (defface +mode-line-buffer-minor-mode
+       `((t (:inherit mode-line)))
+       ""
+       :group '+mode-line)
+
+     (defface +mode-line-evil-normal-state   `((t (:inherit mode-line))) "Highlight face for `mode-line' when in `evil-normal-state'.")
+     (defface +mode-line-evil-emacs-state    `((t (:inherit mode-line))) "Highlight face for `mode-line' when in `evil-emace-state'.")
+     (defface +mode-line-evil-insert-state   `((t (:inherit mode-line))) "Highlight face for `mode-line' when in `evil-insert-state'.")
+     (defface +mode-line-evil-motion-state   `((t (:inherit mode-line))) "Highlight face for `mode-line' when in `evil-motion-state'.")
+     (defface +mode-line-evil-visual-state   `((t (:inherit mode-line))) "Highlight face for `mode-line' when in `evil-visual-state'.")
+     (defface +mode-line-evil-operator-state `((t (:inherit mode-line))) "Highlight face for `mode-line' when in `evil-operator-state'.")
+     (defface +mode-line-evil-replace-state  `((t (:inherit mode-line))) "Highlight face for `mode-line' when in `evil-replace-state'.")
+
+     (defface +mode-line-minibuffer-face
+       `((t (:inherit +mode-line-evil-emacs-state)))
+       "highlight face for doom-modeline when minibuffer is active"
+       :group '+mode-line)
+
+     (defface +mode-line-host-face
+       '((t (:italic t)))
+       "Face for remote hosts in the mode-line."
+       :group '+mode-line)
+
+     (defface +mode-line-linter-info
+       '((t (:inherit compilation-mode-line-exit)))
+       ""
+       :group '+mode-line)
+
+     (defface +mode-line-linter-warning
+       '((t (:inherit compilation-mode-line-run)))
+       ""
+       :group '+mode-line)
+
+     (defface +mode-line-linter-error
+       '((t (:inherit compilation-mode-line-fail)))
+       ""
+       :group '+mode-line)
    #+END_SRC
 
-   Detect and display the current evil-register and the register under which a macro
-   is currently being recorded... so for example if I hit ="r= than my mode-line can
-   output show that sequence to let me know which register I'm working with. Similar
-   story for a macro and if I select a register whithin a macro it should say =@q "a=.
-
-   #+BEGIN_SRC emacs-lisp
-     (defconst +mode-line-macro-symbol "@")
-     (defconst +mode-line-register-symbol "\"")
-
-     (defun +modeline-evil-macro-and-register ()
-       (let ((macro (when defining-kbd-macro
-                      (concat +mode-line-macro-symbol
-                              (when (bound-and-true-p evil-this-macro)
-                                (string evil-this-macro)))))
-             (register (when (bound-and-true-p evil-this-register)
-                         (concat +mode-line-register-symbol
-                                 (char-to-string evil-this-register)))))
-         (cond
-          ((and macro register)
-           (concat macro " " register))
-          (macro macro)
-          (register register))))
-   #+END_SRC
-
-   Extract and display version-control information related to the current buffer. For
-   git this includes a github icon and the current git branch. For svn... I have no
-   idea, if I ever use a project that has SVN I may well find out :stuck_out_tongue:.
-
-   #+BEGIN_SRC emacs-lisp
-     (defun +modeline-vc-icon ()
-       (when vc-mode
-         (cond ((string-match-p "Git[:-]" vc-mode)
-                (cons 'faicon "github-alt"))
-               ((string-match-p "SVN-" vc-mode)
-                (cons 'fileicon "svn")))))
-
-     (defun +modeline-vc-status (&rest propertize)
-       (when vc-mode
-         (or (when-let ((branch (cadr (split-string vc-mode "Git[:-]"))))
-               (apply #'propertize branch
-                      'local-map (get-text-property 1 'local-map branch)
-                      propertize))
-             (when (string-match-p "SVN-" vc-mode)
-               (let ((revision (cadr (split-string vc-mode "-" ))))
-                 (propertize revision propertize))))))
-   #+END_SRC
-
-   Next on the list are icons/status-info for the current linter/syntax-highlighter
-   for the buffer you're in. This can come from either [[https://www.flycheck.org/en/latest/][flycheck]] or [[https://www.gnu.org/software/emacs/manual/html_node/flymake/Using-Flymake.html#Using-Flymake][GNU flymake]] but
-   I *don't* recommend having both active simultaneously.
-
-   Each of these functions returns a plist of properties related to the current
-   buffer. This includes formatted error/warning/info counts and a meta-tag
-   indicating the status of the associated checker.
-
-   #+BEGIN_SRC emacs-lisp
-     (defconst +modeline-checker-bullet "•%s"
-       "The bullet used for each section of a `flymake'/`flycheck' segment.
-     This should be a format string with a single `%s'-expression corresponding to
-     the number of errors.")
-
-     (defun +modeline-flymake (info-face warn-face error-face meta-face)
-       ;; See [[https://www.gnu.org/software/emacs/manual/html_node/flymake/Syntax-check-statuses.html#Syntax-check-statuses][here]], flymake shows different indicators depending on the linting status.
-       ;; Status format adapted from `flymake--mode-line-format'.
-       (let ((known (and flymake--backend-state
-                         (hash-table-keys flymake--backend-state)))
-             (running (flymake-running-backends))
-             (disabled (flymake-disabled-backends))
-             (reported (flymake-reporting-backends)))
-         `(:meta ,(cond ((null known)
-                         (propertize "?" 'face meta-face))
-                        ((cl-set-difference running reported)
-                         (propertize "%" 'face meta-face))
-                        ((and disabled (null running))
-                         (propertize "!" 'face error-face)))
-           ,@(cl-loop with idx = nil
-                      with acc = (make-vector 3 0)                                   ; See (flymake--severity :error)
-                      for diag in (flymake-diagnostics)
-                      do (setq idx (- (flymake--severity (flymake-diagnostic-type diag)) 1))
-                      when (and (>= idx 0)
-                                (<  idx 3))
-                      do (aset acc idx (1+ (aref acc idx)))
-                      finally do (cl-loop
-                               for (i . face) in `((0 . ,info-face)
-                                                   (1 . ,warn-face)
-                                                   (2 . ,error-face))
-                               when (eq (aref acc i) 0)
-                               do (aset acc i nil)
-                               else
-                               do (aset acc i
-                                        (propertize (format +modeline-checker-bullet (aref acc i)) 'face face)))
-                      finally return
-                      `(:info     ,(aref acc 0)
-                        :warning  ,(aref acc 1)
-                        :error    ,(aref acc 2))))))
-
-     (defvar flycheck-current-errors)
-     (defvar flycheck-last-status-change)
-     (defun +modeline-flycheck (info-face warn-face error-face _meta-face)
-       (let ((counts (flycheck-count-errors flycheck-current-errors))
-             (running (eq 'running flycheck-last-status-change)))
-         (cl-loop for (level . face) in `((info    . ,info-face)
-                                          (warning . ,warn-face)
-                                          (error   . ,error-face))
-                  collect (intern (concat ":" (symbol-name level)))
-                  collect (when (or running
-                                    (flycheck-has-current-errors-p level))
-                            (propertize (format
-                                         +modeline-checker-bullet
-                                         (or (alist-get level counts)
-                                             "?"))
-                                        'face face)))))
-   #+END_SRC
-
-   Lastly lets just add a helper method to format the output of the previous
-   functions in a way that looks pretty *and* can be substituted back into the
-   mode-line.
-
-   #+BEGIN_SRC emacs-lisp
-     (defun +modeline-format-checker-status (stat)
-       "Formats the output of `+modeline-flycheck' or `+modeline-flymake'
-     into a string that can be substituted back into the mode-line."
-       (let ((meta      (plist-get stat :meta))
-             (errors    (plist-get stat :error))
-             (warnings  (plist-get stat :warning))
-             (infos     (plist-get stat :info)))
-         (concat (when meta
-                   (concat "[" meta "]"))
-                 (and meta
-                      (or errors warnings infos)
-                      " ")
-                 (string-join (delq nil (list errors warnings infos)) " "))))
-   #+END_SRC
-
-   Emacs has a few language-server packages. More recent variants are implementation
-   of the [[https://microsoft.github.io/language-server-protocol/][lsp-protocol]] for which emacs has 2 mainstream client implementations [[https://microsoft.github.io/language-server-protocol/][lsp-mode]]
-   and [[https://github.com/joaotavora/eglot][eglot]]. There's also some +older+ *more-established* language server packages such
-   [[https://github.com/mopemope/meghanada-emacs][meghanada-mode]] or [[https://github.com/pythonic-emacs/anaconda-mode][anaconda-mode]].
-
-   Each of these functions return a plist containing a server status message, some
-   meta-information (eg. server-name or server-port) and a face that should be
-   attached to it.
-
-   Much of these were partially adapted from: [[https://github.com/seagle0128/doom-modeline/blob/af5f61888e7eb0aa521d2d29b42221302b717915/doom-modeline-segments.el#L1871][doom-modeline]].
-
-   #+BEGIN_SRC emacs-lisp
-     (defun +modeline-lsp-status (info-face warn-face error-face meta-face)
-       (let* ((workspaces (lsp-workspaces))
-              (face (if workspaces
-                        info-face
-                      error-face)))
-         `(:msg ,(if workspaces "OK" ":broken")
-           :meta ,(propertize
-                   (cl-loop for w in workspaces concat (lsp--workspace-print w))
-                   'face meta-face)
-           :face ,face)))
-
-     (defun +modeline-eglot-status (info-face warn-face error-face meta-face)
-       (pcase-let* ((server (eglot-current-server))
-                    (server-name (and server
-                                      (plist-get (eglot--server-info server) :name)))
-                    (pending (and server (hash-table-count
-                                          (jsonrpc--request-continuations server))))
-                    (`(,_id ,doing ,done-p ,detail) (and server (eglot--spinner server)))
-                    (last-error (and server (jsonrpc-last-error server))))
-         `(:msg ,(cond
-                  (last-error ":error")
-                  ((or (and doing (not done-p))
-                       (and pending (cl-plusp pending)))
-                   ":wait")
-                  ((or server
-                       server-name) "OK")
-                  (t ":broken"))
-           :meta ,(and server-name
-                       (propertize server-name 'face meta-face))
-           :face ,(cond (last-error error-face)
-                        ((and doing (not done-p)) warn-face)
-                        ((and pending (cl-plusp pending)) warn-face)
-                        (server info-face)
-                        (t warn-face)))))
-
-     (defvar anaconda-mode-process)
-     (defun +modeline-anaconda-status (info-face warn-face error-face meta-face)
-       `(:meta ,(propertize
-                 (concat "Anaconda"
-                         (when-let ((proc anaconda-mode-process)
-                                    (port (process-get proc 'port)))
-                           (format ":%d" port)))
-                 'face meta-face)
-         :face ,(if (anaconda-mode-running-p)
-                    info-face
-                  error-face)))
-   #+END_SRC
-
-   #+BEGIN_SRC emacs-lisp
-     (defun +mode-line-language-server (&rest args)
-       (cond ((bound-and-true-p anaconda-mode)
-              (apply #'+modeline-anaconda-status args))
-             ((bound-and-true-p lsp-mode)
-              (apply #'+modeline-lsp-status args))
-             ((bound-and-true-p eglot--managed-mode)
-              (apply #'+modeline-eglot-status args))))
-
-     (defun +modeline-format-language-server-status (stat)
-       (let (;; (face (plist-get stat :face))
-             (msg (plist-get stat :msg))
-             (meta (plist-get stat :meta)))
-         (concat
-          msg
-          (when meta
-            (concat "[" meta "]")))))
-   #+END_SRC
-
-   Discover the name of the current buffers project.
-
-   #+BEGIN_SRC emacs-lisp
-     (defun +mode-line-project ()
-       (cond
-        ((fboundp 'projectile-project-name)
-         (let ((project-name (projectile-project-name)))
-           (unless (or (string= project-name "-")
-                       (string= project-name (buffer-name)))
-             project-name)))))
-   #+END_SRC
-
-*** spaceline
-    :PROPERTIES:
-    :header-args+: :tangle (package-str! "init.el" spaceline)
-    :END:
-
-    An amazing mode line... needs to be initialised before all others to make sure
-    every buffer inherits the same mode line.
-
-    I'll be using a fork of powerline (spacelines dependency) which has a lot more new
-    features compared to the one in melpa.
-
+*** anzu
     #+BEGIN_SRC emacs-lisp
-      (use-package powerline
-        :straight (powerline :host github :repo "jonathanchu/emacs-powerline"
-                             :fork (:repo "milkypostman/powerline")))
+      (defun +mode-line-anzu ()
+        (when (and (boundp 'anzu--state) anzu--state)
+          (cond ((eq anzu--state 'replace-query)
+                 (format " Replace: %d" anzu--cached-count))
+                (anzu--overflow-p
+                 (format " %d/%d+" anzu--current-position anzu--total-matched))
+                (t
+                 (format " %d/%d" anzu--current-position anzu--total-matched)))))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp
-      (add-hook 'after-load-theme-hook
-                (lambda (&rest _)
-                  (set-face-attribute
-                   'mode-line nil
-                   :box
-                   `(:line-width 1 :color ,(face-attribute 'mode-line :background) :style none))))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package spaceline
-        :straight t
-        :demand   t
-        :hook (after-load-theme . powerline-reset)
-        :config
-        (setq spaceline-org-clock t
-              powerline-default-separator 'slant
-
-              spaceline-window-number-p t
-              spaceline-window-numbers-unicode nil
-
-              ;; unicode numbers on the terminal aren't the right
-              ;; width and I'm too lazy to find a better font.
-              spaceline-workspace-number-p nil
-              spaceline-workspace-numbers-unicode nil
-
-              spaceline-buffer-id-max-length +modeline-buffer-id-max-length
-              spaceline-flycheck-bullet +modeline-checker-bullet)
-
-        (setq-default mode-line-format (spaceline-spacemacs-theme))
-        ;; Also make sure spaceline is applied to any existing buffers.
-        (dolist (buf (buffer-list))
-          (with-current-buffer buf
-            (setq mode-line-format (spaceline-spacemacs-theme))))
-
-        (push '(operator  . spaceline-evil-operator)  spaceline-evil-state-faces)
-        (push '(multiedit . spaceline-evil-multiedit) spaceline-evil-state-faces)
-
-        (defvar spaceline-highlight-evil-operator+ t
-          "when true, spaceline will highlight operator state
-      like it would any other state.")
-
-        (setq spaceline-highlight-face-func
-              (defun spaceline-highlight-face+ ()
-                (if (active-minibuffer-window)
-                    'spaceline-minibuffer
-                  ;; (spaceline-highlight-face-evil-state)
-                  ;; redefine spaceline-highlight-face-evil-state here because
-                  ;; it doesn't highlight operator state :(
-                  (if (bound-and-true-p evil-local-mode)
-                      (let* ((state (if (and (eq 'operator evil-state)
-                                            (not spaceline-highlight-evil-operator+))
-                                       evil-previous-state
-                                     evil-state))
-                             (face (assq state spaceline-evil-state-faces)))
-                        (if face (cdr face) (spaceline-highlight-face-default)))
-                    (spaceline-highlight-face-default))))))
-    #+END_SRC
-
-**** icons
+*** buffer-name
      #+BEGIN_SRC emacs-lisp
-       (defvar spaceline-preferred-icon-height 0.98
-         "height of icons in the spaceline modeline")
+       (defvar +mode-line-buffer-id-max-length 25
+         "Truncate the buffer-id when it's larger than this many characters.
+       Set to nil to disable buffer-name truncation.")
 
-       (defun spaceline--face-icon-height (face)
-         (let ((height (face-attribute face :height)))
-           (unless (eq height 'unspecified)
-             (/ height 100.0))))
+       (defvar +mode-line-buffer-id-ellipses "..."
+         "Suffix to be attached to truncated buffer names.")
+     #+END_SRC
 
-       (defun spaceline-icon-height (&optional height)
-         (or height
-             spaceline-preferred-icon-height
-             (spaceline--face-icon-height 'mode-line)
-             (spaceline--face-icon-height 'default)))
+     #+BEGIN_SRC emacs-lisp
+       (defun +mode-line-buffer-name ()
+         (propertize
+          (s-truncate +mode-line-buffer-id-max-length
+                      (format-mode-line "%b")
+                      +mode-line-buffer-id-ellipses)
+          'face '+mode-line-buffer-name))
 
-       (cl-defmacro spaceline-prepared-icon (func icon-arg &rest args)
-         "retrieve an `all-the-icons' icon for display in the spaceline.
-       FUNC is a function such as `all-the-icon-faicon' which accepts an argument
-       ICON-ARG and a bunch of face properties and returns either a symbol or an
-       icon string.
+     #+END_SRC
 
-       The remaining arguments should form a PLIST with the following being used
-       by this function and the remaining being passed directly to FUNC.
+*** buffer-encoding
+    #+BEGIN_SRC emacs-lisp
+      (defun +mode-line-buffer-eol ()
+        (concat
+         " "
+         (let ((eol (coding-system-eol-type buffer-file-coding-system)))
+           (propertize
+            (pcase eol
+              (0 "LF")
+              (1 "CRLF")
+              (2 "CR")
+              (_ ""))
+            'mouse-face 'mode-line-highlight
+            'help-echo (format "End-of-line style: %s\nmouse-1: Cycle"
+                               (pcase eol
+                                 (0 "Unix-style LF")
+                                 (1 "DOS-style CRLF")
+                                 (2 "Mac-style CR")
+                                 (_ "Undecided")))
+            'local-map (let ((map (make-sparse-keymap)))
+                         (define-key map [mode-line mouse-1] 'mode-line-change-eol)
+                         map)))))
+    #+END_SRC
 
-       Keywords
-       --------
-       face - Can be given to specify a face for the icon. This face will be applied
-              over the regular background of the current spaceline section.
+    #+BEGIN_SRC emacs-lisp
+      (defun +mode-line-buffer-encoding ()
+        "Displays the eol and the encoding style of the buffer the same way Atom does."
+        (concat
+         " "
+         (let* ((sys (coding-system-plist buffer-file-coding-system))
+                (cat (plist-get sys :category))
+                (sym (if (memq cat
+                               '(coding-category-undecided coding-category-utf-8))
+                         'utf-8
+                       (plist-get sys :name))))
+           (propertize
+            (upcase (symbol-name sym))
+            'mouse-face 'mode-line-highlight
+            'help-echo 'mode-line-mule-info-help-echo
+            'local-map mode-line-coding-system-map))))
+    #+END_SRC
 
-       face-when-active - When specified means the face argument from before will only
-                          only be applied on the windows spaceline sees as active.
+*** buffer-icon
+    When available we should try to show an icon for the current file.
 
-       family - Can be specified as a function to force usage of a certain font family
-                for the icon. If ommited the family property is extracted from the icon
-                directly. eg. `all-the-icons-icon-family-for-mode'.
-       "
-         (plist-bind! (args :face :family :height :propertize (:v-adjust . -0.1) (:face-when-active . t))
-           (setq family (eval family))
+    #+BEGIN_SRC emacs-lisp
+      (defvar-local +mode-line--buffer-file-icon nil)
+      (defun +mode-line-update-buffer-file-icon (&rest _)
+        "Update file icon in `mode-line'."
+        (setq +mode-line--buffer-file-icon
+              (when (and +icons-available (featurep 'all-the-icons))
+                (let ((icon (or (all-the-icons-icon-for-buffer))))
+                  (propertize (if (or (null icon) (symbolp icon))
+                                  (all-the-icons-faicon "file-o" nil nil :face 'all-the-icons-dsilver)
+                                (when (stringp icon)
+                                  (remove-text-properties 0 (length icon) '(font-lock-face) icon)
+                                  (remove-text-properties 0 (length icon) '(face) icon))
+                                icon)
+                              'help-echo (format "Major-mode: %s" (format-mode-line mode-name))
+                              'display '(raise -0.135))))))
 
-           `(let* ((use-face (and ,face
-                                  ,@(when face-when-active
-                                      (list (quote (bound-and-true-p active))))))
-                   (icon (funcall ,func ,icon-arg
-                                  :face (when use-face ,face)
-                                  :v-adjust ,v-adjust
-                                  :height (spaceline-icon-height ,height)
-                                  ,@args)))
-              (unless (symbolp icon)
-                (if use-face
-                    (prog1 icon
-                      ;; see https://github.com/domtronn/all-the-icons.el/issues/131
-                      (add-face-text-property 0 (length icon) :inherit t icon))
-                  (propertize (concat icon (unless (display-graphic-p)  " "))
-                              ;; 'display '(raise 0.1)
+      (add-hook 'find-file-hook #'+mode-line-update-buffer-file-icon)
+      (add-hook 'after-change-major-mode-hook #'+mode-line-update-buffer-file-icon)
+      (add-hook 'clone-indirect-buffer-hook #'+mode-line-update-buffer-file-icon)
+    #+END_SRC
+
+*** buffer-size
+    #+BEGIN_SRC emacs-lisp
+      (defsubst +mode-line-buffer-size ()
+        "Show buffer size."
+        (when size-indication-mode
+          (concat " "
+                  (propertize "%I"
+                              'help-echo "Buffer size
+      mouse-1: Display Line and Column Mode Menu"
                               'mouse-face 'mode-line-highlight
-                              'face (list :family (or
-                                                   ,@(when (and family (functionp family))
-                                                       (funcall family))
-                                                   (plist-get (get-text-property 0 'face icon)
-                                                              :family))
-                                          :inherit)))))))
-       (put 'spaceline-prepared-icon 'lisp-indent-function 'defun)
+                              'local-map mode-line-column-line-number-mode-map))))
+    #+END_SRC
 
-       (cl-defmacro spaceline-icon (family icon &rest args)
-         "alias for `spaceline-prepared-icon' which uses a font-family as a function.
-       FONT-FAMILY should be a symbol (such as faicon) relating to some font family.
-       ICON should be a string relating to an icon in that family.
+*** evil-face
+    #+BEGIN_SRC emacs-lisp
+      (defsubst +mode-line-evil-face ()
+        (if (active-minibuffer-window)
+            '+mode-line-minibuffer-face
+          (if (bound-and-true-p evil-local-mode)
+              (cond
+               ((evil-normal-state-p)   '+mode-line-evil-normal-state)
+               ((evil-emacs-state-p)    '+mode-line-evil-emacs-state)
+               ((evil-insert-state-p)   '+mode-line-evil-insert-state)
+               ((evil-motion-state-p)   '+mode-line-evil-motion-state)
+               ((evil-visual-state-p)   '+mode-line-evil-visual-state)
+               ((evil-operator-state-p) '+mode-line-evil-operator-state)
+               ((evil-replace-state-p)  '+mode-line-evil-replace-state)
+               (t                       '+mode-line-evil-normal-state))
+            '+mode-line-evil-normal-state)))
+    #+END_SRC
 
-       See `spaceline-prepared-icon' for a description of the remaining arguments.
-       "
-         (let* ((icon-func (intern (concat "all-the-icons-" (symbol-name family))))
-                (family-func (intern (concat (symbol-name icon-func) "-family"))))
-           `(spaceline-prepared-icon #',icon-func ,icon :family #',family-func ,@args)))
-       (put 'spaceline-icon 'lisp-indent-function 'defun)
-     #+END_SRC
+*** evil-register
+    Detect and display the current evil-register and the register under which a macro
+    is currently being recorded... so for example if I hit ="r= than my mode-line can
+    output show that sequence to let me know which register I'm working with. Similar
+    story for a macro and if I select a register whithin a macro it should say =@q "a=.
 
-**** segments
+    #+BEGIN_SRC emacs-lisp
+      (defconst +mode-line-macro-symbol "@")
+      (defconst +mode-line-register-symbol "\"")
+
+      (defun +mode-line-evil-macro-and-register ()
+        (concat (when defining-kbd-macro
+                  (concat " "
+                          +mode-line-macro-symbol
+                          (when (bound-and-true-p evil-this-macro)
+                            (string evil-this-macro))))
+                (when (bound-and-true-p evil-this-register)
+                  (concat " "
+                          +mode-line-register-symbol
+                          (char-to-string evil-this-register)))))
+    #+END_SRC
+
+*** evil-matches
+    #+BEGIN_SRC emacs-lisp
+      (defsubst +mode-line-evil-substitute ()
+        "Show number of matches for evil-ex substitutions and highlights in real time."
+        (when (and (bound-and-true-p evil-local-mode)
+                   (or (assq 'evil-ex-substitute evil-ex-active-highlights-alist)
+                       (assq 'evil-ex-global-match evil-ex-active-highlights-alist)
+                       (assq 'evil-ex-buffer-match evil-ex-active-highlights-alist)))
+          (let ((range (if evil-ex-range
+                           (cons (car evil-ex-range) (cadr evil-ex-range))
+                         (cons (line-beginning-position) (line-end-position))))
+                (pattern (car-safe (evil-delimited-arguments evil-ex-argument 2))))
+            (if pattern
+                (format " %s matches" (how-many pattern (car range) (cdr range)))
+              " -"))))
+    #+END_SRC
+
+*** winum+evil-state
+    #+BEGIN_SRC emacs-lisp
+      (defun +mode-line-winum ()
+        (let* ((face (+mode-line-evil-face))
+               (space (propertize " " 'face face)))
+          (concat space
+                  (when (> (length (frames-on-display-list)) 1)
+                    (propertize (format-mode-line (mode-line-frame-control))
+                                'face `(:weight bold :inherit ,face)))
+                  (propertize
+                   (cond
+                    ((active-minibuffer-window) "●")
+                    ((bound-and-true-p winum-mode)
+                     (substring-no-properties (winum-get-number-string)))
+                    ((bound-and-true-p ace-window-display-mode)
+                     (aw-update)
+                     (window-parameter (selected-window) 'ace-window-path))
+                    ((bound-and-true-p window-numbering-mode)
+                     (window-numbering-get-number-string))
+                    (t " "))
+                   'face face)
+                  space)))
+    #+END_SRC
+
+*** version-control
+    Extract and display version-control information related to the current buffer. For
+    git this includes a github icon and the current git branch. For svn... I have no
+    idea, if I ever use a project that has SVN I may well find out :stuck_out_tongue:.
+
+    #+BEGIN_SRC emacs-lisp
+      (defvar-local +mode-line-vc-text nil
+        "The version control status for the current buffer.
+      Adapted from `mood-line'.")
+
+      (defun +mode-line--update-vc-status ()
+        (setq +mode-line-vc-text
+              (when (and vc-mode buffer-file-name)
+                (let ((backend (vc-backend buffer-file-name))
+                      (state (vc-state buffer-file-name (vc-backend buffer-file-name))))
+                  (cl-destructuring-bind (icon . face)
+                      (cond ((memq state '(edited added))
+                             (cons "+" 'compilation-mode-line-exit))
+                            ((eq state 'needs-merge)
+                             (cons "←" 'compilation-mode-line-run))
+                            ((eq state 'needs-update)
+                             (cons "↑" 'compilation-mode-line-run))
+                            ((memq state '(removed conflict unregistered))
+                             (cons "✖" 'compilation-mode-line-fail))
+                            ;; (t (propertize "✔ " 'face face))
+                            (t (cons nil nil))
+                            )
+                      (when icon
+                        (apply #'propertize
+                               (concat " " icon " "
+                                       (substring vc-mode (+ (if (eq backend 'Hg) 2 3) 2)))
+                               `(,@(when face (list 'face face))
+                                 'mouse-face face))))))))
+
+      ;; Hooks to auto-update vc status alongside the buffer.
+      (add-hook 'find-file-hook #'+mode-line--update-vc-status)
+      (add-hook 'after-save-hook #'+mode-line--update-vc-status)
+      (advice-add #'vc-refresh-state :after #'+mode-line--update-vc-status)
+    #+END_SRC
+
+*** checkers
+    Next on the list are icons/status-info for the current linter/syntax-highlighter
+    for the buffer you're in. This can come from either [[https://www.flycheck.org/en/latest/][flycheck]] or [[https://www.gnu.org/software/emacs/manual/html_node/flymake/Using-Flymake.html#Using-Flymake][GNU flymake]] but
+    I *don't* recommend having both active simultaneously.
+
+    These are hard coded indicators which are substituted as is when applicable.
+
+    #+BEGIN_SRC emacs-lisp
+      (defconst +mode-line-checker-running
+        (propertize " Δ Checking" 'face 'compilation-mode-line-run))
+
+      (defconst +mode-line-checker-failed
+        (propertize " ✖ Error" 'face 'compilation-mode-line-fail))
+
+      (defconst +mode-line-checker-interrupted
+        " ⏸ Paused")
+    #+END_SRC
+
+    The actual error, info and warning indicators are shown as bullets using
+    following format.
+
+    #+BEGIN_SRC emacs-lisp
+      (defconst +mode-line-checker-bullet "•"
+        "The bullet used for each section of a `flymake'/`flycheck' segment.")
+    #+END_SRC
+
+     Lastly lets just add a helper method to format any checker diagnostics
+     in a way that looks pretty *and* can be substituted back into the mode-line.
+
      #+BEGIN_SRC emacs-lisp
-       (spaceline-define-segment evil-macro-and-register
-         (+modeline-evil-macro-and-register)
-         :enabled t)
+       (defsubst +mode-line-format-a-diagnostic (count icon face running)
+         (setq count
+               (cond
+                (count (number-to-string count))
+                (running "?")))
+         (and count
+              (propertize
+               (concat
+                (if (featurep 'all-the-icons)
+                    (all-the-icons-pad+ (all-the-icons-nerd-mdi icon))
+                  +mode-line-checker-bullet)
+                count)
+               'face face)))
 
-       ;; see for eg segments: [[https://github.com/domtronn/all-the-icons.el/wiki/Spaceline]]
-       (spaceline-define-segment minibuffer-active
-         "show a stop symbol if minibuffer is active"
-         (spaceline-icon faicon "dot-circle-o" :v-adjust 0.00)
-         :when (and +icons-available
-                    (active-minibuffer-window)))
-
-       (spaceline-define-segment buffer-mode-icon
-         "an `all-the-icons' segment to show the mode of the current buffer"
-         (spaceline-prepared-icon #'all-the-icons-icon-for-mode major-mode
-           :v-adjust -0.15)
-         :enabled +icons-available)
-
-       (spaceline-define-segment version-control-type-icon
-         (when-let* ((icon (+modeline-vc-icon)))
-           (spaceline-prepared-icon
-            (all-the-icons--function-name (car icon))
-            (cdr icon)))
-         :when +icons-available)
-
-       (spaceline-define-segment version-control-status
-         "An `all-the-icons' segment to depict the current VC system with an icon"
-         (+modeline-vc-status 'display '(raise 0.1) 'face :inherit)
-         :when (and active +icons-available))
-
-       (spaceline-define-segment flymake-checker
-         (when-let ((stat (+modeline-flymake 'spaceline-flycheck-info
-                                             'spaceline-flycheck-warning
-                                             'spaceline-flycheck-error
-                                             'mode-line-emphasis)))
-           (+modeline-format-checker-status stat))
-         :when (bound-and-true-p flymake-mode))
-
-       (spaceline-define-segment language-server
-         (when-let ((stat (+mode-line-language-server 'spaceline-flycheck-info
-                                                      'spaceline-flycheck-warning
-                                                      'spaceline-flycheck-error
-                                                      'mode-line-emphasis)))
-           (concat
-            (spaceline-icon faicon "rocket" 'face (plist-get stat :face))
-            (+modeline-format-language-server-status stat)))
-         :when +icons-available)
-
-       (spaceline-define-segment project
-         (+mode-line-project))
-     #+END_SRC
-
-**** format
-     #+BEGIN_SRC emacs-lisp
-       (spaceline-compile
-         ;; Left
-         '((minibuffer-active
-            :fallback ((persp-name
-                        workspace-number
-                        window-number)
-                       :fallback evil-state)
-            :face highlight-face
-            :priority 100)
-           auto-compile
-           (anzu
-            :priority 98)
-           ((buffer-modified
-             buffer-size
-             buffer-mode-icon
-             buffer-id
-             remote-host)
-            :priority 98)
-           (major-mode :priority 79)
-           (process :when active)
-           ;; assumes flymake and flycheck won't be used simulataneously
-           ((flymake-checker
-             flycheck-error
-             flycheck-warning
-             flycheck-info)
-            :priority 89
-            :when active)
-           (minor-modes
-            :when active
-            :priority 9)
-           ;; (mu4e-alert-segment :when active)
-           ;; (erc-track :when active)
-           ((version-control-type-icon
-             version-control-status
-             :fallback version-control)
-            :priority 78)
-           (language-server
-            :when active)
-           ;; (org-pomodoro :when active)
-           (org-clock :when active))
-
-         ;; Right
-         '(project
-           which-function
-           (python-pyvenv
-            :fallback python-pyenv)
-           (purpose :priority 94)
-           (battery :when active)
-           (selection-info :priority 95)
-           input-method
-           ((evil-macro-and-register
-             buffer-encoding-abbrev
-             point-position
-             line-column)
-            :separator " | "
-            :priority 96)
-           (global :when active)
-           (buffer-position :priority 99)
-           (hud :priority 99)))
-     #+END_SRC
-
-
-*** doom-modeline
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! doom-modeline)
-      (use-package doom-modeline
-        :straight (doom-modeline :fork (:host github :repo "mohkale/doom-modeline" :branch "emacs-dotfiles"))
-        :hook ((after-init         . doom-modeline-mode)
-               (doom-modeline-mode . size-indication-mode)
-               (doom-modeline-mode . column-number-mode))
-        :init
-        (setq doom-modeline-project-detection 'projectile
-              doom-modeline-buffer-file-name-style 'buffer-name
-              doom-modeline-icon (or (display-graphic-p)
-                                     +icons-available)
-              doom-modeline-major-mode-color-icon nil
-              doom-modeline-minor-modes t
-              doom-modeline-enable-word-count nil
-              doom-modeline-checker-simple-format t
-              doom-modeline-number-limit 99
-              doom-modeline-modal-icon nil
-              doom-modeline-env-version nil
-              doom-modeline-buffer-state-icon nil
-              doom-modeline-height 1)
-
-        (advice-add 'doom-modeline--set-char-widths :override #'ignore)
-
-        :config
-        (setq find-file-visit-truename
-              (or find-file-visit-truename                                 ; if already enabled, don't alter it
-                  ;; These are a single file/name so we don't need to follow
-                  ;; symlinks when displaying them.
-                  (not (member doom-modeline-buffer-file-name-style
-                               '(file-name buffer-name)))))
-
-        (advice-add 'mode-line-frame-control :override
-                    (defun mode-line-frame-control+ ()
-                      "%F "))
-
-        (defun doom-modeline-truncate-right+ (val)
-          (string-truncate-right! val 1))
-
-        (defun doom-modeline-truncate-left+ (val)
-          (string-truncate-left! val 1))
-
-        (defun doom-modeline-truncate+ (val)
-          (string-truncate! val 1 1))
-
-        (defun doom-modeline-limited-width-hide+ (func &rest args)
-          (unless doom-modeline--limited-width-p
-            (apply func args)))
-
-        (advice-add 'doom-modeline-segment--buffer-position :filter-return #'doom-modeline-truncate+)
-
-        (advice-add 'doom-modeline-icon :filter-return #'all-the-icons-pad-on-tty-advice+)
-
-        (advice-add #'doom-modeline--buffer-name :filter-return
-                    (defun doom-modeline-buffer-name-truncate+ (val)
-                      (when val
-                        (let ((name (format-mode-line val)))
-                          (if (and (eval-when-compile
-                                     (and +modeline-buffer-id-max-length
-                                          (< (length +modeline-buffer-id-ellipses)
-                                             +modeline-buffer-id-max-length)))
-                                   (> (length name) +modeline-buffer-id-max-length))
-                              (apply #'propertize
-                                     (concat
-                                      (substring-no-properties name 0
-                                                               (eval-when-compile
-                                                                 (- +modeline-buffer-id-max-length
-                                                                    (length +modeline-buffer-id-ellipses))))
-                                      +modeline-buffer-id-ellipses)
-                                     (text-properties-at 0 val))
-                            name)))))
-
-        (doom-modeline-def-segment buffer-info+
-          "Custom variant of buffer-info with buffer-state shown without icons."
-          (concat
-           "[%*]"
-           (doom-modeline-spc)
-           (doom-modeline--buffer-mode-icon)
-           (doom-modeline-spc)
-           (doom-modeline--buffer-name)))
-
-        (advice-add #'doom-modeline--anzu             :filter-return #'doom-modeline-truncate+)
-        (advice-add #'doom-modeline--iedit            :filter-return #'doom-modeline-truncate+)
-        (advice-add #'doom-modeline--symbol-overlay   :filter-return #'doom-modeline-truncate+)
-        (advice-add #'doom-modeline--evil-substitute  :filter-return #'doom-modeline-truncate+)
-        (advice-add #'doom-modeline--multiple-cursors :filter-return #'doom-modeline-truncate+)
-
-        (doom-modeline-def-segment matches+
-          (let ((meta (string-join
+       (defsubst +mode-line-format-diagnostics (_meta diags &optional running)
+         "Format DIAGS into a string for the mode-line.
+       DIAGS should be an alist of error, warning, and info.
+       META is meta-data associated with the checker (see `flymake').
+       RUNNING indicates that more results may be pending."
+         (let-alist diags
+           (let ((msg (s-join
+                       " "
                        (delq nil
-                             `(,(and (doom-modeline--active)
-                                     (+modeline-evil-macro-and-register))
-                               ,(doom-modeline--anzu)
-                               ,(doom-modeline--phi-search)
-                               ,(doom-modeline--evil-substitute)
-                               ,(doom-modeline--iedit)
-                               ,(doom-modeline--symbol-overlay)
-                               ,(doom-modeline--multiple-cursors)))
-                       (doom-modeline-spc))))
-            (or (and (not (string-empty-p meta))
-                     (concat (doom-modeline-spc)
-                             meta
-                             (doom-modeline-spc)))
-                (doom-modeline--buffer-size))))
+                             (list
+                              (+mode-line-format-a-diagnostic .info    "alert-box"          '+mode-line-linter-info running)
+                              (+mode-line-format-a-diagnostic .warning "multiplication-box" '+mode-line-linter-warning running)
+                              (+mode-line-format-a-diagnostic .error   "minus-box"          '+mode-line-linter-error running))))))
+             (unless (string-empty-p msg)
+               (concat " " msg )))))
+     #+END_SRC
 
-        (defsubst doom-modeline--evil-face+ ()
-          (if (active-minibuffer-window)
-              'doom-modeline-minibuffer-face
-            (if (bound-and-true-p evil-local-mode)
-                (cond
-                 ((evil-normal-state-p)   'doom-modeline-evil-normal-state)
-                 ((evil-emacs-state-p)    'doom-modeline-evil-emacs-state)
-                 ((evil-insert-state-p)   'doom-modeline-evil-insert-state)
-                 ((evil-motion-state-p)   'doom-modeline-evil-motion-state)
-                 ((evil-visual-state-p)   'doom-modeline-evil-visual-state)
-                 ((evil-operator-state-p) 'doom-modeline-evil-operator-state)
-                 ((evil-replace-state-p)  'doom-modeline-evil-replace-state)
-                 (t                       'doom-modeline-evil-normal-state))
-              'doom-modeline-evil-normal-state)))
+**** flycheck
+     #+BEGIN_SRC emacs-lisp
+       (defvar-local +mode-line-flycheck-text nil)
+       (defun +mode-line--update-flycheck (&optional status)
+         (setq +mode-line-flycheck-text
+               (concat
+                ;; (pcase status
+                ;;   ;; ('finished)
+                ;;   ('running +mode-line-checker-running)
+                ;;   ('errored +mode-line-checker-failed)
+                ;;   ('interrupted +mode-line-checker-interrupted)
+                ;;   ('no-checker nil))
+                (unless (member status '(errored no-checker))
+                  (when flycheck-current-errors
+                    (+mode-line-format-diagnostics
+                     nil
+                     (flycheck-count-errors flycheck-current-errors)
+                     (eq status 'running)))))))
 
-        (doom-modeline-def-segment evil-state-and-winum+
-          (let* ((face (doom-modeline--evil-face+))
-                 (space (propertize " " 'face face)))
-            (concat space
-                    (when (> (length (frames-on-display-list)) 1)
-                      (propertize (format-mode-line (mode-line-frame-control))
-                                  'face `(:weight bold :inherit ,face)))
-                    (propertize
-                     (cond
-                      ((active-minibuffer-window) "●")
-                      ((bound-and-true-p winum-mode)
-                       (substring-no-properties (winum-get-number-string)))
-                      ((bound-and-true-p ace-window-display-mode)
-                       (aw-update)
-                       (window-parameter (selected-window) 'ace-window-path))
-                      ((bound-and-true-p window-numbering-mode)
-                       (window-numbering-get-number-string))
-                      (t " "))
-                     'face face)
-                    space)))
+       (add-hook 'flycheck-status-changed-functions #'+mode-line--update-flycheck)
+       (add-hook 'flycheck-mode-hook #'+mode-line--update-flycheck)
+     #+END_SRC
 
-        (doom-modeline-def-segment vc-status+
-          (when (and vc-mode
-                     (doom-modeline--active)
-                     (not doom-modeline--limited-width-p))
-            (let ((stat (+modeline-vc-status))
-                  (icon (+modeline-vc-icon)))
-              (when (or stat icon)
-                (concat (when icon
-                          (concat (doom-modeline-spc)
-                                  (doom-modeline-propertize-icon
-                                   (doom-modeline-icon (car icon) (cdr icon) ?v ?v))))
-                        (when stat
-                          (concat (doom-modeline-spc)
-                                  stat)))))))
+**** flymake
+     #+BEGIN_SRC emacs-lisp
+       (defun +mode-line--count-flymake-diagnostics ()
+         (cl-loop with idx = nil
+                  with acc = (make-vector 3 0)                                   ; See (flymake--severity :error)
+                  for diag in (flymake-diagnostics)
+                  do (setq idx (- (flymake--severity (flymake-diagnostic-type diag)) 1))
+                  when (and (>= idx 0)
+                            (<  idx 3))
+                  do (aset acc idx (1+ (aref acc idx)))
+                  finally return
+                  (seq-filter (lambda (a) (not (eq (cdr a) 0)))
+                              `((info    . ,(aref acc 0))
+                                (warning . ,(aref acc 1))
+                                (error   . ,(aref acc 2))))))
 
-        (defsubst doom-modeline--build-server-section+ (stat-func fallback-str)
-          (when-let ((stat (funcall stat-func
-                                    'doom-modeline-lsp-success
-                                    'doom-modeline-lsp-warning
-                                    'doom-modeline-lsp-error
-                                    'mode-line-emphasis)))
-            (concat
-             (doom-modeline-lsp-icon fallback-str (plist-get stat :face))
-             ;; (+modeline-format-language-server-status stat)
-             )))
+       (defvar-local +mode-line-flymake-text nil)
+       (defun +mode-line--update-flymake-text (&rest _)
+         ;; See [[https://www.gnu.org/software/emacs/manual/html_node/flymake/Syntax-check-statuses.html#Syntax-check-statuses][here]].
+         (setq +mode-line-flymake-text
+               (let* ((known (and flymake--backend-state
+                                  (hash-table-keys flymake--backend-state)))
+                      (running (flymake-running-backends))
+                      (disabled (flymake-disabled-backends))
+                      (reported (flymake-reporting-backends))
+                      (all-disabled (and disabled (null running)))
+                      (some-waiting (cl-set-difference running reported)))
+                 (concat
+                  ;; (cond
+                  ;;  (some-waiting +mode-line-checker-running)
+                  ;;  (all-disabled +mode-line-checker-interrupted))
+                  (unless all-disabled
+                    (+mode-line-format-diagnostics
+                     ;; TODO: Do something with the status-text.
+                     ;; (cond ((null known)
+                     ;;        (propertize "?" 'face meta-face))
+                     ;;       (some-waiting
+                     ;;        (propertize "%" 'face meta-face))
+                     ;;       (all-disabled
+                     ;;        (propertize "!" 'face error-face)))
+                     nil
+                     (+mode-line--count-flymake-diagnostics)
+                     some-waiting))))))
 
-        (advice-add #'doom-modeline-update-lsp :override
-                    (defun doom-modeline-update-lsp+ ()
-                      (setq doom-modeline--lsp
-                            (doom-modeline--build-server-section+ #'+modeline-lsp-status "LSP"))))
+       (advice-add #'flymake--handle-report :after #'+mode-line--update-flymake-text)
+     #+END_SRC
 
-        (advice-add #'doom-modeline-update-eglot :override
-                    (defun doom-modeline-update-eglot+ ()
-                      (setq doom-modeline--eglot
-                            (doom-modeline--build-server-section+ #'+modeline-eglot-status "EGLOT"))))
+*** language-server
+    Emacs has a few language-server packages. More recent variants are implementation
+    of the [[https://microsoft.github.io/language-server-protocol/][lsp-protocol]] for which emacs has 2 mainstream client implementations [[https://microsoft.github.io/language-server-protocol/][lsp-mode]]
+    and [[https://github.com/joaotavora/eglot][eglot]]. There's also some +older+ *more-established* language server packages such
+    [[https://github.com/mopemope/meghanada-emacs][meghanada-mode]] or [[https://github.com/pythonic-emacs/anaconda-mode][anaconda-mode]].
 
-        (defun doom-modeline--anaconda-server ()
-          (when (bound-and-true-p anaconda-mode)
-            (doom-modeline--build-server-section+ #'+modeline-anaconda-status "Anaconda")))
+    Each of these functions return a plist containing a server status message, some
+    meta-information (eg. server-name or server-port) and a face that should be
+    attached to it.
 
-        (doom-modeline-def-segment meta-icons+
-          "Icons indicating various kinds of states related to the current buffer.
-      Think minor-mode list except not full text."
-          (let* ((face (if (doom-modeline--active)
-                           'doom-modeline-panel
-                         'mode-line-inactive))
-                 (icons (string-join
-                         (delq
-                          nil (list (cond ((bound-and-true-p lsp-mode)
-                                           doom-modeline--lsp)
-                                          ((bound-and-true-p eglot--managed-mode)
-                                           doom-modeline--eglot)
-                                          ((bound-and-true-p anaconda-mode)
-                                           (doom-modeline--anaconda-server)))
-                                    (and (buffer-narrowed-p)
-                                         (doom-modeline-icon 'nerd-mdi "json" "{}" "{}" :face face))))
-                         (doom-modeline-spc))))
-            (unless (string-empty-p icons)
-              (concat icons (doom-modeline-spc)))))
+    Much of these were partially adapted from: [[https://github.com/seagle0128/doom-modeline/blob/af5f61888e7eb0aa521d2d29b42221302b717915/doom-modeline-segments.el#L1871][doom-modeline]].
 
-        (defsubst doom-modeline--build-flychecker-section+ (stat-func)
-          (when-let* ((stat (funcall stat-func
-                                     'doom-modeline-info
-                                     'doom-modeline-debug
-                                     'doom-modeline-urgent
-                                     'doom-modeline-lsp-running))
-                      (body (+modeline-format-checker-status stat)))
-            (unless (string-empty-p body)
-              (concat
-               (propertize "<" 'face 'mode-line-emphasis)
-               body
-               (propertize ">" 'face 'mode-line-emphasis)))))
+**** lsp
+     #+BEGIN_SRC emacs-lisp
+       (defvar-local +mode-line-lsp-text nil)
+       (defun +mode-line--update-lsp ()
+         (setq +mode-line-lsp-text
+               (let* ((workspaces (lsp-workspaces)))
+                 (propertize (all-the-icons-pad+
+                              (all-the-icons-faicon "rocket"
+                                                    :face (if workspaces
+                                                              nil
+                                                            'compilation-mode-line-fail)))
+                             'help-echo
+                             (if workspaces
+                                 (concat "LSP Connected "
+                                         (string-join
+                                          (mapcar (lambda (w)
+                                                    (format "[%s]\n" (lsp--workspace-print w)))
+                                                  workspaces))
+                                         "C-mouse-1: Switch to another workspace folder
+       mouse-1: Describe current session
+       mouse-2: Quit server
+       mouse-3: Reconnect to server")
+                               "LSP Disconnected
+       mouse-1: Reload to start server")
+                             'mouse-face 'mode-line-highlight
+                             'local-map (let ((map (make-sparse-keymap)))
+                                          (if workspaces
+                                              (progn
+                                                (define-key map [mode-line C-mouse-1]
+                                                  #'lsp-workspace-folders-open)
+                                                (define-key map [mode-line mouse-1]
+                                                  #'lsp-describe-session)
+                                                (define-key map [mode-line mouse-2]
+                                                  #'lsp-workspace-shutdown)
+                                                (define-key map [mode-line mouse-3]
+                                                  #'lsp-workspace-restart))
+                                            (progn
+                                              (define-key map [mode-line mouse-1]
+                                                (lambda ()
+                                                  (interactive)
+                                                  (ignore-errors (revert-buffer t t))))))
+                                          map)))))
+       (add-hook 'lsp-before-initialize-hook #'+mode-line--update-lsp)
+       (add-hook 'lsp-after-initialize-hook #'+mode-line--update-lsp)
+       (add-hook 'lsp-after-uninitialized-functions #'+mode-line--update-lsp)
+       (add-hook 'lsp-before-open-hook #'+mode-line--update-lsp)
+       (add-hook 'lsp-after-open-hook #'+mode-line--update-lsp)
+     #+END_SRC
 
-        (advice-add #'doom-modeline-update-flycheck-icon :override
-                    (defun doom-modeline-update-flycheck-icon+ (&optional _)
-                      (setq doom-modeline--flycheck-icon
-                            (doom-modeline--build-flychecker-section+ #'+modeline-flycheck))))
-        (advice-add #'doom-modeline-update-flycheck-text :override #'ignore)
+**** eglot
+     #+BEGIN_SRC emacs-lisp
+       (defvar-local +mode-line-eglot-text nil)
+       (defun +mode-line--update-eglot ()
+         "Update `eglot' state."
+         (setq +mode-line-eglot-text
+               (pcase-let* ((server (eglot-current-server))
+                            (nick (and server (eglot--project-nickname server)))
+                            (pending (and server (hash-table-count
+                                                  (jsonrpc--request-continuations server))))
+                            (`(,_id ,doing ,done-p ,detail) (and server (eglot--spinner server)))
+                            (last-error (and server (jsonrpc-last-error server)))
+                            (face (cond (last-error 'compilation-mode-line-fail)
+                                        ((and doing (not done-p)) nil)
+                                        ((and pending (cl-plusp pending)) 'compilation-mode-line-run)
+                                        (nick nil)
+                                        (t 'compilation-mode-line-run))))
+                 (propertize (all-the-icons-pad+ (all-the-icons-faicon "rocket" :face face))
+                             'help-echo (cond
+                                         (last-error
+                                          (format "EGLOT\nAn error occured: %s
+             mouse-3: Clear this status" (plist-get last-error :message)))
+                                         ((and doing (not done-p))
+                                          (format "EGLOT\n%s%s" doing
+                                                  (if detail (format "%s" detail) "")))
+                                         ((and pending (cl-plusp pending))
+                                          (format "EGLOT\n%d outstanding requests" pending))
+                                         (nick (format "EGLOT Connected (%s/%s)
+             C-mouse-1: Go to server errors
+             mouse-1: Go to server events
+             mouse-2: Quit server
+             mouse-3: Reconnect to server" nick (eglot--major-mode server)))
+                                         (t "EGLOT Disconnected
+             mouse-1: Start server"))
+                             'mouse-face 'mode-line-highlight
+                             'local-map (let ((map (make-sparse-keymap)))
+                                          (cond (last-error
+                                                 (define-key map [mode-line mouse-3]
+                                                   #'eglot-clear-status))
+                                                ((and pending (cl-plusp pending))
+                                                 (define-key map [mode-line mouse-3]
+                                                   #'eglot-forget-pending-continuations))
+                                                (nick
+                                                 (define-key map [mode-line C-mouse-1]
+                                                   #'eglot-stderr-buffer)
+                                                 (define-key map [mode-line mouse-1]
+                                                   #'eglot-events-buffer)
+                                                 (define-key map [mode-line mouse-2]
+                                                   #'eglot-shutdown)
+                                                 (define-key map [mode-line mouse-3]
+                                                   #'eglot-reconnect))
+                                                (t (define-key map [mode-line mouse-1]
+                                                     #'eglot)))
+                                          map)))))
+       (add-hook 'eglot--managed-mode-hook #'+mode-line--update-eglot)
+     #+END_SRC
 
-        (advice-add #'doom-modeline-update-flymake-icon :override
-                    (defun doom-modeline-update-flymake-icon+ (&rest _)
-                      (setq doom-modeline--flymake-icon
-                            (doom-modeline--build-flychecker-section+ #'+modeline-flymake))))
-        (advice-add #'doom-modeline-update-flymake-text :override #'ignore)
+*** project
+    Discover the name of the current buffers project.
 
-        (doom-modeline-def-segment checker+
-          (when-let ((icon (cond ((and (bound-and-true-p flymake-mode)
-                                       (bound-and-true-p flymake--backend-state)) ; only support 26+
-                                  doom-modeline--flymake-icon)                    ;
-                                 ((bound-and-true-p flycheck-mode)
-                                  doom-modeline--flycheck-icon))))
-            (concat
-             (doom-modeline-spc)
-             icon)))
+    #+BEGIN_SRC emacs-lisp
+      (defun +mode-line-project ()
+        (cond
+         ((fboundp 'projectile-project-name)
+          (let ((project-name (projectile-project-name)))
+            (unless (or (string= project-name "-")
+                        (string= project-name (buffer-name)))
+              project-name)))
+         ((fboundp 'project-current)
+          (cdr (project-current)))))
+    #+END_SRC
 
-        (doom-modeline-def-segment space+
-          (doom-modeline-spc))
+*** segments
+    This section groups functions from the previous sections into standalone
+    functions so the mode-line is nicer to read.
 
-        (advice-add #'doom-modeline-segment--buffer-encoding :filter-return #'doom-modeline-truncate+)
-        (advice-add #'doom-modeline-segment--buffer-encoding :around #'doom-modeline-limited-width-hide+)
+    #+BEGIN_SRC emacs-lisp
+      (defun +mode-line-matches ()
+        (let ((meta (concat (+mode-line-evil-macro-and-register)
+                            (+mode-line-anzu)
+                            (+mode-line-evil-substitute))))
+          (or (and (not (string-empty-p meta)) meta)
+              (+mode-line-buffer-size))))
 
-        (doom-modeline-def-modeline 'mohkale
-          ;; Left hand side
-          '(bar                                                            ; Forces the mode-line to take up a given height (in GUI
-            evil-state-and-winum+
-            matches+                                                       ; Search results, macro state, multiple-cursors etc.
-            buffer-info+
-            remote-host
-            process
-            parrot
-            selection-info
-            vc-status+
-            checker+)
+      (defun +mode-line-buffer-icon ()
+        (when-let ((icon +mode-line--buffer-file-icon))
+          (concat (all-the-icons-pad+ +mode-line--buffer-file-icon) " ")))
 
-          ;; Right hand side
-          '(misc-info
-            minor-modes
-            meta-icons+
-            input-method
-            buffer-encoding
-            buffer-position
-            major-mode))
+      (defun +mode-line-misc-info ()
+        (let ((misc-info (s-trim (format-mode-line mode-line-misc-info 'file-name-shadow))))
+          (unless (string-empty-p misc-info)
+            (concat " " misc-info))))
+    #+END_SRC
 
-        (dolist (it '(doom-modeline-format--main
-                      doom-modeline-format--dashboard
-                      doom-modeline-format--project
-                      doom-modeline-format--message
-                      doom-modeline-format--org-src
-                      doom-modeline-format--special
-                      doom-modeline-format--pdf
-                      doom-modeline-format--vcs
-                      doom-modeline-format--info))
-          (when (symbol-function it)
-            (defalias it (symbol-function 'doom-modeline-format--mohkale))))
+*** format
+    My personal mode-line configuration (distinct from both doom and spacemacs).
+    This was mostly inspired by [[https://gitlab.com/jessieh/mood-line/-/tree/master][mood-line]], a fork of doom-modeline with a much
+    simpler design.
 
-        (define-minor-mode doom-modeline-mode
-          "Toggle doom-modeline on or off."
-          :group 'doom-modeline
-          :global t
-          :lighter nil
-          :keymap doom-modeline-mode-map
-          (if doom-modeline-mode
-              (progn
-                (doom-modeline-refresh-bars)        ; Create bars
-                (doom-modeline-set-main-modeline)   ; Set mode-line for current buffer
-                (doom-modeline-set-main-modeline t) ; Set default mode-line
+    First lets enable some useful minor modes to toggles some mode-line indicators.
 
-                (dolist (buf (buffer-list))
-                  (with-current-buffer buf
-                    (doom-modeline-set-main-modeline))))
-            ;; Restore mode-line
-            (setq         mode-line-format doom-modeline--default-format)
-            (setq-default mode-line-format doom-modeline--default-format)
+    #+BEGIN_SRC emacs-lisp
+      (add-hook 'emacs-startup-hook 'size-indication-mode)
+      (add-hook 'emacs-startup-hook 'column-number-mode)
+    #+END_SRC
 
-            (dolist (buf (buffer-list))
-              (with-current-buffer buf
-                (setq mode-line-format doom-modeline--default-format))))))
+    Here are the actual sections of my mode-line, divided into left and right sides.
+    NOTE: These will be evaluated twice so any % sequences must be escaped.
+
+    #+BEGIN_SRC emacs-lisp
+      (defvar mode-line-left+
+        '((:eval (+mode-line-winum))
+          (:eval (+mode-line-matches))
+          " [%*] "
+          (:eval (+mode-line-buffer-icon))
+          (:eval (+mode-line-buffer-name))
+          (mode-line-process
+           (:propertize (" " mode-line-process)
+            face +mode-line-buffer-minor-mode))
+          (:propertize (:eval (when default-directory
+                                (when-let ((host (file-remote-p default-directory 'host)))
+                                   (concat "@" host))))
+           face +mode-line-host-face)
+          (:eval (or +mode-line-flymake-text
+                     +mode-line-flycheck-text))
+          " ")
+        "The left hand side of my customized `mode-line'.")
+
+      (defvar mode-line-right+
+        '((:eval +mode-line-vc-text)
+          (:eval (let ((msg (concat (and (buffer-narrowed-p)
+                                         (featurep 'all-the-icons)
+                                         (all-the-icons-pad+ (all-the-icons-nerd-mdi "eye")))
+                                    +mode-line-eglot-text
+                                    +mode-line-lsp-text)))
+                   (unless (string-empty-p msg)
+                     (concat " " msg))))
+          (:propertize ("" minor-mode-alist)
+           face +mode-line-buffer-minor-mode
+           mouse-face mode-line-highlight
+           help-echo "Minor mode
+        mouse-1: Display minor mode menu
+        mouse-2: Show help for minor mode
+        mouse-3: Toggle minor modes"
+           local-map ,mode-line-minor-mode-keymap)
+          (:eval (+mode-line-misc-info))
+          (:eval (+mode-line-buffer-eol))
+          (:eval (+mode-line-buffer-encoding))
+          (line-number-mode
+           (column-number-mode " %l:%c" " %l")
+           (column-number-mode " :%c"))
+          (" " mode-line-percent-position)
+          " "
+          (:propertize mode-name
+           face +mode-line-major-mode)
+          ;; (:eval (mood-line-segment-process))
+          " ")
+        "The right hand side of my customized mood-line.")
+    #+END_SRC
+
+    This is the helper function which actually formats and renders the mode-line,
+    spacing the two sections equally.
+
+    #+BEGIN_SRC emacs-lisp
+      ;; Fix annoying space inconsistency in text terminals due to fringe.
+      (add-hook 'window-configuration-change-hook
+                (defun +mode-line-update-window-is-right-most ()
+                  (dolist (window (window-list))
+                    (set-window-parameter
+                     window 'right-most
+                     (not (window-in-direction 'right window))))))
+
+      (defun +mode-line-align (left right)
+        "Return a string of `window-width' length containing LEFT and RIGHT, aligned respectively."
+        (list left
+              (propertize " "
+                          'display `((space
+                                      :align-to
+                                      (- (+ right right-fringe right-margin)
+                                         ,(if (and (not (display-graphic-p))
+                                                   (window-parameter (selected-window) 'right-most))
+                                              0
+                                            1)
+                                         ;; WARN: Requires double evaluation of RHS forms for spacing.
+                                         ,(string-width (format-mode-line (cons "" right)))))))
+              right))
+    #+END_SRC
+
+    And now we finally assign the mode-line format.
+
+    #+BEGIN_SRC emacs-lisp
+      (setq-default
+       mode-line-format
+       `((:eval
+          (+mode-line-align mode-line-left+ mode-line-right+))))
+
+      (dolist (buf (buffer-list))
+        (with-current-buffer buf
+          (setq mode-line-format (default-value 'mode-line-format))))
     #+END_SRC
 
 ** occur
@@ -16142,6 +16009,9 @@
 
        :config
        (require 'yasnippet)                                                          ; needed or else snippet expansion won't happen.
+
+       ;; Remove eglot from `mode-line-misc-info'.
+       (setf (alist-get 'eglot--managed-mode mode-line-misc-info nil t) nil)
 
        (defun eglot-eldoc-toggle-order+ ()
          "Toggle the precedence of flymake notifications in eldoc."
@@ -21372,13 +21242,6 @@
        :group 'spaceline)
    #+END_SRC
 
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! doom-modeline)
-     (defface doom-modeline-minibuffer-face
-       `((t (:inherit doom-modeline-evil-emacs-state)))
-       "highlight face for doom-modeline when minibuffer is active"
-       :group 'doom-modeline)
-   #+END_SRC
-
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy)
      (defface ivy-actual-highlight-face '((t (:inherit highlight)))
        "Face actually used by ivy to highlight some candidates.
@@ -21640,6 +21503,21 @@
                              (:weight light :foreground "grey80" :background "grey30"
                               :box (:line-width 1 :color "grey40" :style none)))))
 
+      `(+mode-line-linter-info ((,cls (:foreground ,green-dim))))
+      `(+mode-line-linter-warning ((,cls (:foreground ,blue-dim))))
+      `(+mode-line-linter-error ((,cls (:foreground ,red-dim))))
+
+      `(+mode-line-evil-normal-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background "DarkGoldenrod2"))))
+      `(+mode-line-evil-emacs-state   ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,blue))))
+      `(+mode-line-evil-insert-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,green-int-256))))
+      `(+mode-line-evil-motion-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,purple-int))))
+      `(+mode-line-evil-visual-state  ((,cls (:inherit mode-line :foreground ,very-light-grey :background ,dark-grey))))
+      `(+mode-line-evil-operator-state ((,cls (:weight normal :inherit (error spaceline-evil-motion)))))
+      `(+mode-line-evil-replace-state ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,turquoise-int))))
+      `(+mode-line-buffer-minor-mode ((,cls (:foreground ,purple))))
+
+      `(+mode-line-host-face ((,cls (:inherit +mode-line-host-face))))
+
       `(compilation-mode-line-fail ((,cls (:inherit bold :foreground ,red-dim))))
       `(compilation-mode-line-run  ((,cls (:inherit bold :foreground ,orange-dim))))
       `(compilation-mode-line-exit  ((,cls (:inherit bold :foreground ,green-dim))))
@@ -21668,13 +21546,13 @@
       `(spaceline-flycheck-info    ((,cls (:inherit compilation-mode-line-exit))))
 
      ;;; doom-modeline
-      `(doom-modeline-evil-normal-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background "DarkGoldenrod2"))))
-      `(doom-modeline-evil-insert-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,green-int-256))))
-      `(doom-modeline-evil-emacs-state   ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,blue))))
-      `(doom-modeline-evil-replace-state ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,turquoise-int))))
-      `(doom-modeline-evil-visual-state  ((,cls (:inherit mode-line :foreground ,very-light-grey :background ,dark-grey))))
-      `(doom-modeline-evil-motion-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,purple-int))))
-      `(doom-modeline-evil-operator-state ((,cls (:weight normal :inherit (error spaceline-evil-motion)))))
+      `(doom-modeline-evil-normal-state ((,cls (:inherit +mode-line-evil-normal-state))))
+      `(doom-modeline-evil-emacs-state ((,cls (:inherit +mode-line-evil-emacs-state))))
+      `(doom-modeline-evil-insert-state ((,cls (:inherit +mode-line-evil-insert-state))))
+      `(doom-modeline-evil-motion-state ((,cls (:inherit +mode-line-evil-motion-state))))
+      `(doom-modeline-evil-visual-state ((,cls (:inherit +mode-line-evil-visual-state))))
+      `(doom-modeline-evil-operator-state ((,cls (:inherit +mode-line-evil-operator-state))))
+      `(doom-modeline-evil-replace-state ((,cls (:inherit +mode-line-evil-replace-state))))
 
       `(doom-modeline-buffer-modified ((,cls (:inherit doom-modeline-buffer-file))))
       `(doom-modeline-lsp-error ((,cls (:inherit compilation-mode-line-fail))))
@@ -21686,7 +21564,7 @@
       `(doom-modeline-debug ((,cls (:inherit compilation-mode-line-run))))
       `(doom-modeline-info ((,cls (:inherit compilation-mode-line-exit))))
 
-      `(doom-modeline-buffer-minor-mode ((,cls (:foreground ,purple))))
+      `(doom-modeline-buffer-minor-mode ((,cls (:inherit +mode-line-buffer-minor-mode))))
       `(doom-modeline-panel ((,cls (:foreground ,very-dark-grey))))
 
      ;;; magit/forge
