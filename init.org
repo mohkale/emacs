@@ -1609,19 +1609,34 @@
     By default I'd rather switch focus so lets enable it.
 
     #+BEGIN_SRC emacs-lisp
-      ;; changing at startup messes up the display of the dashboard :(
-      (defconst default-display-buffer-action
-        display-buffer-fallback-action
-        "the value for fallback actions without my configuration")
+      (defmacro with-display-buffer-no-select-window (&rest body)
+        "Within the scope of `body' update `display-buffer-fallback-action' to not
+      select the displayed window by default."
+        (declare (indent defun))
+        `(let ((display-buffer-fallback-action
+                (append (list (car display-buffer-fallback-action))
+                        (list '(body-function . nil))
+                        (cdr display-buffer-fallback-action))))
+           ,@body))
 
-      (defun restore-default-display-buffer-actions (func &rest args)
+      (defun display-buffer-no-select-window-advice (func &rest args)
         "restore the default display buffer actions used by emacs."
-        (let ((display-buffer-fallback-action
-               default-display-buffer-action))
+        (with-display-buffer-no-select-window
           (apply func args)))
 
-      (setq default-display-buffer-base-actions
-            '((body-function . select-window)))
+      ;; Make the default body-function for `display-buffer' select the
+      ;; displayed window. You can override this in `display-buffer-alist'
+      ;; by setting (body-function . nil) in the actions configuration.
+      ;;
+      ;; WARN This is a finnicky solution. If you ever decide to use a
+      ;; different body-function or if you only want to select the window
+      ;; with a specific handler instead of the global one then you'll
+      ;; probably have to defer to one of the display+select actions defined
+      ;; above.
+      (setq display-buffer-fallback-action
+            ;; by default, focus on displayed windows
+            `(,@display-buffer-fallback-action
+              (body-function . select-window)))
     #+END_SRC
 
     Firstly lets disable automatic selection for any buffers matching the following
@@ -1638,8 +1653,9 @@
                     "*HTTP Response*"
                     "*Compile-Log*"
                     (and "*eglot-help for " (+ any) "*")))
-              ,@display-buffer-fallback-action
-              (body-function . nil))
+              ,(car display-buffer-fallback-action)
+              (body-function . nil)
+              ,@(cdr display-buffer-fallback-action))
             display-buffer-alist)
     #+END_SRC
 
@@ -1658,12 +1674,13 @@
                display-buffer-in-side-window-and-focus)
               (side . bottom)
               (window-height . 0.5)
-              (reusable-frames . t))
+              (reusable-frames . t)
+              (body-function . nil))
             display-buffer-alist)
     #+END_SRC
 
     Some commands like ~next-error~ rely on the compilation-buffer being open and
-    visilbe so they try to display them, but don't account for the buffer being
+    visible so they try to display them, but don't account for the buffer being
     open in a separate window.
 
     #+BEGIN_SRC emacs-lisp
@@ -1672,10 +1689,10 @@
       ;; `next-error' and `previous-error'.
       (push `(,(defun next-error-hide-compilation-buffer+ (_buffer _action)
                  "Make `next-error' work when the compilation buffer is hidden
-            or open in separate frame.
-            By default `next-error' and it's derivatives pop open a compilation
-            buffer or have this annoying bug where they keep showing the same
-            buffer in new windows if the compilation-buffer isn't visible."
+      or open in separate frame.
+      By default `next-error' and it's derivatives pop open a compilation
+      buffer or have this annoying bug where they keep showing the same
+      buffer in new windows if the compilation-buffer isn't visible."
                  (member this-command '(next-error
                                         previous-error
                                         first-error
@@ -1686,7 +1703,8 @@
               ;; Allow reuse-window to check other [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Buffer-Display-Action-Functions.html][frames]] and don't
               ;; switch frames by default.
               (reusable-frames . t)
-              (inhibit-switch-frame . t))
+              (inhibit-switch-frame . t)
+              (body-function . nil))
             display-buffer-alist)
     #+END_SRC
 
@@ -2381,7 +2399,8 @@
 
      (defvar whitespace-exempt-buffers
        (list (rx "*Ibuffer confirmation*")
-             (rx "*Org Export Dispatcher*"))
+             (rx "*Org Export Dispatcher*")
+             (rx "*eldoc*"))
        "regular expressions matching buffer names under which no trailing
      whitespace is shown.")
    #+END_SRC
@@ -5864,8 +5883,8 @@
 
        :config
        ;; don't let display steal focus
-       (advice-add 'company-show-location   :around 'restore-default-display-buffer-actions)
-       (advice-add 'company-show-doc-buffer :around 'restore-default-display-buffer-actions)
+       (advice-add 'company-show-location   :around 'display-buffer-no-select-window-advice)
+       (advice-add 'company-show-doc-buffer :around 'display-buffer-no-select-window-advice)
 
        (global-company-mode +1)
 
@@ -9632,8 +9651,8 @@
                          "*compilation*")))))
             (if (not buffer)
                 (user-error "Compilation buffer doesn't exist")
-              (display-buffer buffer '((reusable-frames . nil)
-                                       (body-function . select-window))))))
+              (when-let ((window (display-buffer buffer '((reusable-frames . nil)))))
+                (select-window window)))))
 
         (defun +set-compilation-bindings (mode map)
           (leader/set-keys-for-major-mode mode
@@ -10677,10 +10696,7 @@
        :config
        (defun eldoc-doc-buffer-no-select+ ()
          (interactive)
-         (let ((display-buffer-alist
-                `((,(rx "*eldoc*")
-                   ,@default-display-buffer-action)
-                  ,@display-buffer-alist)))
+         (with-display-buffer-no-select-window
            (eldoc-doc-buffer)))
 
        :leader
@@ -10750,8 +10766,8 @@
                    (when (bound-and-true-p flycheck-mode)
                      (flycheck-mode -1))))
 
-       (advice-add #'flymake--handle-report :around #'restore-default-display-buffer-actions)
-       (advice-add #'flymake-show-diagnostic :around #'restore-default-display-buffer-actions)
+       (advice-add #'flymake--handle-report :around #'display-buffer-no-select-window-advice)
+       (advice-add #'flymake-show-diagnostic :around #'display-buffer-no-select-window-advice)
 
        (defun flymake-first-error+ ()
          (interactive)
@@ -12278,7 +12294,7 @@
        :config
        ;; occur-mode-display-occurrence
        (advice-add 'occur-mode-display-occurrence :around
-                   #'restore-default-display-buffer-actions)
+                   #'display-buffer-no-select-window-advice)
 
        (defun evil-adjust-occur-next ()
          (interactive)
@@ -12575,7 +12591,7 @@
        :config
        (dolist (func '(perform-replace
                        query-replace))
-         (advice-add func :around #'restore-default-display-buffer-actions))
+         (advice-add func :around #'display-buffer-no-select-window-advice))
 
        :leader
        ("bf" 'flush-lines
@@ -13671,9 +13687,9 @@
 
         (push 'embark-collect-mode whitespace-exempt-modes)
 
-        (advice-add 'embark-export           :around #'restore-default-display-buffer-actions)
-        (advice-add 'embark-collect-live     :around #'restore-default-display-buffer-actions)
-        (advice-add 'embark-collect-snapshot :around #'restore-default-display-buffer-actions)
+        (advice-add 'embark-export           :around #'display-buffer-no-select-window-advice)
+        (advice-add 'embark-collect-live     :around #'display-buffer-no-select-window-advice)
+        (advice-add 'embark-collect-snapshot :around #'display-buffer-no-select-window-advice)
 
         (defun embark-find-mkdir+ (dir)
           "Mkdirectory and then find it."
@@ -15949,7 +15965,7 @@
        (setq deft-directory (org! "notes"))
        (push 'deft-mode whitespace-exempt-modes)
 
-       (advice-add 'deft-open-file :around 'restore-default-display-buffer-actions)
+       (advice-add 'deft-open-file :around 'display-buffer-no-select-window-advice)
 
        (defun deft-find-file-other-window+ ()
          "preview file at point in another window and then select it."
@@ -20493,7 +20509,7 @@
                            ((package! lsp-mode) 'lsp-mode)))
        :config
        (setq rustic-lsp-server (if (executable-find "rust-analyzer") 'rust-analyzer 'rls))
-       (advice-add 'rustic-popup :around #'restore-default-display-buffer-actions)
+       (advice-add 'rustic-popup :around #'display-buffer-no-select-window-advice)
 
        (push 'rustic-popup-mode whitespace-exempt-modes)
        (evil-set-initial-state 'rustic-popup-mode 'emacs)
