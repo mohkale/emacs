@@ -15825,9 +15825,12 @@
           (setq dashboard-startup-banner
                 (if (and (not arg) (display-graphic-p))
                     'official                                                         ; prefer official cover.
+                  ;; You can create more banners using [[https://lachlanarthur.github.io/Braille-ASCII-Art/][this]] site.
                   (seq-random-elt
-                   (or (file-expand-wildcards
-                        (concat +dashboard-banners-directory "*.txt"))
+                   (or (cl-remove dashboard-startup-banner
+                                  (file-expand-wildcards
+                                   (concat +dashboard-banners-directory "*.txt"))
+                                  :test #'string-equal)
                        '(1 2 3))))))
 
         ;; For some reason, the font-lock rules for the dashboard don't seem to
