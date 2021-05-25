@@ -14040,31 +14040,90 @@
        (defvar consult-bibtex-default-action+ 'consult-bibtex-insert-pdftools-link
          "The default action for the `consult-bibtex+` command.")
 
-       (defun consult-bibtex-read-entry+ (&optional arg local-bib)
+       (defvar consult-bibtex-pdf-narrow-key+ ?p
+         "Narrowing key used to narrow onto documents with PDFs.")
+
+       (defvar consult-bibtex-note-narrow-key+ ?n
+         "Narrowing key used to narrow onto documents with notes.")
+
+       (defvar consult-bibtex-narrow+
+         '((?b . "Book")
+           (?u . "Unpublished")
+           (?l . "Booklet")
+           (?a . "Article")
+           (?m . "Misc")
+           (?p . "Proceedings")
+           (?P . "Inproceedings")
+           (?B . "Inbook"))
+         "Narrowing configuration for `consult-bibtex+'.")
+
+       (defun consult-bibtex-candidates+ (&optional cands)
+         (or cands
+             (setq cands (bibtex-completion-candidates)))
+         (cl-loop
+          for cand in cands
+          with cand-str = nil
+          do (setq cand-str
+                   (concat (bibtex-completion-get-value "=type=" cand) " "
+                           (bibtex-completion-format-entry (cdr cand) (1- (frame-width)))))
+          ;; Add a `consult--type' property for narrowing support.
+          do (add-text-properties 0 1
+                                  `(consult--type
+                                    ,(or
+                                      (when-let ((type (bibtex-completion-get-value "=type=" cand)))
+                                        (car (rassoc (capitalize type) consult-bibtex-narrow+)))
+                                      (car (rassoc "Other" consult-bibtex-narrow+)))
+                                    ;; Symbols are more performant than strings for most situations.
+                                    bib-type ,(intern (capitalize (bibtex-completion-get-value "=type=" cand)))
+                                    consult--candidate ,(bibtex-completion-get-value "=key=" cand)
+                                    has-pdf ,(not (not (bibtex-completion-get-value "=has-pdf=" cand)))
+                                    has-note ,(not (not (bibtex-completion-get-value "=has-note=" cand))))
+                                  ;; The trailing type text is there for matching, it'll be removed by consult.
+                                  cand-str)
+          collect cand-str))
+
+       (defun consult-bibtex-read-entry+ (&optional arg cands)
          (when arg
            (bibtex-completion-clear-cache))
          (bibtex-completion-init)
-         (let* ((candidates (cl-loop
-                             for cand in (bibtex-completion-candidates)
-                             collect (cons
-                                      (bibtex-completion-format-entry (cdr cand) (1- (frame-width)))
-                                      (bibtex-completion-get-value "=key=" cand))))
+         (let* ((candidates (or cands
+                                (consult-bibtex-candidates+)))
                 (preselect
                  (when-let ((key (bibtex-completion-key-at-point)))
-                   (cl-find-if (lambda (cand)
-                                 (string-equal key (cdr cand)))
-                               candidates))))
-           (alist-get
-            (consult--read candidates
-                           :prompt (format "BibTeX entries%s: " (if local-bib " (local)" ""))
-                           :category 'bibtex-completion
-                           :default preselect
-                           :history '(:input consult-bibtex-history+))
-            candidates nil nil #'string-equal)))
+                   (cl-find-if (apply-partially #'string-equal key) candidates))))
+           (consult--read candidates
+                          :prompt "BibTeX entries: "
+                          :require-match t
+                          :category 'bibtex-completion
+                          :lookup 'consult--lookup-candidate
+                          :default preselect
+                          :title
+                          ;; (consult--type-title consult-bibtex-narrow+)
+                          (lambda (cand transform)
+                            (if transform
+                                (substring cand (1+ (length (symbol-name (get-text-property 0 'bib-type cand)))))
+                              (symbol-name (get-text-property 0 'bib-type cand))))
+                          :narrow
+                          ;; Allow narrowing on PDFs and notes, alongside just `consult--type'.
+                          (let ((type-narrow (car (consult--type-narrow consult-bibtex-narrow+))))
+                            (cons (lambda (cand)
+                                    (when consult--narrow
+                                      (cond
+                                       ((eq consult--narrow consult-bibtex-pdf-narrow-key+)
+                                        (get-text-property 0 'has-pdf cand))
+                                       ((eq consult--narrow consult-bibtex-note-narrow-key+)
+                                        (get-text-property 0 'has-note cand))
+                                       (t (funcall type-narrow cand)))))
+                                  `(,@(and consult-bibtex-pdf-narrow-key+
+                                           `((,consult-bibtex-pdf-narrow-key+ . "With PDFs")))
+                                    ,@(and consult-bibtex-note-narrow-key+
+                                           `((,consult-bibtex-note-narrow-key+ . "With Notes")))
+                                    ,@consult-bibtex-narrow+)))
+                          :history '(:input consult-bibtex-history+))))
 
-       (defun consult-bibtex+ (&optional arg local-bib)
+       (defun consult-bibtex+ (&optional arg)
          (interactive "P")
-         (when-let ((entry (consult-bibtex-read-entry+ arg local-bib)))
+         (when-let ((entry (consult-bibtex-read-entry+ arg)))
            (if consult-bibtex-default-action+
                (funcall-interactively consult-bibtex-default-action+ entry)
              (warn "`consult-bibtex-default-action+' is unassigned."))))
