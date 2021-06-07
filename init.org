@@ -167,6 +167,7 @@
          flycheck                                                          ; A better buffer linter and error-checker package
          ;; frog-jump-buffer                                               ; Posframe to jump to a buffer
          ;; hide-comnt                                                     ; Minor mode to disable rendering of comments
+         ;; notmuch                                                        ; Mail client and manager
          imenu                                                             ; Interactively jump to points of interest in this buffer
          ;; olivetti                                                       ; A nice writing environment for emacs
          ;; pdf-tools                                                      ; Use emacs as quick and dirty pdf viewer
@@ -9973,6 +9974,81 @@
         (leader/set-keys-for-major-mode 'edmacro-mode
           "," 'edmacro-finish-edit
           "i" 'edmacro-insert-key))
+    #+END_SRC
+
+** message
+   #+BEGIN_SRC emacs-lisp
+     (use-package message
+       :custom
+       (message-auto-save-directory (var! "messages/"))
+
+       :leader
+       ("ac" 'message-mail)
+
+       :lazy-leader
+       (:mode 'message-mode
+        leader-major-mode-key 'message-send-and-exit
+        "q" 'message-kill-buffer
+        "r" 'message-dont-send
+        "s" 'message-send)
+       (:mode 'notmuch-message-mode
+        leader-major-mode-key 'notmuch-mua-send-and-exit
+        "q" 'notmuch-mua-kill-buffer
+        "s" 'notmuch-mua-send)
+       (:mode '(message-mode notmuch-message-mode)
+        "a" 'mml-attach-file
+        "p" 'message-yank-original
+        "P" 'message-fill-yanked-message
+
+        "g" "goto"
+        "gb" 'message-goto-body
+        "gs" 'message-goto-subject
+        "gt" 'message-goto-to
+        "gc" 'message-goto-cc
+        "gb" 'message-goto-bcc
+        "gr" 'message-goto-reply-to
+        "gf" 'message-goto-followup-to
+        "gF" 'message-goto-fcc
+        "gz" 'message-goto-signature))
+   #+END_SRC
+
+*** smtpmail
+    Is what we use to send messages through an appropriate SMTP server.
+
+    The builtin implementation is decent but it doesn't support multiple accounts so
+    I haven't configured any default smtp servers here.
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package smtpmail
+        :custom
+        (smtpmail-queue-dir (var! "mail/queued")))
+    #+END_SRC
+
+    ~smtpmail-multi~ is an alternative to smtpmail which does support multiple
+    accounts. It doesn't re-implement the same general logic of the ~smtpmail~
+    package instead it just switches the default variables used based on which
+    account the mail is being sent through.
+
+    #+BEGIN_SRC emacs-lisp
+      (use-package smtpmail-multi
+        :straight t
+        :custom
+        (smtpmail-multi-default-account 'kisara)
+        (send-mail-function 'smtpmail-multi-send-it)
+        (message-send-mail-function 'smtpmail-multi-send-it)
+        (smtpmail-multi-associations
+         `((,(rx "mohkale@kisara.moe") kisara)
+           (,(rx "mohkalsin@gmail.com") mohkalsin)
+           (,(rx "mohkalex@gmail.com") mohkalex)))
+
+        :init
+        (setq smtpmail-multi-accounts
+              `((kisara . ("mohkale" "kisara.moe" 587 header starttls nil nil nil))
+                (mohkalsin . ("mohkalsin" "smtp.gmail.com" 587 header starttls nil nil nil))
+                (mohkalex . ("mohkalex" "smtp.gmail.com" 587 header starttls nil nil nil))))
+
+        (with-eval-after-load 'smtpmail
+          (require 'smtpmail-multi)))
     #+END_SRC
 
 ** mode-line
