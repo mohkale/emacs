@@ -228,6 +228,7 @@
          ;; ggtags                                                         ; GNU Global source code tagging system
          ;; ycmd                                                           ; A language-server for most languages. written in python.
          ;; anaconda                                                       ; A no-longer mainatained, but still powerful language-server for python
+         ;; tree-sitter                                                    ; Incremental parsing of your source code asynchronously.
 
      ;;; Languages
          bibtex
@@ -1623,6 +1624,7 @@
                     "*org-roam*"
                     "*HTTP Response*"
                     "*Compile-Log*"
+                    (and bol "tree-sitter: ")
                     (and "*eglot-help for " (+ any) "*")))
               ,(car display-buffer-fallback-action)
               (body-function . nil)
@@ -16880,6 +16882,32 @@
        ;;         )
        ;;     )
        )
+   #+END_SRC
+
+** tree-sitter
+   TODO: Finish [[https://ubolonton.github.io/emacs-tree-sitter/syntax-highlighting/customization/][guide]].
+
+   #+BEGIN_SRC emacs-lisp :tangle (package-yes! tree-sitter)
+     (use-package tree-sitter
+       :delight (tree-sitter-mode " T")
+       :straight t
+       :hook ((emacs-startup . global-tree-sitter-mode)
+              (tree-sitter-mode . tree-sitter-hl-mode)))
+   #+END_SRC
+
+   Tree sitter itself provides the backbone for tree-sitter parsing but it doesn't
+   setup or associate languages to parsers because eventually it's expected for
+   language modes to set this up themselves.
+   For now the *tree-sitter-langs* package provides language associations.
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package tree-sitter-langs
+       :straight t
+       :after tree-sitter
+       :demand t
+       :config
+       (push '(typescript-react-mode . typescript) tree-sitter-major-mode-language-alist)
+       (push '(web-mode . html) tree-sitter-major-mode-language-alist))
    #+END_SRC
 
 ** rainbow-mode
