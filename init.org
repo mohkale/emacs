@@ -21275,33 +21275,21 @@
 
   #+BEGIN_SRC emacs-lisp
     (add-to-list 'custom-theme-load-path (etc! "themes"))
-
-    (add-hook 'emacs-startup-hook
-              (lambda (&rest _)
-                (load-theme 'an-old-hope t)))
+    (load-theme 'an-old-hope t)
   #+END_SRC
 
-** Faces
    Define some extra faces for use in a few different places.
 
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! spaceline)
-     (defface spaceline-minibuffer
-       `((t (:inherit spaceline-evil-emacs)))
-       "Highlight face for spaceline when minibuffer is active"
-       :group 'spaceline)
+   Custom face declarations like these should be put into ~early-init.el~ so they can
+   be used in any packages in my config without needing to wait for all of ~init.el~ to
+   be loaded.
 
-     (defface spaceline-evil-operator
-       `((t (:inherit spaceline-evil-motion)))
-       "Evil operator state face"
-       :group 'spaceline)
-
-     (defface spaceline-evil-multiedit
-       `((t (:weight normal :inherit (highlight spaceline-evil-motion))))
-       "Face for evil multiedit face"
-       :group 'spaceline)
+   #+BEGIN_SRC emacs-lisp :tangle early-init.el
+     (defface tab-bar-separator '((t (:inherit font-lock-string-face))) "")
+     (defface tab-bar-inactive-separator '((t (:inherit shadow))) "")
    #+END_SRC
 
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy)
+   #+BEGIN_SRC emacs-lisp :tangle (package-str! "early-init.el" ivy)
      (defface ivy-actual-highlight-face '((t (:inherit highlight)))
        "Face actually used by ivy to highlight some candidates.
      See `an-old-hope-theme' for why this is necessary.")
@@ -21403,488 +21391,574 @@
                                 (color-values name)))))))
    #+END_SRC
 
-   #+HEADER: :var cls=(eval t) tru=(quote ((type graphic) (min-colors 16777216))) gui=(quote ((type graphic)))
-   #+HEADER: :var   very-light-grey=aoh-gen-color(hue=228, sat=7,   light=81)     very-light-grey-256="#d0d0d0"
-   #+HEADER: :var        light-grey=aoh-gen-color(hue=228, sat=7,   light=55)          light-grey-256="#8a8a8a"
-   #+HEADER: :var              grey=aoh-gen-color(hue=228, sat=7,   light=44)                grey-256="#6c6c6c"
-   #+HEADER: :var         dark-grey=aoh-gen-color(hue=228, sat=7,   light=29)           dark-grey-256="#5f5f87"
-   #+HEADER: :var    very-dark-grey=aoh-gen-color(hue=228, sat=7,   light=12)      very-dark-grey-256="#1c1c1c"
-   #+HEADER: :var               red=aoh-gen-color(hue=352, sat=81,  light=58)                 red-256="#d75f5f"
-   #+HEADER: :var           red-dim=aoh-gen-color(hue=352, sat=60,  light=58)             red-dim-256="#d75f5f"
-   #+HEADER: :var           red-int=aoh-gen-color(hue=360, sat=90,  light=58)             red-int-256="#ff5f5f"
-   #+HEADER: :var            orange=aoh-gen-color(hue=25,  sat=86,  light=55)              orange-256="#ff8700"
-   #+HEADER: :var        orange-dim=aoh-gen-color(hue=25,  sat=60,  light=60)          orange-dim-256="#d7875f"
-   #+HEADER: :var        orange-int=aoh-gen-color(hue=25,  sat=86,  light=65)          orange-int-256="#ff875f"
-   #+HEADER: :var            yellow=aoh-gen-color(hue=50,  sat=74,  light=61)              yellow-256="#d7d75f"
-   #+HEADER: :var        yellow-dim=aoh-gen-color(hue=50,  sat=74,  light=31)          yellow-dim-256="#878700"
-   #+HEADER: :var        yellow-int=aoh-gen-color(hue=50,  sat=100, light=61)          yellow-int-256="#ffd75f"
-   #+HEADER: :var             green=aoh-gen-color(hue=107, sat=40,  light=57)               green-256="#87af5f"
-   #+HEADER: :var         green-int=aoh-gen-color(hue=120, sat=50,  light=57)           green-int-256="#5fd75f"
-   #+HEADER: :var         green-dim=aoh-gen-color(hue=107, sat=30,  light=50)           green-dim-256="#87af5f"
-   #+HEADER: :var              blue=aoh-gen-color(hue=196, sat=64,  light=58)                blue-256="#5fafd7"
-   #+HEADER: :var          blue-dim=aoh-gen-color(hue=200, sat=44,  light=58)            blue-dim-256="#5fafaf"
-   #+HEADER: :var          blue-int=aoh-gen-color(hue=220, sat=84,  light=64)            blue-int-256="#5f87ff"
-   #+HEADER: :var            purple=aoh-gen-color(hue=313, sat=32,  light=60)              purple-256="#af87af"
-   #+HEADER: :var        purple-dim=aoh-gen-color(hue=313, sat=32,  light=70)          purple-dim-256="#d787af"
-   #+HEADER: :var        purple-int=aoh-gen-color(hue=313, sat=40,  light=60)          purple-int-256="#af5faf"
-   #+HEADER: :var         turquoise=aoh-gen-color(hue=165, sat=70,  light=65)           turquoise-256="#5fd7d7"
-   #+HEADER: :var     turquoise-dim=aoh-gen-color(hue=165, sat=60,  light=85)       turquoise-dim-256="#afffd7"
-   #+HEADER: :var     turquoise-int=aoh-gen-color(hue=165, sat=80,  light=50)       turquoise-int-256="#00d7af"
-   #+HEADER: :var             black=aoh-gen-color(hue=240, sat=6,   light=14)               black-256="#262626"
-   #+HEADER: :var         black-dim=aoh-gen-color(hue=240, sat=10,  light=20)           black-dim-256="#00005f"
-   #+HEADER: :var         black-int=aoh-gen-color(hue=240, sat=6,   light=0)            black-int-256="#000000"
-   #+HEADER: :var             white=aoh-gen-color(hue=0,   sat=100, light=100)              white-256="#ffffff"
-   #+HEADER: :var line-highlight-bg=aoh-gen-color(hue=228, sat=7,   light=21)   line-highlight-bg-256="#303030"
-   #+HEADER: :var   extra-dark-grey=aoh-gen-color(hue=228, sat=7,   light=10)     extra-dark-grey-256="#00005f"
-   #+HEADER: :var             debug=aoh-gen-color(hue=198, sat=91,  light=13)               debug-256="#00005f"
-   #+HEADER: :var rainbow-delimeters-colors=(list "#E6B422" "#C70067" "#00A960" "#FC7482")
-   #+BEGIN_SRC emacs-lisp :results silent
-     (defface an-old-hope-very-light-grey `((,tru (:foreground ,very-light-grey)) (,cls (:foreground ,very-light-grey-256))) "")
-     (defface an-old-hope-light-grey      `((,tru (:foreground ,light-grey))      (,cls (:foreground ,light-grey-256)))      "")
-     (defface an-old-hope-grey            `((,tru (:foreground ,grey))            (,cls (:foreground ,grey-256)))            "")
-     (defface an-old-hope-dark-grey       `((,tru (:foreground ,dark-grey))       (,cls (:foreground ,dark-grey-256)))       "")
-     (defface an-old-hope-very-dark-grey  `((,tru (:foreground ,very-dark-grey))  (,cls (:foreground ,very-dark-grey-256)))  "")
-     (defface an-old-hope-red             `((,tru (:foreground ,red))             (,cls (:foreground ,red-256)))             "")
-     (defface an-old-hope-red-dim         `((,tru (:foreground ,red-dim))         (,cls (:foreground ,red-dim-256)))         "")
-     (defface an-old-hope-red-int         `((,tru (:foreground ,red-int))         (,cls (:foreground ,red-int-256)))         "")
-     (defface an-old-hope-orange          `((,tru (:foreground ,orange))          (,cls (:foreground ,orange-256)))          "")
-     (defface an-old-hope-orange-dim      `((,tru (:foreground ,orange-dim))      (,cls (:foreground ,orange-dim-256)))      "")
-     (defface an-old-hope-orange-int      `((,tru (:foreground ,orange-int))      (,cls (:foreground ,orange-int-256)))      "")
-     (defface an-old-hope-yellow          `((,tru (:foreground ,yellow))          (,cls (:foreground ,yellow-256)))          "")
-     (defface an-old-hope-yellow-dim      `((,tru (:foreground ,yellow-dim))      (,cls (:foreground ,yellow-dim-256)))      "")
-     (defface an-old-hope-yellow-int      `((,tru (:foreground ,yellow-int))      (,cls (:foreground ,yellow-int-256)))      "")
-     (defface an-old-hope-green           `((,tru (:foreground ,green))           (,cls (:foreground ,green-256)))           "")
-     (defface an-old-hope-green-int       `((,tru (:foreground ,green-int))       (,cls (:foreground ,green-int-256)))       "")
-     (defface an-old-hope-green-dim       `((,tru (:foreground ,green-dim))       (,cls (:foreground ,green-dim-256)))       "")
-     (defface an-old-hope-blue            `((,tru (:foreground ,blue))            (,cls (:foreground ,blue-256)))            "")
-     (defface an-old-hope-blue-dim        `((,tru (:foreground ,blue-dim))        (,cls (:foreground ,blue-dim-256)))        "")
-     (defface an-old-hope-blue-int        `((,tru (:foreground ,blue-int))        (,cls (:foreground ,blue-int-256)))        "")
-     (defface an-old-hope-purple          `((,tru (:foreground ,purple))          (,cls (:foreground ,purple-256)))          "")
-     (defface an-old-hope-purple-dim      `((,tru (:foreground ,purple-dim))      (,cls (:foreground ,purple-dim-256)))      "")
-     (defface an-old-hope-purple-int      `((,tru (:foreground ,purple-int))      (,cls (:foreground ,purple-int-256)))      "")
-     (defface an-old-hope-turquoise       `((,tru (:foreground ,turquoise))       (,cls (:foreground ,turquoise-256)))       "")
-     (defface an-old-hope-turquoise-dim   `((,tru (:foreground ,turquoise-dim))   (,cls (:foreground ,turquoise-dim-256)))   "")
-     (defface an-old-hope-turquoise-int   `((,tru (:foreground ,turquoise-int))   (,cls (:foreground ,turquoise-int-256)))   "")
-     (defface an-old-hope-black           `((,tru (:foreground ,black))           (,cls (:foreground ,black-256)))           "")
-     (defface an-old-hope-black-dim       `((,tru (:foreground ,black-dim))       (,cls (:foreground ,black-dim-256)))       "")
-     (defface an-old-hope-black-int       `((,tru (:foreground ,black-int))       (,cls (:foreground ,black-int-256)))       "")
-     (defface an-old-hope-white           `((,tru (:foreground ,white))           (,cls (:foreground ,white-256)))           "")
-
-     (custom-theme-set-faces 'an-old-hope
-     ;;; defaults
-      `(default
-         ((,tru (:foreground ,very-light-grey :background ,very-dark-grey))
-          ;; let the terminal inherit its background from the terminals default.
-          (,cls (:foreground ,very-light-grey-256))))
-
-      `(italic ((,cls (:italic t :inherit default))))
-      `(shadow ((,cls (:foreground ,light-grey))))
-      `(hl-line ((,cls (:background ,line-highlight-bg))))
-
-     ;;; font-lock - Syntax Highlighting Colors
-      `(font-lock-builtin-face ((,cls (:foreground ,blue))))
-      `(font-lock-comment-face ((,cls (:foreground ,grey))))
-      `(font-lock-keyword-face ((,cls (:foreground ,green-256))))
-      `(font-lock-constant-face ((,cls (:foreground ,red-256 :inherit bold))))
-      `(font-lock-function-name-face ((,cls (:foreground ,yellow-int-256))))
-      `(font-lock-negation-char-face ((,cls (:foreground ,red-256))))
-      `(font-lock-preprocessor-face ((,cls (:inherit font-lock-keyword-face))))
-      `(font-lock-string-face ((,cls (:foreground ,blue))))
-      `(font-lock-doc-face ((t (:foreground ,blue))))
-      `(font-lock-type-face ((,cls (:foreground ,red-256))))
-      `(font-lock-variable-name-face ((,cls (:foreground ,yellow-int-256))))
-      `(font-lock-warning-face ((,cls (:background ,yellow-int
-                                       :foreground ,very-dark-grey
-                                       :distant-foreground ,yellow-int
-                                       :underline nil :inherit bold))))
-
-      `(error   ((,cls (:background ,red        :distant-foreground ,red        :foreground ,very-dark-grey :inherit bold))))
-      `(success ((,cls (:background ,green-int  :distant-foreground ,green-int  :foreground ,very-dark-grey :inherit bold))))
-      `(warning ((,cls (:background ,yellow-int :distant-foreground ,yellow-int :foreground ,very-dark-grey :inherit bold))))
-
-      `(cursor ((,cls (:background ,blue))))
-      `(custom-button ((,cls (:background ,very-dark-grey
-                              :foreground ,very-light-grey
-                              :box (:line-width 2 :style released-button)))))
-
-      ;; Fringe has a different background on the GUI and the terminal, because the default bg
-      ;; on the terminal is taken from the terminal bg. We apply a variant color for the fringe
-      ;; on the terminal to make it distinctive.
-      `(fringe
-         ((,gui (:background ,black))
-          (,cls (:background ,very-dark-grey))))
-      `(header-line ((,cls (:background ,very-dark-grey :foreground ,blue))))
-      `(line-number ((,cls (:foreground ,very-light-grey :inherit fringe))))
-      `(line-number-current-line ((,cls (:foreground ,blue :inherit line-number))))
-      `(vertical-border ((,cls (:foreground ,grey))))
-      `(internal-border ((,cls (:foreground ,white :background ,white))))
-      `(minibuffer-prompt ((,cls (:foreground ,yellow-256 :weight bold))))
-      `(minibuffer-depth-indicator ((,cls (:foreground ,yellow-256 :weight bold))))
-      `(tooltip ((,cls (:background ,dark-grey :foreground ,very-light-grey))))
-
-      `(highlight ((,cls (:foreground ,very-dark-grey :background ,blue
-                          :distant-foreground ,blue :inherit bold))))
-
-      `(region ((,cls (:background ,dark-grey :weight bold))))
-      `(secondary-selection ((,cls (:inherit region))))
-
-      ;; face for current search match. exiting now takes you to it.
-      `(isearch ((,cls (:background ,blue-int :inherit bold))))
-      `(isearch-fail ((,cls (:inherit compilation-mode-line-fail))))
-      `(match ((,cls (:foreground ,green-int))))
-      ;; face for matches other than the current match
-      `(evil-ex-search ((,cls (:background ,purple :inherit bold))))
-      `(lazy-highlight ((,cls (:background ,blue-int :foreground ,black-dim))))
-
-      ;; delimeter colors just taken from https://github.com/gastrodia/rainbow-brackets
-      ;; colors 5-9 just recycle 1-4, maybe come up with more.
-      `(rainbow-delimiters-depth-1-face ((,cls (:foreground ,(nth 0 rainbow-delimeters-colors)))))
-      `(rainbow-delimiters-depth-2-face ((,cls (:foreground ,(nth 1 rainbow-delimeters-colors)))))
-      `(rainbow-delimiters-depth-3-face ((,cls (:foreground ,(nth 2 rainbow-delimeters-colors)))))
-      `(rainbow-delimiters-depth-4-face ((,cls (:foreground ,(nth 3 rainbow-delimeters-colors)))))
-      `(rainbow-delimiters-depth-5-face ((,cls (:foreground ,(nth 0 rainbow-delimeters-colors)))))
-      `(rainbow-delimiters-depth-6-face ((,cls (:foreground ,(nth 1 rainbow-delimeters-colors)))))
-      `(rainbow-delimiters-depth-7-face ((,cls (:foreground ,(nth 2 rainbow-delimeters-colors)))))
-      `(rainbow-delimiters-depth-8-face ((,cls (:foreground ,(nth 3 rainbow-delimeters-colors)))))
-      `(rainbow-delimiters-depth-9-face ((,cls (:foreground ,(nth 0 rainbow-delimeters-colors)))))
-
-      ;; hyperlinks and path links
-      `(link ((,cls (:foreground ,blue))))
-      `(link-visited ((,cls (:foreground ,turquoise :inherit link))))
-
-      `(hl-todo ((,cls (:foreground ,yellow-int :inherit bold))))
-
-     ;;; modeline
-      `(mode-line ((,cls
-                    (:background ,very-light-grey :foreground ,very-dark-grey
-                     :box (:line-width 1 :color ,very-light-grey :style none)))))
-      `(mode-line-inactive ((,cls
-                             (:weight light :foreground "grey80" :background "grey30"
-                              :box (:line-width 1 :color "grey40" :style none)))))
-
-      `(+mode-line-linter-info ((,cls (:foreground ,green-dim))))
-      `(+mode-line-linter-warning ((,cls (:foreground ,blue-dim))))
-      `(+mode-line-linter-error ((,cls (:foreground ,red-dim))))
-
-      `(+mode-line-evil-normal-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background "DarkGoldenrod2"))))
-      `(+mode-line-evil-emacs-state   ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,blue))))
-      `(+mode-line-evil-insert-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,green-int-256))))
-      `(+mode-line-evil-motion-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,purple-int))))
-      `(+mode-line-evil-visual-state  ((,cls (:inherit mode-line :foreground ,very-light-grey :background ,dark-grey))))
-      `(+mode-line-evil-operator-state ((,cls (:weight normal :inherit (error spaceline-evil-motion)))))
-      `(+mode-line-evil-replace-state ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,turquoise-int))))
-      `(+mode-line-buffer-minor-mode ((,cls (:foreground ,purple))))
-
-      `(+mode-line-host-face ((,cls (:inherit +mode-line-host-face))))
-
-      `(compilation-mode-line-fail ((,cls (:inherit bold :foreground ,red-dim))))
-      `(compilation-mode-line-run  ((,cls (:inherit bold :foreground ,orange-dim))))
-      `(compilation-mode-line-exit  ((,cls (:inherit bold :foreground ,green-dim))))
-
-      `(magit-mode-line-process-error ((,cls (:inherit compilation-mode-line-fail))))
-
-     ;;; powerline
-      `(powerline-active1 ((,gui (:background ,black :foreground ,very-light-grey :inherit mode-line))
-                           (,cls (:foreground ,very-light-grey :inherit default))))
-      `(powerline-active2 ((,cls (:inherit powerline-active1))))
-      `(powerline-inactive1 ((,cls (:box (:line-width 1 :color "grey40" :style none)
-                                    :inherit powerline-active1))))
-
-     ;;; spaceline
-      `(spaceline-evil-normal  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background "DarkGoldenrod2"))))
-      `(spaceline-evil-insert  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,green-int-256))))
-      `(spaceline-evil-emacs   ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,blue))))
-      `(spaceline-evil-replace ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,turquoise-int))))
-      `(spaceline-evil-visual  ((,cls (:inherit mode-line :foreground ,very-light-grey :background ,dark-grey))))
-      `(spaceline-evil-motion  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,purple-int))))
-      `(spaceline-minibuffer   ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,blue))))
-      `(spaceline-evil-operator ((,cls (:weight normal :inherit (error spaceline-evil-motion)))))
-
-      `(spaceline-flycheck-error   ((,cls (:inherit compilation-mode-line-fail))))
-      `(spaceline-flycheck-warning ((,cls (:inherit compilation-mode-line-run))))
-      `(spaceline-flycheck-info    ((,cls (:inherit compilation-mode-line-exit))))
-
-     ;;; doom-modeline
-      `(doom-modeline-evil-normal-state ((,cls (:inherit +mode-line-evil-normal-state))))
-      `(doom-modeline-evil-emacs-state ((,cls (:inherit +mode-line-evil-emacs-state))))
-      `(doom-modeline-evil-insert-state ((,cls (:inherit +mode-line-evil-insert-state))))
-      `(doom-modeline-evil-motion-state ((,cls (:inherit +mode-line-evil-motion-state))))
-      `(doom-modeline-evil-visual-state ((,cls (:inherit +mode-line-evil-visual-state))))
-      `(doom-modeline-evil-operator-state ((,cls (:inherit +mode-line-evil-operator-state))))
-      `(doom-modeline-evil-replace-state ((,cls (:inherit +mode-line-evil-replace-state))))
-
-      `(doom-modeline-buffer-modified ((,cls (:inherit doom-modeline-buffer-file))))
-      `(doom-modeline-lsp-error ((,cls (:inherit compilation-mode-line-fail))))
-      `(doom-modeline-lsp-warning ((,cls (:inherit compilation-mode-line-run))))
-      `(doom-modeline-lsp-success ((,cls ())))
-      `(doom-modeline-lsp-running ((,cls (:foreground ,blue-int :inherit compilation-mode-line-run))))
-
-      `(doom-modeline-urgent ((,cls (:inherit compilation-mode-line-fail))))
-      `(doom-modeline-debug ((,cls (:inherit compilation-mode-line-run))))
-      `(doom-modeline-info ((,cls (:inherit compilation-mode-line-exit))))
-
-      `(doom-modeline-buffer-minor-mode ((,cls (:inherit +mode-line-buffer-minor-mode))))
-      `(doom-modeline-panel ((,cls (:foreground ,very-dark-grey))))
-
-     ;;; magit/forge
-      `(forge-post-author ((,cls (:inherit magit-log-author))))
-
-     ;;; evil
-      `(vimish-fold-overlay ((,cls (:background ,dark-grey :foreground ,green))))
-
-     ;;; flycheck
-      `(flycheck-fringe-info    ((,cls (:foreground ,green-int  :inherit fringe))))
-      `(flycheck-fringe-warning ((,cls (:foreground ,yellow-int :inherit fringe))))
-      `(flycheck-fringe-error   ((,cls (:foreground ,red-int    :inherit fringe))))
-
-      `(flycheck-info      ((,cls (:underline (:style wave :color ,green)))))
-      `(flycheck-warning   ((,cls (:underline (:style wave :color ,yellow)))))
-      `(flycheck-duplicate ((,cls (:underline (:style wave :color ,orange)))))
-      `(flycheck-error     ((,gui (:underline (:style wave :color ,red)))
-                            (,cls (:background ,red-256 :inherit error))))
-
-     ;;; flymake
-      `(flymake-note    ((,cls (:underline (:style wave :color ,green)))))
-      `(flymake-warning ((,cls (:underline (:style wave :color ,yellow)))))
-      `(flymake-error   ((,gui (:underline (:style wave :color ,red)))
-                         (,cls (:background ,red-256 :inherit error))))
-
-     ;;; flyspell
-      `(flyspell-duplicate ((,cls (:foreground ,orange-dim :underline t))))
-      `(flyspell-incorrect ((,cls (:foreground ,red-dim :underline t))))
-
-     ;;; avy
-      `(avy-background-face ((,cls (:foreground ,grey))))
-
-      ;; Same as the corresponding evil faces but adjustedusing [[https://webaim.org/resources/contrastchecker/][contrast-checker]].
-      `(avy-lead-face   ((,cls (:background "#B00303" :foreground ,white))))
-      `(avy-lead-face-0 ((,cls (:background "#124FCA" :foreground ,white))))
-      `(avy-lead-face-1 ((,cls (:background ,very-light-grey :foreground ,very-dark-grey))))
-      `(avy-lead-face-2 ((,cls (:background "#883A77" :foreground ,white))))
-
-      ;; Not avy, but avy like enough
-      `(selectrum-quick-keys-highlight ((,cls (:background "#B00303" :foreground ,white))))
-      `(selectrum-quick-keys-match ((,cls (:background "#124FCA" :foreground ,white))))
-
-      `(frog-menu-border ((,cls (:background ,white :foreground ,white))))
-      `(frog-menu-posframe-background-face ((,cls (:background ,very-dark-grey))))
-
-     ;;; company - intellisense
-      `(company-tooltip-mouse ((,cls (:foreground ,turquoise-int))))
-      `(company-template-field ((,cls (:foreground ,turquoise-int))))
-
-      ;; scrollbar
-      `(company-scrollbar-bg ((,cls (:background ,line-highlight-bg :foreground ,very-light-grey))))
-      `(company-scrollbar-fg ((,cls (:background ,red               :foreground ,dark-grey))))
-
-      `(company-preview ((,cls (:foreground ,blue-int :weight bold :inherit hl-line))))
-      `(company-preview-common ((,cls (:inherit company-preview))))
-      `(company-preview-search ((,cls (:foreground ,orange-int :weight normal :inherit company-preview))))
-
-      ;; NOTE tooltip is the drop down menu which shows up when multiple results exist
-      `(company-tooltip ((,cls (:background ,black-dim :inherit tooltip))))
-      `(company-tooltip-common ((,cls (:foreground ,red-int :inherit (company-tooltip bold)))))
-      `(company-tooltip-search ((,cls (:foreground ,blue-int :inherit company-tooltip))))
-      `(company-tooltip-search-common ((,cls (:inherit company-tooltip-search))))
-
-      `(company-tooltip-selection ((,cls (:background ,dark-grey :inherit (company-tooltip bold)))))
-      `(company-tooltip-common-selection ((,cls (:background ,dark-grey :inherit company-tooltip-common))))
-      `(company-tooltip-search-selection ((,cls (:background ,dark-grey :inherit (company-tooltip-search)))))
-
-      `(company-icon+ ((,cls (:weight normal :inherit company-tooltip))))
-      `(company-current-icon+ ((,cls (:weight normal :inherit company-tooltip-selection))))
-
-      ;; NOTE annotations are extra information in the tooltip
-      `(company-tooltip-annotation ((,cls (:weight bold :foreground ,grey))))
-      `(company-tooltip-annotation-selection ((,cls (:inherit company-tooltip-annotation))))
-
-      `(popup ((,cls (:inherit popup-face))))
-
-     ;;;; custom mode variants
-     ;;; whitespace-mode
-      `(whitespace-space ((,cls (:foreground ,dark-grey))))
-      `(trailing-whitespace ((,cls (:background ,dark-grey))))
-
-     ;;; auto-highlight-symbol mode
-      ;; NOTE: distant foreground is meaningless here because the faces are always given priority.
-      `(ahs-definition-face ((,cls (:background ,blue-dim :distant-foreground ,blue-dim :foreground ,dark-grey))))
-      `(ahs-edit-mode-face ((,cls (:background ,red-dim :distant-foreground ,red-dim :foreground ,very-light-grey))))
-      `(ahs-face ((,cls (:background ,very-light-grey :foreground ,black :inherit bold))))
-      `(ahs-plugin-whole-buffer-face ((,cls (:background ,blue :distant-foreground ,green :foreground ,black))))
-      `(ahs-plugin-bod-face ((,cls (:background ,blue-int :distant-foreground ,blue-int :foreground ,black))))
-      `(ahs-plugin-defalt-face ((,cls (:background ,orange-dim :distant-foreground ,orange-dim :foreground ,black))))
-      `(ahs-warning-face ((,cls (:foreground ,red-dim))))
-
-     ;;; compilation mode
-      `(compilation-line-number ((,cls (:foreground ,yellow))))
-      `(compilation-column-number ((,cls (:inherit font-lock-doc-face))))
-
-      ;; NOTE also represents value count in mode line
-      `(compilation-error ((,cls (:foreground ,red :inherit bold))))
-      `(compilation-info ((,cls (:foreground ,green-int :inherit bold))))
-      `(compilation-warning ((,cls (:foreground ,orange-int :inherit bold))))
-
-     ;;; markdown-mode
-      `(markdown-code-face ((,cls (:inherit default))))
-
-     ;;; anzu
-      `(anzu-mode-line ((,cls (:foreground ,very-dark-grey :inherit bold))))
-      `(anzu-mode-line-no-match ((,cls (:foreground ,red-int :inherit bold))))
-
-     ;;; hydra-posframe
-      ;; for some reason... if hydra-posframe-face inherits default, internal border won't work
-      `(hydra-posframe-face ((,cls (:background ,very-dark-grey :foreground ,very-light-grey))))
-      `(hydra-posframe-border-face ((,cls (:inherit internal-border))))
-
-     ;;; selectrum
-      ;; TODO: Remove non-prescient variants
-      `(selectrum-current-candidate ((,cls (:foreground ,very-dark-grey :weight bold :inherit highlight))))
-      `(selectrum-primary-highlight ((,cls (:background "#555555"))))
-      `(selectrum-prescient-current-candidate ((,cls (:foreground ,very-dark-grey :weight bold :inherit highlight))))
-      `(selectrum-prescient-primary-highlight ((,cls (:background "#555555"))))
-      `(selectrum-secondary-highlight ((,cls (:background "#7777FF")))) ;; #8A498A
-
-     ;;; consult
-      `(consult-async-finished ((,cls (:inherit compilation-info))))
-      `(consult-async-running ((,cls (:inherit compilation-warning))))
-      `(consult-async-failed ((,cls (:inherit compilation-error))))
-      `(consult-narrow-indicator ((,cls (:foreground ,blue :weight bold))))
-      `(consult-preview-match ((,cls (:foreground ,blue-int :weight bold))))
-
-     ;;; orderless
-      ;; Match face were taken from ivys default match faces.
-      `(orderless-match-face-0 ((,cls (:background "#555555"))))
-      `(orderless-match-face-1 ((,cls (:background "#777777"))))
-      `(orderless-match-face-2 ((,cls (:background "#7777ff"))))
-      `(orderless-match-face-3 ((,cls (:background "#8a498a"))))
-
-     ;;; swiper
-      `(swiper-match-face-1 ((,cls (:background "#555555"))))
-      `(swiper-match-face-2 ((,cls (:background "#777777"))))
-      `(swiper-match-face-3 ((,cls (:background "#7777ff"))))
-      `(swiper-match-face-4 ((,cls (:background "#8a498a"))))
-
-     ;;; ivy
-      ;; by default, it seems if ivy-highlight-face has its own spec, it'll interfere
-      ;; with the face of ivy-current-match. Which'll make it harder to tell which
-      ;; candidate is the current candidate.
-      ;;
-      ;; If ivy-highlight-face just inherits another face, then when both it and
-      ;; ivy-current-match are applied to a string, ivy-current-match will override
-      ;; ivy-highlight-face. Thus, this.
-      `(ivy-actual-highlight-face ((,cls (:foreground ,very-dark-grey :background ,turquoise
-                                          :distant-foreground ,turquoise :inherit bold))))
-      `(ivy-highlight-face ((,cls (:inherit ivy-actual-highlight-face))))
-      `(ivy-current-match ((,cls (:foreground ,very-dark-grey :weight bold :inherit highlight))))
-
-     ;;; org-mode
-      `(org-link ((,cls (:inherit (link bold)))))
-      `(org-footnote ((,cls (:foreground ,blue))))
-      `(org-tag ((,cls (:foreground ,purple-int :inherit bold))))
-
-      ;; Overridden by hl-todo-keyword-faces
-      `(org-todo ((,cls (:foreground ,purple-int :inherit bold))))
-      `(org-done ((,cls (:foreground ,green-int :inherit bold))))
-
-      `(org-upcoming-deadline ((,cls (:foreground ,red-dim))))
-      `(org-warning ((,cls (:foreground ,orange :inherit bold))))
-      `(org-scheduled-today ((,cls (:foreground ,green-int))))
-      `(org-block-begin-line ((,cls (:background "royalblue4" :distant-foreground "royalblue4" :foreground "steelblue1" :extend t))))
-      `(org-meta-line ((,cls (:inherit font-lock-comment-face))))
-
-      `(org-block ((,cls (:background ,extra-dark-grey :extend t))))
-      `(org-document-title ((,cls (:foreground ,white :height 1.3 :inherit bold))))
-
-     ;;; rust[ic]-mode
-      `(rustic-compilation-warning ((,cls (:inherit compilation-warning))))
-      `(rustic-compilation-info ((,cls (:inherit compilation-info))))
-      `(rustic-compilation-error ((,cls (:inherit compilation-error))))
-      `(rustic-compilation-column ((,cls (:inherit compilation-column-number))))
-      `(rustic-compilation-line ((,cls (:inherit compilation-line-number))))
-
-     ;;; dired
-      `(dired-symlink ((,cls (:foreground ,blue))))
-      `(dired-special ((,cls (:foreground ,purple))))
-
-     ;;; dashboard
-      `(dashboard-text-banner ((,cls (:foreground ,orange-int))))
-      `(dashboard-items-face ((,cls (:weight normal))))
-      `(dashboard-no-items-face ((,cls (:weight normal))))
-      `(dashboard-heading ((,cls (:inherit (bold dashboard-navigator)))))
-
-     ;;; eshell-prompt-extras
-      `(epe-remote-face ((,cls (:foreground ,turquoise))))
-      `(epe-venv-face ((,cls (:foreground ,purple))))
-
-     ;;; typescript
-      `(typescript-primitive-face ((,cls (:inherit font-lock-type-face))))
-
-     ;;; latex
-      `(font-latex-sedate-face       ((,cls (:inherit font-lock-keyword-face))))
-      `(font-latex-sectioning-0-face ((,cls (:inherit font-lock-function-name-face))))
-      `(font-latex-sectioning-1-face ((,cls (:inherit font-lock-function-name-face))))
-      `(font-latex-sectioning-2-face ((,cls (:inherit font-lock-function-name-face))))
-      `(font-latex-sectioning-3-face ((,cls (:inherit font-lock-function-name-face))))
-      `(font-latex-sectioning-4-face ((,cls (:inherit font-lock-function-name-face))))
-      `(font-latex-sectioning-5-face ((,cls (:inherit font-lock-function-name-face))))
-
-     ;;; man/woman
-      `(Man-underline  ((,cls (:foreground ,green-int :inherit bold))))
-      `(Man-overstrike ((,cls (:foreground ,red :inherit bold))))
-      `(woman-addition ((,cls (:foreground ,purple))))
-      `(woman-bold     ((,cls (:foreground ,red :inherit bold))))
-      `(woman-italic   ((,cls (:foreground ,green))))
-      `(woman-unknown  ((,cls (:inherit error))))
-
-     ;;; vline
-      `(vline ((,cls (:inherit hl-line))))
-      `(vline-visual ((,cls (:inherit hl-line))))
-
-     ;;; marginalia
-      `(marginalia-documentation ((,cls (:inherit font-lock-comment-face))))
-
-     ;;; term
-      `(term-color-black ((,cls (:foreground ,dark-grey :background ,dark-grey))))
-      `(term-color-red ((,cls (:foreground ,red :background ,red))))
-      `(term-color-cyan ((,cls (:foreground ,turquoise :background ,turquoise))))
-      `(term-color-blue ((,cls (:foreground ,blue :background ,blue))))
-      `(term-color-white ((,cls (:foreground ,white :background ,white))))
-      `(term-color-green ((,cls (:foreground ,green :background ,green))))
-      `(term-color-yellow ((,cls (:foreground ,yellow :background ,yellow))))
-      `(term-color-magenta ((,cls (:foreground ,purple :background ,purple))))
-
-     ;;; logview-mode
-      `(logview-pulse ((,cls (:inherit highlight))))
-      `(logview-highlight ((,cls (:inherit evil-ex-lazy-highlight))))
-      `(logview-level-trace ((,cls (:inherit font-lock-comment-face))))
-      `(logview-level-debug ((,cls (:inherit font-lock-function-name-face))))
-      `(logview-level-information ((,cls (:inherit font-lock-keyword-face))))
-      `(logview-level-warning ((,cls (:foreground ,orange-int))))
-      `(logview-level-error ((,cls (:inherit font-lock-type-face))))
-
-      `(logview-trace-entry ((,cls (:inherit default))))
-      `(logview-debug-entry ((,cls (:inherit default))))
-      `(logview-information-entry ((,cls (:inherit default))))
-      `(logview-warning-entry ((,cls (:inherit default))))
-      `(logview-error-entry ((,cls (:inherit default))))
-
-     ;;; GNU info
-      `(info-title-1 ((,cls (:inherit (font-lock-function-name-face bold)))))
-      `(info-title-2 ((,cls (:foreground ,red-256))))
-      `(info-title-3 ((,cls (:foreground ,green-256))))
-      `(info-title-4 ((,cls (:foreground ,green-256))))
-      `(info-quoted ((,cls (:inherit shadow))))
-      `(info-menu-star ((,cls (:foreground ,red))))
-      `(info-xref ((,cls (:inherit (link bold)))))
-      `(info-xref-visited ((,cls (:underline ,blue :inherit (link bold)))))
-      `(info-menu-header ((,cls (:inherit info-header-node)))) ;; not sure what the difference is
-
-     ;;; xref
-      `(xref-match ((,cls (:foreground ,red :inherit bold))))
-
-     ;;; help
-      `(help-key-binding ((,cls (:foreground ,turquoise))))
-      )
+*** faces
+    :PROPERTIES:
+    :header-args+: :var cls=(eval t) tru=(quote ((type graphic) (min-colors 16777216))) gui=(quote ((type graphic)))
+    :header-args+: :var   very-light-grey=aoh-gen-color(hue=228, sat=7,   light=81)     very-light-grey-256="#d0d0d0"
+    :header-args+: :var        light-grey=aoh-gen-color(hue=228, sat=7,   light=55)          light-grey-256="#8a8a8a"
+    :header-args+: :var              grey=aoh-gen-color(hue=228, sat=7,   light=44)                grey-256="#6c6c6c"
+    :header-args+: :var         dark-grey=aoh-gen-color(hue=228, sat=7,   light=29)           dark-grey-256="#5f5f87"
+    :header-args+: :var    very-dark-grey=aoh-gen-color(hue=228, sat=7,   light=12)      very-dark-grey-256="#1c1c1c"
+    :header-args+: :var               red=aoh-gen-color(hue=352, sat=81,  light=58)                 red-256="#d75f5f"
+    :header-args+: :var           red-dim=aoh-gen-color(hue=352, sat=60,  light=58)             red-dim-256="#d75f5f"
+    :header-args+: :var           red-int=aoh-gen-color(hue=360, sat=90,  light=58)             red-int-256="#ff5f5f"
+    :header-args+: :var            orange=aoh-gen-color(hue=25,  sat=86,  light=55)              orange-256="#ff8700"
+    :header-args+: :var        orange-dim=aoh-gen-color(hue=25,  sat=60,  light=60)          orange-dim-256="#d7875f"
+    :header-args+: :var        orange-int=aoh-gen-color(hue=25,  sat=86,  light=65)          orange-int-256="#ff875f"
+    :header-args+: :var            yellow=aoh-gen-color(hue=50,  sat=74,  light=61)              yellow-256="#d7d75f"
+    :header-args+: :var        yellow-dim=aoh-gen-color(hue=50,  sat=74,  light=31)          yellow-dim-256="#878700"
+    :header-args+: :var        yellow-int=aoh-gen-color(hue=50,  sat=100, light=61)          yellow-int-256="#ffd75f"
+    :header-args+: :var             green=aoh-gen-color(hue=107, sat=40,  light=57)               green-256="#87af5f"
+    :header-args+: :var         green-int=aoh-gen-color(hue=120, sat=50,  light=57)           green-int-256="#5fd75f"
+    :header-args+: :var         green-dim=aoh-gen-color(hue=107, sat=30,  light=50)           green-dim-256="#87af5f"
+    :header-args+: :var              blue=aoh-gen-color(hue=196, sat=64,  light=58)                blue-256="#5fafd7"
+    :header-args+: :var          blue-dim=aoh-gen-color(hue=200, sat=44,  light=58)            blue-dim-256="#5fafaf"
+    :header-args+: :var          blue-int=aoh-gen-color(hue=220, sat=84,  light=64)            blue-int-256="#5f87ff"
+    :header-args+: :var            purple=aoh-gen-color(hue=313, sat=32,  light=60)              purple-256="#af87af"
+    :header-args+: :var        purple-dim=aoh-gen-color(hue=313, sat=32,  light=70)          purple-dim-256="#d787af"
+    :header-args+: :var        purple-int=aoh-gen-color(hue=313, sat=40,  light=60)          purple-int-256="#af5faf"
+    :header-args+: :var         turquoise=aoh-gen-color(hue=165, sat=70,  light=65)           turquoise-256="#5fd7d7"
+    :header-args+: :var     turquoise-dim=aoh-gen-color(hue=165, sat=60,  light=85)       turquoise-dim-256="#afffd7"
+    :header-args+: :var     turquoise-int=aoh-gen-color(hue=165, sat=80,  light=50)       turquoise-int-256="#00d7af"
+    :header-args+: :var             black=aoh-gen-color(hue=240, sat=6,   light=14)               black-256="#262626"
+    :header-args+: :var         black-dim=aoh-gen-color(hue=240, sat=10,  light=20)           black-dim-256="#00005f"
+    :header-args+: :var         black-int=aoh-gen-color(hue=240, sat=6,   light=0)            black-int-256="#000000"
+    :header-args+: :var             white=aoh-gen-color(hue=0,   sat=100, light=100)              white-256="#ffffff"
+    :header-args+: :var line-highlight-bg=aoh-gen-color(hue=228, sat=7,   light=21)   line-highlight-bg-256="#303030"
+    :header-args+: :var   extra-dark-grey=aoh-gen-color(hue=228, sat=7,   light=10)     extra-dark-grey-256="#00005f"
+    :header-args+: :var             debug=aoh-gen-color(hue=198, sat=91,  light=13)               debug-256="#00005f"
+    :header-args+: :var rainbow-delimeters-colors=(list "#E6B422" "#C70067" "#00A960" "#FC7482")
+    :END:
+
+    #+BEGIN_SRC emacs-lisp :tangle "early-init.el" :results silent
+      (defface aoh-very-light-grey `((,tru (:foreground ,very-light-grey)) (,cls (:foreground ,very-light-grey-256))) "Face containing fg color very-light-grey from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-light-grey      `((,tru (:foreground ,light-grey))      (,cls (:foreground ,light-grey-256)))      "Face containing fg color light-grey from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-grey            `((,tru (:foreground ,grey))            (,cls (:foreground ,grey-256)))            "Face containing fg color grey from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-dark-grey       `((,tru (:foreground ,dark-grey))       (,cls (:foreground ,dark-grey-256)))       "Face containing fg color dark-grey from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-very-dark-grey  `((,tru (:foreground ,very-dark-grey))  (,cls (:foreground ,very-dark-grey-256)))  "Face containing fg color very-dark-grey from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-red             `((,tru (:foreground ,red))             (,cls (:foreground ,red-256)))             "Face containing fg color red from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-red-dim         `((,tru (:foreground ,red-dim))         (,cls (:foreground ,red-dim-256)))         "Face containing fg color red-dim from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-red-int         `((,tru (:foreground ,red-int))         (,cls (:foreground ,red-int-256)))         "Face containing fg color red-int from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-orange          `((,tru (:foreground ,orange))          (,cls (:foreground ,orange-256)))          "Face containing fg color orange from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-orange-dim      `((,tru (:foreground ,orange-dim))      (,cls (:foreground ,orange-dim-256)))      "Face containing fg color orange-dim from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-orange-int      `((,tru (:foreground ,orange-int))      (,cls (:foreground ,orange-int-256)))      "Face containing fg color orange-int from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-yellow          `((,tru (:foreground ,yellow))          (,cls (:foreground ,yellow-256)))          "Face containing fg color yellow from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-yellow-dim      `((,tru (:foreground ,yellow-dim))      (,cls (:foreground ,yellow-dim-256)))      "Face containing fg color yellow-dim from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-yellow-int      `((,tru (:foreground ,yellow-int))      (,cls (:foreground ,yellow-int-256)))      "Face containing fg color yellow-int from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-green           `((,tru (:foreground ,green))           (,cls (:foreground ,green-256)))           "Face containing fg color green from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-green-int       `((,tru (:foreground ,green-int))       (,cls (:foreground ,green-int-256)))       "Face containing fg color green-int from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-green-dim       `((,tru (:foreground ,green-dim))       (,cls (:foreground ,green-dim-256)))       "Face containing fg color green-dim from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-blue            `((,tru (:foreground ,blue))            (,cls (:foreground ,blue-256)))            "Face containing fg color blue from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-blue-dim        `((,tru (:foreground ,blue-dim))        (,cls (:foreground ,blue-dim-256)))        "Face containing fg color blue-dim from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-blue-int        `((,tru (:foreground ,blue-int))        (,cls (:foreground ,blue-int-256)))        "Face containing fg color blue-int from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-purple          `((,tru (:foreground ,purple))          (,cls (:foreground ,purple-256)))          "Face containing fg color purple from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-purple-dim      `((,tru (:foreground ,purple-dim))      (,cls (:foreground ,purple-dim-256)))      "Face containing fg color purple-dim from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-purple-int      `((,tru (:foreground ,purple-int))      (,cls (:foreground ,purple-int-256)))      "Face containing fg color purple-int from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-turquoise       `((,tru (:foreground ,turquoise))       (,cls (:foreground ,turquoise-256)))       "Face containing fg color turquoise from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-turquoise-dim   `((,tru (:foreground ,turquoise-dim))   (,cls (:foreground ,turquoise-dim-256)))   "Face containing fg color turquoise-dim from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-turquoise-int   `((,tru (:foreground ,turquoise-int))   (,cls (:foreground ,turquoise-int-256)))   "Face containing fg color turquoise-int from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-black           `((,tru (:foreground ,black))           (,cls (:foreground ,black-256)))           "Face containing fg color black from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-black-dim       `((,tru (:foreground ,black-dim))       (,cls (:foreground ,black-dim-256)))       "Face containing fg color black-dim from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-black-int       `((,tru (:foreground ,black-int))       (,cls (:foreground ,black-int-256)))       "Face containing fg color black-int from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+      (defface aoh-white           `((,tru (:foreground ,white))           (,cls (:foreground ,white-256)))           "Face containing fg color white from [[https://github.com/mohkale/an-old-hope-theme][an-old-hope-theme]].")
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp :results silent
+      (custom-theme-set-faces 'an-old-hope
+      ;;; defaults
+       `(default
+          ((,tru (:foreground ,very-light-grey :background ,very-dark-grey))
+           ;; let the terminal inherit its background from the terminals default.
+           (,cls (:foreground ,very-light-grey-256))))
+
+       `(italic ((,cls (:italic t))))
+       `(shadow ((,cls (:foreground ,light-grey))))
+       `(hl-line ((,cls (:background ,line-highlight-bg))))
+
+       `(error   ((,cls (:background ,red        :distant-foreground ,red        :foreground ,very-dark-grey :inherit bold))))
+       `(success ((,cls (:background ,green-int  :distant-foreground ,green-int  :foreground ,very-dark-grey :inherit bold))))
+       `(warning ((,cls (:background ,yellow-int :distant-foreground ,yellow-int :foreground ,very-dark-grey :inherit bold))))
+
+       `(cursor ((,cls (:background ,blue))))
+       `(custom-button ((,cls (:background ,very-dark-grey
+                               :foreground ,very-light-grey
+                               :box (:line-width 2 :style released-button)))))
+
+      ;;; font-lock - Syntax Highlighting Colors
+       `(font-lock-builtin-face ((,cls (:foreground ,blue))))
+       `(font-lock-comment-face ((,cls (:foreground ,grey))))
+       `(font-lock-keyword-face ((,cls (:foreground ,green-256))))
+       `(font-lock-constant-face ((,cls (:foreground ,red-256 :inherit bold))))
+       `(font-lock-function-name-face ((,cls (:foreground ,yellow-int-256))))
+       `(font-lock-negation-char-face ((,cls (:foreground ,red-256))))
+       `(font-lock-preprocessor-face ((,cls (:inherit font-lock-keyword-face))))
+       `(font-lock-string-face ((,cls (:foreground ,blue))))
+       `(font-lock-doc-face ((t (:foreground ,blue))))
+       `(font-lock-type-face ((,cls (:foreground ,red-256))))
+       `(font-lock-variable-name-face ((,cls (:foreground ,yellow-int-256))))
+       `(font-lock-warning-face ((,cls (:background ,yellow-int
+                                        :foreground ,very-dark-grey
+                                        :distant-foreground ,yellow-int
+                                        :underline nil :inherit bold))))
+
+      ;;; Tree sitter
+       ;; An alternative to `font-lock-mode' with considerably more diverse highlighting.
+       `(tree-sitter-hl-face:number ((,cls (:inherit default))))
+       `(tree-sitter-hl-face:doc ((,cls (:inherit font-lock-comment-face))))
+       `(tree-sitter-hl-face:property ((,cls (:inherit default))))
+       `(tree-sitter-hl-face:tag ((,cls (:inherit font-lock-type-face))))
+       `(tree-sitter-hl-face:attribute ((,cls (:inherit font-lock-variable-name-face))))
+       `(tree-sitter-hl-face:attribute ((,cls (:inherit font-lock-variable-name-face))))
+       `(tree-sitter-hl-face:constructor ((,cls (:inherit font-lock-function-name-face))))
+       `(tree-sitter-hl-face:method.call ((,cls (:inherit font-lock-function-name-face))))
+       `(tree-sitter-hl-face:function.call ((,cls (:inherit font-lock-function-name-face))))
+       `(tree-sitter-hl-face:string.special ((,cls (:inherit font-lock-string-face))))
+       `(tree-sitter-hl-face:type.parameter ((,cls (:inherit font-lock-variable-name-face))))
+       `(tree-sitter-hl-face:function.special ((,cls (:inherit font-lock-builtin-face))))
+       `(tree-sitter-hl-face:variable.special ((,cls (:inherit (italic font-lock-variable-name-face)))))
+
+       ;; Fringe has a different background on the GUI and the terminal, because the default bg
+       ;; on the terminal is taken from the terminal bg. We apply a variant color for the fringe
+       ;; on the terminal to make it distinctive.
+       `(fringe
+          ((,gui (:background ,black))
+           (,cls (:background ,very-dark-grey))))
+       `(header-line ((,cls (:background ,very-dark-grey :foreground ,blue))))
+       `(line-number ((,cls (:foreground ,very-light-grey :inherit fringe))))
+       `(line-number-current-line ((,cls (:foreground ,blue :inherit line-number))))
+       `(vertical-border ((,cls (:foreground ,grey))))
+       `(internal-border ((,cls (:foreground ,white :background ,white))))
+       `(minibuffer-prompt ((,cls (:foreground ,yellow-256 :weight bold))))
+       `(minibuffer-depth-indicator ((,cls (:foreground ,yellow-256 :weight bold))))
+       `(tooltip ((,cls (:background ,dark-grey :foreground ,very-light-grey))))
+
+       `(highlight ((,cls (:foreground ,very-dark-grey :background ,blue
+                           :distant-foreground ,blue :inherit bold))))
+
+       `(region ((,cls (:background ,dark-grey :weight bold))))
+       `(secondary-selection ((,cls (:inherit region))))
+
+       ;; face for current search match. exiting now takes you to it.
+       `(isearch ((,cls (:background ,blue-int :inherit bold))))
+       `(isearch-fail ((,cls (:inherit compilation-mode-line-fail))))
+       `(match ((,cls (:foreground ,green-int))))
+       ;; face for matches other than the current match
+       `(evil-ex-search ((,cls (:background ,purple :inherit bold))))
+       `(lazy-highlight ((,cls (:background ,blue-int :foreground ,black-dim))))
+
+       ;; delimeter colors just taken from https://github.com/gastrodia/rainbow-brackets
+       ;; colors 5-9 just recycle 1-4, maybe come up with more.
+       `(rainbow-delimiters-depth-1-face ((,cls (:foreground ,(nth 0 rainbow-delimeters-colors)))))
+       `(rainbow-delimiters-depth-2-face ((,cls (:foreground ,(nth 1 rainbow-delimeters-colors)))))
+       `(rainbow-delimiters-depth-3-face ((,cls (:foreground ,(nth 2 rainbow-delimeters-colors)))))
+       `(rainbow-delimiters-depth-4-face ((,cls (:foreground ,(nth 3 rainbow-delimeters-colors)))))
+       `(rainbow-delimiters-depth-5-face ((,cls (:foreground ,(nth 0 rainbow-delimeters-colors)))))
+       `(rainbow-delimiters-depth-6-face ((,cls (:foreground ,(nth 1 rainbow-delimeters-colors)))))
+       `(rainbow-delimiters-depth-7-face ((,cls (:foreground ,(nth 2 rainbow-delimeters-colors)))))
+       `(rainbow-delimiters-depth-8-face ((,cls (:foreground ,(nth 3 rainbow-delimeters-colors)))))
+       `(rainbow-delimiters-depth-9-face ((,cls (:foreground ,(nth 0 rainbow-delimeters-colors)))))
+
+       ;; hyperlinks and path links
+       `(link ((,cls (:foreground ,blue))))
+       `(link-visited ((,cls (:foreground ,turquoise :inherit link))))
+
+       `(hl-todo ((,cls (:foreground ,yellow-int :inherit bold))))
+
+      ;;; modeline
+       `(mode-line ((,cls
+                     (:background ,very-light-grey :foreground ,very-dark-grey
+                      :box (:line-width 1 :color ,very-light-grey :style none)))))
+       `(mode-line-inactive ((,cls
+                              (:weight light :foreground "grey80" :background "grey30"
+                               :box (:line-width 1 :color "grey40" :style none)))))
+
+       `(+mode-line-linter-info ((,cls (:foreground ,green-dim))))
+       `(+mode-line-linter-warning ((,cls (:foreground ,blue-dim))))
+       `(+mode-line-linter-error ((,cls (:foreground ,red-dim))))
+
+       `(+mode-line-evil-normal-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background "DarkGoldenrod2"))))
+       `(+mode-line-evil-emacs-state   ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,blue))))
+       `(+mode-line-evil-insert-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,green-int-256))))
+       `(+mode-line-evil-motion-state  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,purple-int))))
+       `(+mode-line-evil-visual-state  ((,cls (:inherit mode-line :foreground ,very-light-grey :background ,dark-grey))))
+       `(+mode-line-evil-operator-state ((,cls (:weight normal :inherit (error spaceline-evil-motion)))))
+       `(+mode-line-evil-replace-state ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,turquoise-int))))
+       `(+mode-line-buffer-minor-mode ((,cls (:foreground ,purple))))
+
+       `(+mode-line-host-face ((,cls (:inherit +mode-line-host-face))))
+
+       `(compilation-mode-line-fail ((,cls (:inherit bold :foreground ,red-dim))))
+       `(compilation-mode-line-run  ((,cls (:inherit bold :foreground ,orange-dim))))
+       `(compilation-mode-line-exit  ((,cls (:inherit bold :foreground ,green-dim))))
+
+       `(magit-mode-line-process-error ((,cls (:inherit compilation-mode-line-fail))))
+
+      ;;; powerline
+       `(powerline-active1 ((,gui (:background ,black :foreground ,very-light-grey :inherit mode-line))
+                            (,cls (:foreground ,very-light-grey :inherit default))))
+       `(powerline-active2 ((,cls (:inherit powerline-active1))))
+       `(powerline-inactive1 ((,cls (:box (:line-width 1 :color "grey40" :style none)
+                                     :inherit powerline-active1))))
+
+      ;;; spaceline
+       `(spaceline-evil-normal  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background "DarkGoldenrod2"))))
+       `(spaceline-evil-insert  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,green-int-256))))
+       `(spaceline-evil-emacs   ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,blue))))
+       `(spaceline-evil-replace ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,turquoise-int))))
+       `(spaceline-evil-visual  ((,cls (:inherit mode-line :foreground ,very-light-grey :background ,dark-grey))))
+       `(spaceline-evil-motion  ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,purple-int))))
+       `(spaceline-minibuffer   ((,cls (:inherit mode-line :foreground ,very-dark-grey  :background ,blue))))
+       `(spaceline-evil-operator ((,cls (:weight normal :inherit (error spaceline-evil-motion)))))
+
+       `(spaceline-flycheck-error   ((,cls (:inherit compilation-mode-line-fail))))
+       `(spaceline-flycheck-warning ((,cls (:inherit compilation-mode-line-run))))
+       `(spaceline-flycheck-info    ((,cls (:inherit compilation-mode-line-exit))))
+
+      ;;; doom-modeline
+       `(doom-modeline-evil-normal-state ((,cls (:inherit +mode-line-evil-normal-state))))
+       `(doom-modeline-evil-emacs-state ((,cls (:inherit +mode-line-evil-emacs-state))))
+       `(doom-modeline-evil-insert-state ((,cls (:inherit +mode-line-evil-insert-state))))
+       `(doom-modeline-evil-motion-state ((,cls (:inherit +mode-line-evil-motion-state))))
+       `(doom-modeline-evil-visual-state ((,cls (:inherit +mode-line-evil-visual-state))))
+       `(doom-modeline-evil-operator-state ((,cls (:inherit +mode-line-evil-operator-state))))
+       `(doom-modeline-evil-replace-state ((,cls (:inherit +mode-line-evil-replace-state))))
+
+       `(doom-modeline-buffer-modified ((,cls (:inherit doom-modeline-buffer-file))))
+       `(doom-modeline-lsp-error ((,cls (:inherit compilation-mode-line-fail))))
+       `(doom-modeline-lsp-warning ((,cls (:inherit compilation-mode-line-run))))
+       `(doom-modeline-lsp-success ((,cls ())))
+       `(doom-modeline-lsp-running ((,cls (:foreground ,blue-int :inherit compilation-mode-line-run))))
+
+       `(doom-modeline-urgent ((,cls (:inherit compilation-mode-line-fail))))
+       `(doom-modeline-debug ((,cls (:inherit compilation-mode-line-run))))
+       `(doom-modeline-info ((,cls (:inherit compilation-mode-line-exit))))
+
+       `(doom-modeline-buffer-minor-mode ((,cls (:inherit +mode-line-buffer-minor-mode))))
+       `(doom-modeline-panel ((,cls (:foreground ,very-dark-grey))))
+
+      ;;; magit/forge
+       `(forge-post-author ((,cls (:inherit magit-log-author))))
+
+      ;;; evil
+       `(vimish-fold-overlay ((,cls (:background ,dark-grey :foreground ,green))))
+
+      ;;; flycheck
+       `(flycheck-fringe-info    ((,cls (:foreground ,green-int  :inherit fringe))))
+       `(flycheck-fringe-warning ((,cls (:foreground ,yellow-int :inherit fringe))))
+       `(flycheck-fringe-error   ((,cls (:foreground ,red-int    :inherit fringe))))
+
+       `(flycheck-info      ((,cls (:underline (:style wave :color ,green)))))
+       `(flycheck-warning   ((,cls (:underline (:style wave :color ,yellow)))))
+       `(flycheck-duplicate ((,cls (:underline (:style wave :color ,orange)))))
+       `(flycheck-error     ((,gui (:underline (:style wave :color ,red)))
+                             (,cls (:background ,red-256 :inherit error))))
+
+      ;;; flymake
+       `(flymake-note    ((,cls (:underline (:style wave :color ,green)))))
+       `(flymake-warning ((,cls (:underline (:style wave :color ,yellow)))))
+       `(flymake-error   ((,gui (:underline (:style wave :color ,red)))
+                          (,cls (:background ,red-256 :inherit error))))
+
+      ;;; flyspell
+       `(flyspell-duplicate ((,cls (:foreground ,orange-dim :underline t))))
+       `(flyspell-incorrect ((,cls (:foreground ,red-dim :underline t))))
+
+      ;;; avy
+       `(avy-background-face ((,cls (:foreground ,grey))))
+
+       ;; Same as the corresponding evil faces but adjustedusing [[https://webaim.org/resources/contrastchecker/][contrast-checker]].
+       `(avy-lead-face   ((,cls (:background "#B00303" :foreground ,white))))
+       `(avy-lead-face-0 ((,cls (:background "#124FCA" :foreground ,white))))
+       `(avy-lead-face-1 ((,cls (:background ,very-light-grey :foreground ,very-dark-grey))))
+       `(avy-lead-face-2 ((,cls (:background "#883A77" :foreground ,white))))
+
+       ;; Not avy, but avy like enough
+       `(selectrum-quick-keys-highlight ((,cls (:background "#B00303" :foreground ,white))))
+       `(selectrum-quick-keys-match ((,cls (:background "#124FCA" :foreground ,white))))
+
+       `(frog-menu-border ((,cls (:background ,white :foreground ,white))))
+       `(frog-menu-posframe-background-face ((,cls (:background ,very-dark-grey))))
+
+      ;;; company - intellisense
+       `(company-tooltip-mouse ((,cls (:foreground ,turquoise-int))))
+       `(company-template-field ((,cls (:foreground ,turquoise-int))))
+
+       ;; scrollbar
+       `(company-scrollbar-bg ((,cls (:background ,line-highlight-bg :foreground ,very-light-grey))))
+       `(company-scrollbar-fg ((,cls (:background ,red               :foreground ,dark-grey))))
+
+       `(company-preview ((,cls (:foreground ,blue-int :weight bold :inherit hl-line))))
+       `(company-preview-common ((,cls (:inherit company-preview))))
+       `(company-preview-search ((,cls (:foreground ,orange-int :weight normal :inherit company-preview))))
+
+       ;; NOTE tooltip is the drop down menu which shows up when multiple results exist
+       `(company-tooltip ((,cls (:background ,black-dim :inherit tooltip))))
+       `(company-tooltip-common ((,cls (:foreground ,red :inherit (company-tooltip bold)))))
+       `(company-tooltip-search ((,cls (:foreground ,blue-int :inherit company-tooltip))))
+       `(company-tooltip-search-common ((,cls (:inherit company-tooltip-search))))
+
+       `(company-tooltip-selection ((,cls (:background ,dark-grey :inherit company-tooltip))))
+       `(company-tooltip-common-selection ((,cls (:background ,dark-grey :inherit company-tooltip-common))))
+       `(company-tooltip-search-selection ((,cls (:background ,dark-grey :inherit (company-tooltip-search)))))
+
+       `(company-icon+ ((,cls (:weight normal :inherit company-tooltip))))
+       `(company-current-icon+ ((,cls (:weight normal :inherit company-tooltip-selection))))
+
+       ;; NOTE annotations are extra information in the tooltip
+       `(company-tooltip-annotation ((,cls (:weight bold :foreground ,grey))))
+       `(company-tooltip-annotation-selection ((,cls (:inherit company-tooltip-annotation))))
+
+       `(popup ((,cls (:inherit popup-face))))
+
+      ;;;; custom mode variants
+      ;;; whitespace-mode
+       `(whitespace-space ((,cls (:foreground ,dark-grey))))
+       `(trailing-whitespace ((,cls (:background ,dark-grey))))
+
+      ;;; auto-highlight-symbol mode
+       ;; NOTE: distant foreground is meaningless here because the faces are always given priority.
+       `(ahs-definition-face ((,cls (:background ,blue-dim :distant-foreground ,blue-dim :foreground ,dark-grey))))
+       `(ahs-edit-mode-face ((,cls (:background ,red-dim :distant-foreground ,red-dim :foreground ,very-light-grey))))
+       `(ahs-face ((,cls (:background ,very-light-grey :foreground ,black :inherit bold))))
+       `(ahs-plugin-whole-buffer-face ((,cls (:background ,blue :distant-foreground ,green :foreground ,black))))
+       `(ahs-plugin-bod-face ((,cls (:background ,blue-int :distant-foreground ,blue-int :foreground ,black))))
+       `(ahs-plugin-defalt-face ((,cls (:background ,orange-dim :distant-foreground ,orange-dim :foreground ,black))))
+       `(ahs-warning-face ((,cls (:foreground ,red-dim))))
+
+      ;;; compilation mode
+       `(compilation-line-number ((,cls (:foreground ,yellow))))
+       `(compilation-column-number ((,cls (:inherit font-lock-doc-face))))
+
+       ;; NOTE also represents value count in mode line
+       `(compilation-error ((,cls (:foreground ,red :inherit bold))))
+       `(compilation-info ((,cls (:foreground ,green-int :inherit bold))))
+       `(compilation-warning ((,cls (:foreground ,orange-int :inherit bold))))
+
+      ;;; markdown-mode
+       `(markdown-code-face ((,cls (:inherit default))))
+
+      ;;; anzu
+       `(anzu-mode-line ((,cls (:foreground ,very-dark-grey :inherit bold))))
+       `(anzu-mode-line-no-match ((,cls (:foreground ,red-int :inherit bold))))
+
+      ;;; hydra-posframe
+       ;; for some reason... if hydra-posframe-face inherits default, internal border won't work
+       `(hydra-posframe-face ((,cls (:background ,very-dark-grey :foreground ,very-light-grey))))
+       `(hydra-posframe-border-face ((,cls (:inherit internal-border))))
+
+      ;;; selectrum
+       ;; TODO: Remove non-prescient variants
+       `(selectrum-current-candidate ((,cls (:foreground ,very-dark-grey :weight bold :inherit highlight))))
+       `(selectrum-primary-highlight ((,cls (:background "#555555"))))
+       `(selectrum-prescient-current-candidate ((,cls (:foreground ,very-dark-grey :weight bold :inherit highlight))))
+       `(selectrum-prescient-primary-highlight ((,cls (:background "#555555"))))
+       `(selectrum-secondary-highlight ((,cls (:background "#7777FF")))) ;; #8A498A
+
+      ;;; consult
+       `(consult-async-finished ((,cls (:inherit compilation-info))))
+       `(consult-async-running ((,cls (:inherit compilation-warning))))
+       `(consult-async-failed ((,cls (:inherit compilation-error))))
+       `(consult-narrow-indicator ((,cls (:foreground ,blue :weight bold))))
+       `(consult-preview-match ((,cls (:foreground ,blue-int :weight bold))))
+
+      ;;; orderless
+       ;; Match face were taken from ivys default match faces.
+       `(orderless-match-face-0 ((,cls (:background "#555555"))))
+       `(orderless-match-face-1 ((,cls (:background "#777777"))))
+       `(orderless-match-face-2 ((,cls (:background "#7777ff"))))
+       `(orderless-match-face-3 ((,cls (:background "#8a498a"))))
+
+      ;;; swiper
+       `(swiper-match-face-1 ((,cls (:background "#555555"))))
+       `(swiper-match-face-2 ((,cls (:background "#777777"))))
+       `(swiper-match-face-3 ((,cls (:background "#7777ff"))))
+       `(swiper-match-face-4 ((,cls (:background "#8a498a"))))
+
+      ;;; ivy
+       ;; by default, it seems if ivy-highlight-face has its own spec, it'll interfere
+       ;; with the face of ivy-current-match. Which'll make it harder to tell which
+       ;; candidate is the current candidate.
+       ;;
+       ;; If ivy-highlight-face just inherits another face, then when both it and
+       ;; ivy-current-match are applied to a string, ivy-current-match will override
+       ;; ivy-highlight-face. Thus, this.
+       `(ivy-actual-highlight-face ((,cls (:foreground ,very-dark-grey :background ,turquoise
+                                           :distant-foreground ,turquoise :inherit bold))))
+       `(ivy-highlight-face ((,cls (:inherit ivy-actual-highlight-face))))
+       `(ivy-current-match ((,cls (:foreground ,very-dark-grey :weight bold :inherit highlight))))
+
+      ;;; org-mode
+       `(org-link ((,cls (:inherit (link bold)))))
+       `(org-footnote ((,cls (:foreground ,blue))))
+       `(org-tag ((,cls (:foreground ,purple-int :inherit bold))))
+
+      ;;; org-ref
+       ;; All of these have their own distinct look and feel, but honestly
+       ;; their just links so distinguishing them is unecessary in most cases.
+       `(org-ref-ref-face ((,cls (:inherit org-link))))
+       `(org-ref-cite-face ((,cls (:foreground ,green-int :inherit org-link))))
+       `(org-ref-label-face ((,cls (:inherit org-link))))
+       `(org-ref-acronym-face ((,cls (:inherit org-link))))
+       `(org-ref-glossary-face ((,cls (:inherit org-link))))
+
+       ;; Overridden by hl-todo-keyword-faces
+       `(org-todo ((,cls (:foreground ,purple-int :inherit bold))))
+       `(org-done ((,cls (:foreground ,green-int :inherit bold))))
+
+       `(org-upcoming-deadline ((,cls (:foreground ,red-dim))))
+       `(org-warning ((,cls (:foreground ,orange :inherit bold))))
+       `(org-scheduled-today ((,cls (:foreground ,green-int))))
+       `(org-block-begin-line ((,cls (:background "royalblue4" :distant-foreground "royalblue4" :foreground "steelblue1" :extend t))))
+       `(org-meta-line ((,cls (:inherit font-lock-comment-face))))
+
+       `(org-block ((,cls (:background ,extra-dark-grey :extend t))))
+       `(org-document-title ((,cls (:foreground ,white :height 1.3 :inherit bold))))
+
+      ;;; rust[ic]-mode
+       `(rustic-compilation-warning ((,cls (:inherit compilation-warning))))
+       `(rustic-compilation-info ((,cls (:inherit compilation-info))))
+       `(rustic-compilation-error ((,cls (:inherit compilation-error))))
+       `(rustic-compilation-column ((,cls (:inherit compilation-column-number))))
+       `(rustic-compilation-line ((,cls (:inherit compilation-line-number))))
+
+      ;;; dired
+       `(dired-symlink ((,cls (:foreground ,blue))))
+       `(dired-special ((,cls (:foreground ,purple))))
+
+      ;;; dashboard
+       `(dashboard-text-banner ((,cls (:foreground ,orange-int))))
+       `(dashboard-items-face ((,cls (:weight normal))))
+       `(dashboard-no-items-face ((,cls (:weight normal))))
+       `(dashboard-heading ((,cls (:inherit (bold dashboard-navigator)))))
+
+      ;;; eshell-prompt-extras
+       `(epe-remote-face ((,cls (:foreground ,turquoise))))
+       `(epe-venv-face ((,cls (:foreground ,purple))))
+
+      ;;; typescript
+       `(typescript-primitive-face ((,cls (:inherit font-lock-type-face))))
+
+      ;;; latex
+       `(font-latex-sedate-face       ((,cls (:inherit font-lock-keyword-face))))
+       `(font-latex-sectioning-0-face ((,cls (:inherit font-lock-function-name-face))))
+       `(font-latex-sectioning-1-face ((,cls (:inherit font-lock-function-name-face))))
+       `(font-latex-sectioning-2-face ((,cls (:inherit font-lock-function-name-face))))
+       `(font-latex-sectioning-3-face ((,cls (:inherit font-lock-function-name-face))))
+       `(font-latex-sectioning-4-face ((,cls (:inherit font-lock-function-name-face))))
+       `(font-latex-sectioning-5-face ((,cls (:inherit font-lock-function-name-face))))
+
+      ;;; man/woman
+       `(Man-underline  ((,cls (:foreground ,green-int :inherit bold))))
+       `(Man-overstrike ((,cls (:foreground ,red :inherit bold))))
+       `(woman-addition ((,cls (:foreground ,purple))))
+       `(woman-bold     ((,cls (:foreground ,red :inherit bold))))
+       `(woman-italic   ((,cls (:foreground ,green))))
+       `(woman-unknown  ((,cls (:inherit error))))
+
+      ;;; vline
+       `(vline ((,cls (:inherit hl-line))))
+       `(vline-visual ((,cls (:inherit hl-line))))
+
+      ;;; marginalia
+       `(marginalia-documentation ((,cls (:inherit font-lock-comment-face))))
+
+      ;;; term
+       `(term-color-black ((,cls (:foreground ,dark-grey :background ,dark-grey))))
+       `(term-color-red ((,cls (:foreground ,red :background ,red))))
+       `(term-color-cyan ((,cls (:foreground ,turquoise :background ,turquoise))))
+       `(term-color-blue ((,cls (:foreground ,blue :background ,blue))))
+       `(term-color-white ((,cls (:foreground ,white :background ,white))))
+       `(term-color-green ((,cls (:foreground ,green :background ,green))))
+       `(term-color-yellow ((,cls (:foreground ,yellow :background ,yellow))))
+       `(term-color-magenta ((,cls (:foreground ,purple :background ,purple))))
+
+      ;;; logview-mode
+       `(logview-pulse ((,cls (:inherit highlight))))
+       `(logview-highlight ((,cls (:inherit evil-ex-lazy-highlight))))
+       `(logview-level-trace ((,cls (:inherit font-lock-comment-face))))
+       `(logview-level-debug ((,cls (:inherit font-lock-function-name-face))))
+       `(logview-level-information ((,cls (:inherit font-lock-keyword-face))))
+       `(logview-level-warning ((,cls (:foreground ,orange-int))))
+       `(logview-level-error ((,cls (:inherit font-lock-type-face))))
+
+       `(logview-trace-entry ((,cls (:inherit default))))
+       `(logview-debug-entry ((,cls (:inherit default))))
+       `(logview-information-entry ((,cls (:inherit default))))
+       `(logview-warning-entry ((,cls (:inherit default))))
+       `(logview-error-entry ((,cls (:inherit default))))
+
+      ;;; GNU info
+       `(info-title-1 ((,cls (:inherit (font-lock-function-name-face bold)))))
+       `(info-title-2 ((,cls (:foreground ,red-256))))
+       `(info-title-3 ((,cls (:foreground ,green-256))))
+       `(info-title-4 ((,cls (:foreground ,green-256))))
+       `(info-quoted ((,cls (:inherit shadow))))
+       `(info-menu-star ((,cls (:foreground ,red))))
+       `(info-xref ((,cls (:inherit (link bold)))))
+       `(info-xref-visited ((,cls (:underline ,blue :inherit (link bold)))))
+       `(info-menu-header ((,cls (:inherit info-header-node)))) ;; not sure what the difference is
+
+      ;;; xref
+       `(xref-match ((,cls (:foreground ,red :inherit bold))))
+
+      ;;; help
+       `(help-key-binding ((,cls (:foreground ,turquoise))))
+
+      ;;; mu4e/gnus/message/notmuch
+       `(message-header-name ((,cls (:inherit font-lock-keyword-face))))
+       `(message-header-other ((,cls (:inherit default))))
+       `(message-header-to ((,cls (:inherit (bold font-lock-function-name-face)))))
+       `(message-header-subject ((,cls (:inherit font-lock-type-face))))
+       `(message-header-cc ((,cls (:inherit font-lock-string-face))))
+       `(message-header-xheader ((,cls (:foreground ,turquoise-int))))
+       `(message-header-newsgroups ((,cls (:inherit (italic message-header-other)))))
+       `(message-separator ((,cls (:inherit shadow))))
+       `(message-mml ((,cls (:foreground ,turquoise-int))))
+       ;; message-cited-text-1
+       ;; message-cited-text-2
+       ;; message-cited-text-3
+       ;; message-cited-text-4
+
+       `(mu4e-highlight-face ((,cls (:inherit (bold font-lock-string-face)))))
+
+       `(gnus-header-from ((,cls (:inherit message-header-to))))
+       `(gnus-header-name ((,cls (:inherit message-header-name))))
+       `(gnus-header-content ((,cls (:inherit message-header-other))))
+       `(gnus-header-subject ((,cls (:inherit message-header-subject))))
+       `(gnus-header-newsgroups ((,cls (:inherit message-header-newsgroups))))
+
+       `(notmuch-tag-face ((,cls (:inherit font-lock-keyword-face))))
+       `(notmuch-tag-unread ((,cls (:inherit font-lock-type-face))))
+       `(notmuch-tag-flagged ((,cls (:inherit font-lock-string-face))))
+       `(notmuch-tree-match-tag-face ((,cls (:inherit (bold notmuch-tag-face)))))
+       `(notmuch-crypto-signature-bad ((,cls (:inherit error))))
+       `(notmuch-crypto-signature-unknown ((,cls (:inherit notmuch-crypto-signature-bad))))
+       `(notmuch-crypto-signature-good ((,cls (:inherit success))))
+       `(notmuch-crypto-signature-good-key ((,cls (:background ,orange-int))))
+       `(notmuch-search-matching-authors ((,cls (:inherit notmuch-tree-match-author-face))))
+
+      ;;; tab-bar
+       ;; `(tab-bar)
+       `(tab-bar-tab ((,cls (:foreground ,white :inherit default))))
+       `(tab-bar-tab-inactive ((,cls (:foreground ,very-light-grey :background ,black-dim))))
+       `(tab-bar-separator ((,cls (:foreground ,blue :inherit tab-bar-tab))))
+       `(tab-bar-inactive-separator ((,cls (:foreground "black" :inherit tab-bar-tab-inactive))))
+
+       ;; (tab-bar-tab-ungrouped)
+       ;; (tab-bar-tab-group-current)
+       ;; (tab-bar-tab-group-inactive)
+
+      ;;; git-gutter
+       `(git-gutter:added ((,cls (:foreground ,green-int :inherit bold))))
+       `(git-gutter:deleted ((,cls (:foreground ,red-int :inherit bold))))
+       `(git-gutter:modified ((,cls (:foreground ,purple-int :inherit bold))))
+       `(git-gutter:modified ((,cls (:foreground ,light-grey :inherit bold))))
+       `(git-gutter:separator ((,cls (:foreground ,turquoise :inherit bold))))
+
+       `(diff-hl-change ((,cls (:foreground ,purple-int :inherit bold))))
+       `(diff-hl-insert ((,cls (:foreground ,green-int :inherit bold))))
+       `(diff-hl-delete ((,cls (:foreground ,red-int :inherit bold))))
+       )
 
       (custom-theme-set-variables 'an-old-hope
         `(hl-todo-keyword-faces
@@ -21911,8 +21985,9 @@
             ("\\?\\?\\?+"  ,orange)))
         `(ansi-color-names-vector
           '(,dark-grey ,red ,green ,yellow ,blue ,purple ,turquoise ,white)))
-   #+END_SRC
+    #+END_SRC
 
-   #+BEGIN_SRC emacs-lisp
-      (provide-theme 'an-old-hope)
-   #+END_SRC
+    #+BEGIN_SRC emacs-lisp
+       (provide-theme 'an-old-hope)
+    #+END_SRC
+
