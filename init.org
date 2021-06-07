@@ -7643,8 +7643,40 @@
          "M-i" 'aya-expand))
     #+END_SRC
 
+*** aas
+    Tracks what you enter into a buffer, and if it matches some pattern then it
+    automatically expands a snippet.
+    Latex snippets courtesy of [[https://github.com/tecosaur/LaTeX-auto-activating-snippets][laas]].
 
+    #+BEGIN_SRC emacs-lisp
+      (use-package aas
+        :straight t)
 
+      (use-package laas
+        :straight t
+        :hook ((org-mode . aas-activate-for-major-mode)
+               (org-mode . laas-mode)
+               (LaTeX-mode . laas-mode))
+        :config
+        (put 'aas-set-snippets 'lisp-indent-function 'defun)
+        (aas-set-snippets 'laas-mode
+          :cond #'laas-mathp
+          "On"    "\\mathcal{O}(n)"
+          "O1"    "\\mathcal{O}(1)"
+          "Olog"  "\\mathcal{O}(\\log n)"
+          "Olon"  "\\mathcal{O}(n \\log n)"
+          "mod"   "\\mod"
+          ;; "<<"    nil
+          )
+
+        (aas-set-snippets 'org-mode
+          :cond (lambda () (not (laas-mathp)))
+          "<<" (lambda! ()
+                 (yas-expand-snippet
+                  (concat "#+BEGIN_SRC $1\n"
+                          "$0\n"
+                          "#+END_SRC")))))
+    #+END_SRC
 
 * Builtins
   Configurations for packages ditributed by emacs itself. Some of these I rarely use,
