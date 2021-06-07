@@ -117,6 +117,16 @@
      #!/usr/bin/env $0
    #+END_SRC
 
+** today
+   #+BEGIN_SRC snippet :tangle snippets/text-mode/today
+     # name: today
+     # group: general
+     # key: today
+     # contributor: @mohkale
+     # --
+     `(format-time-string "%Y-%m-%d")`
+   #+END_SRC
+
 * prog-mode
   #+BEGIN_SRC text :tangle snippets/prog-mode/.yas-parents :shebang
     text-mode
@@ -224,6 +234,10 @@
    #+END_SRC
 
 * org-mode
+  #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/.yas-parents
+    latex-mode
+  #+END_SRC
+
 ** bold
    #+BEGIN_SRC snippet :tangle snippets/org-mode/bold
       # name: bold
@@ -328,16 +342,6 @@
       #+include: $0
    #+END_SRC
 
-** elisp
-   #+BEGIN_SRC snippet :tangle snippets/org-mode/elisp
-     # name: elisp
-     # key: <e
-     # --
-     ,#+BEGIN_SRC emacs-lisp
-     $0
-     ,#+END_SRC
-   #+END_SRC
-
 ** src
    #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/src
      # name: src
@@ -348,58 +352,12 @@
      ,#+END_SRC
    #+END_SRC
 
-** latex
-   #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/latex
-     # name: latex
-     # key: <l
-     # --
-     ,#+BEGIN_SRC latex
-     $0
-     ,#+END_SRC
-   #+END_SRC
-
-** C
-   #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/C
-     # name: C
-     # key: <c
-     # --
-     ,#+BEGIN_SRC C
-     $0
-     ,#+END_SRC
-   #+END_SRC
-
-** python
-   #+BEGIN_SRC emacs-lisp :tangle snippets/org-mode/python
-     # name: python
-     # key: <p
-     # --
-     ,#+BEGIN_SRC python
-     $0
-     ,#+END_SRC
-   #+END_SRC
-
-** roam_tags
+** filetags
    #+BEGIN_SRC snippet :tangle snippets/org-mode/roam_tags
      # name: roam_tags
      # key: rt
      # --
-     ,#+roam_tags: $0
-   #+END_SRC
-
-** roam_alias
-   #+BEGIN_SRC snippet :tangle snippets/org-mode/roam_alias
-     # name: roam_alias
-     # key: ra
-     # --
-     ,#+roam_alias: $0
-   #+END_SRC
-
-** roam_key
-   #+BEGIN_SRC snippet :tangle snippets/org-mode/roam_key
-     # name: roam_key
-     # key: rk
-     # --
-     ,#+roam_key: $0
+     ,#+filetags: $0
    #+END_SRC
 
 * web-mode
@@ -1317,8 +1275,7 @@
      # key: ias
      # group : general
      # --
-     import ${1:lib} as ${3:alias}
-     $0
+     import ${1:lib} as ${3:alias}$0
    #+END_SRC
 
 ** pl
@@ -2383,7 +2340,7 @@
       # key: up
       # --
       (use-package ${1:package-name}
-      :straight t$0)
+        :straight t$0)
    #+END_SRC
 
 ** with-current-buffer
@@ -2423,7 +2380,6 @@
 * latex-mode
 ** abs
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/abs
-      # -*- mode: snippet -*-
       # name: abs
       # key: abs
       # --
@@ -2432,7 +2388,6 @@
 
 ** acronym
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/acronym
-      # -*- mode: snippet -*-
       # name: acronym
       # key: ac
       # --
@@ -2441,7 +2396,6 @@
 
 ** add
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/add
-      # -*- mode: snippet -*-
       # name: add
       # key: a
       # --
@@ -2450,7 +2404,6 @@
 
 ** article
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/article
-      # -*- mode: snippet -*-
       # name: full template of article class
       # key: article
       # --
@@ -2466,7 +2419,6 @@
 
 ** bigcap
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/bigcap
-      # -*- mode: snippet -*-
       # name: bigcap
       # key: bigcap
       # --
@@ -2475,7 +2427,6 @@
 
 ** bigcup
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/bigcup
-      # -*- mode: snippet -*-
       # name: bigcup
       # key: bigcup
       # --
@@ -2484,7 +2435,6 @@
 
 ** binom
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/binom
-      # -*- mode: snippet -*-
       # name: binom
       # key: binom
       # --
@@ -2493,7 +2443,6 @@
 
 ** capgls
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/capgls
-      # -*- mode: snippet -*-
       # name: Gls
       # key: G
       # --
@@ -2502,7 +2451,6 @@
 
 ** caption
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/caption
-      # -*- mode: snippet -*-
       # name: caption
       # key: ca
       # --
@@ -2511,7 +2459,6 @@
 
 ** cite
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/cite
-      # -*- mode: snippet -*-
       # name: cite
       # key: c
       # --
@@ -2520,7 +2467,6 @@
 
 ** columns
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/columns
-      # -*- mode: snippet -*-
       # name: columns
       # key: cols
       # --
@@ -2537,7 +2483,6 @@
 
 ** figure
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/figure
-      # -*- mode: snippet -*-
       # name: figure
       # key: fig
       # --
@@ -2551,7 +2496,6 @@
 
 ** frame
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/frame
-      # -*- mode: snippet -*-
       # name: frame
       # key: fr
       # --
@@ -2563,7 +2507,6 @@
 
 ** frac
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/frac
-      # -*- mode: snippet -*-
       # name: frac
       # key: f
       # --
@@ -2572,7 +2515,6 @@
 
 ** if
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/if
-      # -*- mode: snippet -*-
       # name: if
       # key: if
       # --
@@ -2585,7 +2527,6 @@
 
 ** includegraphics
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/includegraphics
-      # -*- mode: snippet -*-
       # name: includegraphics
       # key: ig
       # --
@@ -2594,7 +2535,6 @@
 
 ** item
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/item
-      # -*- mode: snippet -*-
       # name: item
       # key: it
       # --
@@ -2603,7 +2543,6 @@
 
 ** left-right
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/left-right
-      # -*- mode: snippet -*-
       # name: left and right
       # key: lr
       # --
@@ -2612,7 +2551,6 @@
 
 ** listing
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/listing
-      # -*- mode: snippet -*-
       # name: listing
       # key: lst
       # --
@@ -2623,7 +2561,6 @@
 
 ** math
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/math
-     # -*- mode: snippet -*-
      # name: math
      # key: m
      # --
@@ -2632,7 +2569,6 @@
 
 ** math-displayed
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/math-displayed
-      # -*- mode: snippet -*-
       # name: math-displayed
       # key: M
       # --
@@ -2641,7 +2577,6 @@
 
 ** movie
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/movie
-      # -*- mode: snippet -*-
       # name: movie
       # key: movie
       # --
@@ -2661,7 +2596,6 @@
 
 ** note
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/note
-      # -*- mode: snippet -*-
       # name: note
       # key: no
       # --
@@ -2670,7 +2604,6 @@
 
 ** prod
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/prod
-      # -*- mode: snippet -*-
       # name: prod
       # key: prod
       # --
@@ -2679,7 +2612,6 @@
 
 ** python
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/python
-      # -*- mode: snippet -*-
       # name: python
       # key: <p
       # --
@@ -2691,7 +2623,6 @@
 
 ** section
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/section
-      # -*- mode: snippet -*-
       # name: section
       # key: sec
       # --
@@ -2703,7 +2634,6 @@
 
 ** subf
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/subf
-      # -*- mode: snippet -*-
       # name: subf
       # key: sf
       # --
@@ -2713,27 +2643,40 @@
       $0
    #+END_SRC
 
+** supersubscript
+   #+BEGIN_SRC snippet :tangle snippets/latex-mode/supersubscript
+     # name: supersubscript
+     # key: ss
+     # --
+     {$1}^{$2}_{$3}$0
+   #+END_SRC
+
 ** superscript
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/superscript
-      # -*- mode: snippet -*-
-      # name: superscript
-      # key: su
-      # --
-      {$1}^{$2}$0
+     # name: superscript
+     # key: su
+     # --
+     {$1}^{$2}$0
    #+END_SRC
 
 ** subscript
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/subscript
-      # -*- mode: snippet -*-
       # name: subscript
       # key: sb
       # --
       {$1}_{$2}$0
    #+END_SRC
 
+** text
+   #+BEGIN_SRC snippet :tangle snippets/latex-mode/text
+     # name: text
+     # key: txt
+     # --
+     \text{$1}$0
+   #+END_SRC
+
 ** subfigure
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/subfigure
-      # -*- mode: snippet -*-
       # name: subfigure
       # key: subfig
       # --
@@ -2751,7 +2694,6 @@
 
 ** subsec
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/subsec
-      # -*- mode: snippet -*-
       # name: subsec
       # key: sub
       # --
@@ -2763,7 +2705,6 @@
 
 ** sigma
    #+BEGIN_SRC snippet :tangle snippets/latex-mode/sigma
-     # -*- mode: snippet -*-
      # name: sigma
      # key: sum
      # --
@@ -2773,7 +2714,6 @@
 * c-lang-common
 ** typedef
    #+BEGIN_SRC snippet :tangle snippets/c-lang-common/typedef
-      # -*- mode: snippet -*-
       # name: typedef
       # key: typedef
       # --
@@ -2782,7 +2722,6 @@
 
 ** guard
    #+BEGIN_SRC snippet :tangle snippets/c-lang-common/guard
-      # -*- mode: snippet -*-
       # name: #ifndef XXX; #define XXX; #endif
       # key: guard
       # --
@@ -2796,7 +2735,6 @@
 
 ** main
    #+BEGIN_SRC snippet :tangle snippets/c-lang-common/main
-      # -*- mode: snippet -*-
       # name: main
       # key: main
       # --
@@ -2808,7 +2746,6 @@
 
 ** inc.1
    #+BEGIN_SRC snippet :tangle snippets/c-lang-common/incl
-      # -*- mode: snippet -*-
       # name: #include "..."
       # key  : incl
       # --
@@ -2817,7 +2754,6 @@
 
 ** inc
    #+BEGIN_SRC snippet :tangle snippets/c-lang-common/inc
-      # -*- mode: snippet -*-
       # name: #include <...>
       # key  : inc
       # --
@@ -2826,7 +2762,6 @@
 
 ** ifdef
    #+BEGIN_SRC snippet :tangle snippets/c-lang-common/ifdef
-      # -*- mode: snippet -*-
       # name: ifdef
       # key: ifdef
       # --
@@ -2837,7 +2772,6 @@
 
 # ** function_doxygen_doc
 #    #+BEGIN_SRC snippet :tangle snippets/c-lang-common/function_doxygen_doc
-#       # -*- mode: snippet -*-
 #       # contributor: Dan Pitic <dpitic@gmail.com>
 #       # name: Function Doxygen Doc
 #       # key: doxy
@@ -2856,7 +2790,6 @@
 
 ** fopen
    #+BEGIN_SRC snippet :tangle snippets/c-lang-common/fopen
-      # -*- mode: snippet -*-
       # name: FILE *fp = fopen(..., ...);
       # key: fopen
       # --
@@ -2866,7 +2799,6 @@
 * cc-mode
 ** while
    #+BEGIN_SRC snippet :tangle snippets/cc-mode/while
-      # -*- mode: snippet -*-
       # name: while
       # key: while
       # --
@@ -2877,7 +2809,6 @@
 
 ** ternary
    #+BEGIN_SRC snippet :tangle snippets/cc-mode/ternary
-      # -*- mode: snippet -*-
       # name: ternary
       # key: ?
       # --
@@ -2886,7 +2817,6 @@
 
 ** switch
    #+BEGIN_SRC snippet :tangle snippets/cc-mode/switch
-      # -*- mode: snippet -*-
       # name: switch (...) { case : ... default: ...}
       # key: switch
       # --
@@ -2901,7 +2831,6 @@
 
 ** struct
    #+BEGIN_SRC snippet :tangle snippets/cc-mode/struct
-      # -*- mode: snippet -*-
       # name: struct ... { ... }
       # key: struct
       # --
@@ -2912,7 +2841,6 @@
 
 ** printf
    #+BEGIN_SRC snippet :tangle snippets/cc-mode/printf
-      # -*- mode: snippet -*-
       # name: printf
       # key: printf
       # --
@@ -2922,7 +2850,6 @@
 
 ** if
    #+BEGIN_SRC snippet :tangle snippets/cc-mode/if
-      # -*- mode: snippet -*-
       # name: if (...) { ... }
       # key: if
       # --
@@ -2933,7 +2860,6 @@
 
 # ** function_description
 #    #+BEGIN_SRC snippet :tangle snippets/cc-mode/function_description
-#       # -*- mode: snippet -*-
 #       #cotributor: Henrique Jung <henriquenj@gmail.com>
 #       # name: Function description
 #       # key: \brief
@@ -2951,7 +2877,6 @@
 
 ** for_n
    #+BEGIN_SRC snippet :tangle snippets/cc-mode/for_n
-      # -*- mode: snippet -*-
       # contributor: York Zhao
       # name: for_n
       # key: forn
@@ -2963,7 +2888,6 @@
 
 ** for
    #+BEGIN_SRC snippet :tangle snippets/cc-mode/for
-      # -*- mode: snippet -*-
       # name: for
       # key: for
       # --
@@ -2974,7 +2898,6 @@
 
 # ** file_description
 #    #+BEGIN_SRC snippet :tangle snippets/cc-mode/file_description
-#       # -*- mode: snippet -*-
 #       #cotributor: Henrique Jung <henriquenj@gmail.com>
 #       # name: File description
 #       # key: \file
@@ -2991,7 +2914,6 @@
 
 ** else
    #+BEGIN_SRC snippet :tangle snippets/cc-mode/else
-      # -*- mode: snippet -*-
       # name: else { ... }
       # key: else
       # --
@@ -3002,7 +2924,6 @@
 
 ** do
    #+BEGIN_SRC snippet :tangle snippets/cc-mode/do
-      # -*- mode: snippet -*-
       # name: do { ... } while (...)
       # key: do
       # --
@@ -3013,7 +2934,6 @@
 
 ** case
    #+BEGIN_SRC snippet :tangle snippets/cc-mode/case
-      # -*- mode: snippet -*-
       # name: case : {...}
       # key: case
       # expand-env: ((yas-also-auto-indent-first-line t))
@@ -3032,7 +2952,6 @@
 
 ** union
    #+BEGIN_SRC snippet :tangle snippets/c-mode/union
-      # -*- mode: snippet -*-
       # name: union
       # key: union
       # --
@@ -3043,7 +2962,6 @@
 
 ** printf
    #+BEGIN_SRC snippet :tangle snippets/c-mode/printf
-      # -*- mode: snippet -*-
       # name: printf
       # key: pr
       # --
@@ -3052,7 +2970,6 @@
 
 ** packed
    #+BEGIN_SRC snippet :tangle snippets/c-mode/packed
-      # -*- mode: snippet -*-
       # name: packed
       # key: packed
       # --
@@ -3061,7 +2978,6 @@
 
 ** malloc
    #+BEGIN_SRC snippet :tangle snippets/c-mode/malloc
-      # -*- mode: snippet -*-
       # name: malloc
       # key: malloc
       # --
@@ -3071,7 +2987,6 @@
 
 ** fprintf
    #+BEGIN_SRC snippet :tangle snippets/c-mode/fprintf
-      # -*- mode: snippet -*-
       # name: fprintf
       # key: fprintf
       # --
@@ -3080,7 +2995,6 @@
 
 ** define
    #+BEGIN_SRC snippet :tangle snippets/c-mode/define
-      # -*- mode: snippet -*-
       # name: define
       # key: d
       # --
@@ -3110,7 +3024,6 @@
 
 ** using
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/using
-      # -*- mode: snippet -*-
       # name: using namespace ...
       # key: using
       # --
@@ -3120,7 +3033,6 @@
 
 ** tryw
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/tryw
-      # -*- mode: snippet -*-
       # name: tryw
       # key: tryw
       # --
@@ -3133,7 +3045,6 @@
 
 ** try
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/try
-      # -*- mode: snippet -*-
       # name: try
       # key: try
       # a bit too intrusive now still, not always I want to do this
@@ -3147,7 +3058,6 @@
 
 # ** trm
 #    #+BEGIN_SRC snippet :tangle snippets/c++-mode/trm
-#       # -*- mode: snippet -*-
 #       # name: generate_n
 #       # key: trm
 #       # --
@@ -3157,7 +3067,6 @@
 
 ** throw
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/throw
-      # -*- mode: snippet -*-
       # name: throw
       # key: throw
       # --
@@ -3166,7 +3075,6 @@
 
 ** this
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/this
-      # -*- mode: snippet -*-
       # name: this
       # key: th
       # --
@@ -3175,7 +3083,6 @@
 
 ** return
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/return
-      # -*- mode: snippet -*-
       # name: return
       # key: ret
       # --
@@ -3184,7 +3091,6 @@
 
 # ** test_suite
 #    #+BEGIN_SRC snippet :tangle snippets/c++-mode/test_suite
-#       # -*- mode: snippet -*-
 #       # name: test_suite
 #       # key: ts
 #       # group: testing
@@ -3198,7 +3104,6 @@
 
 # ** test_main
 #    #+BEGIN_SRC snippet :tangle snippets/c++-mode/test_main
-#       # -*- mode: snippet -*-
 #       # name: test_main
 #       # key: test_main
 #       # group: testing
@@ -3211,7 +3116,6 @@
 
 # ** test case
 #    #+BEGIN_SRC snippet :tangle snippets/c++-mode/test-case
-#       # -*- mode: snippet -*-
 #       # name: test case
 #       # key: tc
 #       # group: testing
@@ -3223,7 +3127,6 @@
 
 ** template
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/template
-      # -*- mode: snippet -*-
       # name: template
       # key: temp
       # --
@@ -3233,7 +3136,6 @@
 
 ** std_colon
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/std_colon
-      # -*- mode: snippet -*-
       # name: std::
       # key: st
       # --
@@ -3242,7 +3144,6 @@
 
 ** std
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/std
-      # -*- mode: snippet -*-
       # name: std
       # key: std
       # --
@@ -3251,7 +3152,6 @@
 
 ** protected
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/protected
-      # -*- mode: snippet -*-
       # name: protected
       # key: pt
       # expand-env: ((yas-also-auto-indent-first-line t))
@@ -3262,7 +3162,6 @@
 
 ** private
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/private
-      # -*- mode: snippet -*-
       # name: private
       # key: pr
       # expand-env: ((yas-also-auto-indent-first-line t))
@@ -3273,7 +3172,6 @@
 
 ** operator_ostream
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator_ostream
-      # -*- mode: snippet -*-
       # name: operator<<
       # key: <<
       # group: operator overloading
@@ -3286,7 +3184,6 @@
 
 ** operator_istream
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator_istream
-      # -*- mode: snippet -*-
       # name: operator>>
       # key: >>
       # group: operator overloading
@@ -3299,7 +3196,6 @@
 
 ** operator[]
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator[]
-     # -*- mode: snippet -*-
      # name: operator[]
      # key: []
      # group: operator overloading
@@ -3311,7 +3207,6 @@
 
 ** operator==
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator==
-      # -*- mode: snippet -*-
       # name: operator==
       # key: ==
       # group: operator overloading
@@ -3323,7 +3218,6 @@
 
 ** operator=
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator=
-      # -*- mode: snippet -*-
       # name: operator=
       # key: =
       # where this is a reference to myself
@@ -3339,7 +3233,6 @@
 
 ** operator+=
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator+=
-      # -*- mode: snippet -*-
       # name: operator+=
       # key: +=
       # group: operator overloading
@@ -3352,7 +3245,6 @@
 
 ** operator+
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator+
-      # -*- mode: snippet -*-
       # name: operator+
       # key: +
       # group: operator overloading
@@ -3366,7 +3258,6 @@
 
 ** operator!=
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/operator!=
-     # -*- mode: snippet -*-
      # name: operator!=
      # key: !=
      # group: operator overloading
@@ -3378,7 +3269,6 @@
 
 ** namespace
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/namespace
-      # -*- mode: snippet -*-
       # name: namespace
       # key: ns
       # --
@@ -3391,7 +3281,6 @@
 
 ** member_function
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/member_function
-     # -*- mode: snippet -*-
      # name: member_function
      # key: fund
      # --
@@ -3402,7 +3291,6 @@
 
 ** inline
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/inline
-      # -*- mode: snippet -*-
       # name: inline
       # key: il
       # --
@@ -3411,7 +3299,6 @@
 
 ** function
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/function
-      # -*- mode: snippet -*-
       # name: function
       # key: fun
       # --
@@ -3420,7 +3307,6 @@
 
 ** friend
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/friend
-      # -*- mode: snippet -*-
       # name: friend
       # key: fr
       # --
@@ -3429,7 +3315,6 @@
 
 ** fori
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/fori
-      # -*- mode: snippet -*-
       # name: fori
       # key: fori
       # --
@@ -3440,7 +3325,6 @@
 
 # ** fixture
 #    #+BEGIN_SRC snippet :tangle snippets/c++-mode/fixture
-#       # -*- mode: snippet -*-
 #       # name: fixture
 #       # key: fixt
 #       # --
@@ -3453,7 +3337,6 @@
 
 ** enum
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/enum
-      # -*- mode: snippet -*-
       # name: enum
       # key: enum
       # --
@@ -3464,7 +3347,6 @@
 
 ** doc
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/doc
-      # -*- mode: snippet -*-
       # name: doc
       # key: doc
       # --
@@ -3475,7 +3357,6 @@
 
 ** delete[]
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/delete[]
-     # -*- mode: snippet -*-
      # name: delete[]
      # key: dla
      # --
@@ -3484,7 +3365,6 @@
 
 ** delete
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/delete
-      # -*- mode: snippet -*-
       # name: delete
       # key: dl
       # --
@@ -3493,7 +3373,6 @@
 
 ** d_operator_ostream
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/d_operator_ostream
-      # -*- mode: snippet -*-
       # name: d_operator<<
       # key: <<
       # --
@@ -3502,7 +3381,6 @@
 
 ** d_operator_istream
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/d_operator_istream
-      # -*- mode: snippet -*-
       # name: d_operator>>
       # key: >>
       # --
@@ -3511,7 +3389,6 @@
 
 ** d_operator[]_const
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/d_operator[]_const
-     # -*- mode: snippet -*-
      # name: d_operator[]_const
      # key: c[
      # --
@@ -3520,7 +3397,6 @@
 
 ** d_operator[]
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/d_operator[]
-     # -*- mode: snippet -*-
      # name: d_operator[]
      # key: [
      # --
@@ -3529,7 +3405,6 @@
 
 ** d_operator
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/d_operator
-      # -*- mode: snippet -*-
       # name: d_operator<<
       # key: <<
       # --
@@ -3538,7 +3413,6 @@
 
 ** d+=
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/d+=
-      # -*- mode: snippet -*-
       # name: d+=
       # key: d+=
       # --
@@ -3547,7 +3421,6 @@
 
 ** cpp
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/cpp
-      # -*- mode: snippet -*-
       # name: cpp
       # key: cpp
       # --
@@ -3556,7 +3429,6 @@
 
 ** constructor
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/constructor
-      # -*- mode: snippet -*-
       # name: constructor
       # key: ct
       # --
@@ -3567,7 +3439,6 @@
 
 ** const_[]
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/const_[]
-     # -*- mode: snippet -*-
      # name: const_[]
      # key: c[
      # --
@@ -3578,7 +3449,6 @@
 
 ** class11
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/class11
-     # -*- mode: snippet -*-
      # name: class11
      # key: cls11
      # group: c++11
@@ -3626,7 +3496,6 @@
 
 ** class
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/class
-      # -*- mode: snippet -*-
       # name: class
       # key: cls
       # --
@@ -3640,7 +3509,6 @@
 
 # ** boost_require
 #    #+BEGIN_SRC snippet :tangle snippets/c++-mode/boost_require
-#       # -*- mode: snippet -*-
 #       # name: boost_require
 #       # key: req
 #       # group: boost
@@ -3651,7 +3519,6 @@
 
 ** beginend
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/beginend
-      # -*- mode: snippet -*-
       # name: v.begin(), v.end()
       # key: beginend
       # --
@@ -3660,7 +3527,6 @@
 
 ** assert
    #+BEGIN_SRC snippet :tangle snippets/c++-mode/assert
-      # -*- mode: snippet -*-
       # name: assert
       # key: ass
       # --
