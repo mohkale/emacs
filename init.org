@@ -182,6 +182,7 @@
          ;; vterm                                                          ; A virtual terminal emulator... interfaced with emacs
          ;; wakatime                                                       ; Track your habits using the [[wakatime][https://wakatime.com/]]
          ;; ztree                                                          ; Directory tree viewer, think NERDTree
+         git-gutter                                                        ; Show version control information in the window fringe.
 
      ;;; Completion frameworks
          ;; ivy                                                            ; A clean minimalist completion framework.
@@ -15421,6 +15422,52 @@
         "r" 'recompile
         "f" 'next-error-follow-minor-mode))
    #+END_SRC
+
+** git-gutter
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! git-gutter)
+   :END:
+
+   #+begin_src emacs-lisp :tangle no
+     (use-package git-gutter ;; git-gutter-fringe
+       :straight t
+       :defer 10
+       :delight ""
+       :custom
+       (git-gutter:added-sign "┃")
+       (git-gutter:modified-sign "┃")
+       (git-gutter:added-sign "┃")
+       (git-gutter:deleted-sign "┃")
+       (git-gutter:hide-gutter t)
+
+       ;; :config
+       ;; (add-hook 'prog-mode-hook #'git-gutter-mode)
+
+       :leader
+       ("tg" 'git-gutter-mode
+        "tG" 'global-git-gutter-mode))
+   #+end_src
+
+   #+begin_src emacs-lisp
+     (use-package diff-hl
+       :straight t
+       :hook ((diff-hl-mode . diff-hl-margin-mode)
+              (diff-hl-mode . diff-hl-flydiff-mode))
+       :custom
+       (diff-hl-flydiff-delay 0.8)
+       (diff-hl-margin-symbols-alist
+        '((insert . "┃")
+          (delete . "┃")
+          (change . "┃")
+          (unknown . "┃")
+          (ignored . "┃")))
+       :init
+       (use-package smartrep
+         :straight t)
+
+       :leader
+       ("tg" 'diff-hl-mode))
+   #+end_src
 
 ** hide-comnt
    Toggles the display of comments in the current buffer.
