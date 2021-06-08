@@ -1875,138 +1875,6 @@
         (add-hook 'emacs-startup-hook 'animate-birthday-present))
     #+END_SRC
 
-*** dotfiles
-    :PROPERTIES:
-    :header-args+: :tangle lisp/+dotfiles.el
-    :END:
-
-    This branch defines commands to interface with scripts from my [[https://github.com/mohkale/dotfiles][dotfiles]].
-
-    #+BEGIN_SRC emacs-lisp :tangle yes
-      (use-package +dotfiles
-        :commands (+dot-goto-repo
-                   +dot-goto-fsmap
-                   +dot-goto-fsmap-dirs
-                   +dot-goto-executable
-                   +dot-open-bookmark)
-        :leader
-        ("fd" "dotfiles"
-         "fdp" '+dot-goto-repo
-         "fdf" '+dot-goto-fsmap
-         "fdd" '+dot-goto-fsmap-dirs
-         "fdx" '+dot-goto-executable
-         "fdb" '+dot-open-bookmark))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp
-      (defconst +dot-goto-repo-command '("ls-projects"))
-
-      (defvar +dot-goto-repo-history nil)
-      (defun +dot-goto-repo ()
-        (interactive)
-        "List repositories using my [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-repos][ls-projects]] script and ask for one to jump to."
-        (let ((repo (completing-read "Repo: "
-                                     (apply #'process-lines +dot-goto-repo-command)
-                                     nil t nil '+dot-goto-repo-history)))
-          (dired repo)))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp
-      (defconst +dot-goto-executable-command '("ls-exec"))
-
-      (defvar +dot-goto-executable-history nil)
-      (defun +dot-goto-executable ()
-        (interactive)
-        "List and jump to an executable using [[https://github.com/mohkale/dotfiles/blob/master/bin/ls-exec][ls-exec]]."
-        (let ((cand (completing-read "Executable: "
-                                     (apply #'process-lines +dot-goto-executable-command))))
-          (find-file cand)))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp
-      (defconst +dot-goto-fsmap-command
-        '("sh" "-c"
-          "ls-fsmaps -er | if hash column 2>/dev/null; then column -s : -t; else tr ':' ' '; fi"))
-
-      (defconst +dot-goto-fsmap-dirs-command
-        '("sh" "-c"
-          "ls-fsmaps -erd | if hash column 2>/dev/null; then column -s : -t; else tr ':' ' '; fi"))
-
-      (defun +dot-goto-fsmap-format-lines (lines)
-        (save-match-data
-          (cl-loop for fsmap in lines
-                   with path  = nil
-                   with alias = nil
-                   with spacing = nil
-                   when (string-match (rx bol
-                                          (group (one-or-more (not whitespace)))
-                                          (group (+ (any whitespace)))
-                                          (group (one-or-more anychar))
-                                          eol)
-                                      fsmap)
-                     do (setq alias   (match-string 1 fsmap)
-                              spacing (match-string 2 fsmap)
-                              path    (match-string 3 fsmap))
-                     and collect (propertize
-                                  (concat (propertize alias 'face 'font-lock-type-face)
-                                           spacing
-                                           ;; (propertize path 'face (if (file-directory-p path) 'dired-directory 'default))
-                                           path)
-                                  'fsmap path))))
-
-      (defvar +dot-goto-fsmap-history nil)
-      (defun +dot-goto-fsmap (&optional dirs-only)
-        "List file system maps (using [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-fsmaps][here]]) and find one in emacs."
-        (interactive "P")
-        (if-let ((fsmaps (+dot-goto-fsmap-format-lines
-                          (apply #'process-lines
-                                 (if dirs-only
-                                     +dot-goto-fsmap-dirs-command
-                                   +dot-goto-fsmap-command)))))
-            (find-file (get-text-property 0 'fsmap (completing-read "File system map: " fsmaps nil t nil '+dot-goto-fsmap-history)))
-          (user-error "No fsmaps found")))
-
-      (defun +dot-goto-fsmap-dirs ()
-        (interactive)
-        (+dot-goto-fsmap '(4)))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp
-      (defconst +dot-open-bookmark-command '("ls-bookmarks"))
-
-      (defun +dot-open-bookmark-format-lines (lines)
-        (cl-loop for row in lines
-                 do (setq row (split-string row "\t"))
-                 with url   = nil
-                 with tags  = nil
-                 with title = nil
-                 do (setq url   (nth 0 row)
-                          tags  (nth 1 row)
-                          title (nth 2 row))
-                 when (string-prefix-p "http" url)
-                   collect (propertize
-
-                            (concat (unless (string-empty-p tags)
-                                      (propertize (concat "(" tags ") ") 'face 'bold))
-                                    title
-                                    (when url
-                                      (when-let ((domain (url-domain (url-generic-parse-url url))))
-                                        (concat " [" (propertize domain 'face 'font-lock-preprocessor-face) "]"))))
-                            'bookmark url)))
-
-      (defvar +dot-open-bookmark-history nil)
-      (defun +dot-open-bookmark ()
-        "List system bookmarks (using [[https://github.com/mohkale/dotfiles/blob/master/bin/ls-bookmarks][this]]) and open it in your default browser."
-        (interactive)
-        (if-let ((bookmarks (+dot-open-bookmark-format-lines (apply #'process-lines +dot-open-bookmark-command))))
-            (xopen-url+ (get-text-property 0 'bookmark (completing-read "Bookmark: " bookmarks nil t nil '+dot-open-bookmark-history)))
-          (user-error "No bookmarks")))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp
-      (provide '+dotfiles)
-    #+END_SRC
-
 * Core
   core functions needed to edit with emacs and basic syntax sugar functions, inspired
   by [[https://github.com/hlissner/doom-emacs/blob/develop/core/core-lib.el][doom]].
@@ -12445,12 +12313,17 @@
          consult-recent-file
          consult--source-file
          consult--source-project-file
+         +dot-goto-fsmap
          :preview-key consult-manual-preview-key)
 
         (consult-customize consult-recent-file :sort nil)
 
+        (setq consult-async-default-split "/")
+        ;; Async commands that produce a lot of output so it's useful for them to be async
+        ;; but once produced you won't be re-running the command again.
         (consult-customize
-         consult-find :initial (concat consult-async-default-split "*" consult-async-default-split))
+         consult-find +dot-goto-repo +dot-goto-executable +dot-goto-fsmap +dot-open-bookmark
+         :initial (concat consult-async-default-split "*" consult-async-default-split))
 
         (consult-customize
          switch-to-scratch-buffer :state #'consult--buffer-state)
@@ -13396,6 +13269,161 @@
 **** consult-extensions-eob
      #+BEGIN_SRC emacs-lisp
        (provide '+consult-custom)
+     #+END_SRC
+
+**** dotfiles
+     :PROPERTIES:
+     :header-args+: :tangle lisp/+consult-dotfiles.el
+     :END:
+
+     This branch defines commands to interface with scripts from my [[https://github.com/mohkale/dotfiles][dotfiles]].
+
+     #+BEGIN_SRC emacs-lisp :tangle (package-str! "yes" selectrum)
+       (use-package +consult-dotfiles
+         :commands (+dot-goto-repo
+                    +dot-goto-fsmap
+                    +dot-goto-executable
+                    +dot-open-bookmark)
+         :leader
+         ("fd" "dotfiles"
+          "fdp" '+dot-goto-repo
+          "fda" '+dot-goto-fsmap
+          "fdf" '+dot-goto-fsmap
+          "fdx" '+dot-goto-executable
+          "fdb" '+dot-open-bookmark))
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp
+       (defvar +dot-goto-repo-history nil)
+
+       (defun +dot-goto-repo (repo)
+         "List repositories using my [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-repos][ls-projects]] script and ask for one to jump to."
+         (interactive
+          (list (consult--read
+                 (consult--async-command "ls-projects")
+                 :prompt "Repo: "
+                 :category 'project-file
+                 :require-match t
+                 :history '(:input +dot-goto-repo-history)
+                 :initial (consult--async-split-initial "*"))))
+         (cond
+          ((functionp 'projectile-switch-project-by-name)
+           (projectile-switch-project-by-name repo))
+          (t (dired repo))))
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp
+       (defvar +dot-goto-executable-history nil)
+
+       (defun +dot-goto-executable (executable)
+         "List and jump to an executable using [[https://github.com/mohkale/dotfiles/blob/master/bin/ls-exec][ls-exec]]."
+         (interactive
+          (list (consult--read
+                 (consult--async-command "ls-exec")
+                 :prompt "Find executable: "
+                 :category 'file
+                 :require-match t
+                 :history '(:input +dot-goto-repo-history)
+                 :initial (consult--async-split-initial "*"))))
+         (find-file executable))
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp
+       (defvar +dot-goto-fsmap-narrow '((?f . "File")
+                                        (?d . "Directory")
+                                        (?s . "Symlink")
+                                        (?u . "Unknown")))
+
+       (defun +dot-goto-fsmap-format-lines (lines)
+         (save-match-data
+           (cl-loop for fsmap in lines
+                    when (string-match (rx bol
+                                           (group (one-or-more (not whitespace)))
+                                           ":"
+                                           (group (one-or-more anychar))
+                                           eol)
+                                       fsmap)
+                      collect
+                      (let* ((alias (match-string 1 fsmap))
+                             (path  (match-string 2 fsmap))
+                             str)
+                        (setq str (concat (propertize alias 'face 'font-lock-type-face)
+                                          " "
+                                          path))
+                        (add-text-properties 0 1 `(consult--type
+                                                   ,(or (let ((type (file-attribute-type (file-attributes (file-chase-links path)))))
+                                                          (cond
+                                                           ((eq type t) ?d)
+                                                           ((eq type nil) ?f)
+                                                           ((stringp type) ?s)))
+                                                        ?u))
+                                             str)
+                        (list str (expand-file-name path) 1 1)))))
+
+       (defvar +dot-goto-fsmap-history nil)
+
+       (defun +dot-goto-fsmap (file)
+         "List file system maps (using [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-fsmaps][here]]) and find one in emacs."
+         (interactive
+          (list (consult--read
+                 (consult--async-command "ls-fsmaps -er"
+                   (consult--async-transform +dot-goto-fsmap-format-lines))
+                 :prompt "File system map: "
+                 :lookup #'consult--lookup-cdr
+                 :state (consult--grep-state)
+                 :require-match t
+                 :group
+                 (consult--type-group +dot-goto-fsmap-narrow)
+                 :narrow
+                 ;; (consult--type-narrow +dot-goto-fsmap-narrow)
+                 (let* ((narrow (consult--type-narrow +dot-goto-fsmap-narrow))
+                        (pred (plist-pop! narrow :predicate)))
+                   `(:predicate
+                     ,(lambda (cand)
+                        (funcall pred (car cand)))
+                     ,@narrow))
+                 :history '(:input +dot-goto-fsmap-history)
+                 :initial (consult--async-split-initial "*"))))
+         (find-file file))
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp
+       (defun +dot-open-bookmark-format-lines (lines)
+         (cl-loop for row in lines
+                  do (setq row (split-string row "\t"))
+                  with url   = nil
+                  with tags  = nil
+                  with title = nil
+                  do (setq url   (nth 0 row)
+                           tags  (nth 1 row)
+                           title (nth 2 row))
+                  when (string-prefix-p "http" url)
+                    collect (cons
+                             (concat (unless (string-empty-p tags)
+                                       (propertize (concat "(" tags ") ") 'face 'bold))
+                                     title
+                                     (when url
+                                       (when-let ((domain (url-domain (url-generic-parse-url url))))
+                                         (concat " [" (propertize domain 'face 'font-lock-preprocessor-face) "]"))))
+                             url)))
+
+       (defvar +dot-open-bookmark-history nil)
+
+       (defun +dot-open-bookmark (bookmark)
+         "List system bookmarks (using [[https://github.com/mohkale/dotfiles/blob/master/bin/ls-bookmarks][this]]) and open it in your default browser."
+         (interactive
+          (list (consult--read (consult--async-command "ls-bookmarks"
+                                 (consult--async-transform +dot-open-bookmark-format-lines))
+                               :prompt "Bookmark: "
+                               :lookup #'consult--lookup-cdr
+                               :require-match t
+                               :history '(:input +dot-open-bookmark-history)
+                               :initial (consult--async-split-initial "*"))))
+         (xopen-url+ bookmark))
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp
+       (provide '+dotfiles)
      #+END_SRC
 
 *** affe
