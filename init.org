@@ -1139,8 +1139,8 @@
         :straight (spaceleader :host github :repo "mohkale/spaceleader")
         :demand t
         :config
-        (require 'spaceleader-base) ;; Allow base leader bindings.
-        (leader/set-keys leader-server-leader-prefix "lang-server")
+        (require 'spaceleader-use-package)
+        (leader-set-keys leader-server-leader-prefix "lang-server")
 
         :general
         ("C-@" (general-simulate-key "C-SPC")) ;; C-SPC in terminal
@@ -1158,143 +1158,254 @@
 
     Let's add a ~use-package~ keyword for setting up leader-keys.
 
-    #+BEGIN_SRC emacs-lisp
-      ;; Where these are placed determines whether they're deferred or not.
-      (let ((tail (nthcdr (cl-position :init use-package-keywords) use-package-keywords)))
-        (setcdr tail (cons :leader (cdr tail))))
-      (let ((tail (nthcdr (cl-position :config use-package-keywords) use-package-keywords)))
-        (setcdr tail (cons :lazy-leader (cdr tail))))
+**** base
+     Here we setup the base leader-key bindings we have always available, regardless
+     of later configurations or overrides.
 
-      (defun use-package-normalize/:leader (_name _keyword args)
-        args)
+     #+begin_src emacs-lisp
+       (leader-set-keys
+         "TAB" '(switch-to-last-buffer :wk "last-buffer")
+         "SPC" '(execute-extended-command :wk "M-x")
+         "<escape>" 'abort-recursive-edit
+         "DEL"      'exit-recursive-edit
 
-      (defun use-package-leader-format-args+ (args)
-        ;; Properties
-        ;;  :defer - when true, leader are only assigned after package load
-        ;;  :modes/:mode - when true leaders are only bound in given major modes
-        ;;  :minor - when true :modes applies to minor-modes, not majors
-        ;;  :prefix - call leader/with-prefix with argument before rendering
-        (cl-loop
-         with modes = nil
-         ;; with minor = nil
-         with prefix = nil
-         ;; with leader-func = nil
-         with res = nil
-         for arg in args
-         do (let ((major (not (plist-pop! arg :minor))))
-              (setq modes (or (plist-pop! arg :modes)
-                              (plist-pop! arg :mode))
-                    prefix (plist-pop! arg :prefix)
-                    res (if modes
-                            (list (if major 'leader/set-keys-for-major-mode 'leader/set-keys-for-mode)
-                                  modes)
-                            ""
-                          '(leader/set-keys))
-                    ;; leader-func '(leader/set-keys-for-mode)
-                    ))
-         when (not arg)
-         do (display-warning 'use-package ":leader got no bindings")
-         else
-         do (setq res `(,@res ,@arg))
-         end
-         when prefix
-         do (setq res `(leader/with-prefix ,prefix ,res))
-         end
-         collect res))
+         "!" 'shell-command
+         "&" 'async-shell-command
+         "." 'repeat
+         "u" 'universal-argument)
 
-      (defun use-package-handler/:leader (name keyword args rest state &optional _defer)
-        (let ((body (use-package-process-keywords name rest state)))
-          (if (not args)
-              body
-            (use-package-concat
-             (funcall use-package--hush-function keyword
-                      (list (cons 'progn (use-package-leader-format-args+ args))))
-             body))))
+       (leader-declare-prefix "a" "applications")
+       (leader-set-keys
+         "a:" 'eshell
+         "a*" 'calc-dispatch
+         "ad" 'calendar
+         "af" 'describe-face
+         "aX" 'customize
+         "al" 'find-library
+         "at" 'load-theme
+         "am" +man-command
+         "ae" 'list-processes
 
-      (defalias 'use-package-normalize/:lazy-leader #'use-package-normalize/:leader)
-      (defalias 'use-package-handler/:lazy-leader #'use-package-handler/:leader)
-    #+END_SRC
+         "ap" '(nil :wk "packages")
+         "api" 'straight-use-package
+         "apU" 'straight-pull-all
+         "apu" 'straight-pull-package-and-deps
+         "apf" 'straight-fetch-all
+         "apx" 'straight-prune-build
+         "apR" 'straight-rebuild-all
+         "apr" 'straight-rebuild-package
+         "apz" 'straight-freeze-versions
+         "apt" 'straight-thaw-versions)
 
-    #+BEGIN_SRC emacs-lisp
-      (leader/set-keys
-        "TAB" "last-buffer"
-        "TAB" 'switch-to-last-buffer
+       (leader-declare-prefix "b" "buffers")
+       (leader-set-keys
+         "bb" 'switch-to-buffer
+         "bB" 'switch-to-buffer-other-window
+         "bd" 'kill-this-buffer
+         "bE" 'erase-buffer
+         "bm" 'buffer-menu
+         "bn" 'next-buffer
+         "bp" 'previous-buffer
+         "bc" 'rename-buffer
+         "bC" 'rename-uniquely
+         "bo" 'occur
+         "b DEL" 'bury-buffer
+         "be" 'safe-erase-buffer
+         "bK" 'kill-this-buffer
+         "bk" 'kill-this-buffer-and-window-maybe
+         "bM" 'switch-to-messages-buffer
+         "by" 'yank-whole-buffer-as-kill)
 
-        "fj" '("jump-to-directory" . dired-jump)
-        "jd" '("jump-to-directory" . dired-jump)
-        "jD" '("jump-to-directory-other-window" . dired-jump-other-window)
+       (leader-declare-prefix "c" "compile/comments")
+       (leader-set-keys
+         "cx" 'kill-compilation
+         "cr" 'recompile
+         "ck" 'comment-kill
+         "c[" 'comment-box
+         "ci" 'comment-indent
+         "cb" 'display-compilation-buffer
+         "cy" 'yank-and-comment
+         "cc" 'compile)
 
-        "ic" 'insert-char
+       (leader-declare-prefix "e" "errors")
+       (leader-set-keys
+         "e1" 'first-error
+         "en" 'next-error
+         "ep" 'previous-error)
 
-        "a"  "applications"
-        "a:" 'eshell
-        "a*" 'calc-dispatch
-        "ad" 'calendar
-        "af" 'describe-face
-        "aX" 'customize
-        "al" 'find-library
-        "at" 'load-theme
-        "am" +man-command
-        "ae" 'list-processes
+       (leader-declare-prefix
+        "h" "help"
+        "hd" "help-describe")
+       (leader-set-keys
+         "hh" 'display-local-help
+         "hn" 'view-emacs-news
+         "h/" 'apropos-command
+         "hg" 'describe-gnu-project
+         "hl" 'view-lossage                                                            ; show last few entered commands
+         "hw" 'where-is                                                                ; show where a command is bound
+         "hp" 'view-emacs-problems
+         "ht" 'view-emacs-todo
+         "h RET" 'view-order-manuals
 
-        "ap" "packages"
-        "api" 'straight-use-package
-        "apU" 'straight-pull-all
-        "apu" 'straight-pull-package-and-deps
-        "apf" 'straight-fetch-all
-        "apx" 'straight-prune-build
-        "apR" 'straight-rebuild-all
-        "apr" 'straight-rebuild-package
-        "apz" 'straight-freeze-versions
-        "apt" 'straight-thaw-versions
+         "hdo" 'describe-symbol
+         "hdi" 'describe-input-method
+         "hdL" 'describe-language-environment
+         "hdb" 'describe-bindings
+         "hdc" 'describe-char
+         "hdu" 'describe-coding-system
+         "hdF" 'describe-face
+         "hdk" 'describe-key
+         "hdK" 'describe-key-briefly
+         "hdp" 'describe-package
+         "hdP" 'finder-by-keyword
+         "hds" 'describe-syntax
+         "hdt" 'describe-theme
+         "hdv" 'describe-variable
+         "hdf" 'describe-function
+         "hdv" 'describe-variable)
 
-        "ff" 'find-file
-        "bb" 'switch-to-buffer
-        "be" 'safe-erase-buffer
-        "bK" 'kill-this-buffer
-        "bk" 'kill-this-buffer-and-window-maybe
-        "bM" 'switch-to-messages-buffer
-        "by" 'yank-whole-buffer-as-kill
-        "ss" 'isearch-forward
+       (leader-declare-prefix "i" "insert")
+       (leader-set-keys
+         "ij" 'custom-insert-line-below
+         "ik" 'custom-insert-line-above
+         "ic" 'insert-char)
 
-        "hdf" 'describe-function
-        "hdv" 'describe-variable
+       (leader-declare-prefix
+        "M" "modes"
+        "Md" "dired")
+       (leader-set-keys
+         "Mz" 'zone
+         "Ml" 'emacs-lisp-mode
+         "ML" 'lisp-interaction-mode
+         "Mc" 'c++-mode
+         "MC" 'c-mode
+         "Mf" 'flyspell-mode
+         "MF" 'follow-mode
+         "Mt" 'text-mode
+         "Mp" 'python-mode
+         "Mr" 'ruby-mode
+         "Ms" 'shell-script-mode
+         "Mw" 'whitespace-mode
+         "Mo" 'org-mode
+         "Mx" 'hexl-mode
+         "M?" 'toggle-rot13-mode
+         "Mv" 'visual-line-mode
+         "MD" 'decipher
+         "MF" 'flyspell-prog-mode
 
-        "f DEL" 'save-buffers-kill-emacs
+         "Mdd" 'toggle-editable-dired
+         "Mde" 'invoke-editable-dired
+         "Md ESC" 'wdired-abort-changes
+         "Mdq" 'wdired-abort-changes)
 
-        "cb" 'display-compilation-buffer
-        "cy" 'yank-and-comment
-        "cc" 'compile
+       (leader-declare-prefix "n" "narrrow/numbers")
+       (leader-set-keys
+         "nr" 'narrow-to-region
+         "np" 'narrow-to-page
+         "nw" 'widen)
 
-        "i"  "insert"
-        "ij" 'custom-insert-line-below
-        "ik" 'custom-insert-line-above
+       (leader-declare-prefix "x" "text")
+       (leader-set-keys
+         "xa" 'describe-text-properties
+         "xf" 'list-faces
+         "xt" 'delete-trailing-whitespace)
 
-        "j" "jump"
+       (leader-declare-prefix "s" "search/symbol")
+       (leader-set-keys
+         "sg" 'rgrep
+         "sF" 'find-dired
+         "sf" 'find-grep-dired
+         "ss" 'isearch-forward)
 
-        "Md" "dired"
-        "MF" 'flyspell-prog-mode
-        ;; TODO bind in dired
-        "Mdd" 'toggle-editable-dired
-        "Mde" 'invoke-editable-dired
-        "Md ESC" 'wdired-abort-changes
-        "Mdq" 'wdired-abort-changes
+       (leader-declare-prefix "*" "calculator")
+       (leader-set-keys
+         "*." 'calc-dispatch
+         "**" 'calc
+         "*y" 'calc-copy-to-buffer)
 
-        "xf" 'list-faces
-        "xt" 'delete-trailing-whitespace
+       (leader-declare-prefix "t" "toggles")
+       (leader-set-keys
+         "tn" '(display-line-numbers-mode :wk "toggle-line-numbers")
+         "tl" 'toggle-truncate-lines
+         "tw" 'toggle-word-wrap
+         "t|" 'toggle-scroll-bar
+         "t-" 'toggle-horizontal-scroll-bar
+         "td" 'toggle-debug-on-error
+         "tq" 'toggle-debug-on-quit
+         "tf" 'toggle-frame-fullscreen
+         "tg" 'toggle-tool-bar-mode-from-frame
+         "tG" 'toggle-menu-bar-mode-from-frame
+         "tu" 'toggle-uniquify-buffer-names
+         "tb" 'toggle-indicate-empty-lines
+         "ta" 'toggle-text-mode-auto-fill
+         "te" '(read-only-mode :wk "toggle-read-only")
+         "tc" 'toggle-case-fold-search
+         "ti" 'toggle-input-method
+         "t TAB" 'set-indent-offset
+         "th" 'toggle-buffer-header
+         "tL" 'toggle-lexical-binding
+         "tr" 'toggle-relative-linum)
 
-        "t TAB" 'set-indent-offset
-        "th" 'toggle-buffer-header
-        "tL" 'toggle-lexical-binding
-        "tr" 'toggle-relative-linum)
+       (leader-declare-prefix
+        "f" "files/frames"
+        "fe" "emacs"
+        "fv" "variables"
+        "fvc" "copy"
+        "fvr" "remove")
+       (leader-set-keys
+         "ff" 'find-file
+         "f\"" 'recover-this-file
+         "f'" 'recover-file
+         "fc" 'copy-file
+         "ff" 'find-file
+         "fo" 'find-file-other-window
+         "fh" 'find-file-at-point
+         "sF" 'find-dired
+         "fL" 'find-file-literally
+         ;; frame
+         "fx" 'delete-frame
+         "fX" 'delete-other-frames
+         "f RET" '("maximize" . toggle-frame-maximized)
+         "fn" 'make-frame-command
+         "fm" 'set-frame-name
+         "fg" 'select-frame-by-name
+         "f TAB" 'other-frame
+         "f DEL" 'save-buffers-kill-emacs
 
-      (defconst emacs-window-map (make-sparse-keymap)
-        "my keymap to interact with emacs windows.")
+         "fev" 'emacs-version
 
-      (leader/set-keys
-        "w" "windows"
-        "w" emacs-window-map)
-    #+END_SRC
+         "fvd" 'add-dir-local-variable
+         "fvs" 'add-file-local-variable
+         "fvl" 'add-file-local-variable-prop-line
+
+         "fvcf" 'copy-dir-locals-to-file-locals
+         "fvcd" 'copy-file-locals-to-dir-locals
+         "fvcl" 'copy-dir-locals-to-file-locals-prop-line
+
+         "fvrv" 'kill-local-variable
+         "fvrd" 'delete-dir-local-variable
+         "fvrf" 'delete-file-local-variable
+         "fvrl" 'delete-file-local-variable-prop-line)
+
+       (leader-declare-prefix "j" "jump")
+       (leader-set-keys
+         "jc" 'goto-char
+         "jn" 'next-error
+         "jp" 'previous-error
+         "j TAB" 'move-to-column
+         "fj" '(dired-jump :wk "jump-to-directory")
+         "jd" '(dired-jump :wk "jump-to-directory")
+         "jD" '(dired-jump-other-window :wk "jump-to-directory-other-window"))
+     #+end_src
+
+     #+BEGIN_SRC emacs-lisp
+       (defconst emacs-window-map (make-sparse-keymap)
+         "my keymap to interact with emacs windows.")
+
+       (leader-set-keys
+         "w" "windows"
+         "w" emacs-window-map)
+     #+END_SRC
 
 *** bindings
     where I put global bindings.
@@ -1739,7 +1850,7 @@
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
-      (leader/set-keys
+      (leader-set-keys
         "U" 'universal-argument
         "u" 'smart-universal-argument)
 
@@ -2083,10 +2194,9 @@
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
-     (leader/set-keys
+     (leader-set-keys
        "fec" 'find-dotemacs-org-file
        "fed" 'find-dotemacs-directory
-       "fea" 'find-dotemacs-snippet
        "fey" 'find-dotemacs-snippets-file
        "fel" 'find-dotemacs-file
        "fef" 'find-file-from-dotemacs
@@ -2229,7 +2339,7 @@
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
-     (leader/set-keys
+     (leader-set-keys
        "f~" 'write-backup
        "fa" 'write-autosave
        "fD" 'delete-buffer-file
@@ -2831,7 +2941,7 @@
           (call-interactively 'toggle-comment-at-point)))
 
       (defun yank-and-comment ()
-        (interactive "P")
+        (interactive)
         (when (> (length kill-ring) 0)
           (save-excursion
             (let ((beginning (point)))
@@ -3818,7 +3928,7 @@
         :straight t
         :leader
         (:prefix "jh"
-         ""   "motion"
+         ""   '(nil :wk "motion")
          "w"  'evilem-motion-forward-word-begin
          "W"  'evilem-motion-forward-WORD-begin
          "e"  'evilem-motion-forward-word-end
@@ -4233,7 +4343,7 @@
 
       (evil-ex-define-cmd "rev[erse]" 'evil-reverse)
 
-      (leader/set-keys
+      (leader-set-keys
         "xc" 'evil-capitalize)
     #+END_SRC
 
@@ -4797,7 +4907,10 @@
              emojify-display-style 'unicode)
 
        :leader
-       ("xm" 'emojify-insert-emoji)
+       ("Me" 'emojify-mode
+        "xe" 'emojify-insert-emoji
+        "he" 'emojify-apropos-emoji
+        "hde" 'emojify-describe-emoji)
 
        :general
        (:keymaps 'emojify-list-mode-map
@@ -4857,7 +4970,7 @@
        (setq git-link-open-in-browser nil)
 
        :leader
-       ("gy"  "links"
+       ("gy"  '(nil :wk "links")
         "gyl" 'git-link
         "gyc" 'git-link-commit
         "gyh" 'git-link-homepage))
@@ -4915,7 +5028,7 @@
        :config
        (setq lv-use-separator t)
        :leader
-       ("H" '("hydras" . "cut off one head, two more shall take it's place")))
+       ("H" '(nil :wk ("hydras" . "cut off one head, two more shall take it's place"))))
 
      (use-package pretty-hydra :straight t)
    #+END_SRC
@@ -4952,7 +5065,7 @@
     #+BEGIN_SRC emacs-lisp
       (autoload 'hydra-text-zoom/body (lisp! "hydras" "hydra-text-zoom.el") nil t)
 
-      (leader/set-keys
+      (leader-set-keys
         "Hx" '("hydra-text-zoom" . hydra-text-zoom/body)
         "x." '("hydra-text-zoom" . hydra-text-zoom/body))
     #+END_SRC
@@ -4976,7 +5089,7 @@
       (general-define-key
        :keymaps 'emacs-window-map
         "." '(hydra-winman/body    :wk "hydra-winman"))
-      (leader/set-keys
+      (leader-set-keys
         "Hh" '("hydra-winman"      . hydra-winman/body))
     #+END_SRC
 
@@ -5067,7 +5180,7 @@
         "w"   '(hydra-eyebrowse/body :wk "hydra-windows")
         "C-w" '(hydra-eyebrowse/body :wk "hydra-windows"))
 
-      (leader/set-keys
+      (leader-set-keys
         "HL" '("hydra-eyebrowse"   . hydra-eyebrowse/body))
     #+END_SRC
 
@@ -5200,7 +5313,7 @@
 *** hydra-persp
     #+BEGIN_SRC emacs-lisp
       (autoload 'hydra-persp/body (lisp! "hydras" "hydra-persp.el") nil t)
-      (leader/set-keys
+      (leader-set-keys
         "Hl" '("hydra-persp"     . hydra-persp/body)
         "fl" '("hydra-layouts"   . hydra-persp/body))
     #+END_SRC
@@ -5336,7 +5449,7 @@
 *** hydra-flycheck
     #+BEGIN_SRC emacs-lisp
       (autoload 'hydra-flycheck/body (lisp! "hydras" "hydra-flycheck.el") nil t)
-      (leader/set-keys
+      (leader-set-keys
         "He" '("hydra-flycheck"    . hydra-flycheck/body))
     #+END_SRC
 
@@ -5593,7 +5706,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (autoload 'hydra-org-clock/body (lisp! "hydras" "hydra-org-clock.el") nil t)
-      (leader/set-keys
+      (leader-set-keys
         "Hc" '("hydra-org-clock"   . hydra-org-clock/body))
     #+END_SRC
 
@@ -5776,7 +5889,7 @@
 *** hydra-vlc-rc
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! vlc-rc)
       (autoload 'hydra-vlc-rc/body (lisp! "hydras" "hydra-vlc-rc.el") nil t)
-      (leader/set-keys
+      (leader-set-keys
         "Hv" '("hydra-vlc"         . hydra-vlc-rc/body))
     #+END_SRC
 
@@ -5844,7 +5957,7 @@
 *** hydra-visual-move
     #+BEGIN_SRC emacs-lisp
       (autoload 'hydra-visual-move/body (lisp! "hydras" "hydra-visual-move.el") nil t)
-      (leader/set-keys
+      (leader-set-keys
         "Hm" '("hydra-visual-move" . hydra-visual-move/body))
     #+END_SRC
 
@@ -5866,7 +5979,7 @@
       (autoload 'hydra-indent/body (lisp! "hydras" "hydra-indent.el") nil t)
       (general-define-key
        "C-x TAB" 'hydra-indent/body)
-      (leader/set-keys
+      (leader-set-keys
         "H TAB" '("hydra-indent" . hydra-indent/body))
     #+END_SRC
 
@@ -6141,7 +6254,7 @@
      (use-package lorem-ipsum
        :straight t
        :leader
-       ("il"  "lorem-ipsum"
+       ("il"  '(nil :wk "lorem-ipsum")
         "ill" 'Lorem-ipsum-insert-list
         "ilp" 'Lorem-ipsum-insert-paragraphs
         "ils" 'Lorem-ipsum-insert-sentences))
@@ -6203,7 +6316,7 @@
      (use-package pcre2el
        :straight t
        :leader
-       ("xr"   "regexp"
+       ("xr"   '(nil :wk "regexp")
         "xrb"  'regexp-builder
         "xr'"  'rxt-convert-to-strings
         "xr/"  'rxt-explain
@@ -6211,14 +6324,14 @@
         "xrt"  'rxt-toggle-elisp-rx
         "xrx"  'rxt-convert-to-rx
 
-        "xre"  "elisp"
+        "xre"  '(nil :wk "elisp")
         "xre'" 'rxt-elisp-to-strings
         "xre/" 'rxt-explain-elisp
         "xrep" 'rxt-elisp-to-pcre
         "xret" 'rxt-toggle-elisp-rx
         "xrex" 'rxt-elisp-to-rx
 
-        "xrp"  "PCRE"
+        "xrp"  '(nil :wk "PCRE")
         "xrp'" 'rxt-pcre-to-strings
         "xrp/" 'rxt-explain-pcre
         "xrpe" 'rxt-pcre-to-elisp
@@ -6684,7 +6797,7 @@
         "pb"    'projectile-switch-to-buffer
         "po"    'projectile-org-project-file+
 
-        "p"  "projectile"
+        "p"  '(nil :wk "projectile")
         "p TAB" 'projectile-find-other-file
         "p!" 'projectile-run-shell-command-in-root
         "p%" 'projectile-replace-regexp
@@ -6782,13 +6895,11 @@
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package +projectile-commands
-        :commands (projectile-persp-switch-project+
-                   projectile-show-and-copy-project-dir
+        :commands (projectile-show-and-copy-project-dir
                    project-has-file-p
                    when-project-has-file-p)
         :leader
-        ("pl" 'projectile-persp-switch-project+
-         "py" 'projectile-show-and-copy-project-dir))
+        ("py" 'projectile-show-and-copy-project-dir))
     #+END_SRC
 
     #+begin_src emacs-lisp
@@ -7070,8 +7181,8 @@
 
    #+BEGIN_SRC emacs-lisp
      (with-eval-after-load 'with-editor
-       (leader/with-prefix leader-major-mode-prefix
-         (leader/set-keys-for-mode 'with-editor-mode
+       (leader-with-prefix leader-major-mode-prefix
+         (leader-set-keys-for-mode 'with-editor-mode
            ","  'with-editor-finish
            "q"  'with-editor-cancel)))
     #+END_SRC
@@ -7148,7 +7259,7 @@
 
         (yas-global-mode 1)
 
-        (leader/set-keys-for-major-mode 'snippet-mode
+        (leader-set-keys-for-major-mode 'snippet-mode
           "m" 'yas-load-snippet-buffer-and-close
           "l" 'yas-load-snippet-buffer
           "t" 'yas-tryout-snippet)
@@ -7423,7 +7534,7 @@
       (use-package auto-yasnippet
         :straight t
         :leader
-        ("is"  "auto-yasnippet"
+        ("is"  '(nil :wk "auto-yasnippet")
          "isc" 'aya-create
          "ise" 'aya-expand
          "isw" 'aya-persist-snippet)
@@ -7961,7 +8072,7 @@
                 (select-window window)))))
 
         (defun +set-compilation-bindings (mode map)
-          (leader/set-keys-for-major-mode mode
+          (leader-set-keys-for-major-mode mode
             "RET" 'recompile
             "k" 'kill-compilation
             "f" 'next-error-follow-minor-mode)
@@ -8250,7 +8361,7 @@
          ))
 
       (defun +comint-set-leader-keys (mode)
-        (leader/set-keys-for-major-mode mode
+        (leader-set-keys-for-major-mode mode
           "z" 'comint-send-eof
           "*" 'comint-insert-previous-argument
           "r" 'comint-dynamic-list-input-ring
@@ -8262,7 +8373,7 @@
           "t" 'comint-show-output
           "o" 'comint-delete-output
 
-          "s" "subjob"
+          "s" '(nil :wk "subjob")
           "ss" 'comint-stop-subjob
           "sq" 'comint-quit-subjob
           "si" 'comint-interrupt-subjob))
@@ -8334,7 +8445,7 @@
 
        :leader
        (:prefix "ip"
-        "" "abbrev"
+        "" '(nil :wk "abbrev")
         "r" 'read-abbrev-file
         "w" 'write-abbrev-file
         "e" 'edit-abbrevs
@@ -8415,7 +8526,7 @@
 
        :leader
        (:prefix leader-diff-leader-prefix
-        "" "diff"
+        "" '(nil :wk "diff")
         "SPC" 'diff-buffer-with-file)
 
        :lazy-leader
@@ -8563,7 +8674,7 @@
        "C-k" 'dired-prev-subdir
        "C-l" 'dired-goto-max-subdir)
 
-      (leader/set-keys-for-major-mode 'dired-mode
+      (leader-set-keys-for-major-mode 'dired-mode
         "?" 'dired-summary ;; like transient state
         "#" 'dired-clean-directory
         "o" 'browse-url-of-dired-file ;; open in external app
@@ -8572,18 +8683,18 @@
         "g" 'dired-goto-file ;; prompt for file to visit in current buffer
         "s" 'dired-sort-toggle-or-edit
 
-        "r"  "rename"
+        "r"  '(nil :wk "rename")
         "ru" 'dired-upcase
         "rd" 'dired-downcase
 
         ;; flag means mark delete
-        "d"  "delete"
+        "d"  '(nil :wk "delete")
         "d&" 'dired-flag-garbage-files
         "d~" 'dired-flag-backup-files
         "d/" 'dired-flag-files-regexp
         "d#" 'dired-flag-auto-save-files
 
-        "m"  "mark"
+        "m"  '(nil :wk "mark")
         "mm" 'dired-toggle-marks
         "mu" 'dired-unmark
         "m DEL" 'dired-unmark-backward
@@ -8596,19 +8707,19 @@
         "m(" 'dired-mark-sexp
 
         ;; emacs related bindings
-        "e"  "emacs"
+        "e"  '(nil :wk "emacs")
         "ec" 'dired-do-byte-compile
         "el" 'dired-do-load
         "ef" 'dired-do-find-marked-files
 
         ;; change fs property commands
-        "c"  "change"
+        "c"  '(nil :wk "change")
         "cg" 'dired-do-chgrp
         "cm" 'dired-do-chmod
         "co" 'dired-do-chown
 
         ;; filesystem
-        "f"  "filesystem"
+        "f"  '(nil :wk "filesystem")
         "fg" 'dired-do-find-regexp             ;; grep marked files
         "fs" 'dired-do-find-regexp-and-replace ;; substitute
         "fi" 'dired-info
@@ -8619,14 +8730,14 @@
         "fZ" 'epa-dired-do-encrypt-to ;; compress as
 
         ;; EasyPG/GPG
-        "fp"  "GPG"
+        "fp"  '(nil :wk "GPG")
         "fpd" 'epa-dired-do-decrypt
         "fpe" 'epa-dired-do-encrypt
         "fps" 'epa-dired-do-sign
         "fpv" 'epa-dired-do-verify
 
         ;; operations bound to regexp search
-        "f/"     "search"
+        "f/"     '(nil :wk "search")
         "f/c"    'dired-do-copy-regexp
         "f/r"    'dired-do-rename-regexp
         "f/h"    'dired-do-hardlink-regexp
@@ -8790,16 +8901,16 @@
       "<mouse-1>" 'image-dired-mouse-select-thumbnail
       "<mouse-2>" 'image-dired-mouse-display-image)
 
-     (leader/set-keys-for-major-mode 'image-dired-thumbnail-mode
+     (leader-set-keys-for-major-mode 'image-dired-thumbnail-mode
        "g" 'image-dired-jump-original-dired-buffer
        "m" 'image-dired
 
-       "t"  "tagging"
+       "t"  '(nil :wk "tagging")
        "td" 'image-dired-thumbnail-set-image-description
        "tt" 'image-dired-tag-thumbnail
        "tT" 'image-dired-tag-thumbnail-remove
 
-       "e" "edit"
+       "e" '(nil :wk "edit")
        "el" 'image-dired-rotate-thumbnail-left
        "eL" 'image-dired-rotate-original-left
        "er" 'image-dired-rotate-thumbnail-right
@@ -8835,7 +8946,7 @@
       "<up>"    'image-scroll-down
       "<down>"  'image-scroll-up)
 
-     (leader/set-keys-for-major-mode 'image-dired-display-image-mode
+     (leader-set-keys-for-major-mode 'image-dired-display-image-mode
        "h" 'image-bol ; far left   edge
        "j" 'image-eob ; far bottom edge
        "k" 'image-bob ; far top    edge
@@ -8975,7 +9086,7 @@
          ;;   "S-RET" 'ediff-show-meta-buff-from-registry
          ;;   "?" 'ediff-toggle-verbose-help-meta-buffer)
 
-         (leader/set-keys-for-major-mode 'ediff-meta-mode
+         (leader-set-keys-for-major-mode 'ediff-meta-mode
            "tf" 'ediff-toggle-filename-truncation
            "tv" 'ediff-toggle-verbose-help-meta-buffer)
 
@@ -9278,7 +9389,7 @@
 
         (evil-set-initial-state 'ibuffer-mode 'motion)
 
-        (leader/set-keys-for-major-mode 'ibuffer-mode
+        (leader-set-keys-for-major-mode 'ibuffer-mode
           ;; unbound:
           ;;  * ibuffer-do-print
           "RET" 'ibuffer-do-view-horizontally
@@ -9310,7 +9421,7 @@
           "g"   'ibuffer-jump-to-buffer
           "b"   'ibuffer-jump-to-filter-group
 
-          "m"  "mark"
+          "m"  '(nil :wk "mark")
           "m*" 'ibuffer-mark-modified-buffers
           "m%" 'ibuffer-mark-read-only-buffers
           "mm" 'ibuffer-toggle-marks
@@ -9431,7 +9542,7 @@
         :leader
         (:mode 'ibuffer-mode
          :prefix "f"
-         ""       "filter"
+         ""       '(nil :wk "filter")
          "TAB"    'ibuffer-exchange-filters
          "RET"    'ibuffer-filter-by-mode
          "DEL"    'ibuffer-delete-saved-filters
@@ -9754,8 +9865,8 @@
    emacs macro facilities configuration.
 
    #+BEGIN_SRC emacs-lisp
-     (leader/set-keys
-       "k"  "macros/lisp")
+     (leader-set-keys
+       "k"  '(nil :wk "macros/lisp"))
 
      ;; remove mode-line-indicator for macros
      (setq mode-line-defining-kbd-macro nil)
@@ -9772,7 +9883,7 @@
          "i" 'insert-kbd-macro
          "q" 'kbd-macro-query ;; prompt at macro point
 
-         "c"  "counter"
+         "c"  '(nil :wk "counter")
          "cs" 'kmacro-set-counter
          "c=" 'kmacro-set-counter
          "cc" 'kmacro-insert-counter
@@ -9794,7 +9905,7 @@
          "b"   'kmacro-bind-to-key)
 
         :config
-        (leader/set-keys-for-major-mode 'edmacro-mode
+        (leader-set-keys-for-major-mode 'edmacro-mode
           "," 'edmacro-finish-edit
           "i" 'edmacro-insert-key))
     #+END_SRC
@@ -9823,7 +9934,7 @@
         "p" 'message-yank-original
         "P" 'message-fill-yanked-message
 
-        "g" "goto"
+        "g" '(nil :wk "goto")
         "gb" 'message-goto-body
         "gs" 'message-goto-subject
         "gt" 'message-goto-to
@@ -10624,7 +10735,7 @@
         ;; occur-mode-mouse-goto
         "RET" 'occur-mode-goto-occurrence
         "o" 'occur-mode-goto-occurrence-other-window
-        "s" 'occur-mode-display-occurrence
+        "M-RET" 'occur-mode-display-occurrence
 
         "j"  'evil-adjust-occur-next
         "k"  'evil-adjust-occur-prev
@@ -10639,8 +10750,8 @@
         "RET" 'occur-mode-goto-occurrence
         "go"  'occur-mode-goto-occurrence-other-window
         "gO"  'occur-mode-display-occurrence
-        "j"   'evil-adjust-occur-next
-        "k"   'evil-adjust-occur-prev
+        "gj"  'evil-adjust-occur-next
+        "gk"  'evil-adjust-occur-prev
         [remap quit-window] 'occur-cease-edit))
    #+END_SRC
 
@@ -10714,7 +10825,7 @@
         "?" 'package-menu-quick-help
         "/" 'package-menu-filter
 
-        "m"  "mark"
+        "m"  '(nil :wk "mark")
         "m~" 'package-menu-mark-obsolete-for-deletion
         "mu" 'package-menu-mark-unmark
         "mi" 'package-menu-mark-install
@@ -10764,7 +10875,7 @@
 
        :init
        (with-eval-after-load 'elisp-mode
-         (leader/set-keys-for-major-mode '(emacs-lisp-mode
+         (leader-set-keys-for-major-mode '(emacs-lisp-mode
                                            lisp-interaction-mode)
            "eM" 'pp-macroexpand-expression
            "em" 'pp-macroexpand-last-sexp
@@ -10784,7 +10895,7 @@
        (:mode 'proced-mode
         "k" 'proced-send-signal
 
-        "m"  "mark"
+        "m"  '(nil :wk "mark")
         "ma" 'proced-mark-all
         "mu" 'proced-unmark-all
         "mp" 'proced-mark-parents
@@ -11106,7 +11217,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package simple
        :leader
-       ("i TAB"     "indent"
+       ("i TAB"     '(nil :wk "indent")
         "i TAB TAB" 'indent-region
         "i TAB RET" 'split-line
         "i TAB SPC" 'just-one-space
@@ -11187,17 +11298,17 @@
            (when (>= beginning-word-point bol)
              (call-interactively 'backward-kill-word))))
 
-       (leader/set-keys-for-major-mode 'eshell-mode
+       (leader-set-keys-for-major-mode 'eshell-mode
          "o"   'eshell-show-output
          "O"   'eshell-mark-output
          "RET" 'eshell-queue-input
 
-         "i"  "insert"
+         "i"  '(nil :wk "insert")
          "ib" 'eshell-insert-buffer-name
          "ip" 'eshell-insert-process
          "ie" 'eshell-insert-envvar
 
-         "k"  "kill/signal"
+         "k"  '(nil :wk "kill/signal")
          "kz" 'eshell-send-eof-to-process
          "kc" 'eshell-interrupt-process
          "kq" 'eshell-quit-process)
@@ -11287,7 +11398,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package smerge-mode
        :init
-       (leader/set-keys
+       (leader-set-keys
          "gi" 'smerge-mode)
 
        :lazy-leader
@@ -11492,7 +11603,7 @@
         "D"     'vc-annotate-show-changeset-diff-revision-at-line
         "t"     'vc-annotate-toggle-annotation-visibility
 
-        "g"     "goto"
+        "g"     '(nil :wk "goto")
         "gg"    'vc-annotate-goto-line
         "gc"    'vc-annotate-revision-at-line
         "gp"    'vc-annotate-revision-previous-to-line
@@ -11521,7 +11632,7 @@
         "SPC" 'log-edit-done
         "DEL" 'log-edit-kill-buffer
 
-        "i"  "insert"
+        "i"  '(nil :wk "insert")
         "ic" 'log-edit-insert-changelog
         "if" 'log-edit-insert-filenames
         "iC" 'log-edit-insert-changelog-entries
@@ -11530,7 +11641,7 @@
         "iF" 'log-edit-insert-filenames-without-changelog
         "im" 'log-edit-insert-message-template
 
-        "t"  "toggle"
+        "t"  '(nil :wk "toggle")
         "ta" 'vc-git-log-edit-toggle-amend
         "ts" 'vc-git-log-edit-toggle-signoff)
 
@@ -12060,6 +12171,10 @@
          "m" 'embark-find-mkdir+
          "+" 'embark-find-mkdir+
          "o" 'xopen-url+)
+        (:keymaps 'embark-command-map
+         "g" 'embark-find-definition
+         "b" 'global-set-key
+         "w" 'where-is)
 
         :lazy-leader
         (:mode 'embark-collect-mode
@@ -12267,7 +12382,7 @@
          "kg" 'consult-kmacro
          "ry" 'consult-yank
 
-         "ps" "search"
+         "ps" '(nil :wk "search")
          "psr" 'consult-ripgrep
          "psv" 'consult-git-grep
          "psg" 'consult-grep
@@ -12279,6 +12394,8 @@
         :general
         (:keymaps 'org-mode-map
          [remap consult-imenu] 'consult-org-heading)
+        (:keymaps 'selectrum-minibuffer-map
+         "C-." 'hydra-selectrum/body)
         ([remap imenu] 'consult-imenu
          [remap imenu-anywhere] 'consult-project-imenu
          [remap switch-to-buffer] 'consult-buffer
@@ -12346,12 +12463,12 @@
 
       (setq org-roam-capture-function 'consult-org-capture+)
 
-      (leader/set-keys
+      (leader-set-keys
         "rj" 'consult-evil-jumps+
         "rn" 'consult-evil-marks+
         "ob" 'consult-bibtex+)
 
-      (leader/set-keys-for-major-mode 'org-mode
+      (leader-set-keys-for-major-mode 'org-mode
         "[" 'consult-bibtex+)
 
       (general-define-key
@@ -13125,7 +13242,7 @@
                     +dot-goto-executable
                     +dot-open-bookmark)
          :leader
-         ("fd" "dotfiles"
+         ("fd" '(nil :wk "dotfiles")
           "fdp" '+dot-goto-repo
           "fda" '+dot-goto-fsmap
           "fdf" '+dot-goto-fsmap
@@ -13797,7 +13914,7 @@
                 do (define-key deft-mode-map (vector i) nil)
                 do (define-key deft-mode-map (vector 'insert-state i) 'deft-filter-increment))
 
-       (leader/set-keys-for-major-mode 'deft-mode
+       (leader-set-keys-for-major-mode 'deft-mode
          "n" 'deft-new-file
          "a" 'deft-archive-file
          "d" 'deft-delete-file
@@ -14037,7 +14154,7 @@
 
        :leader
        (:prefix leader-server-leader-prefix
-        "" "server"
+        "" '(nil :wk "server")
         "l" 'eglot
         "e" 'eglot-events-buffer
         "x" 'eglot-shutdown)
@@ -14062,12 +14179,12 @@
         "o" 'eglot-reconnect
         "t" 'eglot-eldoc-toggle-order+
 
-        "g" "goto"
+        "g" '(nil :wk "goto")
         "gg" 'eglot-find-implementation
         "gG" 'eglot-find-typeDefinition
         "gd" 'eglot-find-declaration
 
-        "w"  "workspace"
+        "w"  '(nil :wk "workspace")
         "wf" 'eglot-forget-pending-continuations
         "wc" 'eglot-signal-didChangeConfiguration))
    #+END_SRC
@@ -14165,7 +14282,7 @@
                 do (setq engine id-str)
               do (progn
                    (when key
-                     (leader/set-keys key (cons engine id-sym)))
+                     (leader-set-keys key (cons engine id-sym)))
                    (autoload id-sym "engine-mode.el" nil t)))
 
      (with-eval-after-load 'engine-mode
@@ -14181,7 +14298,7 @@
 
    #+BEGIN_SRC emacs-lisp :var prefix-aliases=engine-mode-prefix-names
      (eval
-      `(leader/set-keys
+      `(leader-declare-prefix
          ,@(cl-loop for (prefix name) in prefix-aliases
                     collect prefix collect name)))
    #+END_SRC
@@ -14195,7 +14312,7 @@
         (alist-get (completing-read "Engine: " engine-engines+)
                    engine-engines+ nil nil #'string-equal)))
 
-     (leader/set-keys "ses" 'engine-search+)
+     (leader-set-keys "ses" 'engine-search+)
    #+END_SRC
 
 ** expand-region
@@ -14438,7 +14555,7 @@
      (use-package ggtags
        :straight t
        :leader
-       ("T"  "tags"
+       ("T"  '(nil :wk "tags")
         "TD" 'ggtags-delete-tags
         "T/" 'ggtags-grep)
 
@@ -14577,7 +14694,7 @@
        (:mode 'lsp-mode
         :minor t
         :prefix leader-server-leader-prefix
-        "" "server"
+        "" '(nil :wk "server")
 
         "?" 'lsp-describe-session
         "a" 'lsp-execute-code-action
@@ -14585,23 +14702,23 @@
         "h" 'lsp-describe-thing-at-point
         "x" 'lsp-disconnect
 
-        "w"  "workspace"
+        "w"  '(nil :wk "workspace")
         "wR" 'lsp-restart-workspace
         "wa" 'lsp-workspace-folders-add
         "wr" 'lsp-workspace-folders-remove
         "ws" 'lsp-workspace-folders-switch
 
-        "l"  "lens"
+        "l"  '(nil :wk "lens")
         "ll" 'lsp-lens-mode
         "ls" 'lsp-lens-show
         "lh" 'lsp-lens-hide
 
-        "r"  "refactor"
+        "r"  '(nil :wk "refactor")
         "rr" 'lsp-format-buffer
         "ri" 'lsp-organize-imports
         "rc" 'lsp-rename
 
-        "g"  "goto"
+        "g"  '(nil :wk "goto")
         "gg" 'lsp-goto-type-definition
         "gG" 'lsp-goto-implementation
         "gF" 'lsp-find-implementation
@@ -14625,7 +14742,7 @@
         (:mode 'lsp-mode
          :minor t
          :prefix leader-server-leader-prefix
-         "p"  "peek"
+         "p"  '(nil :wk "peek")
          "pg" 'lsp-ui-peek-find-definitions
          "pG" 'lsp-ui-peek-find-definitions))
     #+END_SRC
@@ -14694,7 +14811,7 @@
         "s" 'magit-jump-to-staged
         "f" 'magit-jump-to-untracked
         "r" 'magit-show-refs
-        "y" "copy"
+        "y" '(nil :wk "copy")
         "ys" 'magit-copy-section-value
         "yr" 'magit-copy-buffer-revision)
        (:mode 'magit-log-select-mode
@@ -14710,7 +14827,7 @@
         "r"  'magit-pop-revision-stack
         "a"  'git-commit-insert-pseudo-header
 
-        "i"  "insert"
+        "i"  '(nil :wk "insert")
         "ia" 'git-commit-ack ;; knowledgement
         "iS" 'git-commit-suggested
         "im" 'git-commit-modified
@@ -15037,7 +15154,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package git-rebase
         :config
-        ;; (leader/set-keys-for-major-mode 'git-rebase-mode
+        ;; (leader-set-keys-for-major-mode 'git-rebase-mode
         ;;   "x" 'git-rebase-kill-line
         ;;   )
 
@@ -15271,7 +15388,7 @@
         "i" 'notmuch-jump-search)
 
        (:mode 'notmuch-show
-        "t" "toggles"
+        "t" '(nil :wk "toggles")
         "ti" 'notmuch-show-toggle-thread-indentation
         "td" (defun notmuch-show-toggle-delete+ ()
                (interactive)
@@ -15281,7 +15398,7 @@
                (notmuch-toggle-tag+ "flagged" "show"))
         "th" #'notmuch-show-toggle-visibility-headers)
        (:mode 'notmuch-tree-mode
-        "t" "toggles"
+        "t" '(nil :wk "toggles")
         "td" (defun notmuch-tree-toggle-delete ()
                (interactive)
                (notmuch-toggle-tag+ "deleted" "tree"))
@@ -15292,7 +15409,7 @@
                (interactive)
                (notmuch-toggle-tag+ "flagged" "tree")))
        (:mode 'notmuch-search-mode
-        "t" "toggles"
+        "t" '(nil :wk "toggles")
         "to" 'notmuch-search-toggle-order
         "td" (defun notmuch-search-toggle-delete ()
                (interactive)
@@ -15378,6 +15495,9 @@
 
 *** bindings
     #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/+pdf-tools-bindings.el" pdf-tools)
+      (leader-set-keys-for-major-mode 'pdf-view-mode-map
+        "g" 'pdf-outline)
+
       (general-define-key
        :keymaps 'pdf-view-mode-map
        :states 'motion
@@ -15425,7 +15545,7 @@
        :states 'visual
        "y" 'pdf-view-kill-ring-save)
 
-      (leader/set-keys-for-major-mode 'pdf-view-mode
+      (leader-set-keys-for-major-mode 'pdf-view-mode
         "l" 'pdf-view-goto-label
         "o" 'pdf-occur
 
@@ -15436,7 +15556,7 @@
         "p" 'pdf-view-printer-minor-mode
 
         ;; narrow to a subslice of the given page.
-        "s"  "slice"
+        "s"  '(nil :wk "slice")
         "sm" 'pdf-view-set-slice-using-mouse
         "ss" 'pdf-view-set-slice-from-bounding-box
         "sr" 'pdf-view-reset-slice)
@@ -15468,7 +15588,7 @@
        "<C-up>" 'outline-move-subtree-up
        "<C-down>" 'outline-move-subtree-down)
 
-      (leader/set-keys-for-major-mode 'pdf-outline-buffer-mode
+      (leader-set-keys-for-major-mode 'pdf-outline-buffer-mode
         "f" 'pdf-outline-follow-mode
         "m" 'outline-mark-subtree)
 
@@ -15516,7 +15636,7 @@
        "ZQ" 'tablist-quit
        "ZZ" 'tablist-quit)
 
-      (leader/set-keys-for-major-mode 'pdf-occur-buffer-mode
+      (leader-set-keys-for-major-mode 'pdf-occur-buffer-mode
         "/!" 'tablist-negate-filter
         "//" 'tablist-display-filter
         "/=" 'tablist-push-equal-filter
@@ -15592,7 +15712,7 @@
        :commands (piper-ui)
        :leader
        (:prefix "|"
-        ""    "piper"
+        ""    '(nil :wk "piper")
         "RET" 'piper-ui
         "|"   'piper
         "o"   'piper-other
@@ -15961,7 +16081,7 @@
 
        :leader
        (:prefix leader-diff-leader-prefix
-        "" "diff"
+        "" '(nil :wk "diff")
         "RET" 'vdiff-merge-conflict
         "d" 'vdiff-current-file
         "f" 'vdiff-files
@@ -15982,7 +16102,7 @@
         ">" 'vdiff-send-changes-and-step
         "<" 'vdiff-send-changes
 
-        "TAB"     "refine"
+        "TAB"     '(nil :wk "refine")
         "TAB TAB" 'vdiff-refine-this-hunk
         "TAB DEL" 'vdiff-remove-refinements-in-hunk
         "TAB RET" 'vdiff-refine-all-hunks
@@ -15991,7 +16111,7 @@
         ;; 'vdiff-refine-all-hunks-symbol
         ;; 'vdiff-refine-all-hunks-word
 
-        "t"  "toggle"
+        "t"  '(nil :wk "toggle")
         "ti" 'vdiff-toggle-case
         "tw" 'vdiff-toggle-whitespace)
 
@@ -16029,11 +16149,11 @@
 
        :leader
        (:prefix "v"
-        "" "VLC"
-        "" vlc-rc-map
+        "" '(nil :wk "VLC")
+        "s" '(nil :wk "set")
+        "t" '(nil :wk "toggle")
 
-        "s" "set"
-        "t" "toggle")
+        "" vlc-rc-map)
 
        :general
        (:keymaps 'dired-mode-map
@@ -16324,7 +16444,7 @@
         (:mode 'ycmd-mode
          :minor t
          :prefix leader-server-leader-prefix
-         ""  "ycmd"
+         ""  '(nil :wk "ycmd")
          "y" 'ycmd-mode
          "Y" 'global-ycmd-mode
          "n" 'ycmd-open
@@ -16343,7 +16463,7 @@
          "C-r" 'ycmd-refactor-rename
          "C-c" 'ycmd-display-completions
 
-         "g"  "jump"
+         "g"  '(nil :wk "jump")
          "gg" 'ycmd-goto
          "gG" 'ycmd-goto-imprecise
          "gt" 'ycmd-goto-type
@@ -16442,7 +16562,7 @@
         :commands (restclient)
         :config
         (let ((leader leader-major-mode-key))
-          (leader/set-keys-for-major-mode 'restclient-mode
+          (leader-set-keys-for-major-mode 'restclient-mode
             "RET"   '("execute-current" . restclient-http-send-current)
             "M-RET" '("execute-current-raw" . restclient-http-send-current-raw)
             leader  '("execute-current-same-window" . restclient-http-send-current-stay-in-window)
@@ -16581,7 +16701,7 @@
           "p" 'pp-buffer
 
           ;; eval
-          "e"  "eval"
+          "e"  '(nil :wk "eval")
           "eb" 'eval-buffer
           "ee" 'eval-last-sexp
           "eE" 'eval-replace-last-sexp
@@ -16706,7 +16826,7 @@
          ;; unbound: python-nav-forward-sexp[-safe]
          ;;          python-nav-backward-sexp[-safe]
 
-         "n"  "navigate"
+         "n"  '(nil :wk "navigate")
          "nh" 'python-nav-forward-statement
          "nj" 'python-nav-forward-block
          "nk" 'python-nav-backward-block
@@ -16724,10 +16844,10 @@
          ;; "n M-0" 'python-nav-beginning-of-defun
          "n M-$" 'python-nav-end-of-defun
 
-         "h"  "help"
+         "h"  '(nil :wk "help")
          "hp" 'python-eldoc-at-point
 
-         "e"  "eval/exec"
+         "e"  '(nil :wk "eval/exec")
          "ed" 'python-shell-send-defun
          "eb" 'python-shell-send-buffer
          "ef" 'python-shell-send-file
@@ -16811,7 +16931,7 @@
         :straight t
         :leader
         (:mode 'python-mode
-         "i"  "imports"
+         "i"  '(nil :wk "imports")
          "ii" 'pytimport-remove-unused
          "iu" 'pyimport-insert-missing))
     #+END_SRC
@@ -16824,7 +16944,7 @@
         :straight t
         :leader
         (:mode 'python-mode
-         "i"  "imports"
+         "i"  '(nil :wk "imports")
          "is" 'py-isort-buffer
          "ir" 'py-isort-region))
     #+END_SRC
@@ -16867,7 +16987,7 @@
 
      (push (cons +ruby-mode 2) +indent-config)
 
-     (leader/set-keys "Mr" +ruby-mode)
+     (leader-set-keys "Mr" +ruby-mode)
    #+END_SRC
 
 *** ruby-mode
@@ -16904,12 +17024,12 @@
          "f" 'enh-ruby-find-file
          "e" 'enh-ruby-find-error
 
-         "i"  "insert"
+         "i"  '(nil :wk "insert")
          "ie" 'enh-ruby-insert-end
          "it" 'enh-ruby-indent-exp
          "i TAB" 'enh-ruby-indent-exp
 
-         "n"  "navigate"
+         "n"  '(nil :wk "navigate")
          "nh" 'enh-ruby-backward-sexp
          "nl" 'enh-ruby-forward-sexp
          "nk" 'enh-ruby-up-sexp
@@ -16954,7 +17074,7 @@
 
         :lazy-leader
         (:mode +ruby-mode
-         "r"  "REPL"
+         "r"  '(nil :wk "REPL")
          "rr" 'inf-ruby
          "rg" 'inf-ruby-console-gem
          "rz" 'inf-ruby-console-zues
@@ -16975,7 +17095,7 @@
 
         :lazy-leader
         (:mode +ruby-mode
-         "i"  "insert"
+         "i"  '(nil :wk "insert")
          "i:" 'ruby-tools-to-symbol
          "i{" 'ruby-tools-interpolate
          "i <backspace>" 'ruby-tools-clear-string
@@ -16989,7 +17109,7 @@
         :straight t
         :leader
         (:mode +ruby-mode
-         "b"  "bundler"
+         "b"  '(nil :wk "bundler")
          "rb" 'bundle-console
          "bf" 'bundle-open
          "bi" 'bundle-install
@@ -17083,7 +17203,7 @@
          ;; "tw" 'web-mode-whitespace-show
 
          ;; insert
-         "i"  "insert"
+         "i"  '(nil :wk "insert")
          "ia" 'web-mode-attribute-insert
          "ip" 'web-mode-element-wrap ; wrap current element in a new element with name from prompt
          "ic" 'web-mode-element-clone
@@ -17091,7 +17211,7 @@
          "ie" 'web-mode-element-insert-at-point ; converts word before point to tag
 
          ;; refactor/insert
-         "r"  "refactor"
+         "r"  '(nil :wk "refactor")
          "rs" 'web-mode-tag-attributes-sort
          "r(" 'web-mode-element-extract  ; add linebreak before every tag in body
          "r)" 'web-mode-element-contract ; collapse tag into a single line
@@ -17103,13 +17223,13 @@
          "rF" 'web-mode-element-children-fold-or-unfold ; collapse the children of current tags body, not body itself
 
          ;; delete
-         "d"  "delete"
+         "d"  '(nil :wk "delete")
          "da" 'web-mode-attribute-kill
          "de" 'web-mode-element-kill
          "dp" 'web-mode-element-vanish ; delete element, but move body up a level instead of erasing it
 
          ;; DOM
-         "D"  "DOM"
+         "D"  '(nil :wk "DOM")
          "Da" 'web-mode-dom-apostrophes-replace
          "Ds" 'web-mode-dom-entities-replace
          "Dq" 'web-mode-dom-quotes-replace
@@ -17120,7 +17240,7 @@
          "hj" 'web-mode-jshint
 
          ;; mark
-         "m"  "mark"
+         "m"  '(nil :wk "mark")
          "mT" 'web-mode-tag-select
                                               ; only works while between <>
          "mt" 'web-mode-element-select
@@ -17129,7 +17249,7 @@
          "mm" 'web-mode-mark-and-expand
 
          ;; navigation
-         "n"  "navigate"
+         "n"  '(nil :wk "navigate")
          "n0" 'web-mode-element-beginning
          "n$" 'web-mode-element-end
          "nn" 'web-mode-tag-match
@@ -17139,13 +17259,13 @@
          "nh" 'web-mode-element-parent
          ;; "nt" 'web-mode-dom-traverse
 
-         "na"  "attributes"
+         "na"  '(nil :wk "attributes")
          "na0" 'web-mode-attribute-beginning
          "na$" 'web-mode-attribute-end
          "nah" 'web-mode-attribute-previous
          "nal" 'web-mode-attribute-next
 
-         "nt"  "tags"
+         "nt"  '(nil :wk "tags")
          "nt0" 'web-mode-tag-beginning
          "nt$" 'web-mode-tag-end
          "nth" 'web-mode-tag-previous
@@ -17168,7 +17288,7 @@
         (:mode 'emmet-mode
          :minor t
          :prefix leader-major-mode-prefix
-         "e" "emmet"
+         "e" '(nil :wk "emmet")
          "." 'emmet-expand-line
          ;; "'" 'emmet-preview
          "ee" 'emmet-expand-line
@@ -17201,7 +17321,7 @@
         :after  web-mode
         :leader
         (:mode 'web-mode
-         "rb"  "beautify"
+         "rb"  '(nil :wk "beautify")
          "rbh" 'web-beautify-htlm
          "rbj" 'web-beautify-js
          "rbc" 'web-beautify-css))
@@ -17274,13 +17394,13 @@
         "i" 'sql-show-sqli-buffer
         "t" 'sql-toggle-pop-to-buffer-after-send-region
 
-        "e"  "eval"
+        "e"  '(nil :wk "eval")
         "eb" 'sql-send-buffer
         "ep" 'sql-send-paragraph
         "er" 'sql-send-region
         "es" 'sql-send-string
 
-        "l"  "list"
+        "l"  '(nil :wk "list")
         "ll" 'sql-list-all
         "lt" 'sql-list-table)
        (:mode 'sql-interactive-mode
@@ -17302,7 +17422,7 @@
 
         :lazy-leader
         (:mode 'sql-mode
-         "u"  "upcase"
+         "u"  '(nil :wk "upcase")
          "ur" 'sqlup-capitalize-keywords-in-region
          "ub" 'sqlup-capitalize-keywords-in-buffer))
     #+END_SRC
@@ -17355,12 +17475,12 @@
         "t"  'csv-transpose
         "u"  'csv-unalign-fields
 
-        "s" "sort"
+        "s" '(nil :wk "sort")
         "sf" 'csv-sort-fields
         "sn" 'csv-sort-numeric-fields
         "so" 'csv-toggle-descending
 
-        "v" "yank"
+        "v" '(nil :wk "yank")
         "vf" 'csv-yank-fields
         "vt" 'csv-yank-as-new-table)
 
@@ -17428,7 +17548,7 @@
          "i(" 'sh-function
          "i+" 'sh-add
 
-         "TAB"   "indent"
+         "TAB"   '(nil :wk "indent")
          "TAB -" 'sh-learn-line-indent
          "TAB =" 'sh-set-indent
          "TAB |" 'sh-learn-buffer-indent
@@ -17507,7 +17627,7 @@
         "l" 'logview-refresh-buffer-as-needed
         "w" 'widen
 
-        "t" "toggles"
+        "t" '(nil :wk "toggles")
         "t." 'logview-toggle-show-ellipses
         "tm" 'logview-toggle-search-only-in-messages
         "tD" 'logview-toggle-details-globally
@@ -17518,12 +17638,12 @@
         "th" 'logview-toggle-copy-visible-text-only
         "tg" 'logview-change-target-gap-length
 
-        "s" "show"
+        "s" '(nil :wk "show")
         "se" 'logview-show-entries
         "sa" 'logview-reset-all-filters
         "sA" 'logview-reset-all-filters-restrictions-and-hidings
         "sv" 'logview-show-region-entries
-        "sl" "levels"
+        "sl" '(nil :wk "levels")
         "sle" 'logview-show-only-errors
         "slw" 'logview-show-errors-and-warnings
         "sli" 'logview-show-errors-warnings-and-information
@@ -17535,7 +17655,7 @@
         "slI" 'logview-always-show-errors-warnings-and-information
         "slD" 'logview-always-show-errors-warnings-information-and-debug
 
-        "f" "filter"
+        "f" '(nil :wk "filter")
         "fh" 'logview-hide-entry
         "fv" 'logview-hide-region-entries
         "fm" 'logview-add-include-message-filter
@@ -17547,7 +17667,7 @@
         "f>" 'logview-show-only-as-important
         "fe" 'logview-edit-filters
 
-        "v" "view"
+        "v" '(nil :wk "view")
         "vj" 'logview-next-navigation-view-entry
         "vk" 'logview-previous-navigation-view-entry
         "vv" 'logview-switch-to-view
@@ -17726,7 +17846,7 @@
          "TAB" 'markdown-pre-region ;; preformat
 
          ;; complete/checks
-         "c"  "check/complete"
+         "c"  '(nil :wk "check/complete")
          "cc" 'markdown-complete
          "cb" 'markdown-complete-buffer
          "cr" 'markdown-check-refs
@@ -17740,7 +17860,7 @@
          "O" 'markdown-other-window
 
          ;; insert
-         "i"  "insert"
+         "i"  '(nil :wk "insert")
          "i TAB" 'markdown-insert-image
          "i*" 'markdown-insert-list-item
          "i!" 'markdown-insert-header-setext-1
@@ -17765,7 +17885,7 @@
          "iq" 'markdown-insert-blockquote
          "is" 'markdown-insert-strike-through
 
-         "ih"  "header"
+         "ih"  '(nil :wk "header")
          "ih!" 'markdown-insert-header-setext-1
          "ih1" 'markdown-insert-header-atx-1
          "ih2" 'markdown-insert-header-atx-2
@@ -17779,21 +17899,21 @@
          "ihs" 'markdown-insert-header-setext-2
          "iht" 'markdown-insert-header-setext-1
 
-         "il"  "link"
+         "il"  '(nil :wk "link")
          "ill" 'markdown-insert-link
          "ilf" 'markdown-insert-footnote
          "ilu" 'markdown-insert-uri
          "ilw" 'markdown-insert-wiki-link
 
          ;; delete/kill
-         "d"  "delete"
+         "d"  '(nil :wk "delete")
          "dd" 'markdown-kill-thing-at-point
          "db" 'markdown-kill-block
          "do" 'markdown-kill-outline
          "dy" 'markdown-kill-ring-save
 
          ;; toggles
-         "M"  "toggle"
+         "M"  '(nil :wk "toggle")
          "Mm" 'markdown-toggle-math
          "Mf" 'markdown-toggle-fontify-code-blocks-natively
          "Mi" 'markdown-toggle-inline-images
@@ -17803,31 +17923,31 @@
          "Ml" 'markdown-live-preview-mode
 
          ;; narrowing
-         "n"  "narrow"
+         "n"  '(nil :wk "narrow")
          "nb" 'markdown-narrow-to-block
          "np" 'markdown-narrow-to-page
          "ns" 'markdown-narrow-to-subtree
          "nw" 'widen
 
          ;; marks
-         "m"  "mark"
+         "m"  '(nil :wk "mark")
          "ms" 'markdown-mark-subtree
          "mb" 'markdown-mark-block
 
          ;; table
-         "t"  "table"
+         "t"  '(nil :wk "table")
          "ts" 'markdown-table-sort-lines
          "tT" 'markdown-table-transpose
          "tt" 'markdown-insert-table
          "tn" 'markdown-insert-table
          "tc" 'markdown-table-convert-region
 
-         "ti"  "insert"
+         "ti"  '(nil :wk "insert")
          "tir" 'markdown-table-insert-row
          "tic" 'markdown-table-insert-column
          "tit" 'markdown-insert-table
 
-         "td"  "delete"
+         "td"  '(nil :wk "delete")
          "tdr" 'markdown-table-delete-row
          "tdc" 'markdown-table-delete-column)
 
@@ -17984,7 +18104,7 @@
        (:mode 'kotlin-mode
         "r" 'kotlin-repl
 
-        "e"     "eval"
+        "e"     '(nil :wk "eval")
         "e-"    'kotlin-send-line
         "e|"    'kotlin-send-block
         "er"    'kotlin-send-region
@@ -18039,13 +18159,13 @@
        (:mode 'meghanada-mode
         :minor t
         :prefix leader-server-leader-prefix
-        ""  "meghanada"
+        ""  '(nil :wk "meghanada")
         ""  meghanada-map+
 
-        "c" "compile/run"
-        "t" "test"
-        "S" "server"
-        "i" "insert/refactor")
+        "c" '(nil :wk "compile/run")
+        "t" '(nil :wk "test")
+        "S" '(nil :wk "server")
+        "i" '(nil :wk "insert/refactor"))
 
        :general
        (:keymaps 'meghanada-map+
@@ -18150,12 +18270,12 @@
 
         :lazy-leader
         (:mode 'js2-mode
-         "i"  "insert"
-         "h"  "help"
+         "i"  '(nil :wk "insert")
+         "h"  '(nil :wk "help")
          "gg" 'js2-jump-to-definition
 
          ;; toggle hide-show
-         "H"  "hide/show"
+         "H"  '(nil :wk "hide/show")
          "HH" 'js2-mode-show-all
          "Hw" 'js2-mode-toggle-warnings-and-errors
          "He" 'js2-mode-toggle-element
@@ -18163,14 +18283,14 @@
          "Hf" 'js2-mode-toggle-hide-functions
 
          ;; hide
-         "Hh" "hide"
+         "Hh" '(nil :wk "hide")
          "Hhw" 'js2-mode-hide-warnings-and-errors
          "Hhe" 'js2-mode-hide-element
          "Hhc" 'js2-mode-show-comments
          "Hhf" 'js2-mode-hide-functions
 
          ;; show
-         "Hs" "show"
+         "Hs" '(nil :wk "show")
          "Hsw" 'js2-mode-display-warnings-and-errors
          "Hse" 'js2-mode-show-element
          "Hsc" 'js2-mode-hide-comments
@@ -18243,7 +18363,7 @@
          "]" 'js2r-contract-node-at-point
 
          ;; doesn't work unless executed from within a function
-         "e"  "extract"
+         "e"  '(nil :wk "extract")
          "ef" 'js2r-extract-function
          "em" 'js2r-extract-method
          "ev" 'js2r-extract-var
@@ -18458,18 +18578,18 @@
          "TAB"   'haskell-indent-cycle
          "S-TAB" 'haskell-delete-indentation
 
-         "r"  "refactor"
+         "r"  '(nil :wk "refactor")
          "ri" 'haskell-mode-format-imports
          "rI" 'haskell-sort-imports
 
-         "i"  "insert"
+         "i"  '(nil :wk "insert")
          "is" 'haskell-mode-toggle-scc-at-point
          "i|" 'haskell-indent-insert-guard
          "iw" 'haskell-indent-insert-where
          "io" 'haskell-indent-insert-other
          "i=" 'haskell-indent-insert-equal
 
-         "s"  "session"
+         "s"  '(nil :wk "session")
          "sc" 'haskell-session-change
          "sC" 'haskell-session-change-target
          "sk" 'haskell-session-kill
@@ -18561,20 +18681,20 @@
        :lazy-leader
        (:mode 'go-mode
         ;; requires: go get github.com/rogpeppe/godef
-        "h" "help/guru"
+        "h" '(nil :wk "help/guru")
         "hh" 'godoc-at-point
         "hH" 'godoc
 
-        "g" "goto"
+        "g" '(nil :wk "goto")
         "gi" 'go-goto-imports
         "gc" 'go-coverage
 
-        "i" "imports"
+        "i" '(nil :wk "imports")
         "ia" 'go-import-add
         "ig" 'go-goto-imports
         "ir" 'go-remove-unused-imports
 
-        "e" "playground"
+        "e" '(nil :wk "playground")
         "eb" 'go-play-buffer
         "er" 'go-play-region
         "ed" 'go-download-play))
@@ -18662,18 +18782,18 @@
         "u" 'rustic-playpen
         "d" 'rustic-cargo-doc
 
-        "b" "project"
+        "b" '(nil :wk "project")
         "bc" 'rustic-cargo-clean
         "bo" 'rustic-cargo-outdated
         "bd" 'rustic-cargo-build-doc
 
-        "t" "test"
+        "t" '(nil :wk "test")
         "tt" 'rustic-cargo-test
         "tT" 'rustic-cargo-test-rerun
         "tb" 'rustic-cargo-bench
         "tc" 'rustic-cargo-check
 
-        "r" "refactor"
+        "r" '(nil :wk "refactor")
         "rx" 'rustic-rustfix
         "rf" 'rustic-cargo-fmt
         "rc" 'rustic-cargo-clippy))
@@ -18895,7 +19015,7 @@
          "SPC" 'LaTeX-mark-environment                                                ; or LaTeX-mark-section
 
          ;; preview
-         "p"   "preview"
+         "p"   '(nil :wk "preview")
          "pb"  'preview-buffer
          "pc"  'preview-clearout
          "pd"  'preview-document
@@ -18906,7 +19026,7 @@
          "ps"  'preview-section
 
          ;; fold
-         "z" "fold"
+         "z" '(nil :wk "fold")
          "z=" 'TeX-fold-math
          "zz" 'TeX-fold-dwim
          "zb" 'TeX-fold-buffer
@@ -18922,21 +19042,21 @@
          "zc" 'TeX-fold-clearout-item
 
          ;; indentation
-         "TAB"   "indent"
+         "TAB"   '(nil :wk "indent")
          "TAB b" 'LaTeX-fill-environ
          "TAB p" 'LaTeX-fill-paragra
          "TAB r" 'LaTeX-fill-region
          "TAB s" 'LaTeX-fill-section
 
          ;; modes
-         "M"  "mode"
+         "M"  '(nil :wk "mode")
          "Mp" 'TeX-PDF-mode ;; toggle between PDF and DVI output.
          "Ms" 'TeX-source-correlate-mode
          "Mi" 'TeX-interactive-mode
          "Mm" 'LaTeX-math-mode
 
          ;; toggle
-         "T"  "toggle"
+         "T"  '(nil :wk "toggle")
          "Tb" 'TeX-toggle-debug-bad-boxes
          "Td" 'TeX-toggle-debug-warnings
          "Ts" 'TeX-toggle-suppress-ignored-warnings)
@@ -19043,7 +19163,7 @@
         "o"   'bibtex-remove-OPT-or-ALT
         "C-o" 'bibtex-remove-OPT-or-ALT
 
-        "y" "yank"
+        "y" '(nil :wk "yank")
         "ys" 'bibtex-copy-summary-as-kill
         "yf" 'bibtex-copy-field-as-kill
         "yy" 'bibtex-copy-entry-as-kill
@@ -19052,7 +19172,7 @@
         "f" 'bibtex-make-field
         "d" 'bibtex-kill-field
 
-        "i"    "insert"
+        "i"    '(nil :wk "insert")
         "ii"   'bibtex-entry
         "ip"   'bibtex-Preamble
         "ia"   'bibtex-Article
@@ -19068,7 +19188,7 @@
         "iP"   'bibtex-InProceedings
         "i RET" 'bibtex-Manual
 
-        "it"    "thesis"
+        "it"    '(nil :wk "thesis")
         "itP"   'bibtex-PhdThesis
         "itm"   'bibtex-MastersThesis)
 
@@ -19195,18 +19315,18 @@
          "F" 'ebib-view-file                                     ; open file referenced by current entry
          "!" 'ebib-generate-autokey
 
-         "e" "edit"
+         "e" '(nil :wk "edit")
          "ee" 'ebib-edit-keyname
          "ep" 'ebib-edit-preamble
          "es" 'ebib-edit-strings
 
-         "f" "filters"
+         "f" '(nil :wk "filters")
          "f" ebib-filters-map
 
-         "k" "keywords"
+         "k" '(nil :wk "keywords")
          "k" ebib-keywords-map
 
-         "d" "dependent"
+         "d" '(nil :wk "dependent")
          "d" ebib-dependent-map)
         (:mode 'ebib-entry-mode
          "f" 'ebib-view-file-in-field                                           ; TODO find out what this does
@@ -19551,7 +19671,7 @@
                        (propertize "disabled" 'face 'compilation-error)))))
 
         :leader
-        ("o"  "org"
+        ("o"  '(nil :wk "org")
          "oc" 'org-capture
          "og" 'org-capture-goto-last-stored
          "oa" 'org-agenda
@@ -19614,7 +19734,7 @@
          "M-c" 'org-columns
          "M-p" 'org-delete-property
 
-         "c"  "clock/calendar"
+         "c"  '(nil :wk "clock/calendar")
          "c<" 'org-date-from-calendar
          "c>" 'org-goto-calendar
          "cC" 'org-clock-out
@@ -19628,18 +19748,18 @@
          "c." 'hydra-org-clock/body
          "c C-c" 'org-clock-cancel
 
-         "e"  "export"
+         "e"  '(nil :wk "export")
          "ee" 'org-export-dispatch
          "eh" 'org-html-export-to-html
          "ep" (lambda! ()
                 (org-latex-export-to-pdf org-export-in-background))
 
-         "h"  "headings"
+         "h"  '(nil :wk "headings")
          "hI" 'org-insert-heading
          "hi" 'org-insert-heading-after-current
          "hs" 'org-insert-subheading
 
-         "I"  "insert"
+         "I"  '(nil :wk "insert")
          "Ia" 'org-attach
          "If" 'org-footnote-new
          ;; "Ik" 'insert-keybinding-org
@@ -19647,25 +19767,25 @@
          ;; "Is" 'org-download-screenshot
          ;; "Iy" 'org-download-yank
 
-         "m"  "mark/move"
+         "m"  '(nil :wk "mark/move")
          "ms" 'org-mark-subtree
          "me" 'org-mark-element
          "mb" 'org-babel-mark-block
          "mm." 'hydra-org-navigate/body
 
-         "n"  "narrow"
+         "n"  '(nil :wk "narrow")
          "nb" 'org-narrow-to-block
          "ns" 'org-narrow-to-subtree
          "ne" 'org-narrow-to-element
          "nw" 'widen
 
-         "S"  "subtrees"
+         "S"  '(nil :wk "subtrees")
          "Sh" 'org-promote-subtree
          "Sj" 'org-move-subtree-down
          "Sk" 'org-move-subtree-up
          "Sl" 'org-demote-subtree
 
-         "t" "tables"
+         "t" '(nil :wk "tables")
          "t'"  'org-table-edit-field
          "ta"  'org-table-align
          "tb"  'org-table-blank-field
@@ -19687,22 +19807,22 @@
          "ts"  'org-table-sort-lines
          "tw"  'org-table-wrap-region
 
-         "td"  "delete"
+         "td"  '(nil :wk "delete")
          "tdc" 'org-table-delete-column
          "tdr" 'org-table-delete-row
 
-         "ti"  "insert"
+         "ti"  '(nil :wk "insert")
          "tic" 'org-table-insert-column
          "ti-" 'org-table-hline-and-move
          "tih" 'org-table-insert-hline
          "tir" 'org-table-insert-row
 
-         "tt"  "toggle"
+         "tt"  '(nil :wk "toggle")
          "tta" 'org-toggle-async-export+
          "ttf" 'org-table-toggle-formula-debugger
          "tto" 'org-table-toggle-coordinate-overlays
 
-         ;; "x"  "text"
+         ;; "x"  '(nil :wk "text")
          ;; "xb" 'org-bold
          ;; "xc" 'org-code
          ;; "xi" 'org-italic
@@ -19842,7 +19962,7 @@
          "C" 'org-agenda-columns
 
          ;;; filter/search
-         "/"  "filter/search"
+         "/"  '(nil :wk "filter/search")
          "/c" 'org-agenda-filter-by-category
          "/e" 'org-agenda-filter-by-effort
          "//" 'org-agenda-filter-by-regexp
@@ -19856,7 +19976,7 @@
          "/u" 'org-agenda-bulk-unmark-all
 
          ;;; clock/calendar/diary
-         "c"  "clock/calendar"
+         "c"  '(nil :wk "clock/calendar")
          "cp" 'org-agenda-date-prompt
          "cc" 'org-agenda-clock-in
          "co" 'org-agenda-clock-out
@@ -19865,7 +19985,7 @@
          "c M-c" 'org-agenda-convert-date
 
          ;;; agenda minor modes
-         "m"  "modes"
+         "m"  '(nil :wk "modes")
          "ma" 'org-agenda-archives-mode
          "md" 'org-agenda-day-view
          "mc" 'org-agenda-clockreport-mode
@@ -19877,7 +19997,7 @@
          "mm" 'org-agenda-month-view
 
          ;;; priorities
-         "p"  "priority"
+         "p"  '(nil :wk "priority")
          "pp" 'org-agenda-priority
          "pu" 'org-agenda-priority-up
          "pd" 'org-agenda-priority-down)
