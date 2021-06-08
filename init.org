@@ -15254,6 +15254,19 @@
          :fringe-bitmap '+dot-fringe-bitmap
          :fringe-face 'flycheck-fringe-info)
 
+       ;; Prefer eldoc to flycheck-specific timer.
+       :custom (flycheck-display-errors-function nil)
+       :config
+       (defun flycheck-eldoc-function+ (_callback)
+         (when-let ((errors (flycheck-overlay-errors-at (point))))
+           (flycheck-help-echo-all-error-messages errors)))
+
+       (add-hook 'flycheck-mode-hook
+                 (defun flycheck-setup-eldoc+ ()
+                   (if (bound-and-true-p flycheck-mode)
+                       (add-hook 'eldoc-documentation-functions #'flycheck-eldoc-function+ 50 t)
+                     (remove-hook 'eldoc-documentation-functions #'flycheck-eldoc-function+))))
+
        ;; :config
        ;; ;; Getting fringe/margin indicators on the tty is buggy.
        ;; ;; This works... but it shows up before the line-numbers. You can
