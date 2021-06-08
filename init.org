@@ -2008,18 +2008,23 @@
     #+END_SRC
 
 * Core
-  core functions needed to edit with emacs.
+  core functions needed to edit with emacs and basic syntax sugar functions, inspired
+  by [[https://github.com/hlissner/doom-emacs/blob/develop/core/core-lib.el][doom]].
 
-  basic syntax sugar functions, inspired by [[https://github.com/hlissner/doom-emacs/blob/develop/core/core-lib.el][doom]].
+  This macro lets you create basic interactive lambdas that take no arguments easily.
 
-  #+BEGIN_SRC emacs-lisp
+  #+begin_src emacs-lisp
     (defmacro lambda! (&rest body)
       "Expands to (lambda () (interactive) ,@body).
     A factory for quickly producing interaction commands, particularly for keybinds
     or aliases."
       (declare (doc-string 1) (pure t) (side-effect-free t) (indent defun))
       `(lambda () (interactive) ,@body))
+  #+end_src
 
+  Convert keywords to symbols.
+
+  #+BEGIN_SRC emacs-lisp
     (defun keyword-sym-normalise! (sym)
       "convert a keyword symbol, SYM, to a non-keyword symbol.
     eg. (keyword-sym-normalise! :hello) ;; => 'hello"
@@ -2027,9 +2032,12 @@
         (if (string-prefix-p ":" sym-string)
             (intern (substring sym-string 1))
           sym)))
+  #+END_SRC
 
-    ;; source [[https://www.emacswiki.org/emacs/DestructiveOperations#toc4][Destructive Operations]].
-    (defun nconc-safe (ls1 ls2)
+  A safe variant of ~nconc~ that avoids cyclic lists, source [[https://www.emacswiki.org/emacs/DestructiveOperations#toc4][Destructive Operations]].
+
+  #+begin_src emacs-lisp
+    (defun nconc-safe! (ls1 ls2)
       "`nconc', but avoids creating circular lists."
       (let ((tail ls1))
         (while (and (cdr tail) (not (eq tail ls2)))
@@ -2039,31 +2047,38 @@
               (setq ls1 ls2)
             (setcdr tail ls2)))
         ls1))
+  #+end_src
 
-    (defun inhibit-messages-wrapper (func &rest args)
+
+  Wrapper that suppresses emacs attempts to write a message.
+
+  #+begin_src emacs-lisp
+    (defun inhibit-messages-wrapper! (func &rest args)
       (let ((inhibit-message t))
         (apply func args)))
+  #+end_src
 
-    (defun chain-match-regexp (string &rest regexps)
-      "checks for string-match against STRING using regexps
-    returns true if any of the regexps match the string."
-      (let (match-found regexp)
-        (while (and (not match-found)
-                    (setq regexp (car regexps)))
-          (setq match-found (string-match-p regexp string)
-                regexps (cdr regexps)))
-        (not (not match-found))))
+  Use ~assoc~ to retrieve an element from an alist and then delete that element.
 
+  #+begin_src emacs-lisp
     (defmacro assoc-pop! (key alist)
       `(let ((result (assoc ,key ,alist)))
          (setq ,alist (delete result ,alist))
          result))
+  #+end_src
 
-    ;; see [[https://ftp.gnu.org/old-gnu/Manuals/elisp-manual-20-2.5/html_node/elisp_408.html][here]].
+  Predicate for whether a buffer-object references a killed buffer or not, see [[https://ftp.gnu.org/old-gnu/Manuals/elisp-manual-20-2.5/html_node/elisp_408.html][here]].
+
+  #+begin_src emacs-lisp
     (defun buffer-killed-p (buffer)
       "Return t if BUFFER is killed."
       (not (buffer-name buffer)))
+  #+end_src
 
+
+  String truncation functions.
+
+  #+begin_src emacs-lisp
     (defmacro string-truncate-left! (str count)
       `(and ,str
             (if (> (length ,str) ,count)
@@ -2083,7 +2098,28 @@
               (if (> len (+ ,left ,right))
                   (substring ,str ,left (- len ,right))
                 ""))))
-  #+END_SRC
+  #+end_src
+
+  #+begin_src emacs-lisp
+    (cl-defmacro save-vars-with-temp-buffer! ((&rest vars) &rest body)
+      "Store the values of VARS in current buffer, and then create a
+    temp buffer reassigning the values of VARS and then invoking BODY."
+      (declare (indent defun))
+      (let* ((current-vars
+              (cl-loop with name = nil
+                       for var in vars
+                       do (setq name (symbol-name var))
+                       collect (list (intern (concat "-current-" name))
+                                     var)))
+             (assign-vars
+              (cl-loop for var in current-vars
+                       collect (list (nth 1 var) (car var)))))
+        `(let ,current-vars
+           (with-temp-buffer
+             (let ,assign-vars
+               ,@body)))))
+  #+end_src
+
 
 ** plist-bind
    #+BEGIN_SRC emacs-lisp
@@ -2415,12 +2451,14 @@
              (setq show-trailing-whitespace show)))))
 
      (defun set-trailing-whitespace--name-based (&optional dont-set)
-       "check the name of the current buffer, to see whether trailing
+       "Check the name of the current buffer, to see whether trailing
      whitespace should be shown. see `set-trailing-whitespace--mode-based'."
-       (let ((show (not (and whitespace-exempt-buffers
-                             (apply 'chain-match-regexp
-                                    (buffer-name)
-                                    whitespace-exempt-buffers)))))
+       (let ((show (not
+                    (and whitespace-exempt-buffers
+                         (let ((it (buffer-name)))
+                           (cl-find-if (lambda (regexp)
+                                         (string-match-p regexp it))
+                                       whitespace-exempt-buffers))))))
          (prog1
              show
            (unless dont-set
@@ -2448,13 +2486,17 @@
    #+END_SRC
 
 ** indentation
-   Configure the preferred indentation for buffers. Emacs doesn't really have a nice builtin
-   way to do this across multiple modes. I got tired of always having to remember special
-   variables for each mode so I've defined the following alist to store indent configurations
-   and a command ~set-indent-offset~ which automatically (or manually sets the desired
-   indent).
+   Configure the preferred indentation for buffers. Emacs doesn't really have a nice
+   builtin way to do this across multiple modes. I got tired of always having to
+   remember special variables for each mode so I've defined the following alist to
+   store indent configurations and a command ~set-indent-offset~ which automatically
+   (or manually sets the desired indent).
 
-   #+BEGIN_SRC emacs-lisp
+   ~+indent-config~ is the main user configuration variable for indentation. This is
+   used when no alternative indent config (such as buffer-local variables, or
+   editorconfig files) specify how to deal with the current buffer.
+
+   #+begin_src emacs-lisp
      (defvar +indent-config '((t . 4))
        "alist configuring preferred indentation for buffers.
      the `car' of an entry is used to match which buffer it's applied to
@@ -2472,6 +2514,28 @@
            occurs, changing the buffer name doesn't alter the indent.
      ")
 
+     (defvar-local +indent nil
+       "Override the local indent for the current file.")
+   #+end_src
+
+   A package that lets you configure project parameters (indent size,
+   line endings etc.) in a [[https://editorconfig.org/][single configuration]] file.
+
+   I really only need the parsing fascilities so that I can extract the
+   indent-offset but editorconfig also has a mapping of common indent
+   variables for major-modes that's bound to come in very useful ヽ(*´з｀*)ﾉ.
+
+   #+begin_src emacs-lisp
+     (use-package editorconfig
+       :straight t
+       :demand t
+       :config
+       (setq editorconfig-lisp-use-default-indent t)
+       (push '(plantuml-mode plantuml-indent-level)
+             editorconfig-indentation-alist))
+   #+end_src
+
+   #+BEGIN_SRC emacs-lisp
      (defun +indent-offset (&optional buffer)
        "Use `+indent-config' to find the preffered indent for BUFFER."
        (with-current-buffer (or buffer (current-buffer))
@@ -2489,24 +2553,6 @@
                   and return (if (functionp indent)
                                  (funcall indent)
                                indent))))
-
-     ;; A package that lets you configure project parameters (indent size,
-     ;; line endings etc.) in a [[https://editorconfig.org/][single configuration]] file.
-     ;;
-     ;; I really only need the parsing fascilities so that I can extract the
-     ;; indent-offset but editorconfig also has a mapping of common indent
-     ;; variables defined in an alist that's bound to come in very useful
-     ;; ヽ(*´з｀*)ﾉ.
-     (use-package editorconfig
-       :straight t
-       :demand t
-       :config
-       (setq editorconfig-lisp-use-default-indent t)
-       (push '(plantuml-mode plantuml-indent-level)
-             editorconfig-indentation-alist))
-
-     (defvar-local +indent nil
-       "Override the local indent for the current file.")
 
      (defun set-indent-offset (&optional indent tab-size)
        "Set the indentation level of the current buffer.
@@ -6797,7 +6843,7 @@
          ;; projectiles fault... who knows. also exclude special emacs backup files from search results.
          (setq projectile-generic-command "find . -type f -not -iname '#*#' -print | cut -c3- | tr '\\n' '\\0'"))
 
-       (advice-add 'projectile-cleanup-known-projects :around #'inhibit-messages-wrapper)
+       (advice-add 'projectile-cleanup-known-projects :around #'inhibit-messages-wrapper!)
 
        (defun projectile-compile--double-prefix-means-run-comint (func &optional _args)
          "allow running compilation interactively when multiple prefixes are given.
@@ -6938,7 +6984,15 @@
    #+END_SRC
 
 *** project-types
-    #+BEGIN_SRC emacs-lisp :tangle lisp/+projectile-project-types.el
+    :PROPERTIES:
+    :header-args+: :tangle lisp/+projectile-project-types.el
+    :END:
+
+    #+begin_src emacs-lisp
+      (require 'projectile)
+    #+end_src
+
+    #+BEGIN_SRC emacs-lisp
       (projectile-register-project-type 'rake '("rakefile")
                                         :compile "rake build"
                                         :test    "rake test"
@@ -6982,12 +7036,18 @@
                                         :compile "cmake --build ."
                                         :install "cmake --build . --target install"
                                         :package "cmake --build . --target package")
-
-      (provide '+projectile-project-types)
     #+END_SRC
 
+    #+begin_src emacs-lisp
+      (provide '+projectile-project-types)
+    #+end_src
+
 *** projectile-commands
-    #+BEGIN_SRC emacs-lisp
+    :PROPERTIES:
+    :header-args+: :tangle lisp/+projectile-commands.el
+    :END:
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package +projectile-commands
         :commands (projectile-persp-switch-project+
                    projectile-show-and-copy-project-dir
@@ -6997,6 +7057,10 @@
         ("pl" 'projectile-persp-switch-project+
          "py" 'projectile-show-and-copy-project-dir))
     #+END_SRC
+
+    #+begin_src emacs-lisp
+      (require 'projectile)
+    #+end_src
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/+projectile-commands.el
       (defun projectile-persp-switch-project--action+ (project)
@@ -7037,9 +7101,11 @@
                 for file in files
                 when (file-exists-p (concat project-dir file))
                 return t))))
-
-      (provide '+projectile-commands)
     #+END_SRC
+
+    #+begin_src emacs-lisp
+      (provide '+projectile-commands)
+    #+end_src
 
 ** real-auto-save-mode
    #+BEGIN_SRC emacs-lisp
@@ -7385,18 +7451,25 @@
     #+END_SRC
 
 *** licenses
-    Use yas to generate and insert license headers for the current buffer.
+    :PROPERTIES:
+    :header-args+: :tangle lisp/+yas-license.el
+    :END:
 
-    #+BEGIN_SRC emacs-lisp
+    Use yas to generate and insert license headers, this isn't an automatic process
+    but it works well enough I'd say.
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package +yas-license
         :commands +insert-license
         :leader
         ("ia" '+insert-license))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/+yas-license.el
+    #+begin_src emacs-lisp
       (require 'yasnippet)
+    #+end_src
 
+    #+begin_src emacs-lisp
       (defconst +license-dir (etc! "licenses")
         "Directory in which to find license snippets.")
 
@@ -7407,10 +7480,14 @@
       (defvar +license-last-inserted nil
         "The fully populated last inserted license template.")
 
-      (cl-defun +license-get-name (&optional default)
+      (defun +license-get-name (&optional default)
         (or user-full-name default))
+    #+end_src
 
-      (defun +license--licenses (&optional dir)
+    Commands to list and interactively select a license file.
+
+    #+begin_src emacs-lisp
+      (defun +license-licenses (&optional dir)
         "return an alist of (basename . file) for all .license files in DIR.
       Where DIR defaults to the current working directory (`default-directory')."
         (cl-loop
@@ -7421,8 +7498,8 @@
                               "*.license"))
          collect (cons (file-name-base file) file)))
 
-      (defun +license--read-license ()
-        (let ((licenses (+license--licenses +license-dir))
+      (defun +license-read-license ()
+        (let ((licenses (+license-licenses +license-dir))
               license)
           (when (zerop (length licenses))
             (error "No licenses found in dir: %s" default-directory))
@@ -7436,51 +7513,38 @@
             (insert-file-contents (cdr license))
             (cons (car license)
                   (buffer-substring (point-min) (point-max))))))
+    #+end_src
 
-      (cl-defmacro +with-temp-buffer-and-same-vars ((&rest vars) &rest body)
-        "Store the values of VARS in current buffer, and then create a
-      temp buffer reassigning the values of VARS and then invoking BODY."
-        (let* ((current-vars
-                (cl-loop with name = nil
-                         for var in vars
-                         do (setq name (symbol-name var))
-                         collect (list (intern (concat "-current-" name))
-                                       var)))
-               (assign-vars
-                (cl-loop for var in current-vars
-                         collect (list (nth 1 var) (car var)))))
-          `(let ,current-vars
-             (with-temp-buffer
-               (let ,assign-vars
-                 ,@body)))))
-      (put '+with-temp-buffer-and-same-vars 'lisp-indent-function 'defun)
+    Expand and insert a chosen license into the current buffer at point.
 
-      (defun +license--comment-template (template &optional prefix)
-        (+with-temp-buffer-and-same-vars
+    #+BEGIN_SRC emacs-lisp
+      (defun +license-comment-template (template &optional prefix)
+        (save-vars-with-temp-buffer!
             (comment-start comment-end comment-style
              comment-multi-line comment-add comment-continue)
           (insert template)
           (comment-region (point-min) (point-max) prefix)
           (buffer-substring (point-min) (point-max))))
 
-      (defun +insert-license (&optional prefix)
+      (defun +insert-license (license)
         "Insert a license from the known license list.
       with PREFIX, repeats insertion of the last inserted license."
-        (interactive "P")
-        (let* ((license
-                (if (and prefix +license-last-inserted)
-                    +license-last-inserted
-                  (+license--read-license)))
-               (comment-multi-line t))
+        (interactive
+         (list (or (and current-prefix-arg +license-last-inserted)
+                   (+license-read-license)))
+         "P")
+        (let ((comment-multi-line t))
           (yas-expand-snippet
-           (+license--comment-template (cdr license))
+           (+license-comment-template (cdr license))
            nil nil
            '((yas-indent-line 'fixed)))
 
           (setq +license-last-inserted license)))
-
-      (provide 'yas-license)
     #+END_SRC
+
+    #+begin_src emacs-lisp
+      (provide 'yas-license)
+    #+end_src
 
 **** Types
      :PROPERTIES:
@@ -7774,7 +7838,7 @@
                  `(let ((config (assoc (quote ,mode) prettify-symbols-pretty-symbols-alist+)))
                     (if config
                         ; add to existing config, while preventing cyclic loops
-                        (nconc-safe (car (cdr config)) tuples)
+                        (nconc-safe! (car (cdr config)) tuples)
                       (push (cons (quote ,mode) (list tuples))
                             prettify-symbols-pretty-symbols-alist+)
 
@@ -15329,7 +15393,11 @@
    #+END_SRC
 
 *** flycheck-commands
-    #+BEGIN_SRC emacs-lisp
+    :PROPERTIES:
+    :header-args+: :tangle lisp/+flycheck-commands.el
+    :END:
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package +flycheck-commands
         :commands (toggle-flycheck-messages
                    flycheck-last-error
@@ -15348,7 +15416,12 @@
          "gl" 'flycheck-error-list-goto-last-error))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/+flycheck-commands.el
+    #+begin_src emacs-lisp
+      (require 'flycheck)
+      (require 'evil)
+    #+end_src
+
+    #+BEGIN_SRC emacs-lisp
       (defvar-local flycheck-original-display-errors-function nil
         "The value of `flycheck-display-errors-function' before being toggled
       by `toggle-flycheck-messages'.")
@@ -15406,9 +15479,11 @@
           ([remap evil-previous-line]   . flycheck-error-list-previous-error)
           ([remap evil-goto-first-line] . flycheck-error-list-goto-first-error)
           ([remap evil-goto-line]       . flycheck-error-list-goto-error-or-eob+)))
-
-      (provide '+flycheck-commands)
     #+END_SRC
+
+    #+begin_src emacs-lisp
+      (provide '+flycheck-commands)
+    #+end_src
 
 *** flycheck-pos-tip
     Show a little documentation tooltip when hovering over an error.
@@ -16738,6 +16813,10 @@
    :PROPERTIES:
    :header-args+: :tangle (package-str! "lisp/+skeletor-templates.el" skeletor)
    :END:
+
+   #+begin_src emacs-lisp
+     (require 'skeletor)
+   #+end_src
 
    Firstly lets remove all the builtin skeletor project types because they're like a
    decade old and some just don't work for some reason :/.
@@ -18425,7 +18504,7 @@
       (use-package sh-script
         :hook ((sh-mode . flycheck-mode))
         :config
-        (advice-add 'sh-set-shell :around 'inhibit-messages-wrapper)
+        (advice-add 'sh-set-shell :around 'inhibit-messages-wrapper!)
 
         :lazy-leader
         (:mode 'sh-mode
@@ -22887,10 +22966,13 @@
        (provide-theme 'an-old-hope)
     #+END_SRC
 
+* Appendix
+  This trailing section just defines some file-local variables for this file.
+
 # Local Variables:
 # coding: utf-8-unix
 # eval: (auto-fill-mode)
-# display-line-numbers: nil
+# eval: (display-line-numbers-mode -1)
 # eval: (and (functionp #'diff-hl-mode) (diff-hl-mode))
-# fill-column: 85;
+# fill-column: 85
 # End:
