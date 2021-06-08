@@ -185,8 +185,7 @@
          git-gutter                                                        ; Show version control information in the window fringe.
 
      ;;; Completion frameworks
-         ;; ivy                                                            ; A clean minimalist completion framework.
-         selectrum                                                         ; An ivy-like package designed to be more consistent and predictable
+         selectrum                                                         ; An clean completion-framework designed to be more consistent and predictable
 
      ;;; Completion Assistants
          prescient                                                         ; Sorting/Filtering based on frequency and proximity.
@@ -219,10 +218,6 @@
          ;; ibuffer-persp                                                  ; Filter ibuffer buffers by emacs perspectives
          ibuffer-projectile                                                ; Filter ibuffer buffers by active projects
          ;; company-emoji                                                  ; Show emojis in company-completion candidates
-
-         ;; ivy-rich                                                       ; Extra documentation and meta-info for core ivy functions
-         ;; ivy-rich-icons                                                 ; Enable icons with ivy-find
-         ;; ivy-prescient                                                  ; Sort ivy candidates through prescient. (WARN [[https://github.com/raxod502/prescient.el/issues?q=is%3Aissue+ivy+history][issues]])
 
      ;;; language-support
          ;; ggtags                                                         ; GNU Global source code tagging system
@@ -1819,15 +1814,6 @@
                        (create-new-empty-buffer))
                       ((eq 1 (length buffer-list))
                        (car buffer-list))
-                      ((package! ivy)
-                       (require 'counsel)
-                       (ivy-read "Switch to buffer: " buffer-names
-                                 :require-match t
-                                 :keymap (bound-and-true-p ivy-switch-buffer-map)
-                                 :matcher #'ivy--switch-buffer-matcher
-                                 :caller 'switch-to-scratch-buffer
-                                 :unwind #'counsel--switch-buffer-unwind
-                                 :update-fn 'counsel--switch-buffer-update-fn))
                       (t (completing-read "Switch to buffer: " buffer-names))))
                  (or (get-buffer scratch-buffer-name)
                      (call-interactively 'create-new-empty-buffer)))))
@@ -2089,15 +2075,6 @@
                (when point
                  (goto-char point)))
            (user-error "No configuration file found"))))
-
-     (defun find-dotemacs-snippet ()
-       (interactive)
-       (let ((default-directory (etc! "snippets")))
-         (cond
-          ((package! ivy)
-           (require 'counsel)
-           (funcall-interactively #'counsel-file-jump))
-          (t (user-error "No recursive find-file package found")))))
 
      (defun find-file-from-dotemacs ()
        (interactive)
@@ -5519,109 +5496,6 @@
       (provide 'hydra-ibuffer)
     #+END_SRC
 
-*** hydra-ivy
-    The actual ivy hydra has trailing whitespace and is inseperably tied to C-o for
-    both entry and exit, despite me not liking the former and changing the latter.
-    This is my variant, much of the same functionality, just different display.
-
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy)
-      (autoload 'hydra-ivy/body (lisp! "hydras" "hydra-ivy-custom.el") nil t)
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/hydras/hydra-ivy-custom.el" ivy)
-      (unless (require 'ivy-hydra nil t)
-        (message "Failed to require `ivy-hydra'."))
-
-      (defhydra hydra-ivy (:foreign-keys run :hint nil)
-        "
-       ^ ^   ^ ^   ^ ^ | call        ^^^^| finish         ^^^^| Options | Action _n_/_p_: %s(ivy-action-name)
-      -^-^---^-^---^-^-+^^^^-------------+----------------^^^^+---------+--------------------------^^^^^^^^^^^^^^^^^^^^^^^^|
-       ^ ^   _J_   ^ ^ | _<_/_+_ grow    | _RET_/_d_ done     | _r_egex-switch:   %18s(ivy--matcher-desc) ^^^^^^^^^^^^^^^^^|
-       ^ ^   _j_   ^ ^ | _>_/_-_ shrink  | _C-RET_ dispatch ^^| _c_alling:        %18s(if ivy-calling \"on\" \"off\") ^^^^^|
-       _h_   ^+^   _l_ | _t_oggle-mark ^^| _M-RET_ call     ^^| _C_ase-fold:      %18s`ivy-case-fold-search ^^^^^^^^^^^^^^^|
-       ^ ^   _k_   ^ ^ | _u_n/_m_ark     | _S-SPC_ restrict ^^| _T_runcate-lines: %18s(if truncate-lines \"on\" \"off\") ^^|
-       ^ ^   _K_   ^ ^ | occ_U_r _q_uit  | ^   ^ ^ ^          | _f_ilter:         %18s(if ivy-use-ignore \"on\" \"off\") ^^|
-      "
-        ;; movement
-        ("h" ivy-beginning-of-buffer)
-        ("j" ivy-next-line)
-        ("k" ivy-previous-line)
-        ("l" ivy-end-of-buffer)
-        ("J" ivy-scroll-up-command)
-        ("K" ivy-scroll-down-command)
-
-        ;; finish + marking
-        ("RET"   ivy-alt-done :exit t)
-        ("d"     ivy-alt-done :exit t)
-        ("C-RET" ivy-dispatching-done :exit t)
-        ("M-RET" ivy-call :exit t)
-        ("S-SPC" ivy-restrict-to-matches)
-        ("SPC"   ivy-mark)
-        ("m"     ivy-mark)
-        ("DEL"   ivy-unmark-backward)
-        ("u"     ivy-unmark)
-        ("t"     ivy-toggle-mark)
-        ("T"     ivy-toggle-marks)
-
-        ;; actions
-        ("n" ivy-next-action)
-        ("p" ivy-prev-action)
-        ;; ("r" ivy-read-action) ;; poisons local bindings
-
-        (">" ivy-minibuffer-grow)
-        ("+" ivy-minibuffer-grow)
-        ("<" ivy-minibuffer-shrink)
-        ("-" ivy-minibuffer-shrink)
-
-        ("U" ivy-occur :exit t)
-        ("c" ivy-toggle-calling)
-        ("C" ivy-toggle-case-fold)
-        ("r" ivy-rotate-preferred-builders) ;; change regex
-        ("f" ivy-toggle-ignore)
-        ("T" (setq truncate-lines (not truncate-lines)))
-
-        ;; hidden commands
-        ("1" digit-argument)
-        ("2" digit-argument)
-        ("3" digit-argument)
-        ("4" digit-argument)
-        ("5" digit-argument)
-        ("6" digit-argument)
-        ("7" digit-argument)
-        ("8" digit-argument)
-        ("9" digit-argument)
-        ("0" digit-argument)
-
-        ("g" ivy-beginning-of-buffer)
-        ("G" ivy-end-of-buffer)
-        ("C-u" ivy-scroll-down-command) ;; overriden for uniarg
-
-        ;; exit commands
-        ;; nil                  means exit the hydra
-        ;; keyboard-escape-quit means exit the ivy session
-        ("q"        nil :exit t)
-        ("i"        nil :exit t)
-        ("<escape>" nil :exit t)
-        ("C-."      nil :exit t)
-        ("C-g" keyboard-escape-quit :exit t))
-
-      ;; for some reason, can't be bound within hydra
-      (general-define-key
-        :keymaps 'hydra-ivy/keymap
-        "M-o" 'ivy-beginning-of-buffer)
-
-      ;; escape keys for ivy-dispatching-done-hydra
-      (setq ivy-dispatching-done-hydra-exit-keys '(("ESC" nil) ("C-g" nil)))
-
-      (defalias 'hydra-ivy-custom #'hydra-ivy)
-
-      (advice-add 'ivy-read :after
-                  (defun hydra-ivy--auto-exit-with-ivy (&rest _)
-                    (hydra-ivy/nil)))
-
-      (provide 'hydra-ivy-custom)
-    #+END_SRC
-
 *** hydra-org-agenda
     sourced from [[https://github.com/abo-abo/hydra/wiki/Org-agenda][here]]
 
@@ -6411,15 +6285,7 @@
 
        (defun find-file-new-perspective ()
          (interactive)
-         (cond
-          ((package! ivy)
-           (require 'counsel)
-           (counsel--find-file-1
-            "New persp file: " nil
-            #'find-file-new-perspective--action
-            'counsel-find-file))
-          (t
-           (find-file-new-perspective--action (read-file-name "New persp file:")))))
+         (find-file-new-perspective--action (read-file-name "New persp file:")))
 
        (defun switch-to-persp-by-num (index)
          "switch to a perspective based on it's position in (persp-persps)
@@ -6778,8 +6644,7 @@
                          (when root
                            (projectile-org-capture-templates+ name root)))))
            (call-interactively
-            (cond ((package! ivy) 'counsel-org-capture)
-                  ((package! selectrum) 'consult-org-capture+)
+            (cond ((package! selectrum) 'consult-org-capture+)
                   (t 'org-capture)))))
 
        (defun projectile-org-project-file+ (&optional arg)
@@ -6931,24 +6796,6 @@
     #+end_src
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/+projectile-commands.el
-      (defun projectile-persp-switch-project--action+ (project)
-        (let ((persp-reset-windows-on-nil-window-conf t)
-              (project-name (file-name-nondirectory
-                             (string-remove-suffix "/" project))))
-          (persp-switch project-name)
-          (projectile-switch-project-by-name project)))
-
-      (defun projectile-persp-switch-project+ ()
-        (interactive)
-        (cond ((package! ivy)
-               (ivy-read "Switch to Project Perspective: "
-                         (if (projectile-project-p)
-                             (cons (abbreviate-file-name (projectile-project-root))
-                                   (projectile-relevant-known-projects))
-                           projectile-known-projects)
-                         :action #'projectile-persp-switch-project--action+))
-              (t (message "Completion framework not supported"))))
-
       (defun projectile-show-and-copy-project-dir (&optional prefix)
         (interactive "P")
         (if (not (projectile-project-p))
@@ -11356,13 +11203,6 @@
          "kq" 'eshell-quit-process)
 
        (defun eshell-mode--setup-bindings ()
-         (cond
-          ((package! ivy)
-           (general-define-key
-            :keymaps 'eshell-mode-map
-            "C-s"   'counsel-esh-history
-            "M-SPC" 'counsel-esh-history)))
-
          (general-define-key
            :keymaps 'eshell-mode-map
            ;;; movement commands
@@ -12628,14 +12468,14 @@
               nil (consult-bibtex-candidates+ (orhc-bibtex-candidates)))))))
 
        (defun org-ref-consult-insert-label-link ()
-         "Insert a label with ivy."
+         "Insert a label with `completing-read'."
          (interactive)
          (insert
           (concat (if (not (looking-back "label:" 6)) "label:" "")
                         (completing-read "label: " (org-ref-get-labels)))))
 
        (defun org-ref-consult-insert-ref-link ()
-         "Insert a ref link with ivy.
+         "Insert a ref link with `completing-read'.
        Use a prefix arg to select the ref type."
          (interactive)
          (let ((label (completing-read "label: " (org-ref-get-labels) nil t)))
@@ -12840,7 +12680,7 @@
      #+END_SRC
 
 **** consult-bibtex
-     A native emacs variant for [[*ivy-bibtex][ivy-bibtex]].
+     A native emacs variant for ivy-bibtex.
 
      #+BEGIN_SRC emacs-lisp
        (require 'bibtex-completion)
@@ -13434,947 +13274,6 @@
         (when (package! orderless)
           (setq affe-regexp-function #'orderless-pattern-compiler
                 affe-highlight-function #'orderless-highlight-matches)))
-    #+END_SRC
-
-** ivy
-   :PROPERTIES:
-   :header-args+: :tangle (package-yes! ivy)
-   :END:
-
-   A clean, elegent, completion framework for emacs.
-
-   #+BEGIN_SRC emacs-lisp
-     (use-package ivy
-       :straight t
-       :diminish ivy-mode
-       :commands (ivy-toggle-mark)
-       :hook (after-init . ivy-mode)
-       :config
-       (with-eval-after-load 'magit
-         (setq magit-completing-read-function 'ivy-completing-read))
-
-       (setq ivy-height 15
-             ivy-use-virtual-buffers t
-             projectile-completion-system 'ivy
-             ivy-magic-tilde nil)
-
-       (when (emacs>= "27")
-         ;; see issue: https://github.com/abo-abo/swiper/issues/2397
-         (setq ivy-read-action-function #'ivy-hydra-read-action))
-
-       (push 'ivy-occur-mode whitespace-exempt-modes)
-
-       (setq ivy-preferred-re-builders
-             '((ivy--regex-plus         . "ivy")
-               (ivy--regex-ignore-order . "order")
-               (ivy--regex-fuzzy        . "fuzzy")
-               (regexp-quote            . "literal"))
-
-             ;; store as unique variable because counsel
-             ;; will just end up adding to it anyways.
-             ivy-default-initial-inputs-alist+
-             '((counsel-minor . "^+")
-               ;; (counsel-package . "^+")
-               ;; (org-refile . "^")
-               (org-agenda-refile . "^")
-               (org-capture-refile . "^")
-               ;; (counsel-M-x . "^")
-               ;; (counsel-describe-function . "^")
-               ;; (counsel-describe-variable . "^")
-               ;; (counsel-org-capture . "^")
-               ;; (org-refile . "^")
-               ;; (org-agenda-refile . "^")
-               ;; (org-capture-refile . "^")
-               ;; (Man-completion-table . "^")
-               ;; (woman . "^")
-               )
-
-             ivy-initial-inputs-alist ivy-default-initial-inputs-alist+)
-
-       (defvar ivy-actions-done-hook+ nil
-         "hook run after ivy has completed a set of actions.
-     this could be when `ivy-done' is invoked, or when `ivy-call'
-     has been invoked.")
-
-       (defun ivy-run-actions-done-hook+ (func &rest args)
-         (unwind-protect
-             (apply func args)
-           (run-hooks 'ivy-actions-done-hook+)))
-
-       (advice-add 'ivy-done :around #'ivy-run-actions-done-hook+)
-       (advice-add 'ivy-call :around #'ivy-run-actions-done-hook+)
-
-       (defun ivy-kill-line-backward ()
-         (interactive)
-         (delete-region (minibuffer-prompt-end) (point)))
-
-       (defun ivy-forward-char-or-partial-or-done ()
-         "move forward a character or complete selection
-     completes selection when there's no characters left to
-     move forward."
-         (interactive)
-         (call-interactively (if (eolp)
-                                 'ivy-alt-done
-                               'forward-char)))
-
-       (defun ivy-toggle-mark ()
-         (interactive)
-         (if (ivy--marked-p)
-             (when (ivy--marked-p)
-               (ivy--unmark (ivy-state-current ivy-last)))
-           (unless (ivy--marked-p)
-             (ivy--mark (ivy-state-current ivy-last)))))
-
-       (with-eval-after-load "persp-mode"
-         ;; thanks [[https://gist.github.com/Bad-ptr/1aca1ec54c3bdb2ee80996eb2b68ad2d#file-persp-ivy-el][Bad-ptr]].
-         (add-hook 'ivy-ignore-buffers
-                   (lambda (b)
-                     (when persp-mode
-                       (let ((persp (get-current-persp)))
-                         (if persp
-                             (not (persp-contain-buffer-p b persp))
-                           nil)))))
-
-         (setq ivy-sort-functions-alist
-               (append ivy-sort-functions-alist
-                       '((persp-kill-buffer   . nil)
-                         (persp-remove-buffer . nil)
-                         (persp-add-buffer    . nil)
-                         (persp-switch        . nil)
-                         (persp-window-switch . nil)
-                         (persp-frame-switch  . nil)))))
-
-       :lazy-leader
-       ("bb" 'ivy-switch-buffer
-        "SPC" 'counsel-M-x
-        "RET" 'ivy-resume)
-       (:mode '(ivy-occur-mode ivy-occur-grep-mode)
-        ;; 'ivy-wgrep-change-to-wgrep-mode
-        "SPC" 'ivy-occur-read-action
-        "m"   'ivy-occur-toggle-calling)
-
-       :general
-       (:keymaps 'ivy-minibuffer-map
-        "C-j"   nil                                                                 ; was ivy-alt-done
-        "M-j"   nil                                                                 ; was ivy-yank-word
-        "M-v"   nil                                                                 ; was ivy-scroll-down-command
-        "C-M-y" nil                                                                 ; was ivy-insert-current-full
-
-        "C-r" 'evil-paste-from-register
-        "C-s" 'ivy-reverse-i-search
-
-        "C-v"      'quoted-insert                                                   ; was ivy-scroll-up-command
-        "<return>" 'ivy-alt-done                                                    ; also supports tramp expansion
-        "RET"      'ivy-alt-done
-
-     ;;; misc
-        "C-?" 'describe-mode
-        "M-d" 'kill-ring-save                                                       ; save all candidates to kill ring
-        "S-SPC" 'ivy-restrict-to-matches                                            ; erase input, but start filtering from current candidates
-
-     ;;; marking
-        "C-SPC"         'ivy-mark
-        "M-SPC"         'ivy-toggle-mark
-        "C-M-SPC"       'ivy-toggle-marks
-        "<S-backspace>" 'ivy-unmark-backward
-
-     ;;; selection execution
-        "<S-return>"   'ivy-immediate-done                                           ; exit with current input, not selection
-        "C-c <return>" 'ivy-immediate-done
-        "<C-return>" 'ivy-dispatching-done                                           ; prompt for action, then done
-        "M-RET" 'ivy-call                                                            ; invoke default action'but exit the minibuffer
-        "C-M-<return>" 'ivy-dispatching-call                                         ; prompt for action, then call
-        "C-M-j" 'ivy-next-line-and-call                                              ; move down, then call default action
-        "C-M-k" 'ivy-previous-line-and-call                                          ; move down, then call default action
-        "<escape>" 'minibuffer-keyboard-quit
-
-     ;;; movement commands
-        "C-a" 'move-beginning-of-line
-        "C-e" 'move-end-of-line
-        "C-h" 'backward-char
-        "C-l" 'ivy-forward-char-or-partial-or-done
-        "C-j" 'next-line
-        "C-k" 'previous-line
-        "M-j" 'ivy-next-history-element
-        "M-k" 'ivy-previous-history-element
-        "M-u" 'ivy-occur
-        ;; arrow key variants
-        "<left>"  'backward-char
-        "<right>" 'forward-char
-        "<up>"    'previous-line
-        "<down>"  'next-line
-
-        ;; suprisingly enough, these are bound correctly
-        "C-d" 'scroll-up-command
-        "C-u" 'scroll-down-command
-
-        ;; Taken from helm, shadows hydra-ivy/body
-        "M-o" 'beginning-of-buffer
-        "C-o" 'end-of-buffer
-
-     ;;; insertion/deletion
-        [C-i] 'ivy-insert-current                                                    ; complete current selection into minibuffer leave prompt active to build on it.
-        "TAB" 'ivy-insert-current
-
-        "M-i" 'ivy-yank-word
-        "C-DEL" 'evil-delete-backward-word
-        ;; pull word in from point at buffer
-        "M-y" 'ivy-yank-word
-        "C-w" 'backward-kill-word
-        ;; operate on entire input
-        "M-w" 'ivy-kill-line-backward
-        "M-W" 'kill-line ;; kill forward
-        "M-DEL" 'kill-whole-line
-
-     ;;; history - (C-r/C-s still work fine)
-        "<S-up>"    'ivy-previous-history-element
-        "<S-down>"  'ivy-next-history-element)
-       (:keymaps 'ivy-switch-buffer-map
-        "C-k" 'previous-line
-        "M-d" 'ivy-switch-buffer-kill)
-       (:keymaps 'ivy-reverse-i-search-map
-        "C-k" 'previous-line
-        "C-d" 'ivy-reverse-i-search-kill)
-       (:keymaps '(ivy-occur-mode-map
-                   ivy-occur-grep-mode-map)
-        :states 'motion
-        "q" nil
-        "RET" 'ivy-occur-press-and-switch
-        "M-RET" 'ivy-occur-press
-        "<C-return>" 'ivy-occur-dispatch
-        "gj" 'ivy-occur-next-line
-        "gk" 'ivy-occur-previous-line
-        "}" 'ivy-occur-next-line
-        "{" 'ivy-occur-previous-line
-        ;; TODO make d an evil operator
-        "d" 'ivy-occur-delete-candidate
-        "x" 'ivy-occur-delete-candidate
-        "o" 'compilation-display-error
-
-        "gr" 'ivy-occur-revert-buffer))
-   #+END_SRC
-
-*** ivy-prescient
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy prescient ivy-prescient)
-      (use-package ivy-prescient
-        :straight t
-        :after  prescient
-        :hook (ivy-mode . ivy-prescient-mode)
-        :custom
-        (ivy-prescient-enable-filtering (not (package! orderless)))
-        (ivy-prescient-enable-sorting t)
-        (ivy-prescient-sort-commands
-         '(:not
-           swiper
-           swiper-isearch
-           ivy-switch-buffer
-           counsel-find-file
-           counsel-imenu
-           flyspell-correct-ivy
-           counsel-yank-pop))
-
-        :config
-        (add-hook 'ivy-prescient-mode-hook
-                  (defun ivy-prescient-disable-sort-find-file+ ()
-                    (when (and (eq (car ivy-prescient-sort-commands) :not)
-                               (memq 'counsel-find-file
-                                     (cdr ivy-prescient-sort-commands)))
-                      (ivy--alist-set 'ivy-sort-functions-alist
-                                      #'read-file-name-internal #'ivy-sort-file-function-default)))))
-    #+END_SRC
-
-*** ivy-orderless
-    :PROPERTIES:
-    :header-args+: :tangle (package-yes! ivy orderless)
-    :END:
-
-    Here's some helpers to setup and tear down orderless.
-
-    #+BEGIN_SRC emacs-lisp
-      (defvar ivy-orderless-default-re-builder+ nil
-        "The default re-builder in `ivy-re-builders-alist' before orderless was setup.")
-
-      (defun ivy-setup-orderless+ ()
-        (let ((cell (assoc t ivy-re-builders-alist)))
-          (setq ivy-orderless-default-re-builder+ (cdr cell))
-          (setcdr cell #'orderless-ivy-re-builder))
-        ;; Disable orderless in `swiper-isearch' because of performance
-        ;; issues. See [[https://github.com/abo-abo/swiper/issues/2418][swiper#2418]].
-        (push '(swiper-isearch . ivy--regex-plus) ivy-re-builders-alist))
-
-      (defun ivy-teardown-orderless+ ()
-        (setcdr (assoc t ivy-re-builders-alist) ivy-orderless-default-re-builder+))
-    #+END_SRC
-
-    Now we attach orderless to ivy, either through ivy-prescient or through ivy itself.
-
-    #+BEGIN_SRC emacs-lisp
-      (if (package! prescient ivy-prescient)
-          (add-hook 'ivy-prescient-mode-hook
-                    (defun ivy-prescient-setup-orderless+ ()
-                      (cond ((bound-and-true-p ivy-prescient-mode)
-                             (ivy-setup-orderless+))
-                            (+orderless-requires-prescient
-                             (ivy-teardown-orderless+)))))
-        (add-hook 'ivy-mode-hook #'ivy-setup-orderless+))
-    #+END_SRC
-
-*** ivy-avy
-    #+BEGIN_SRC emacs-lisp
-      (use-package ivy-avy
-        :straight t
-        :after  ivy
-        :commands ivy-avy
-        :general
-        (:keymaps 'ivy-minibuffer-map
-         "C-'"   nil                                                                  ; was ivy-avy
-         "C-q"   'ivy-avy
-         "C-c q" 'ivy-avy))
-    #+END_SRC
-
-*** ivy-hydra
-    #+BEGIN_SRC emacs-lisp
-      (use-package ivy-hydra
-        :straight t
-        :commands hydra-ivy/body
-        :config
-        (when (autoloadp (symbol-function 'hydra-ivy-custom/body))
-          (autoload-do-load (symbol-function 'hydra-ivy-custom/body)))
-
-        :general
-        (:keymaps 'ivy-minibuffer-map
-         "C-." 'hydra-ivy/body))
-    #+END_SRC
-
-*** ivy-xref
-    #+BEGIN_SRC emacs-lisp
-      (use-package ivy-xref
-        :straight t
-        :after  (ivy xref)
-        :init
-        (when (emacs>= "27")
-          (setq xref-show-definitions-function #'ivy-xref-show-defs))
-        (setq xref-show-xrefs-function #'ivy-xref-show-defs)
-
-        :config
-        (defun ivy-xref-call-or-done ()
-          (interactive)
-          (let (orig-point orig-buffer
-                           new-point new-buffer)
-            (with-ivy-window
-              (setq orig-point  (point)
-                    orig-buffer (current-buffer)))
-
-            (ivy-call)
-
-            (with-ivy-window
-              (setq new-point  (point)
-                    new-buffer (current-buffer)))
-
-            (when (and (eq new-point  orig-point)
-                       (eq new-buffer orig-buffer))
-              (ivy-done))))
-
-        (defun ivy-xref-forward-char-or-call-or-done ()
-          (interactive)
-          (call-interactively (if (eolp)
-                                  'ivy-xref-call-or-done
-                                'forward-char)))
-
-        (defvar ivy-xref-map
-          (let ((map (make-sparse-keymap)))
-            (set-keymap-parent map ivy-minibuffer-map)
-            map)
-          "map for use with ivy-xref.")
-
-        (advice-add 'ivy-xref-show-xrefs :around
-                    (defun ivy-xref-use-xref-map (func &rest args)
-                      (let ((ivy-minibuffer-map ivy-xref-map))
-                        (apply func args))))
-
-        :general
-        (:keymaps 'ivy-xref-map
-         "C-l" 'ivy-xref-forward-char-or-call-or-done
-         "M-l" 'ivy-call-and-recenter))
-    #+END_SRC
-
-*** ivy-bibtex
-    Also installs bibtex-completion.
-
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy bibtex)
-      (use-package ivy-bibtex
-        :straight t
-        :leader
-        ("ob" 'ivy-bibtex)
-        (:mode 'org-mode
-         "[" 'ivy-bibtex)
-
-        :config
-        (defun ivy-bibtex-insert-pdftools-link (cand)
-          (bibtex-insert-pdfbib-link+ (list (alist-get "=key=" (cdr cand) nil nil #'string-equal))))
-
-        (setq ivy-bibtex-default-action #'ivy-bibtex-insert-pdftools-link)
-        (ivy-add-actions 'ivy-bibtex '(("j" ivy-bibtex-insert-pdftools-link "Insert pdftool link"))))
-    #+END_SRC
-
-*** ivy-yasnippet
-    Use ivy to select a snippet candidate.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package ivy-yasnippet
-        :straight t
-        :leader
-        ("is" 'ivy-yasnippet)
-
-        :general
-        (:states '(insert normal)
-         "C-M-i" 'ivy-yasnippet))
-    #+END_SRC
-
-*** ivy-lsp
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! lsp-mode ivy)
-      (use-package lsp-ivy
-        :straight t
-        :after lsp-mode
-        :leader
-        (:mode 'lsp-mode
-         :minor t
-         "jl" 'lsp-ivy-workspace-symbol
-         "jL" 'lsp-ivy-global-workspace-symbol)
-
-        :config
-        ;; Fixed ivy issue, see [[https://github.com/emacs-lsp/lsp-ivy/issues/27][#25]].
-        (advice-add #'ivy-update-candidates :around
-                    (defun ivy-update-candidates-dynamic-collection-workaround+ (old-fun &rest args)
-                      (cl-letf (((symbol-function #'completion-metadata) #'ignore))
-                        (apply old-fun args)))))
-    #+END_SRC
-
-*** ivy-flyspell
-    use ivy to correct mispelled words (through flyspell).
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package flyspell-correct-ivy
-        :straight t
-        :after  (flyspell flyspell-correct)
-        :init
-        ;; NOTE wrapper works backwards through the buffer by default.
-        ;;      pass a two prefix args to check forward.
-        (setq flyspell-correct-interface #'flyspell-correct-ivy))
-    #+END_SRC
-
-*** ivy-rich
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy-rich)
-      (use-package ivy-rich
-        :straight t
-        :hook (ivy-mode . ivy-rich-mode)
-        :config
-        ;; Make ivy candidates take up the full line.
-        (setcdr (assq t ivy-format-functions-alist) #'ivy-format-function-line))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy-rich ivy-rich-icons)
-      (use-package all-the-icons-ivy-rich
-        :straight t
-        ;; :hook (ivy-rich-mode . all-the-icons-ivy-rich-mode)
-
-        :config
-        (advice-add 'all-the-icons-ivy-rich--format-icon :filter-return #'all-the-icons-pad-on-tty-advice+))
-    #+END_SRC
-
-*** swiper
-    a minimalist search framework for the current buffer.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package swiper
-        :straight t
-        :config
-        (with-no-warnings
-          (defvaralias 'swiper-history 'regexp-search-ring))
-
-        (defvar swiper-persistent-highlight nil
-          "if swiper is using evil-search for searching, determine
-      whether to persistently highlight the search results or not.
-
-      Personally I don't like persistent highlighting with swiper
-      because I generally use it for one off jumping to important
-      lines, so disable it :P")
-
-        (setq swiper-min-highlight most-positive-fixnum) ;; never highlight
-
-        (advice-add #'swiper--remember-search-history :around
-                    (defun swiper--clear-evil-highlight (func &rest args)
-                      "see `swiper-persistent-highlight'."
-                      (if (bound-and-true-p evil-mode)
-                          (let ((evil-ex-search-persistent-highlight
-                                 swiper-persistent-highlight))
-                            (apply func args))
-                        (apply func args))))
-
-        (advice-add #'swiper--action :around
-                    (defun swiper--action-configure (func &rest args)
-                      ;; disable search highlighting in case of new pattern.
-                      (when (bound-and-true-p evil-mode)
-                        (evil-ex-nohighlight))
-
-                      ;; I don't wanna be told that every time I complete a search
-                      (cl-letf (((symbol-function 'actual-message)
-                                 (symbol-function 'message))
-                                ((symbol-function 'message)
-                                 (lambda (message &rest message-args)
-                                   (unless (string-equal message "Mark saved where search started")
-                                     (apply actual-message message-args)))))
-                        (apply func args))))
-
-        (defun swiper-isearch-next-line ()
-          (interactive)
-          (let ((shift 1))
-            (with-ivy-window
-              (let ((ln (line-number-at-pos (ivy-state-current ivy-last))))
-                (while (and (< (+ ivy--index shift) ivy--length)
-                            (= ln (line-number-at-pos (nth (+ ivy--index shift) ivy--all-candidates))))
-                  (cl-incf shift))))
-            (ivy-next-line shift)))
-
-        (defun swiper-isearch-prev-line ()
-          (interactive)
-          (let ((shift 1))
-            (with-ivy-window
-              (let ((ln (line-number-at-pos (ivy-state-current ivy-last))))
-                (while (and (>= (- ivy--index shift) 0)
-                            (= ln (line-number-at-pos (nth (- ivy--index shift) ivy--all-candidates))))
-                  (cl-incf shift))))
-            (ivy-previous-line shift)))
-
-        (defvar swiper-norm-action--macro-history nil
-          "history variable for macros invoked through `swiper-norm-action'.")
-
-        (defvar swiper-norm-action--macro nil
-          "the macro string used for the current invocation
-      of `swiper-norm-action'.")
-        (add-hook 'ivy-actions-done-hook+
-                  (lambda (&rest _)
-                    "reset the macro recorded by `swiper-norm-action'."
-                    (setq swiper-norm-action--macro nil)))
-
-        (defun swiper-norm-action--execute (markers macro)
-          (unwind-protect
-              (dolist (marker markers)
-                (goto-char marker)
-                (evil-ex-normal
-                 (line-beginning-position)
-                 (line-end-position)
-                 macro))
-            ;; ensure that all markers are deleted afterwards,
-            ;; even in the event of failure
-            (dolist (marker markers)
-              (set-marker marker nil))))
-
-        (defun swiper-norm-action (_)
-          "use swiper like evils :global and :norm command.
-      this function prompts for a normal mode macro string, and then
-      runs the macro on every candidate in the current swiper session.
-
-      This function tries to be smart about how it's invoked, if it's called
-      with no marked candidates, it runs a macro on every candidate in the
-      current swiper session. Otherwise it runs only on the candidates that're
-      marked."
-          ;; when `swiper-norm-action--macro' has already been assigned, this function
-          ;; is being called through marked candidates, which've already been
-          ;; operated on, so just ignore them.
-          (unless swiper-norm-action--macro
-            (let ((history-add-new-input t))
-              (setq swiper-norm-action--macro
-                    (read-string "macro: " nil
-                                 'swiper-norm-action--macro-history)))
-
-            (unless (string-empty-p swiper-norm-action--macro)
-              (let* ((markers
-                      (save-excursion
-                        (goto-char (point-min)) ;; start from beginning of buffer, downwards
-
-                        (cl-loop
-                         for cand in (or ivy-marked-candidates ivy--old-cands) collect
-                         (move-marker (make-marker)
-                                      (line-beginning-position
-                                       (get-text-property 0 'swiper-line-number cand)))))))
-                (evil-with-single-undo
-                  (swiper-norm-action--execute markers swiper-norm-action--macro))))))
-
-        (ivy-add-actions 'swiper '(("n" swiper-norm-action "norm")))
-
-        :leader
-        ("ss" 'swiper
-         "s*" 'swiper-all
-         "sS" 'swiper-multi)
-
-        :general
-        (:keymaps 'ivy-mode-map
-         "M-s" 'swiper-isearch-thing-at-point
-         [remap isearch-forward] 'swiper-isearch)
-        (:keymaps 'swiper-map
-         "M-l" 'swiper-recenter-top-bottom
-         "C-l" 'ivy-forward-char-or-partial-or-done
-         "C-q" 'swiper-avy
-         "C-s" 'swiper-query-replace)
-        (:keymaps 'swiper-isearch-map
-         "C-n" #'swiper-isearch-next-line
-         "C-p" #'swiper-isearch-prev-line))
-    #+END_SRC
-
-*** counsel
-    A bunch of really useful functions to go alongside ivy.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package counsel
-        :straight t
-        :hook (ivy-mode . counsel-mode)
-        :diminish counsel-mode
-        :custom
-        (counsel-preselect-current-file t)
-        (org-roam-capture-function #'counsel-org-capture)
-
-        :init
-        (fset 'describe-bindings-buffer (symbol-function 'describe-bindings))
-        (fset 'describe-bindings (symbol-function 'counsel-descbinds))
-
-        (with-no-warnings
-          (defvaralias 'counsel-find-file-ignore-regexp '+find-file-ignore-regexp))
-
-        (with-eval-after-load 'esh-mode
-          (leader/set-keys-for-major-mode 'eshell-mode
-            "TAB" 'counsel-esh-history))
-
-        :config
-        (advice-add 'counsel-locate-action-extern :override #'xopen-url+)
-
-        (setq ivy-initial-inputs-alist ivy-default-initial-inputs-alist+
-              counsel-find-file-occur-use-find t
-              counsel-evil-registers-height ivy-height)
-
-        (setq counsel-rg-base-command
-         (cond ((windows-p) counsel-rg-base-command)
-               (t '("rg" "-M" "240" "--with-filename" "--no-heading" "--line-number" "--color" "never" "--pcre2" "%s"))))
-
-        (counsel-mode +1)
-
-        (ivy-set-actions 'counsel-fonts
-                         '(("o" describe-font "describe")))
-
-        (ivy-configure 'counsel-evil-registers :height ivy-height)
-
-        (advice-add 'counsel-ag :filter-args
-          (defun +counsel-ag--avoid-git-root (args)
-            "By default `counsel-ag' and it's variants (eg. `counsel-rg') uses in order:
-      - the passed in directory
-      - the current git root
-      - the cwd
-       as the `default-directory' for the subcommand. This makes things
-      confusing when you're cwd is in .gitignore and trying to search for
-      files in there never comes up with any results.
-
-      I'd prefer if rg worked the same in emacs as it would in the terminal
-      (within reason) so here we check if a directory is passed and if not
-      replace it with the cwd. "
-            (unless (or (>= (prefix-numeric-value current-prefix-arg) 4)
-                        (nth 1 args))
-              (setcar (nthcdr 1 args) default-directory))
-            args))
-
-        :leader
-        ("r"  "register/rings"
-         "fs" "recursive-find"
-
-         "ee" 'counsel-compilation-errors
-         "jc" 'counsel-compilation-errors
-         "ie" 'counsel-org-entity
-         "Mm" 'counsel-major
-
-         "je" 'counsel-flycheck
-         "ry" 'counsel-yank-pop
-         "rm" 'counsel-mark-ring
-         "r'" 'counsel-evil-marks
-         "rr" 'counsel-register
-         "re" 'counsel-evil-registers
-         "rf" 'counsel-file-registers
-         "ju" 'counsel-outline
-         "ar" 'counsel-load-library
-
-         "fb" 'counsel-bookmark
-         "fr" 'counsel-recentf
-         "fsf" 'counsel-file-jump
-         "fsd" 'counsel-dired-jump
-         "fsz" 'counsel-fzf
-
-         "ci" 'counsel-compile
-
-         "sb" 'counsel-grep
-         ;; recursive searches
-         "sv" 'counsel-git-grep
-         ;; "sp" 'counsel-pt
-         "sa" 'counsel-ag
-         "sr" 'counsel-rg
-
-         ;; "bb" 'counsel-buffer-or-recentf ;; WARN only file buffers
-         "hdx" 'counsel-fonts
-         "hdB" 'describe-bindings-buffer)
-        (:mode 'org-mode
-         "g" 'counsel-org-goto
-         "G" 'counsel-org-goto-all)
-
-        :general
-        ("M-x" 'counsel-M-x)
-        (:keymaps 'emacs-window-map
-         "x" 'counsel-wmctrl
-         "C-x" 'counsel-wmctrl)
-        (:keymaps 'counsel-mode-map
-         [remap completion-at-point] 'counsel-company
-         [remap insert-char] 'counsel-unicode-char
-         [remap describe-face] 'counsel-faces
-         [remap package-install] 'counsel-package
-         [remap ivy-switch-buffer] 'counsel-switch-buffer
-         [remap find-file] 'counsel-find-file
-         [remap org-capture] 'counsel-org-capture
-         [remap load-theme] 'counsel-load-theme
-         [remap find-library] 'counsel-find-library
-         [remap install-package] 'counsel-package
-         [remap describe-function] 'counsel-describe-function
-         [rempa org-completing-goto+] 'counsel-org-agenda-headlines
-         [remap describe-variable] 'counsel-describe-variable)
-        (:keymaps 'flymake-mode-map
-         [remap counsel-flycheck] 'counsel-flymake)
-        ("C-M-y" 'counsel-yank-pop)
-        (:keymaps 'counsel-find-file-map
-         "C-DEL"         nil
-         "<C-backspace>" nil)
-        (:keymaps 'counsel-describe-map
-         "C-."   'hydra-ivy/body
-         "C-S-." 'counsel-find-symbol)
-        (:keymaps '(counsel-ag-map counsel-imenu-map)
-         "C-l" 'ivy-forward-char-or-partial-or-done
-         "M-l" 'ivy-call-and-recenter)
-        (:keymaps 'counsel-find-file-map
-         "C-h" 'counsel-up-directory))
-    #+END_SRC
-
-*** counsel-evil-jumps
-    #+BEGIN_SRC emacs-lisp
-      (defvar counsel--evil-jumps-calling-point nil
-        "The point from which we began `counsel-evil-jumps'")
-
-      (defun counsel--evil-jumps-update-fn ()
-        (let ((mark (get-text-property 0 'marker (ivy-state-current ivy-last))))
-          (when mark
-            (counsel--mark-ring-delete-highlight)
-            (with-ivy-window
-              (switch-to-buffer (marker-buffer mark))
-              (goto-char mark)
-              (counsel--mark-ring-add-highlight)))))
-
-      (defun counsel--evil-jumps-unwind ()
-        (switch-to-buffer (marker-buffer counsel--evil-jumps-calling-point))
-        (goto-char counsel--evil-jumps-calling-point)
-        (counsel--mark-ring-delete-highlight))
-
-      (defun counsel-evil-jumps ()
-        (interactive)
-        (require 'counsel)
-        (let ((counsel--evil-jumps-calling-point (point-marker)))
-          (ivy-read "Jump: "
-                    (nreverse
-                     (delete-dups
-                      (mapcar (lambda (mark)
-                                (cl-destructuring-bind (pt path) mark
-                                  (let ((buf (get-file-buffer path)))
-                                    (unless buf
-                                      (setq buf (find-file-noselect path t)))
-                                    (with-current-buffer buf
-                                      (goto-char pt)
-                                      (font-lock-fontify-region (line-beginning-position) (line-end-position))
-                                      (propertize
-                                        (format "%s:%d %s"
-                                                    (buffer-name)
-                                                    (line-number-at-pos)
-                                                    (string-trim-right (or (thing-at-point 'line) "")))
-                                        'marker (point-marker))))))
-                              (evil--jumps-savehist-sync))))
-                    :sort nil
-                    :require-match t
-                    :update-fn #'counsel--evil-jumps-update-fn
-                    :unwind #'counsel--evil-jumps-unwind
-                    :action (lambda (cand)
-                              (let ((mark (get-text-property 0 'marker cand)))
-                                (switch-to-buffer (marker-buffer mark))
-                                (goto-char (marker-position mark)))))))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp
-      (leader/set-keys "rn" 'counsel-evil-jumps)
-    #+END_SRC
-
-*** counsel-flymake
-    #+BEGIN_SRC emacs-lisp
-      (defun counsel-flymake ()
-        (interactive)
-        (let* ((flymake--diagnostics-buffer-source (current-buffer))
-               (file (let ((file (buffer-file-name flymake--diagnostics-buffer-source)))
-                       (when file (file-name-base (file-name-sans-extension file)))))
-               (errors (flymake--diagnostics-buffer-entries))
-               (cands (cl-loop with diag     = nil
-                               with vec      = nil                                    ; a vector containing already propertized attributes
-                               with line     = nil
-                               with message  = nil
-                               for err in errors                                      ; for structure of err see:`flymake--diagnostics-buffer-entries'
-                               do (setq diag    (plist-get (car err) :diagnostic)
-                                        vec     (nth 1 err)
-                                        line    (aref vec 0)
-                                        message (concat (aref vec 2) " " (car (aref vec 3))))
-                               collect (propertize (concat (when file (concat file ":"))
-                                                           line ":"
-                                                           message)
-                                                   'point (flymake--diag-beg diag)))))
-          (counsel-mark--ivy-read "flymake errors" cands 'counsel-flymake)))
-    #+END_SRC
-
-*** counsel-pydoc
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ivy python)
-      (use-package counsel-pydoc
-        :straight t
-        :after (python counsel)
-        :leader
-        (:mode 'python-mode
-         "hd" 'counsel-pydoc))
-     #+END_SRC
-
-*** counsel-ggtags
-    #+BEGIN_SRC emacs-lisp
-      (use-package counsel-gtags
-        :straight t
-        :after counsel
-        :leader
-        ("T" "tags"
-         "Tg" 'counsel-gtags-find-definition
-         "TG" 'counsel-gtags-find-reference
-         "Ts" 'counsel-gtags-find-symbol
-         "Tf" 'counsel-gtags-find-file
-         "Tn" 'counsel-gtags-go-forward
-         "TN" 'counsel-gtags-go-backward
-         "Tc" 'counsel-gtags-create-tags
-         "Tu" 'counsel-gtags-update-tags
-         "TT" 'counsel-gtags-dwim))
-    #+END_SRC
-
-*** counsel-tramp
-    Select a remote system to connect to, using ivy.
-
-    #+BEGIN_SRC emacs-lisp :tangle no
-      (use-package counsel-tramp
-        :straight t
-        :after counsel
-        :leader
-        ("f@" 'counsel-tramp))
-    #+END_SRC
-
-*** counsel-web
-    like [[*engine-mode][engine-mode]] except runs queries asynchronously and displays results using an ivy
-    session.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package counsel-web
-        :straight (counsel-web :host github :repo "mnewt/counsel-web")
-        :after counsel
-        :commands (counsel-web-suggest                                                ; async
-                   counsel-web-search
-                   counsel-web-thing-at-point)
-        :init
-        (setq counsel-web-search-action #'browse-url)
-
-        :leader
-        ("se RET"   'counsel-web-search
-         "se M-RET" 'counsel-web-suggest
-         "se TAB"   'counsel-web-thing-at-point))
-    #+END_SRC
-
-*** counsel-projectile
-    #+BEGIN_SRC emacs-lisp
-      (use-package counsel-projectile
-        :straight t
-        :custom
-        (counsel-projectile-org-capture-templates-first-p nil)
-
-        :leader
-        ("p SPC" 'counsel-projectile
-
-         "ps"  "search"
-         "psg" 'counsel-projectile-grep
-         "psv" 'counsel-projectile-git-grep
-         "psa" 'counsel-projectile-ag
-         "psr" 'counsel-projectile-rg)
-
-        :general
-        ([remap counsel-org-capture]                 'counsel-projectile-org-capture
-         [remap counsel-projectile-switch-project]   'counsel-projectile-switch-project
-         [remap counsel-projectile-find-file]        'counsel-projectile-find-file
-         [remap counsel-projectile-find-dir]         'counsel-projectile-find-dir
-         [remap counsel-projectile-switch-to-buffer] 'counsel-projectile-switch-to-buffer))
-    #+END_SRC
-
-*** counsel-css
-    #+BEGIN_SRC emacs-lisp
-      (use-package counsel-css
-        :straight t
-        :after (:all counsel (:any css-mode less-css-mode))
-        :lazy-leader
-        (:mode '(css-mode less-css-mode)
-         "g" 'counsel-css))
-    #+END_SRC
-
-*** counsel-jq
-    #+BEGIN_SRC emacs-lisp
-      (use-package counsel-jq
-        :straight t
-        :after json-mode
-        :leader
-        (:mode 'json-mode
-         "j" 'counsel-jq))
-    #+END_SRC
-
-*** counsel-world-clock
-    #+BEGIN_SRC emacs-lisp :tangle no
-      (use-package counsel-word-clock
-        :straight (counsel-word-clock :host github :repo "kchenphy/counsel-world-clock"))
-   #+END_SRC
-
-*** counsel-make
-    Don't be fooled, helm make works with both helm and ivy.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package helm-make
-        :straight t
-        :init
-        (setq helm-make-completion-method 'ivy)
-
-        :leader
-        ("c SPC" 'helm-make-projectile
-         "cm"    'helm-make))
-    #+END_SRC
-
-*** flx
-    optimizes ivy search ordering for fuzzy searches.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package flx
-        :straight t)
-    #+END_SRC
-
-*** smex
-    Show recently accessed commands at the top of M-x.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package smex
-        :straight t
-        :config
-        (setq smex-save-file (var! "smex-save.el")))
     #+END_SRC
 
 ** ace-link
@@ -16484,7 +15383,6 @@
        :states 'motion
        ;; "RET" 'image-next-line
        "TAB" 'pdf-outline
-       ;; TODO make interactive ivy-based outline
 
        "w" 'pdf-view-fit-height-to-window
        "e" 'pdf-view-fit-width-to-window
@@ -16641,10 +15539,6 @@
 *** commands
     #+BEGIN_SRC emacs-lisp
       (use-package +pdf-tools-commands
-        :lazy-leader
-        (:mode 'pdf-view-mode
-         "g" 'counsel-pdf-outline)
-
         :general
         (:keymaps 'pdf-view-mode-map
          :states  'motion
@@ -16688,34 +15582,6 @@
           (pdf-view-first-page)
           (image-bob)))
 
-      ;; use counsel to go to an outline entry
-      (defun counsel-pdf-outline-action (entry)
-        (let ((line (cdr entry)))
-          (with-current-buffer (ivy-state-buffer ivy-last)
-            (save-excursion
-              (goto-line (1+ line)) ;; was starting from 0.
-              (call-interactively #'pdf-outline-follow-link)))))
-
-      (defun counsel-pdf-outline ()
-        (interactive)
-        (require 'pdf-outline)
-        (let* ((buffer (pdf-outline-noselect nil))
-               entries)
-          (with-current-buffer buffer
-            (setq entries
-                  (split-string
-                   (buffer-substring-no-properties
-                    (point-min) (point-max))
-                   "\n"))
-
-            (cond ((package! ivy)
-                   (ivy-read "Title: "
-                             (-zip entries
-                                   (number-sequence 0 (length entries)))
-                             :action #'counsel-pdf-outline-action
-                             :caller 'counsel-pdf-outline))
-                  (t (message "Completion framework not supported"))))))
-
       (provide '+pdf-tools-commands)
     #+END_SRC
 
@@ -16745,10 +15611,11 @@
        ("cr" 'rake
         "cR" 'rake-rerun)
 
-       :config
-       (setq rake-completion-system 'ivy-read
-             rake-cache-file (var! "rake.cache"))
+       :custom
+       (rake-completion-system 'default)
+       (rake-cache-file (var! "rake.cache"))
 
+       :config
        (defalias 'rake-refresh #'rake-regenerate-cache))
    #+END_SRC
 
@@ -21484,12 +20351,6 @@
                                 :test (lambda (x y) (or (null y) (equal x y)))
                                 :from-end t))))
             (cond
-             ((package! ivy)
-              (ivy-read "Find file: " cands
-                        :initial-input initial-input
-                        :require-match t
-                        :action #'find-file
-                        :caller 'org-find-file))
              ((package! selectrum)
               (find-file
                (consult--read cands
@@ -21501,11 +20362,6 @@
              (t (find-file
                  (alist-get (completing-read "Find file: " cands nil t initial-input)
                             nil nil #'string-equal)))))))
-
-      (when (package! ivy)
-        (ivy-set-actions 'org-find-file
-         '(("j" find-file-other-window "other window")
-           ("f" find-file-other-frame  "other frame"))))
     #+end_src
 
     Toggle the ability to automatically compile the current org file to a pdf
@@ -21600,95 +20456,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package org-ql
-        ;; :straight t
-        :straight t
-        :commands (ivy-org-ql-query
-                   ivy-org-ql-query-picklink
-                   ivy-org-ql-query-goto
-                   ivy-org-ql-query-insert-link)
-        :config
-        ;; basically all of ivy-org-ql was just copied and pasted from
-        ;; here: https://github.com/alphapapa/org-ql/issues/63
-        (defvar ivy-org-ql-query-collect-timer nil)
-        (defun ivy-org-ql-query-collect (input)
-          (when ivy-org-ql-query-collect-timer
-            (cancel-timer ivy-org-ql-query-collect-timer))
-          (if (< (length input) 4)
-              (list "" (format "%d chars more" (- 4 (length input))))
-            (setq ivy-org-ql-query-collect-timer
-                  (run-with-timer
-                   0.25 nil
-                   `(lambda ()
-                      (let ((files (org-agenda-files))
-                            (query (org-ql--plain-query  ,input)))
-                        (when query
-                          (ignore-errors
-                            (setq ivy--all-candidates
-                                  (or
-                                   (org-ql-select files query
-                                     :action (lambda ()
-                                               (propertize (org-get-heading t)
-                                                           'marker (copy-marker (point)))))
-                                   '("" "Search no results!")))
-                            (setq ivy--old-cands ivy--all-candidates)
-                            (ivy--exhibit)))))))
-            nil))
-
-        (defun ivy-org-ql-query ()
-          (interactive)
-          (ivy-read "Org query: " #'ivy-org-ql-query-collect
-                    :dynamic-collection t
-                    :initial-input (ivy-org-ql-query-string)
-                    :action #'ivy-org-ql-query-goto))
-
-        (defun ivy-org-ql-query-picklink ()
-          (interactive)
-          (ivy-read "Org query: " #'ivy-org-ql-query-collect
-                    :dynamic-collection t
-                    :initial-input (ivy-org-ql-query-string)
-                    :action #'ivy-org-ql-query-insert-link))
-
-        (defun ivy-org-ql-query-string ()
-          (when mark-active
-            (buffer-substring-no-properties
-             (region-beginning) (region-end))))
-
-        (defun ivy-org-ql-query-goto (headline)
-          (interactive)
-          (let ((marker (get-text-property 0 'marker headline)))
-            (when (markerp marker)
-              (switch-to-buffer (marker-buffer marker))
-              (goto-char marker)
-              (org-show-entry))))
-
-        (defun ivy-org-ql-query-insert-link (headline &optional link-type breadcrumbs)
-          (interactive)
-          (let ((marker (get-text-property 0 'marker headline))
-                store-link)
-            (when (markerp marker)
-              (org-with-point-at marker
-                (let* ((id (org-id-get (point) t))
-                       (attach-dir (org-attach-dir t))
-                       (breadcrumbs
-                        (when breadcrumbs
-                          (let ((s (org-format-outline-path
-                                    (org-get-outline-path)
-                                    (1- (frame-width))
-                                    nil org-picklink-breadcrumbs-separator)))
-                            (if (eq "" s) "" (concat s org-picklink-breadcrumbs-separator)))))
-                       (item (concat (or breadcrumbs "") (org-entry-get (point) "ITEM")))
-                       (link
-                        (cl-case link-type
-                          (attach (list :link attach-dir :description (concat item "(ATTACH)") :type "file"))
-                          (t (list :link (concat "id:" id) :description item :type "id")))))
-                  (setq store-link link)))
-              (org-insert-link nil (plist-get store-link :link) (plist-get store-link :description))
-              (cond ((org-in-item-p)
-                     (call-interactively #'org-insert-item))
-                    (t (insert " "))))))
-
-        :leader
-        ("oq" 'ivy-org-ql-query))
+        :straight t)
     #+END_SRC
 
 *** company-org-block
@@ -21722,8 +20490,7 @@
         :init
         :custom
         (org-roam-prefer-id-links t)
-        (org-roam-completion-system (cond ((package! ivy) 'ivy)
-                                          (t 'default)))
+        (org-roam-completion-system 'default)
         (org-id-link-to-org-use-id 'create-if-interactive)
         (org-roam-db-location (var! "org-roam.db"))
 
@@ -21735,10 +20502,7 @@
         (defun org-roam-rg ()
           "Run a rg session in your org roam directory."
           (interactive)
-          (cond ((package! ivy)
-                 (require 'counsel)
-                 (counsel-rg nil org-roam-directory))
-                ((package! selectrum)
+          (cond ((package! selectrum)
                  (require 'consult)
                  (consult-ripgrep org-roam-directory))
                 (t (message "No rg package found"))))
@@ -21822,24 +20586,6 @@
               org-ref-pdf-directory (let ((path bibtex-completion-library-path))
                                       (if (listp path) (car path) path))
               org-ref-latex-bib-resolve-func #'expand-file-name))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! org ivy bibtex)
-      (with-eval-after-load 'org-ref
-        (setq org-ref-completion-library 'org-ref-ivy-cite)
-
-        (general-defined-key
-          :keymaps 'org-ref-ivy-cite-keymap
-          "C-j" nil "C-k" nil "C-y" nil "C-M-y" nil
-          "C-<return>" nil "C-." nil)
-
-        (general-define-key
-         :keymaps 'org-ref-ivy-cite-keymap
-         "C-c C-a" 'org-ref-ivy-show-all
-         "C-c C-y" 'org-ref-ivy-sort-year-ascending
-         "C-c M-y" 'org-ref-ivy-sort-year-descending)
-        ;; (set-keymap-parent org-ref-ivy-cite-keymap ivy-minibuffer-map)
-        )
     #+END_SRC
 
 *** org-links
@@ -22290,12 +21036,6 @@
    #+BEGIN_SRC emacs-lisp :tangle early-init.el
      (defface tab-bar-separator '((t (:inherit font-lock-string-face))) "")
      (defface tab-bar-inactive-separator '((t (:inherit shadow))) "")
-   #+END_SRC
-
-   #+BEGIN_SRC emacs-lisp :tangle (package-str! "early-init.el" ivy)
-     (defface ivy-actual-highlight-face '((t (:inherit highlight)))
-       "Face actually used by ivy to highlight some candidates.
-     See `an-old-hope-theme' for why this is necessary.")
    #+END_SRC
 
 ** an-old-hope
