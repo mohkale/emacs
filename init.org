@@ -1449,7 +1449,7 @@
          ;; frame
          "fx" 'delete-frame
          "fX" 'delete-other-frames
-         "f RET" '("maximize" . toggle-frame-maximized)
+         "f RET" '(toggle-frame-maximized :wk "maximize")
          "fn" 'make-frame-command
          "fm" 'set-frame-name
          "fg" 'select-frame-by-name
@@ -2619,7 +2619,7 @@
          (when (numberp indent)
            (setq indent (number-to-string indent)))
          (when (numberp tab-size)
-           (setq indent (number-to-string tab-size)))
+           (setq tab-size (number-to-string tab-size)))
 
          (if (not indent)
              (and (called-interactively-p 'interactive)
@@ -4160,7 +4160,7 @@
         :lazy-leader
         ("jE" 'evil-goto-definition
          "id" 'evil-insert-digraph
-         "sc" '("search-noh" . evil-ex-nohighlight)
+         "sc" '(evil-ex-nohighlight :wk "search-noh")
          "xu" 'evil-upcase
          "xd" 'evil-downcase)
 
@@ -5069,7 +5069,7 @@
                   describe-mode
                   describe-function)
        :leader
-       ("hdm" '("describe-mode" . describe-buffer)
+       ("hdm" '(describe-buffer :wk "describe-mode")
         "hdf" 'describe-function
         "hdK" 'describe-keymap))
    #+END_SRC
@@ -5150,8 +5150,8 @@
       (autoload 'hydra-text-zoom/body (lisp! "hydras" "hydra-text-zoom.el") nil t)
 
       (leader-set-keys
-        "Hx" '("hydra-text-zoom" . hydra-text-zoom/body)
-        "x." '("hydra-text-zoom" . hydra-text-zoom/body))
+        "Hx" '(hydra-text-zoom :wk "hydra-text-zoom"/body)
+        "x." '(hydra-text-zoom :wk "hydra-text-zoom"/body))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-text-zoom.el
@@ -5174,7 +5174,7 @@
        :keymaps 'emacs-window-map
         "." '(hydra-winman/body    :wk "hydra-winman"))
       (leader-set-keys
-        "Hh" '("hydra-winman"      . hydra-winman/body))
+        "Hh" '(hydra-winman/body :wk "hydra-winman"))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-winman.el
@@ -5265,7 +5265,7 @@
         "C-w" '(hydra-eyebrowse/body :wk "hydra-windows"))
 
       (leader-set-keys
-        "HL" '("hydra-eyebrowse"   . hydra-eyebrowse/body))
+        "HL" '(hydra-eyebrowse :wk "hydra-eyebrowse"/body))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-eyebrowse.el
@@ -5398,8 +5398,8 @@
     #+BEGIN_SRC emacs-lisp
       (autoload 'hydra-persp/body (lisp! "hydras" "hydra-persp.el") nil t)
       (leader-set-keys
-        "Hl" '("hydra-persp"     . hydra-persp/body)
-        "fl" '("hydra-layouts"   . hydra-persp/body))
+        "Hl" '(hydra-persp/body :wk "hydra-persp")
+        "fl" '(hydra-persp/body :wk "hydra-layouts"))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-persp.el
@@ -5534,7 +5534,7 @@
     #+BEGIN_SRC emacs-lisp
       (autoload 'hydra-flycheck/body (lisp! "hydras" "hydra-flycheck.el") nil t)
       (leader-set-keys
-        "He" '("hydra-flycheck"    . hydra-flycheck/body))
+        "He" '(hydra-flycheck/body :wk "hydra-flycheck"))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-flycheck.el
@@ -5791,7 +5791,7 @@
     #+BEGIN_SRC emacs-lisp
       (autoload 'hydra-org-clock/body (lisp! "hydras" "hydra-org-clock.el") nil t)
       (leader-set-keys
-        "Hc" '("hydra-org-clock"   . hydra-org-clock/body))
+        "Hc" '(hydra-org-clock/body :wk "hydra-org-clock"))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-org-clock.el
@@ -5974,7 +5974,7 @@
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! vlc-rc)
       (autoload 'hydra-vlc-rc/body (lisp! "hydras" "hydra-vlc-rc.el") nil t)
       (leader-set-keys
-        "Hv" '("hydra-vlc"         . hydra-vlc-rc/body))
+        "Hv" '(hydra-vlc-rc/body :wk "hydra-vlc"))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/hydras/hydra-vlc-rc.el" vlc-rc)
@@ -6042,7 +6042,7 @@
     #+BEGIN_SRC emacs-lisp
       (autoload 'hydra-visual-move/body (lisp! "hydras" "hydra-visual-move.el") nil t)
       (leader-set-keys
-        "Hm" '("hydra-visual-move" . hydra-visual-move/body))
+        "Hm" '(hydra-visual-move/body :wk "hydra-visual-move"))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-visual-move.el
@@ -6064,7 +6064,7 @@
       (general-define-key
        "C-x TAB" 'hydra-indent/body)
       (leader-set-keys
-        "H TAB" '("hydra-indent" . hydra-indent/body))
+        "H TAB" '(hydra-indent/body :wk "hydra-indent"))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-indent.el
@@ -7100,7 +7100,7 @@
          (undo-tree-visualizer-selection-mode -1))
 
        :leader
-       ("au" '("undo-tree" . undo-tree-visualize))
+       ("au" '(undo-tree-visualize :wk "undo-tree"))
 
        :lazy-leader
        (:mode 'undo-tree-visualizer-mode
@@ -8153,7 +8153,7 @@
                          "*compilation*")))))
             (if (not buffer)
                 (user-error "Compilation buffer doesn't exist")
-              (when-let ((window (display-buffer buffer '((reusable-frames . nil)))))
+              (when-let ((window (display-buffer buffer '(nil (reusable-frames . nil)))))
                 (select-window window)))))
 
         (defun +set-compilation-bindings (mode map)
@@ -9044,9 +9044,9 @@
      (use-package display-line-numbers
        :hook ((prog-mode . display-line-numbers-mode)
               (text-mode . display-line-numbers-mode))
-       :config
+       :init
        ;; prefer relative line numbers when available
-       (setq-default display-line-numbers-type 'relative))
+       (setq-default display-line-numbers-type 'visual))
    #+END_SRC
 
 ** ediff
@@ -10786,6 +10786,10 @@
    #+BEGIN_SRC emacs-lisp
      (use-package replace
        :straight (replace :type built-in)
+       :custom
+       ;; By default highlight to the end of the line.
+       (occur-highlight-regexp (rx (zero-or-more any) eol))
+
        :config
        ;; occur-mode-display-occurrence
        (advice-add 'occur-mode-display-occurrence :around
@@ -14685,8 +14689,10 @@
        (git-gutter:deleted-sign "┃")
        (git-gutter:hide-gutter t)
 
-       ;; :config
+       :config
        ;; (add-hook 'prog-mode-hook #'git-gutter-mode)
+       (add-hook 'magit-pre-refresh-hook 'diff-hl-magit-pre-refresh)
+       (add-hook 'magit-post-refresh-hook 'diff-hl-magit-post-refresh)
 
        :leader
        ("tg" 'git-gutter-mode
@@ -16429,9 +16435,9 @@
                        (process-send-string vterm--process "\C-m"))))
 
        :leader
-       ("av" '("vterm" . vterm-toggle)
-        "at" '("vterm-new" . vterm-toggle-new-buffer+)
-        ;; "tv" '("toggle-vterm-fullscreen" . vterm-toggle-fullscreen)
+       ("av" '(vterm-toggle :wk "vterm")
+        "at" '(vterm-toggle-new-buffer+ :wk "vterm-new")
+        ;; "tv" '(vterm-toggle-fullscreen :wk "toggle-vterm-fullscreen")
         )
 
        :general
@@ -16462,7 +16468,7 @@
        (:states 'emacs
         :prefix leader-nnorm-key
         :keymaps 'vterm-mode-map
-        "v" '("copy-mode" . vterm-copy-mode)
+        "v" '(vterm-copy-mode :wk "copy-mode")
         "p" 'vterm-yank)
        (:prefix leader-nnorm-key
         :states 'motion
@@ -16666,10 +16672,10 @@
         :config
         (let ((leader leader-major-mode-key))
           (leader-set-keys-for-major-mode 'restclient-mode
-            "RET"   '("execute-current" . restclient-http-send-current)
-            "M-RET" '("execute-current-raw" . restclient-http-send-current-raw)
-            leader  '("execute-current-same-window" . restclient-http-send-current-stay-in-window)
-            "y"     '("yank-curl-command" . restclient-copy-curl-command)
+            "RET"   '(restclient-http-send-current :wk "execute-current")
+            "M-RET" '(restclient-http-send-current-raw :wk "execute-current-raw")
+            ;; leader  '(restclient-http-send-current-stay-in-window :wk "execute-current-same-window")
+            "y"     '(restclient-copy-curl-command :wk "yank-curl-command")
             "m"     'restclient-mark-current
             "n"     'restclient-narrow-to-current
             "w"     'widen))
@@ -16813,8 +16819,8 @@
           ;; "et" 'elisp-transcript
 
           ;; jump
-          "g" '("goto-definition" . xref-find-definitions)
-          "G" '("goto-definition-other-window" . xref-find-definitions-other-window)
+          "g" '(xref-find-definitions :wk "goto-definition")
+          "G" '(xref-find-definitions-other-window :wk "goto-definition-other-window")
 
           ;; tests
           "t" 'ert
@@ -16855,8 +16861,8 @@
          "<return>" 'paredit-newline)
         (:keymaps 'paredit-mode-map
          :states 'normal
-         "gSh" '("splice-sexp-forward" . paredit-splice-sexp-killing-backward)
-         "gSl" '("splice-sexp-backward" . paredit-splice-sexp-killing-forward))
+         "gSh" '(paredit-splice-sexp-killing-backward :wk "splice-sexp-forward")
+         "gSl" '(paredit-splice-sexp-killing-forward :wk "splice-sexp-backward"))
         (:keymaps 'paredit-mode-map
          :states '(normal insert)
          ;; movement
@@ -19810,7 +19816,7 @@
          ;; "C" 'evil-org-recompute-clocks
          "D" 'org-insert-drawer
          "d" 'org-deadline
-         "f" 'org-set-effort
+         "F" 'org-set-effort
          "i" 'org-clock-in
          "H" 'org-shiftleft
          "J" 'org-shiftdown
@@ -19854,7 +19860,7 @@
          "e"  '(nil :wk "export")
          "ee" 'org-export-dispatch
          "eh" 'org-html-export-to-html
-         "ep" (lambda! ()
+         "ep" (lambda!
                 (org-latex-export-to-pdf org-export-in-background))
 
          "h"  '(nil :wk "headings")
@@ -21042,6 +21048,8 @@
     |         | fourier  |
     |         | yfonts   |
     | super   | nth      |
+    |         | siunitx  |
+    |         | color    |
 
     #+NAME: org-latex-pkgs
     #+BEGIN_SRC emacs-lisp :var pkgs=org-latex-packages
@@ -21957,7 +21965,7 @@
        (provide-theme 'an-old-hope)
     #+END_SRC
 
-* Appendix
+* Appendix                                                          :ARCHIVE:
   This trailing section just defines some file-local variables for this file.
 
 # Local Variables:
@@ -21967,3 +21975,5 @@
 # eval: (and (functionp #'diff-hl-mode) (diff-hl-mode))
 # fill-column: 85
 # End:
+
+#  LocalWords:  config emacs src
