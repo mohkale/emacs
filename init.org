@@ -4,147 +4,52 @@
 #+PROPERTY: header-args :tangle init.el :comments link :mkdirp yes :noweb yes :hlines no :shebang ";; -*- lexical-binding: t -*-"
 
 * Config
-  Configure the desired optional components and experience of my Emacs configuration.
+  This is the root configuration branch for my emacs config.
+
+  Everything that's defined here is intended to be used across all the other
+  branches. This includes a listing of all the configuration options available,
+  any modules that can be toggled and any helper methods to control the
+  configuration.
+
+  As you can see my entire emacs configuration is an org-mode file. It's not a file
+  that's loaded at startup, instead its one that needs to be tangled prior to being
+  run.
+  This can be done manually (run ~emacs~, find this file and then ~M-x org-babel-tangle-file~)
+  however the recommended approach is my tangle script (found at [[file:bin/emacs-tangle][bin/emacs-tangle]]).
+  The script spawns a headless emacs instance that performs the tangling process in
+  the background, this has the added benefit of avoiding any configuration options
+  and packages you may have that could slow down the tangling process.
+
+  Due to being implemented as an org-branch the options from this branch need to be
+  loaded both when emacs is loaded without my config (and is trying to tangle the
+  desired org blocks into their appropriate files) and when starting a new emacs
+  instance with my config.
+
+  I'm getting org-mode to-do this by wrapping each section that needs to be loaded
+  into a src-code block, tangling it to my ~init.el~ *and* calling those blocks right
+  now before anything has been tangled.
+  This is done using the /noweb/ reference syntax.
+
+  *Note*: This branch only contains the *default* configuration options any permanent
+  ones must be placed in [[file:lisp/+config.el][lisp/+config.el]].
 
   #+BEGIN_SRC emacs-lisp
-    ;; We both evaluate the current configuration and load it from the file-system just to
-    ;; make sure that on the initial tangle (when it can't be loaded) we have a decent set
-    ;; of defaults to determine what needs to be tangled.
     <<eval-default-config()>>
     <<load-config()>>
   #+END_SRC
-
-  NOTE: This branch only contains the *default* configuration options and these options will
-  be reset every tangle, to create permanent ~local~ modifications to this create a lisp file
-  at ~lisp/+config.el~ and that will be sourced instead of this.
 
   #+NAME: eval-default-config
   #+BEGIN_SRC emacs-lisp :results values :tangle lisp/+config-default.el
     <<config-modules>>
     <<config-options>>
 
-    (provide '+config-default) nil
-  #+END_SRC
-
-  Okay that's all the configurable part of my emacs configuration, the rest of this
-  section sets up some basic utility methods to help with configuration.
-
-  #+NAME: load-config
-  #+BEGIN_SRC emacs-lisp :results values
-    (unless (or (load (concat user-emacs-directory "lisp/+config") t)
-                (load (concat user-emacs-directory "lisp/+config-default") t)
-                ;; See [[file:bin/tangle-targets][tangle-targets]] and [[file:bin/tangle][tangle]].
-                (bound-and-true-p checking-tangle-targets+)
-                (bound-and-true-p tangling+))
-      (warn "Failed to load emacs configuration file, using default"))
-
-    (defvar +packages)
-    (defmacro package! (&rest pkgs)
-      "Assert whther all the packages in PKGS are to be installed"
-      ;; (append '(and) (cl-loop for pkg in pkgs collect `(member (quote ,pkg) +packages)))
-      (let (pkg res)
-        (while (prog1 (setq pkg (car pkgs))
-                 (setq pkgs (cdr pkgs)))
-          (cond ((eq pkg :not)
-                 (push `(not (package! ,@pkgs)) res)
-                 (setq pkgs nil))
-                ((eq pkg :lsp)
-                 (push '+lsp-command res))
-                (t (push `(member (quote ,pkg) +packages) res))))
-        `(and ,@res)))
-
-    (defmacro package-yes! (&rest pkgs)
-      `(if (package! ,@pkgs) "yes" "no"))
-
-    (defmacro package-no! (&rest pkgs)
-      `(if (package! ,@pkgs) "no" "yes"))
-
-    (defmacro package-str! (str &rest pkgs)
-      `(if (package! ,@pkgs) ,str "no"))
-
-    (defvar +ruby-mode      (intern (concat (symbol-name +ruby-package) "-mode")))
-    (defvar +ruby-mode-hook (intern (concat (symbol-name +ruby-mode)    "-hook")))
-
-    (defun +lsp-should-connect (mode check-workspace check-all-workspaces)
-      (when-let ((enable (alist-get mode +lsp-maybe-connect
-                                    (alist-get t +lsp-maybe-connect))))
-        (when (functionp enable)
-          (setq enable (funcall enable)))
-
-        (cond
-         ((eq enable :local)
-          (funcall check-workspace mode))
-         ((eq enable :global)
-          (funcall check-all-workspaces mode))
-         (t enable))))
-
-    (defconst +lsp-command
-      (cond ((package! eglot)
-             (when (package! lsp-mode)
-               (warn "You've enabled both lsp and eglot, defaulting to eglot."))
-
-             (defun eglot-ensure-maybe+ ()
-               "LSP connector for eglot"
-               (when (+lsp-should-connect
-                      major-mode
-                      #'eglot-mode-server-p+
-                      #'eglot-mode-server-all-p+)
-                 (eglot-ensure))))
-
-            ((package! lsp-mode)
-             (defun +lsp-connect ()
-               "LSP connector for lsp-mode"
-               (when (+lsp-should-connect
-                      major-mode
-                      #'lsp-mode-server-p+
-                      #'lsp-mode-server-all-p+)
-                 (lsp-deferred)))
-
-             #'+lsp-connect))
-      "Command used to start a language server.
-    Can be attached as a mode-hook and will decide how best to start a language
-    server in the current mode.")
-
-    (defun +repo-path (repo-path)
-      "Parse REPO-PATH into a list of paths.
-    The output will be a collection of conses of the form (PATH . DEPTH)
-    specifying we want to look in any directory upto DEPTH paths down in
-    PATH. The result of this can be set to `magit-repository-directories'."
-      (cl-loop for path in (split-string repo-path ":")
-               with depth = nil
-               do (setq depth 0)
-               if (string-suffix-p "/" path)
-                 do (setq depth 1)
-                 and do (while (string-suffix-p "/*/" path)
-                          (setq depth (1+ depth)
-                                path (substring path 0 -2)))
-               unless (string-empty-p path)
-                 collect (cons (string-remove-suffix "/" path) depth)))
-
-    (defconst repo-path
-      "Parse the repo-path environment variable into")
-
+    (provide '+config-default)
     nil
   #+END_SRC
 
-  Lastly here's a little helper sourced from [[https://emacs.stackexchange.com/questions/16890/how-to-find-out-where-a-file-is-being-required][here]] which gives you a tree like
-  overview of all the files emacs requires. It's helpful for figuring out what's
-  forcing a deferred package to be loaded.
-
-  #+BEGIN_SRC emacs-lisp
-    (defvar +require-tree nil)
-    (advice-add 'require :around
-                (defun require--advice (orig-fun feature &rest args)
-                  (setq +require-tree
-                        (append +require-tree
-                                (list (let ((+require-tree (list feature)))
-                                        (apply orig-fun feature args)
-                                        +require-tree))))))
-  #+END_SRC
-
 ** modules
-   Optionally enable or disable entire configuration sections. These generally have a
-   one to one mapping with packages that're to be installed.
+   Optionally enable or disable entire configuration sections.
+   These generally have a one to one mapping with packages that're to be installed.
 
    #+NAME: config-modules
    #+BEGIN_SRC emacs-lisp :tangle no
@@ -268,6 +173,11 @@
    #+END_SRC
 
 ** options
+   Editor variables used for customisation.
+
+   This branch declares and initialises these values so that their visible to the
+   emacs byte-compiler, but you can require and/or modify them in [[file:lisp/+config.el][lisp/+config.el]].
+
    #+NAME: config-options
    #+BEGIN_SRC emacs-lisp :tangle no
      (defvar +man-command (if (member system-type '(cygwin ms-dos windows-nt)) 'woman 'man)
@@ -314,12 +224,12 @@
      useful.")
 
      (defvar +browser-edit-mode initial-major-mode
-       "default major mode for a browser edit session.")
+       "Default major mode for a browser edit session.")
 
      (defvar +browser-edit-mode-alist
        `(("^github.com/" . ,#'markdown-mode)
          ("^gitlab.com/" . ,#'markdown-mode))
-       "association list of url regexps against mode-functions.")
+       "Association list of url regexps against mode-functions.")
 
      (defvar +ruby-package 'ruby
        "Determine which mode to use for ruby from `ruby' or `enh-ruby'.
@@ -347,6 +257,180 @@
      the overhead of an LSP server starting unintentionally whenever you switch to a
      file. It gives you the flexibility to continue existing LSP sessions, but avoid
      spawning new ones unless you actively want them.")
+   #+END_SRC
+
+** require
+   This branch actually requires and sets up my configuration.
+
+   I've also placed any helpers needed by my configuration in here, all of the
+   functions in [[load-config]] will be available while tangling.
+   I recommend trying to keep the following code-block bare. If it contains something
+   that isn't needed while tangling, put that configuration into a separate code-block.
+
+   #+NAME: load-config
+   #+BEGIN_SRC emacs-lisp :results values
+     (unless (or (load (concat user-emacs-directory "lisp/+config") t)
+                 (load (concat user-emacs-directory "lisp/+config-default") t)
+                 ;; See [[file:bin/emacs-tangle-targets][emacs-tangle-targets]] and [[file:bin/emacs-tangle][emacs-tangle]].
+                 (bound-and-true-p checking-tangle-targets+)
+                 (bound-and-true-p tangling+))
+       (warn "Failed to load emacs configuration file, using default"))
+
+     ;;; package!
+     ;; This section sets up a macro for quickly asserting whether an optional module
+     ;; or feature needs to be enabled. This can let you selectively include or exclude
+     ;; code-blocks from tangling based on the users emacs-configuration.
+     (defvar +packages)
+     (defun package-build-cond+ (pkgs)
+       "Build conditions for `package!'.
+     This isn't implemented directly in `package!' because that would require
+     a recursively defined macro that pushes the complexity of building a pkg
+     expression to compile/eval time when it can be done at call-time."
+       (unless (consp pkgs)
+         (setq pkgs (list pkgs)))
+       (let (pkg res)
+         (while (prog1 (setq pkg (car pkgs))
+                  (setq pkgs (cdr pkgs)))
+           (if (consp pkg)
+               (cl-case (car pkg)
+                 ('not (push `(not ,(package-build-cond+ (cdr pkg))) res))
+                 ('or  (push `(or
+                               ,@(mapcar #'package-build-cond+ (cdr pkg)))
+                             res))
+                 ('and (push `(and
+                               ,@(mapcar #'package-build-cond+ (cdr pkg)))
+                             res))
+                 (t (warn "`package!' got an unexpected conditional argument %s" (car pkg))))
+             (cond ((eq pkg :lsp)
+                    (push `(or ,(package-build-cond+ 'lsp-mode)
+                               ,(package-build-cond+ 'eglot))
+                          res))
+                   ((eq pkg :consult)
+                    (push `(or (member (quote consult) +packages)
+                               ,(package-build-cond+ 'selectrum))
+                          res))
+                   ((keywordp pkg)
+                    (warn "`package!' got unknown keyword argument %s" pkg)
+                    (push nil res))
+                   (t (push `(member (quote ,pkg) +packages) res)))))
+         (if (eq 1 (length res))
+             (car res)
+           `(and ,@(nreverse res)))))
+
+     (defmacro package! (&rest pkgs)
+       "Assert whther all the packages in PKGS are to be installed.
+     This is a recursively expanded macro and supports nested conditionals
+     such as `or' or `and' and `not'.
+
+     Each argument in PKGS must be a symbol, a keyword, or a list beginning
+     with a conditional operator as described above.
+     The resulting pkg queries will be parsed and compiled into a conditional
+     that asserts them."
+       (package-build-cond+ pkgs))
+
+     (defmacro package-yes! (&rest pkgs)
+       `(if (package! ,@pkgs) "yes" "no"))
+
+     (defmacro package-no! (&rest pkgs)
+       `(if (package! ,@pkgs) "no" "yes"))
+
+     (defmacro package-str! (str &rest pkgs)
+       `(if (package! ,@pkgs) ,str "no"))
+
+     nil
+   #+END_SRC
+
+   [[*lsp-mode][lsp]] refers to the language-server-protocol and it's how editors such as [[https://code.visualstudio.com/][VSCode]]
+   provide such fast and performant language support across so many languages.
+   Emacs has 2 packages for this but I don't like kick-starting a language-server
+   every time I start a file. The ~+lsp-maybe-connect~ configuration option lets you
+   conditionally connect to a server depending on the current workspace and whether
+   or not a server is already running. These helper methods initialise this feature.
+
+   #+begin_src emacs-lisp
+     (defun +lsp-should-connect (mode check-workspace check-all-workspaces)
+       (when-let ((enable (alist-get mode +lsp-maybe-connect
+                                     (alist-get t +lsp-maybe-connect))))
+         (when (functionp enable)
+           (setq enable (funcall enable)))
+
+         (cond
+          ((eq enable :local)
+           (funcall check-workspace mode))
+          ((eq enable :global)
+           (funcall check-all-workspaces mode))
+          (t enable))))
+
+     (defconst +lsp-command
+       (cond ((package! eglot)
+              (when (package! lsp-mode)
+                (warn "You've enabled both lsp and eglot, defaulting to eglot."))
+
+              (defun eglot-ensure-maybe+ ()
+                "LSP connector for `eglot'."
+                (when (+lsp-should-connect
+                       major-mode
+                       #'eglot-mode-server-p+
+                       #'eglot-mode-server-all-p+)
+                  (eglot-ensure))))
+
+             ((package! lsp-mode)
+              (defun +lsp-connect ()
+                "LSP connector for `lsp-mode'."
+                (when (+lsp-should-connect
+                       major-mode
+                       #'lsp-mode-server-p+
+                       #'lsp-mode-server-all-p+)
+                  (lsp-deferred)))))
+       "Command used to start a language server.
+          Can be attached as a mode-hook and will decide how best to start a language
+          server in the current mode.")
+   #+end_src
+
+   ~$REPO_PATH~ is a ~PATH~ like environment variable and it's how I like to reference
+   repository locations in my dotfiles.
+   This helper provides an interface to this functionality from within emacs, that
+   can be used in packages such as ~projectile~ or ~magit~.
+
+   #+begin_src emacs-lisp
+     (defun +repo-path (repo-path)
+       "Parse REPO-PATH into a list of paths.
+     The output will be a collection of conses of the form (PATH . DEPTH)
+     specifying we want to look in any directory upto DEPTH paths down in
+     PATH. The result of this can be set to `magit-repository-directories'."
+       (cl-loop for path in (split-string repo-path ":")
+                with depth = nil
+                do (setq depth 0)
+                if (string-suffix-p "/" path)
+                do (setq depth 1)
+                and do (while (string-suffix-p "/*/" path)
+                         (setq depth (1+ depth)
+                               path (substring path 0 -2)))
+                unless (string-empty-p path)
+                collect (cons (string-remove-suffix "/" path) depth)))
+   #+end_src
+
+   Declares some variables to streamline access to my preferred ruby language
+   package.
+
+   #+begin_src emacs-lisp
+     (defvar +ruby-mode      (intern (concat (symbol-name +ruby-package) "-mode")))
+     (defvar +ruby-mode-hook (intern (concat (symbol-name +ruby-mode)    "-hook")))
+   #+end_src
+
+   Lastly here's a little helper sourced from [[https://emacs.stackexchange.com/questions/16890/how-to-find-out-where-a-file-is-being-required][here]] which gives you a tree like
+   overview of all the files emacs requires while starting up.
+   It's helpful for figuring out what's forcing a deferred package to be loaded.
+
+   #+BEGIN_SRC emacs-lisp :tangle no
+     (defvar +require-tree nil)
+     (advice-add 'require :around
+                 (defun require--advice (orig-fun feature &rest args)
+                   (setq +require-tree
+                         (append +require-tree
+                                 (list (let ((+require-tree (list feature)))
+                                         (apply orig-fun feature args)
+                                         +require-tree))))))
    #+END_SRC
 
 * Setup
@@ -6757,7 +6841,8 @@
                          (when root
                            (projectile-org-capture-templates+ name root)))))
            (call-interactively
-            (cond ((package! selectrum) 'consult-org-capture+)
+            (cond ((package! :consult)
+                   'consult-org-capture+)
                   (t 'org-capture)))))
 
        (defun projectile-org-project-file+ (&optional arg)
@@ -11139,7 +11224,7 @@
                                                            buf)))
                     (cands (mapcar #'car client-buffers)))
               (cond
-               ((package! selectrum)
+               ((package! :consult)
                 ;; Gives us previews and nicer formatting but may not be available.
                 (consult--read client-buffers
                                :prompt "Client buffer: "
@@ -12073,6 +12158,18 @@
                           selectrum-highlight-candidates-function #'selectrum-highlight+))))
     #+END_SRC
 
+*** consult-selectrum
+   #+begin_src emacs-lisp
+     (advice-add 'consult-line :after #'selectrum-update-regexp-search-ring+)
+   #+end_src
+
+** minibuffer
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! :consult)
+   :END:
+
+   Generic minibuffer completion related packages.
+
 *** marginalia
     #+BEGIN_SRC emacs-lisp
       (use-package marginalia
@@ -12085,10 +12182,11 @@
          "C-c TAB" 'marginalia-cycle)
 
         :config
-        (advice-add #'marginalia-cycle :after
-                    (lambda ()
-                      (when (bound-and-true-p selectrum-mode)
-                        (selectrum-exhibit))))
+        (when (package! selectrum)
+          (advice-add #'marginalia-cycle :after
+                      (lambda ()
+                        (when (bound-and-true-p selectrum-mode)
+                          (selectrum-exhibit)))))
 
         (setq marginalia-command-categories
               (append '((projectile-find-file . project-file)
@@ -12189,13 +12287,14 @@
 
       (use-package embark-consult
         :straight t
-        :after  (embark consult)
+        :after (embark consult)
+        :demand t
         :hook (embark-collect-mode . embark-consult-preview-minor-mode))
     #+END_SRC
 
 *** consult
     #+BEGIN_SRC emacs-lisp
-      (defvar consult-manual-preview-key (kbd "M-SPC")
+      (defvar consult-manual-preview-key (kbd "M-p")
         "Manual key to trigger `consult--read' previews.")
 
       (use-package consult
@@ -12251,8 +12350,6 @@
                               (?v "Variable" font-lock-variable-name-face))))))
 
         :config
-        (advice-add 'consult-line :after #'selectrum-update-regexp-search-ring+)
-
         (evil-set-command-property 'consult-outline :jump t)
         (evil-set-command-property 'consult-mark :jump t)
         (evil-set-command-property 'consult-line :jump t)
@@ -12387,15 +12484,15 @@
          "psv" 'consult-git-grep
          "psg" 'consult-grep
          "psi" 'consult-project-imenu)
-        (:mode '(org-mode outline-mode magit-log-mode)
+        (:mode '(org-mode
+                 outline-mode
+                 magit-log-mode)
          "g" 'consult-imenu)
         (:minor t :mode 'flymake-mode  "je" 'consult-flymake)
 
         :general
         (:keymaps 'org-mode-map
          [remap consult-imenu] 'consult-org-heading)
-        (:keymaps 'selectrum-minibuffer-map
-         "C-." 'hydra-selectrum/body)
         ([remap imenu] 'consult-imenu
          [remap imenu-anywhere] 'consult-project-imenu
          [remap switch-to-buffer] 'consult-buffer
@@ -12424,7 +12521,7 @@
     #+END_SRC
 
 *** consult-lsp
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! selectrum lsp-mode)
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! :consult lsp-mode)
       (use-package consult-lsp
         :straight t
         :config
@@ -12442,10 +12539,14 @@
 
 *** consult-extensions
     :PROPERTIES:
-    :header-args+: :tangle (package-str! "lisp/+consult-custom.el" selectrum)
+    :header-args+: :tangle (package-str! "lisp/+consult-custom.el" :consult)
     :END:
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! "init.el" selectrum)
+    Consult is great but there's some commands its missing that I've had to implement
+    myself. Most of those go into this branch and are tangled to a separate file from
+    my main ~init.el~ to allow ~consult~ to be deferred.
+
+    #+BEGIN_SRC emacs-lisp :tangle (package-str! "init.el" :consult)
       (dolist (cmd '(consult-evil-jumps+
                      consult-evil-marks+
                      consult-org-capture+
@@ -12548,7 +12649,7 @@
      #+END_SRC
 
 **** consult-org-ref
-     #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/+org-ref-consult-cite.el" selectrum)
+     #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/+org-ref-consult-cite.el" :consult)
        (defvar org-ref-ivy-cite-keymap (make-sparse-keymap))
        (defvar org-ref-ivy-set-keywords-keymap (make-sparse-keymap))
        (require 'org-ref-ivy-cite) ; Provides `org-ref-cite-hydra', and other helpers.
@@ -13074,10 +13175,10 @@
 
 **** consult-eglot
      :PROPERTIES:
-     :header-args+: :tangle (package-str! "lisp/+consult-eglot.el" selectrum eglot)
+     :header-args+: :tangle (package-str! "lisp/+consult-eglot.el" :consult eglot)
      :END:
 
-     #+BEGIN_SRC emacs-lisp :tangle (package-str! "yes" selectrum eglot)
+     #+BEGIN_SRC emacs-lisp :tangle (package-yes! :consult eglot)
        (autoload 'consult-eglot-symbols "+consult-eglot.el" nil t)
 
        (general-define-key
@@ -13235,7 +13336,7 @@
 
      This branch defines commands to interface with scripts from my [[https://github.com/mohkale/dotfiles][dotfiles]].
 
-     #+BEGIN_SRC emacs-lisp :tangle (package-str! "yes" selectrum)
+     #+BEGIN_SRC emacs-lisp :tangle (package-yes! :consult)
        (use-package +consult-dotfiles
          :commands (+dot-goto-repo
                     +dot-goto-fsmap
@@ -13384,6 +13485,8 @@
      #+END_SRC
 
 *** affe
+    An experiment for asynchronous fuzzy finding in emacs based on consult.
+
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package affe
         :straight (affe :host github :repo "minad/affe")
@@ -16868,7 +16971,7 @@
     [[https://github.com/davidhalter/jedi][jedi]]. There's also a microsoft based [[https://github.com/microsoft/python-language-server][server]], and the newer/faster [[https://github.com/microsoft/pyright][pyright]] (but be
     forewarned, there be [[https://github.com/microsoft/pylance-release/issues/4][dragons]] there).
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! python :lsp :not anaconda)
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! python :lsp (not anaconda))
       (add-hook 'python-mode-hook +lsp-command)
     #+END_SRC
 
@@ -18648,7 +18751,7 @@
     Firstly in case lsp is not available, lets rely on the builtin nim help
     facilities curtesy of [[https://nim-lang.org/docs/nimsuggest.html][nimsuggest]].
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! nim :not :lsp)
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! nim (not :lsp))
       (add-hook 'nim-mode-hook #'nimsuggest-mode)
     #+END_SRC
 
@@ -18703,7 +18806,7 @@
 *** go-guru
     requires: ~go get golang.org/s/using-guru~
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! :not :lsp)
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! (not :lsp))
       (use-package go-guru
         ;; only use when lsp based language support is not available
         :straight t
@@ -20471,7 +20574,7 @@
                                 :test (lambda (x y) (or (null y) (equal x y)))
                                 :from-end t))))
             (cond
-             ((package! selectrum)
+             ((package! :consult)
               (find-file
                (consult--read cands
                               :prompt "Find file: "
@@ -20622,7 +20725,7 @@
         (defun org-roam-rg ()
           "Run a rg session in your org roam directory."
           (interactive)
-          (cond ((package! selectrum)
+          (cond ((package! :consult)
                  (require 'consult)
                  (consult-ripgrep org-roam-directory))
                 (t (message "No rg package found"))))
@@ -20810,7 +20913,7 @@
          (concat
           "pdfbib:"
           (cond
-           ((package! selectrum)
+           ((package! :consult)
             (consult-bibtex-read-entry+ arg))
            (t (user-error "No bibtex key reader found")))
           "::"
