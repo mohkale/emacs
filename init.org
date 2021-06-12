@@ -91,6 +91,7 @@
 
      ;;; Completion frameworks
          selectrum                                                         ; An clean completion-framework designed to be more consistent and predictable
+         ;; vertico                                                        ; A more-minimalist selectrum alternative aiming to be completing-read compatible
 
      ;;; Completion Assistants
          prescient                                                         ; Sorting/Filtering based on frequency and proximity.
@@ -307,7 +308,8 @@
                           res))
                    ((eq pkg :consult)
                     (push `(or (member (quote consult) +packages)
-                               ,(package-build-cond+ 'selectrum))
+                               ,(package-build-cond+ 'selectrum)
+                               ,(package-build-cond+ 'vertico))
                           res))
                    ((keywordp pkg)
                     (warn "`package!' got unknown keyword argument %s" pkg)
@@ -859,10 +861,13 @@
              find-file-suppress-same-file-warnings t                                ; don't warn when finding a file that's already open.
              recentf-max-saved-items 2048                                           ; keep this many files in the recentf history.
              completion-ignore-case t                                               ; make completion case insensitive, holding down shift is annoying.
+             read-file-name-completion-ignore-case t
+             read-buffer-completion-ignore-case t
              completions-detailed t                                                 ; show annotations for certain completion candidates
              Man-notify-method 'pushy                                               ; Open manual buffer in the current window
              inhibit-startup-echo-area-message t                                    ; Don't tell me I'm in GNU emacs... I think I'll know
              confirm-nonexistent-file-or-buffer nil                                 ; Don't require confirmation when creating a new file
+             history-length 1000                                                    ; Maximum size of a history variable for completing-read
              recenter-positions '(top middle bottom)
              user-mail-address "mohkale@kisara.moe"
              user-full-name "mohsin kaleem")
@@ -2463,14 +2468,14 @@
                                        term-mode
                                        minibuffer-inactive-mode
                                        eshell-mode)
-       "modes under which no trailing whitespace is shown")
+       "Modes under which no trailing whitespace is shown")
 
      (defvar whitespace-exempt-buffers
        (list (rx "*Ibuffer confirmation*")
              (rx "*Org Export Dispatcher*")
-             (rx "*eldoc*"))
-       "regular expressions matching buffer names under which no trailing
-     whitespace is shown.")
+             (rx "*eldoc*")
+             (rx "*Completions*"))
+       "Regular expressions matching buffer names under which no trailing whitespace is shown.")
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
@@ -9877,34 +9882,43 @@
    #+END_SRC
 
 ** minibuffer
+   There are a *tonne*of minibuffer-completion maps. See [[info:emacs#Minibuffer Maps][minibuffer maps]].
+
    #+BEGIN_SRC emacs-lisp
      (general-define-key
       :keymaps 'minibuffer-local-map
-      "M-j" 'next-history-element
-      "M-k" 'previous-history-element
-      "C-j" 'previous-matching-history-element
-      "C-k" 'next-matching-history-element
+      "C-j" 'next-line
+      "C-k" 'previous-line
       "C-h" 'backward-char
-      "C-l" (defun minibuffer-forward-char-or-exit ()
+      ;; "C-l" 'exit-minibuffer
+      "C-l" (defun minibuffer-forward-char-or-exit+ ()
               (interactive)
               (call-interactively (if (eolp)
                                       'exit-minibuffer
                                     'forward-char)))
-
+      "C-d" 'scroll-up-command
+      "C-u" 'scroll-down-command ;'minibuffer-scroll-down-command
+      "C-o" 'end-of-buffer
+      "M-o" 'beginning-of-buffer ; 'minibuffer-beginning-of-buffer
+      "M-j" 'next-history-element
+      "M-k" 'previous-history-element
+      "C-s" 'previous-matching-history-element
+      "C-r" 'next-matching-history-element
       "C-a" 'move-beginning-of-line
       "C-e" 'move-end-of-line
+      [C-i] "TAB"
+      "C-c C-u" 'universal-argument
       "C-v" 'quoted-insert
-      "C-M-q" 'quit-window
       "M-DEL" 'kill-whole-line
-
-      ;; "M-n" nil
-      ;; "M-p" nil
-      ;; "M-r" nil
       "C-w" 'backward-kill-word
-      "C-?" 'minibuffer-completion-help
-      ;; for some reason.. I can't bind Meta keys
-      "M-h" 'backward-kill-sentence
-      "M-l" 'kill-sentence)
+      "C-c C-j" 'forward-paragraph
+      "C-c C-k" 'backward-paragraph
+
+      ;; "C-?" 'minibuffer-completion-help
+      ;; "M-h" 'backward-kill-sentence
+      ;; "M-l" 'kill-sentence
+
+      "M-l" 'minibuffer-recenter-top-bottom)
 
      (general-define-key
       :keymaps 'minibuffer-local-must-match-map
@@ -10946,9 +10960,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package paren
-       :hook ((prog-mode . show-paren-mode)
-              (text-mode . show-paren-mode))
-       :init (setq sp-highlight-pair-overlay nil))
+       :hook (after-init-hook . show-paren-mode))
    #+END_SRC
 
 ** pp/pretty-print
@@ -12122,28 +12134,19 @@
        :general
        (:keymaps 'selectrum-minibuffer-map
         "C-j" 'next-line
-        "C-k" 'previous-line
-        "C-h" 'backward-char
         "C-q" 'selectrum-quick-select
         "M-q" 'selectrum-quick-insert
-        "C-l" (defun selectrum-forward-char-or-exit+ ()
-                (interactive)
-                (call-interactively (if (eolp)
-                                        'selectrum-select-current-candidate
-                                      'forward-char)))
-        "M-j" 'next-history-element
-        "M-k" 'previous-history-element
-        "C-r" 'next-matching-history-element
-        "C-s" 'previous-matching-history-element
-        [C-i] 'selectrum-insert-current-candidate
+        [remap minibuffer-beginning-of-buffer] 'selectrum-goto-beginning
+        [remap minibuffer-scroll-down-command] 'selectrum-previous-page
+        [remap minibuffer-forward-char-or-exit+]
+        (defun selectrum-forward-char-or-exit+ ()
+          (interactive)
+          (call-interactively (if (eolp)
+                                  'selectrum-select-current-candidate
+                                'forward-char)))
+        [remap next-matching-history-element] 'selectrum-select-from-history
         "C-i" 'selectrum-insert-current-candidate
-        "C-o" 'end-of-buffer
-        "M-o" 'beginning-of-buffer
-        "C-d" 'scroll-up-command
-        "C-u" 'scroll-down-command
-        "M-u" 'universal-argument
-        "C-w" 'selectrum-smart-backward-kill-word+
-        "M-i" 'selectrum-insert-current-candidate
+        [remap backward-kill-word] 'selectrum-smart-backward-kill-word+
         "<S-return>" 'selectrum-submit-exact-input))
    #+END_SRC
 
@@ -12167,6 +12170,33 @@
      (advice-add 'consult-line :after #'selectrum-update-regexp-search-ring+)
    #+end_src
 
+** vertico
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! vertico)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package vertico
+       :hook ((after-init . vertico-mode)
+              (minibuffer-setup . cursor-intangible-mode))
+       :straight t
+       :custom
+       (vertico-count 15)
+       (vertico-cycle t)
+       (minibuffer-prompt-properties
+        '(read-only t cursor-intangible t face minibuffer-prompt))
+
+       :general
+       (:keymaps 'vertico-map
+        "<S-return>" 'vertico-exit-input
+        [remap minibuffer-forward-char-or-exit+]
+        (defun vertico-forward-char-or-exit+ ()
+          (interactive)
+          (call-interactively (if (eolp)
+                                  'vertico-exit
+                                'forward-char)))))
+   #+end_src
+
 ** minibuffer
    :PROPERTIES:
    :header-args+: :tangle (package-yes! :consult)
@@ -12178,7 +12208,8 @@
     #+BEGIN_SRC emacs-lisp
       (use-package marginalia
         :straight t
-        :hook (selectrum-mode . marginalia-mode)
+        :hook ((selectrum-mode . marginalia-mode)
+               (vertico-mode . marginalia-mode))
         :general
         (:keymaps 'embark-general-map
          "A" 'marginalia-cycle)
@@ -12245,7 +12276,8 @@
                     (read-only-mode -1)))
 
         :general
-        (:keymaps 'selectrum-minibuffer-map
+        (:keymaps '(selectrum-minibuffer-map
+                    vertico-map)
          "<C-return>" 'embark-act
          "M-RET" 'embark-act-noexit
          "C-c C-o" 'embark-collect-snapshot
@@ -12462,7 +12494,8 @@
         (with-consult-ignore-project+ consult-grep)
 
         :leader
-        (:mode 'selectrum-mode
+        (:mode '(selectrum-mode
+                 vertico-mode)
          :minor t
          "SPC" 'consult-mode-command
          "aa" 'consult-minor-mode-menu
