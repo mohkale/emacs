@@ -157,7 +157,7 @@
  ("skeletor.el" . "f6e560a0bfe459e0b8a268047920ce1148f2ebf6")
  ("smartrep.el" . "f0ff5a6d7b8603603598ae3045c98b011e58d86e")
  ("smtpmail-multi" . "83fa9d7a02e000be95cb282c8b48446646896ea1")
- ("spaceleader" . "1b86b3adcd3ec3ce32e213aef6ba4652e294c0cb")
+ ("spaceleader" . "6112cbf25a2d6dd29b7459ab6f4c29b9eea8a993")
  ("spinner" . "e19f3cfc0646c0e23c10c22df219fcf427054621")
  ("sqlup-mode.el" . "3f9df9c88d6a7f9b1ae907e401cad8d3d7d63bbf")
  ("ssh-config-mode-el" . "ff9a15ec150baef21d7d8c6f79c5602e56825391")

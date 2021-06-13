@@ -1242,7 +1242,7 @@
         :demand t
         :config
         (require 'spaceleader-use-package)
-        (leader-set-keys leader-server-leader-prefix "lang-server")
+        (leader-declare-prefix leader-server-leader-prefix "lang-server")
 
         :general
         ("C-@" (general-simulate-key "C-SPC")) ;; C-SPC in terminal
@@ -1288,7 +1288,7 @@
          "am" +man-command
          "ae" 'list-processes
 
-         "ap" '(nil :wk "packages")
+         "ap" '(:wk "packages")
          "api" 'straight-use-package
          "apU" 'straight-pull-all
          "apu" 'straight-pull-package-and-deps
@@ -4030,7 +4030,7 @@
         :straight t
         :leader
         (:prefix "jh"
-         ""   '(nil :wk "motion")
+         ""   '(:wk "motion")
          "w"  'evilem-motion-forward-word-begin
          "W"  'evilem-motion-forward-WORD-begin
          "e"  'evilem-motion-forward-word-end
@@ -5072,7 +5072,7 @@
        (setq git-link-open-in-browser nil)
 
        :leader
-       ("gy"  '(nil :wk "links")
+       ("gy"  '(:wk "links")
         "gyl" 'git-link
         "gyc" 'git-link-commit
         "gyh" 'git-link-homepage))
@@ -5130,7 +5130,7 @@
        :config
        (setq lv-use-separator t)
        :leader
-       ("H" '(nil :wk ("hydras" . "cut off one head, two more shall take it's place"))))
+       ("H" '(:wk ("hydras" . "cut off one head, two more shall take it's place"))))
 
      (use-package pretty-hydra :straight t)
    #+END_SRC
@@ -6356,7 +6356,7 @@
      (use-package lorem-ipsum
        :straight t
        :leader
-       ("il"  '(nil :wk "lorem-ipsum")
+       ("il"  '(:wk "lorem-ipsum")
         "ill" 'Lorem-ipsum-insert-list
         "ilp" 'Lorem-ipsum-insert-paragraphs
         "ils" 'Lorem-ipsum-insert-sentences))
@@ -6418,7 +6418,7 @@
      (use-package pcre2el
        :straight t
        :leader
-       ("xr"   '(nil :wk "regexp")
+       ("xr"   '(:wk "regexp")
         "xrb"  'regexp-builder
         "xr'"  'rxt-convert-to-strings
         "xr/"  'rxt-explain
@@ -6426,14 +6426,14 @@
         "xrt"  'rxt-toggle-elisp-rx
         "xrx"  'rxt-convert-to-rx
 
-        "xre"  '(nil :wk "elisp")
+        "xre"  '(:wk "elisp")
         "xre'" 'rxt-elisp-to-strings
         "xre/" 'rxt-explain-elisp
         "xrep" 'rxt-elisp-to-pcre
         "xret" 'rxt-toggle-elisp-rx
         "xrex" 'rxt-elisp-to-rx
 
-        "xrp"  '(nil :wk "PCRE")
+        "xrp"  '(:wk "PCRE")
         "xrp'" 'rxt-pcre-to-strings
         "xrp/" 'rxt-explain-pcre
         "xrpe" 'rxt-pcre-to-elisp
@@ -6900,7 +6900,7 @@
         "pb"    'projectile-switch-to-buffer
         "po"    'projectile-org-project-file+
 
-        "p"  '(nil :wk "projectile")
+        "p"  '(:wk "projectile")
         "p TAB" 'projectile-find-other-file
         "p!" 'projectile-run-shell-command-in-root
         "p%" 'projectile-replace-regexp
@@ -7637,7 +7637,7 @@
       (use-package auto-yasnippet
         :straight t
         :leader
-        ("is"  '(nil :wk "auto-yasnippet")
+        ("is"  '(:wk "auto-yasnippet")
          "isc" 'aya-create
          "ise" 'aya-expand
          "isw" 'aya-persist-snippet)
@@ -8476,7 +8476,7 @@
           "t" 'comint-show-output
           "o" 'comint-delete-output
 
-          "s" '(nil :wk "subjob")
+          "s" '(:wk "subjob")
           "ss" 'comint-stop-subjob
           "sq" 'comint-quit-subjob
           "si" 'comint-interrupt-subjob))
@@ -8548,7 +8548,7 @@
 
        :leader
        (:prefix "ip"
-        "" '(nil :wk "abbrev")
+        "" '(:wk "abbrev")
         "r" 'read-abbrev-file
         "w" 'write-abbrev-file
         "e" 'edit-abbrevs
@@ -8629,7 +8629,7 @@
 
        :leader
        (:prefix leader-diff-leader-prefix
-        "" '(nil :wk "diff")
+        "" '(:wk "diff")
         "SPC" 'diff-buffer-with-file)
 
        :lazy-leader
@@ -8710,156 +8710,154 @@
               dired-recent-directories-file (var! "dired/recent.el"))
 
         (push 'dired-mode whitespace-exempt-modes)
-        (require '+dired-bindings))
-    #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/+dired-bindings.el
-      (defun dired-goto-home-dir (&optional other-window)
-        "goto users home directory
+        :commands (dired-goto-home-dir+
+                   dired-evil-scroll-down+
+                   dired-evil-scroll-up+)
+        :config
+        (defun dired-goto-home-dir+ (&optional other-window)
+          "goto users home directory
              with prefix, visits in another window"
-        (interactive "P")
-        (funcall (if other-window
-                     'find-file-other-window
-                   'find-file)
-                 (expand-file-name "~")))
+          (interactive "P")
+          (funcall (if other-window
+                       'find-file-other-window
+                     'find-file)
+                   (expand-file-name "~")))
 
-      (defun dired-evil-scroll-down ()
-        (interactive)
-        (call-interactively 'evil-scroll-down)
-        (dired-move-to-filename))
+        (defun dired-evil-scroll-down+ ()
+          (interactive)
+          (call-interactively 'evil-scroll-down)
+          (dired-move-to-filename))
 
-      (defun dired-evil-scroll-up ()
-        (interactive)
-        (call-interactively 'evil-scroll-up)
-        (dired-move-to-filename))
+        (defun dired-evil-scroll-up+ ()
+          (interactive)
+          (call-interactively 'evil-scroll-up)
+          (dired-move-to-filename))
 
-      (general-define-key
-       :keymaps 'dired-mode-map
-       ;; let map override any motion bindings
-       "<override-state>" 'motion)
+        :general
+        (:keymaps 'dired-mode-map
+         ;; let map override any motion bindings
+         "<override-state>" 'motion)
+        (:keymaps 'dired-mode-map
+         :states  'motion
+         "j" 'dired-next-line
+         "k" 'dired-previous-line
+         "~" 'dired-goto-home-dir+
+         "r" 'dired-do-redisplay
+         "=" 'dired-diff
+         "K" 'dired-do-kill-lines
+         "'" 'dired-show-file-type ;; like file command
+         "M" 'dired-unmark
+         "u" 'dired-unmark
+         "r" 'dired-change-marks
+         "y" 'dired-copy-filename-as-kill
 
-      (general-define-key
-       :keymaps 'dired-mode-map
-       :states  'motion
-       "j" 'dired-next-line
-       "k" 'dired-previous-line
-       "~" 'dired-goto-home-dir
-       "r" 'dired-do-redisplay
-       "=" 'dired-diff
-       "K" 'dired-do-kill-lines
-       "'" 'dired-show-file-type ;; like file command
-       "M" 'dired-unmark
-       "u" 'dired-unmark
-       "r" 'dired-change-marks
-       "y" 'dired-copy-filename-as-kill
+         "M-<return>" 'dired-display-file
+         "C-M-<return>" 'dired-find-alternate-file
+         "C-M-d" 'dired-kill-subdir
 
-       "M-<return>" 'dired-display-file
-       "C-M-<return>" 'dired-find-alternate-file
-       "C-M-d" 'dired-kill-subdir
+         "zc" 'dired-hide-subdir ;; collapse
+         "zC" 'dired-hide-all
 
-       "zc" 'dired-hide-subdir ;; collapse
-       "zC" 'dired-hide-all
+         ;; "|" 'dired-do-hardlink
+         "|" 'dired-do-symlink
+         "C-|" 'dired-do-relsymlink
+         "M-|" 'dired-do-hardlink
+         "M-!" 'dired-do-print ;; append names to end of command
 
-       ;; "|" 'dired-do-hardlink
-       "|" 'dired-do-symlink
-       "C-|" 'dired-do-relsymlink
-       "M-|" 'dired-do-hardlink
-       "M-!" 'dired-do-print ;; append names to end of command
+         "C-S-J" 'dired-next-marked-file
+         "C-S-K" 'dired-prev-marked-file
+         "M-j" 'dired-next-dirline           ; unbound, dired-tree-down
+         "M-k" 'dired-prev-dirline           ; unbound, dired-tree-up
+         "C-d" 'dired-evil-scroll-down+
+         "C-u" 'dired-evil-scroll-up+
+         "C-h" 'dired-goto-min-subdir
+         "C-j" 'dired-next-subdir
+         "C-k" 'dired-prev-subdir
+         "C-l" 'dired-goto-max-subdir)
 
-       "C-S-J" 'dired-next-marked-file
-       "C-S-K" 'dired-prev-marked-file
-       "M-j" 'dired-next-dirline           ; unbound, dired-tree-down
-       "M-k" 'dired-prev-dirline           ; unbound, dired-tree-up
-       "C-d" 'dired-evil-scroll-down
-       "C-u" 'dired-evil-scroll-up
-       "C-h" 'dired-goto-min-subdir
-       "C-j" 'dired-next-subdir
-       "C-k" 'dired-prev-subdir
-       "C-l" 'dired-goto-max-subdir)
+        :leader
+        (:mode 'dired-mode
+         "?" 'dired-summary ;; like transient state
+         "#" 'dired-clean-directory
+         "o" 'browse-url-of-dired-file ;; open in external app
+         "O" 'dired-omit-mode
+         "v" 'dired-view-file          ;; TODO customize view mode
+         "g" 'dired-goto-file ;; prompt for file to visit in current buffer
+         "s" 'dired-sort-toggle-or-edit
 
-      (leader-set-keys-for-major-mode 'dired-mode
-        "?" 'dired-summary ;; like transient state
-        "#" 'dired-clean-directory
-        "o" 'browse-url-of-dired-file ;; open in external app
-        "O" 'dired-omit-mode
-        "v" 'dired-view-file          ;; TODO customize view mode
-        "g" 'dired-goto-file ;; prompt for file to visit in current buffer
-        "s" 'dired-sort-toggle-or-edit
+         "r"  '(:wk "rename")
+         "ru" 'dired-upcase
+         "rd" 'dired-downcase
 
-        "r"  '(nil :wk "rename")
-        "ru" 'dired-upcase
-        "rd" 'dired-downcase
+         ;; Flag means mark delete
+         "d"  '(:wk "delete")
+         "d&" 'dired-flag-garbage-files
+         "d~" 'dired-flag-backup-files
+         "d/" 'dired-flag-files-regexp
+         "d#" 'dired-flag-auto-save-files
 
-        ;; flag means mark delete
-        "d"  '(nil :wk "delete")
-        "d&" 'dired-flag-garbage-files
-        "d~" 'dired-flag-backup-files
-        "d/" 'dired-flag-files-regexp
-        "d#" 'dired-flag-auto-save-files
+         "m"  '(:wk "mark")
+         "mm" 'dired-toggle-marks
+         "mu" 'dired-unmark
+         "m DEL" 'dired-unmark-backward
+         "ml" 'dired-mark-symlinks
+         "md" 'dired-mark-directories
+         "m!" 'dired-mark-executables
+         "mt" 'dired-mark-subdir-files
+         "mg" 'dired-mark-files-containing-regexp ;; grep
+         "ms" 'dired-mark-files-regexp
+         "m(" 'dired-mark-sexp
 
-        "m"  '(nil :wk "mark")
-        "mm" 'dired-toggle-marks
-        "mu" 'dired-unmark
-        "m DEL" 'dired-unmark-backward
-        "ml" 'dired-mark-symlinks
-        "md" 'dired-mark-directories
-        "m!" 'dired-mark-executables
-        "mt" 'dired-mark-subdir-files
-        "mg" 'dired-mark-files-containing-regexp ;; grep
-        "ms" 'dired-mark-files-regexp
-        "m(" 'dired-mark-sexp
+         ;; Emacs related bindings
+         "e"  '(:wk "emacs")
+         "ec" 'dired-do-byte-compile
+         "el" 'dired-do-load
+         "ef" 'dired-do-find-marked-files
 
-        ;; emacs related bindings
-        "e"  '(nil :wk "emacs")
-        "ec" 'dired-do-byte-compile
-        "el" 'dired-do-load
-        "ef" 'dired-do-find-marked-files
+         ;; Change fs property commands
+         "c"  '(:wk "change")
+         "cg" 'dired-do-chgrp
+         "cm" 'dired-do-chmod
+         "co" 'dired-do-chown
 
-        ;; change fs property commands
-        "c"  '(nil :wk "change")
-        "cg" 'dired-do-chgrp
-        "cm" 'dired-do-chmod
-        "co" 'dired-do-chown
+         ;; Filesystem
+         "f"  '(:wk "filesystem")
+         "fg" 'dired-do-find-regexp             ;; grep marked files
+         "fs" 'dired-do-find-regexp-and-replace ;; substitute
+         "fi" 'dired-info
+         "fm" 'dired-man
+         "fr" 'dired-do-run-mail
+         "ft" 'dored-do-touch
+         "fz" 'epa-dired-do-encrypt
+         "fZ" 'epa-dired-do-encrypt-to ;; compress as
 
-        ;; filesystem
-        "f"  '(nil :wk "filesystem")
-        "fg" 'dired-do-find-regexp             ;; grep marked files
-        "fs" 'dired-do-find-regexp-and-replace ;; substitute
-        "fi" 'dired-info
-        "fm" 'dired-man
-        "fr" 'dired-do-run-mail
-        "ft" 'dored-do-touch
-        "fz" 'epa-dired-do-encrypt
-        "fZ" 'epa-dired-do-encrypt-to ;; compress as
+         ;; EasyPG/GPG
+         "fp"  '(:wk "GPG")
+         "fpd" 'epa-dired-do-decrypt
+         "fpe" 'epa-dired-do-encrypt
+         "fps" 'epa-dired-do-sign
+         "fpv" 'epa-dired-do-verify
 
-        ;; EasyPG/GPG
-        "fp"  '(nil :wk "GPG")
-        "fpd" 'epa-dired-do-decrypt
-        "fpe" 'epa-dired-do-encrypt
-        "fps" 'epa-dired-do-sign
-        "fpv" 'epa-dired-do-verify
+         ;; operations bound to regexp search
+         "f/"     '(:wk "search")
+         "f/c"    'dired-do-copy-regexp
+         "f/r"    'dired-do-rename-regexp
+         "f/h"    'dired-do-hardlink-regexp
+         "f/s"    'dired-do-symlink-regexp
+         "f/|"    'dired-do-symlink-regexp
+         "f/ C-|" 'dired-do-relsymlink-regexp
+         "f/ M-|" 'dired-do-hardlink-regexp)
 
-        ;; operations bound to regexp search
-        "f/"     '(nil :wk "search")
-        "f/c"    'dired-do-copy-regexp
-        "f/r"    'dired-do-rename-regexp
-        "f/h"    'dired-do-hardlink-regexp
-        "f/s"    'dired-do-symlink-regexp
-        "f/|"    'dired-do-symlink-regexp
-        "f/ C-|" 'dired-do-relsymlink-regexp
-        "f/ M-|" 'dired-do-hardlink-regexp)
-
-      (general-define-key
-       :keymaps 'dired-mode-map
-       "#" nil "$" nil "%" nil "*" nil "." nil ":" nil "?" nil "~" nil "<" nil
-       "=" nil ">" nil "a" nil "A" nil "B" nil "c" nil "C-M-d" nil "C-M-n" nil
-       "C-M-p" nil "C-M-u" nil "C-o" nil "e" nil "f" nil "F" nil "g" nil "G" nil
-       "h" nil "H" nil "I" nil "j" nil "k" nil "l" nil "L" nil "M" nil "M-$" nil
-       "M-(" nil "M-{" nil "M-}" nil "M-DEL" nil "M-G" nil "n" nil "N" nil "O" nil
-       "p" nil "P" nil "Q" nil "s" nil "SPC" nil "0" nil "S-SPC" nil "t" nil "T" nil
-       "v" nil "V" nil "w" nil "W" nil "X" nil "y" nil "Y" nil "Z" nil "u" nil)
-
-      (provide '+dired-bindings)
+        :general
+        (:keymaps 'dired-mode-map
+         "#" nil "$" nil "%" nil "*" nil "." nil ":" nil "?" nil "~" nil "<" nil
+         "=" nil ">" nil "a" nil "A" nil "B" nil "c" nil "C-M-d" nil "C-M-n" nil
+         "C-M-p" nil "C-M-u" nil "C-o" nil "e" nil "f" nil "F" nil "g" nil "G" nil
+         "h" nil "H" nil "I" nil "j" nil "k" nil "l" nil "L" nil "M" nil "M-$" nil
+         "M-(" nil "M-{" nil "M-}" nil "M-DEL" nil "M-G" nil "n" nil "N" nil "O" nil
+         "p" nil "P" nil "Q" nil "s" nil "SPC" nil "0" nil "S-SPC" nil "t" nil "T" nil
+         "v" nil "V" nil "w" nil "W" nil "X" nil "y" nil "Y" nil "Z" nil "u" nil))
     #+END_SRC
 
 *** all-the-icons-dired
@@ -8947,114 +8945,114 @@
      (use-package image-dired
        :config
        (push 'image-dired-thumbnail-mode whitespace-exempt-modes)
-       (require '+image-dired-bindings))
-   #+END_SRC
 
-   #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/+image-dired-bindings.el" image-dired)
-     ;;; fixed weird moves line, not thumbnail
-     (defun image-dired-slideshow-step ()
-       "Step to next file, if `image-dired-slideshow-times' has not been reached."
-       (if (< image-dired-slideshow-count image-dired-slideshow-times)
-           (progn
-             (message "%s" (1+ image-dired-slideshow-count))
-             (setq image-dired-slideshow-count (1+ image-dired-slideshow-count))
-             (image-dired-display-next-thumbnail-original))
-         (image-dired-slideshow-stop)))
+       :config
+       ;;; Fixed weird moves line, not thumbnail, behaviour.
+       (advice-add #'image-dired-slideshow-step :override
+                   (defun image-dired-slideshow-step+ ()
+                     "Step to next file, if `image-dired-slideshow-times' has not been reached."
+                     (if (< image-dired-slideshow-count image-dired-slideshow-times)
+                         (progn
+                           (message "%s" (1+ image-dired-slideshow-count))
+                           (setq image-dired-slideshow-count (1+ image-dired-slideshow-count))
+                           (image-dired-display-next-thumbnail-original))
+                       (image-dired-slideshow-stop))))
 
-     (general-define-key
-      :keymaps 'image-dired-thumbnail-mode-map
-      :states '(normal visual)
-      "q" nil
+       :general
+       (:keymaps 'image-dired-thumbnail-mode-map
+        :states '(normal visual)
+        "q" nil
 
-      "h" 'image-dired-backward-image
-      "j" 'image-dired-next-line
-      "k" 'image-dired-previous-line
-      "l" 'image-dired-forward-image
-      "<left>"  'image-dired-forward-image
-      "<right>" 'image-dired-previous-image
+        "h" 'image-dired-backward-image
+        "j" 'image-dired-next-line
+        "k" 'image-dired-previous-line
+        "l" 'image-dired-forward-image
+        "<left>"  'image-dired-forward-image
+        "<right>" 'image-dired-previous-image
 
-      "x" 'image-dired-delete-char
-      "m" 'image-dired-mark-thumb-original-file
-      "u" 'image-dired-unmark-thumb-original-file
-      "c" 'image-dired-comment-thumbnail
-      "d" 'image-dired-flag-thumb-original-file
-      "D" 'image-dired-thumbnail-set-image-description
-      "s" 'image-dired-slideshow-start
-      "t" 'image-dired-toggle-mark-thumb-original-file
-      "gr" 'image-dired-refresh-thumb
-      "gc" 'image-dired-create-thumbs
-      "gg" (lambda! (evil-goto-first-line) (evil-beginning-of-line))
-      "G"  (lambda! (goto-char (point-max)) (image-dired-backward-image))
+        "x" 'image-dired-delete-char
+        "m" 'image-dired-mark-thumb-original-file
+        "u" 'image-dired-unmark-thumb-original-file
+        "c" 'image-dired-comment-thumbnail
+        "d" 'image-dired-flag-thumb-original-file
+        "D" 'image-dired-thumbnail-set-image-description
+        "s" 'image-dired-slideshow-start
+        "t" 'image-dired-toggle-mark-thumb-original-file
+        "gr" 'image-dired-refresh-thumb
+        "gc" 'image-dired-create-thumbs
+        "gg" (lambda! (evil-goto-first-line) (evil-beginning-of-line))
+        "G"  (lambda! (goto-char (point-max)) (image-dired-backward-image))
 
-      "C-s" 'image-save           ; NOTE originally was bound to o
+        "C-s" 'image-save                                                            ; NOTE originally was bound to o
 
-      "<C-SPC>"    'image-dired-mark-thumb-original-file
-      "<M-SPC>"    'image-dired-unmark-thumb-original-file
+        "C-SPC"    'image-dired-mark-thumb-original-file
+        "M-SPC"    'image-dired-unmark-thumb-original-file
 
-      "<C-return>" 'image-dired-display-current-image-full
-      "<RET>"      'image-dired-display-thumbnail-original-image
-      "C-l"        'image-dired-display-next-thumbnail-original
-      "C-h"        'image-dired-display-previous-thumbnail-original
-          ;;; column view aliases
-      "J" 'image-dired-display-next-thumbnail-original
-      "K" 'image-dired-display-previous-thumbnail-original
-      ;; "o" 'image-dired-display-thumbnail-original-image
-      "v" 'image-dired-display-thumbnail-original-image
+        "<C-return>" 'image-dired-display-current-image-full
+        "<RET>"      'image-dired-display-thumbnail-original-image
+        "C-l"        'image-dired-display-next-thumbnail-original
+        "C-h"        'image-dired-display-previous-thumbnail-original
+     ;;; column view aliases
+        "J" 'image-dired-display-next-thumbnail-original
+        "K" 'image-dired-display-previous-thumbnail-original
+        ;; "o" 'image-dired-display-thumbnail-original-image
+        "v" 'image-dired-display-thumbnail-original-image
 
-      "<mouse-1>" 'image-dired-mouse-select-thumbnail
-      "<mouse-2>" 'image-dired-mouse-display-image)
+        "<mouse-1>" 'image-dired-mouse-select-thumbnail
+        "<mouse-2>" 'image-dired-mouse-display-image)
+       (:keymaps 'image-dired-display-image-mode-map
+        :states 'normal
+        "f" 'image-dired-display-current-image-full
+        "F" 'image-dired-display-current-image-sized
+        "s" 'image-dired-display-current-image-sized
 
-     (leader-set-keys-for-major-mode 'image-dired-thumbnail-mode
-       "g" 'image-dired-jump-original-dired-buffer
-       "m" 'image-dired
+        "h" 'image-scroll-right
+        "l" 'image-scroll-left
+        "k" 'image-scroll-down
+        "j" 'image-scroll-up
+        ;; horizontal line by line movement
+        "C-d" 'image-scroll-up
+        "C-u" 'image-scroll-down
+        "C-e" 'image-next-line
+        "C-y" 'image-previous-line
+        ;; Arrow Keys Alias hjkl
+        "<left>"  'image-backward-hscroll
+        "<right>" 'image-forward-hscroll
+        "<up>"    'image-scroll-down
+        "<down>"  'image-scroll-up)
 
-       "t"  '(nil :wk "tagging")
-       "td" 'image-dired-thumbnail-set-image-description
-       "tt" 'image-dired-tag-thumbnail
-       "tT" 'image-dired-tag-thumbnail-remove
+       :config
+       (leader-declare-prefix-for-major-mode 'image-dired-thumbnail-mode
+         "t" "tagging"
+         "e" "edit")
 
-       "e" '(nil :wk "edit")
-       "el" 'image-dired-rotate-thumbnail-left
-       "eL" 'image-dired-rotate-original-left
-       "er" 'image-dired-rotate-thumbnail-right
-       "eR" 'image-dired-rotate-original-right
+       :lazy-leader
+       (:mode 'image-dired-thumbnail-mode
+        "g" 'image-dired-jump-original-dired-buffer
+        "m" 'image-dired
 
-       "." 'image-dired-track-original-file
-       "o" 'image-dired-thumbnail-display-external
+        "td" 'image-dired-thumbnail-set-image-description
+        "tt" 'image-dired-tag-thumbnail
+        "tT" 'image-dired-tag-thumbnail-remove
 
-       ;; [re]set number of columns per row
-       "s" 'image-dired-line-up-interactive
-       "S" 'image-dired-line-up-dynamic)
+        "el" 'image-dired-rotate-thumbnail-left
+        "eL" 'image-dired-rotate-original-left
+        "er" 'image-dired-rotate-thumbnail-right
+        "eR" 'image-dired-rotate-original-right
 
-        ;;; image view
-     (general-define-key
-      :keymaps 'image-dired-display-image-mode-map
-      :states 'normal
-      "f" 'image-dired-display-current-image-full
-      "F" 'image-dired-display-current-image-sized
-      "s" 'image-dired-display-current-image-sized
+        "." 'image-dired-track-original-file
+        "o" 'image-dired-thumbnail-display-external
 
-      "h" 'image-scroll-right
-      "l" 'image-scroll-left
-      "k" 'image-scroll-down
-      "j" 'image-scroll-up
-      ;; horizontal line by line movement
-      "C-d" 'image-scroll-up
-      "C-u" 'image-scroll-down
-      "C-e" 'image-next-line
-      "C-y" 'image-previous-line
-      ;; Arrow Keys Alias hjkl
-      "<left>"  'image-backward-hscroll
-      "<right>" 'image-forward-hscroll
-      "<up>"    'image-scroll-down
-      "<down>"  'image-scroll-up)
+        ;; [re]set number of columns per row
+        "s" 'image-dired-line-up-interactive
+        "S" 'image-dired-line-up-dynamic)
 
-     (leader-set-keys-for-major-mode 'image-dired-display-image-mode
-       "h" 'image-bol ; far left   edge
-       "j" 'image-eob ; far bottom edge
-       "k" 'image-bob ; far top    edge
-       "l" 'image-eol ; far right  edge
-       "g" 'image-dired-jump-thumbnail-buffer)
+       (:mode 'image-dired-display-image-mode
+        "h" 'image-bol ; far left   edge
+        "j" 'image-eob ; far bottom edge
+        "k" 'image-bob ; far top    edge
+        "l" 'image-eol ; far right  edge
+        "g" 'image-dired-jump-thumbnail-buffer))
    #+END_SRC
 
 ** display-line-numbers
@@ -9493,54 +9491,55 @@
 
         (evil-set-initial-state 'ibuffer-mode 'motion)
 
-        (leader-set-keys-for-major-mode 'ibuffer-mode
-          ;; unbound:
-          ;;  * ibuffer-do-print
-          "RET" 'ibuffer-do-view-horizontally
-          "1"   'ibuffer-visit-buffer-1-window
-          "+"   'ibuffer-add-to-tmp-show
-          "-"   'ibuffer-add-to-tmp-hide
-          "."   'hydra-ibuffer/body
+        :lazy-leader
+        (:mode 'ibuffer-mode
+         ;; unbound:
+         ;;  * ibuffer-do-print
+         "RET" 'ibuffer-do-view-horizontally
+         "1"   'ibuffer-visit-buffer-1-window
+         "+"   'ibuffer-add-to-tmp-show
+         "-"   'ibuffer-add-to-tmp-hide
+         "."   'hydra-ibuffer/body
 
-          "A"   'ibuffer-auto-mode
-          "E"   'ibuffer-do-view-and-eval
-          "e"   'ibuffer-do-eval
-          "R"   'ibuffer-redisplay
-          "r"   'ibuffer-do-rename-uniquely
-          "S"   'ibuffer-do-query-replace
-          "s"   'ibuffer-do-save
-          ;; "s"   'ibuffer-do-replace-regexp
-          "T"   'ibuffer-visit-tags-table
-          "F"   'ibuffer-find-file
-          "X"   'ibuffer-kill-filter-group
-          "P"   'ibuffer-yank-filter-group
-          "x"   'ibuffer-kill-line
-          "p"   'ibuffer-yank
-          "|"   'ibuffer-do-shell-command-pipe-replace
-          "~"   'ibuffer-do-toggle-modified
+         "A"   'ibuffer-auto-mode
+         "E"   'ibuffer-do-view-and-eval
+         "e"   'ibuffer-do-eval
+         "R"   'ibuffer-redisplay
+         "r"   'ibuffer-do-rename-uniquely
+         "S"   'ibuffer-do-query-replace
+         "s"   'ibuffer-do-save
+         ;; "s"   'ibuffer-do-replace-regexp
+         "T"   'ibuffer-visit-tags-table
+         "F"   'ibuffer-find-file
+         "X"   'ibuffer-kill-filter-group
+         "P"   'ibuffer-yank-filter-group
+         "x"   'ibuffer-kill-line
+         "p"   'ibuffer-yank
+         "|"   'ibuffer-do-shell-command-pipe-replace
+         "~"   'ibuffer-do-toggle-modified
 
-          "o"   'ibuffer-do-view
-          "O"   'ibuffer-do-view-other-frame
+         "o"   'ibuffer-do-view
+         "O"   'ibuffer-do-view-other-frame
 
-          "g"   'ibuffer-jump-to-buffer
-          "b"   'ibuffer-jump-to-filter-group
+         "g"   'ibuffer-jump-to-buffer
+         "b"   'ibuffer-jump-to-filter-group
 
-          "m"  '(nil :wk "mark")
-          "m*" 'ibuffer-mark-modified-buffers
-          "m%" 'ibuffer-mark-read-only-buffers
-          "mm" 'ibuffer-toggle-marks
-          "mf" 'ibuffer-mark-by-name-regexp
-          "mf" 'ibuffer-mark-by-file-name-regexp
-          "mo" 'ibuffer-mark-old-buffers
-          "ml" 'ibuffer-mark-by-locked
-          "mb" 'ibuffer-mark-by-content-regexp
-          "mM" 'ibuffer-mark-by-mode-regexp
-          "md" 'ibuffer-mark-dired-buffers
-          "mh" 'ibuffer-mark-help-buffers
-          "mn" 'ibuffer-mark-dissociated-buffers
-          "mN" 'ibuffer-mark-unsaved-buffers
-          "ms" 'ibuffer-mark-special-buffers
-          "mz" 'ibuffer-mark-compressed-file-buffers)
+         "m" '(:wk "mark")
+         "m*" 'ibuffer-mark-modified-buffers
+         "m%" 'ibuffer-mark-read-only-buffers
+         "mm" 'ibuffer-toggle-marks
+         "mf" 'ibuffer-mark-by-name-regexp
+         "mf" 'ibuffer-mark-by-file-name-regexp
+         "mo" 'ibuffer-mark-old-buffers
+         "ml" 'ibuffer-mark-by-locked
+         "mb" 'ibuffer-mark-by-content-regexp
+         "mM" 'ibuffer-mark-by-mode-regexp
+         "md" 'ibuffer-mark-dired-buffers
+         "mh" 'ibuffer-mark-help-buffers
+         "mn" 'ibuffer-mark-dissociated-buffers
+         "mN" 'ibuffer-mark-unsaved-buffers
+         "ms" 'ibuffer-mark-special-buffers
+         "mz" 'ibuffer-mark-compressed-file-buffers)
 
         :general
         (:keymaps 'ibuffer-mode-map
@@ -9555,8 +9554,6 @@
          ;; ibuffer-do-revert
          ;; ibuffer-do-isearch
          ;; ibuffer-do-isearch-regexp
-
-         [C-m] "RET"
 
          ;; "D" 'ibuffer-mark-for-delete-backwards
          "D" 'ibuffer-do-delete
@@ -9646,7 +9643,7 @@
         :leader
         (:mode 'ibuffer-mode
          :prefix "f"
-         ""       '(nil :wk "filter")
+         ""       '(:wk "filter")
          "TAB"    'ibuffer-exchange-filters
          "RET"    'ibuffer-filter-by-mode
          "DEL"    'ibuffer-delete-saved-filters
@@ -9979,7 +9976,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (leader-set-keys
-       "k"  '(nil :wk "macros/lisp"))
+       "k"  '(:wk "macros/lisp"))
 
      ;; remove mode-line-indicator for macros
      (setq mode-line-defining-kbd-macro nil)
@@ -9996,7 +9993,7 @@
          "i" 'insert-kbd-macro
          "q" 'kbd-macro-query ;; prompt at macro point
 
-         "c"  '(nil :wk "counter")
+         "c"  '(:wk "counter")
          "cs" 'kmacro-set-counter
          "c=" 'kmacro-set-counter
          "cc" 'kmacro-insert-counter
@@ -10047,7 +10044,7 @@
         "p" 'message-yank-original
         "P" 'message-fill-yanked-message
 
-        "g" '(nil :wk "goto")
+        "g" '(:wk "goto")
         "gb" 'message-goto-body
         "gs" 'message-goto-subject
         "gt" 'message-goto-to
@@ -10942,7 +10939,7 @@
         "?" 'package-menu-quick-help
         "/" 'package-menu-filter
 
-        "m"  '(nil :wk "mark")
+        "m"  '(:wk "mark")
         "m~" 'package-menu-mark-obsolete-for-deletion
         "mu" 'package-menu-mark-unmark
         "mi" 'package-menu-mark-install
@@ -11010,7 +11007,7 @@
        (:mode 'proced-mode
         "k" 'proced-send-signal
 
-        "m"  '(nil :wk "mark")
+        "m"  '(:wk "mark")
         "ma" 'proced-mark-all
         "mu" 'proced-unmark-all
         "mp" 'proced-mark-parents
@@ -11332,7 +11329,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package simple
        :leader
-       ("i TAB"     '(nil :wk "indent")
+       ("i TAB"     '(:wk "indent")
         "i TAB TAB" 'indent-region
         "i TAB RET" 'split-line
         "i TAB SPC" 'just-one-space
@@ -11375,8 +11372,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package esh-mode
        :straight (esh-mode :type built-in)
-       :hook (
-              ;;; doesn't persist on window change... boo!!!
+       :hook (;;; doesn't persist on window change... boo!!!
               ;; (eshell-mode . (setq-local cursor-type 'bar))
               ;;; disable company-mode in eshell-mode
               (eshell-mode . (lambda () (company-mode -1))))
@@ -11385,23 +11381,20 @@
        (eshell-aliases-file (var! "eshell" "aliases"))
        (eshell-login-script (etc! "eshell" "loginrc"))
        (eshell-rc-script (etc! "eshell" "eshrc"))
+       (eshell-banner-message "")
 
-       :leader
-       (":" 'eshell-command)
-
-       :config
+       :init
        (evil-set-initial-state 'eshell-mode 'emacs)
 
-       ;; don't auto scroll to bottom after execution
+       :config
+       ;; Don't auto scroll to bottom after execution
        (remove-hook 'eshell-output-filter-functions
                     'eshell-postoutput-scroll-to-bottom)
 
-       ;; clear shouldn't scroll back to bottom of the screen
+       ;; Clear shouldn't scroll back to bottom of the screen
        (advice-add 'eshell/clear :after #'recenter-top-bottom)
 
-       (setq eshell-banner-message "") ;; no banner
-
-       (defun eshell-backward-kill-word ()
+       (defun eshell-backward-kill-word+ ()
          (interactive)
          (let ((bol
                 (save-excursion
@@ -11412,21 +11405,6 @@
                   (point))))
            (when (>= beginning-word-point bol)
              (call-interactively 'backward-kill-word))))
-
-       (leader-set-keys-for-major-mode 'eshell-mode
-         "o"   'eshell-show-output
-         "O"   'eshell-mark-output
-         "RET" 'eshell-queue-input
-
-         "i"  '(nil :wk "insert")
-         "ib" 'eshell-insert-buffer-name
-         "ip" 'eshell-insert-process
-         "ie" 'eshell-insert-envvar
-
-         "k"  '(nil :wk "kill/signal")
-         "kz" 'eshell-send-eof-to-process
-         "kc" 'eshell-interrupt-process
-         "kq" 'eshell-quit-process)
 
        (defun eshell-mode--setup-bindings ()
          (general-define-key
@@ -11457,7 +11435,7 @@
            "C-d"           'eshell-kill-input
            "C-M-k"         'eshell-kill-input
            "M-d"           'eshell-kill-output
-           "C-w"           'eshell-backward-kill-word
+           "C-w"           'eshell-backward-kill-word+
            "<C-backspace>" 'evil-delete-backward-word
            ;; copy entered input back into current line
            "<C-return>"    'eshell-copy-old-input
@@ -11476,10 +11454,28 @@
            "<M-left>"  'eshell-backward-argument
            "<M-right>" 'eshell-forward-argument))
 
-       ;; needs to be in a hook because eshell-mode-map isn't
+       ;; Needs to be in a hook because eshell-mode-map isn't
        ;; defined until the mode is activated, and even then
        ;; it's only buffer-local :(.
-       (add-hook 'eshell-mode-hook #'eshell-mode--setup-bindings))
+       (add-hook 'eshell-mode-hook #'eshell-mode--setup-bindings)
+
+       :leader
+       (":" 'eshell-command)
+       :lazy-leader
+       (:major 'eshell-mode
+        "o"   'eshell-show-output
+        "O"   'eshell-mark-output
+        "RET" 'eshell-queue-input
+
+        "i" '(:wk "insert")
+        "ib" 'eshell-insert-buffer-name
+        "ip" 'eshell-insert-process
+        "ie" 'eshell-insert-envvar
+
+        "k" '(:wk "kill/signal")
+        "kz" 'eshell-send-eof-to-process
+        "kc" 'eshell-interrupt-process
+        "kq" 'eshell-quit-process))
    #+END_SRC
 
 *** eshell-prompt-extras
@@ -11718,7 +11714,7 @@
         "D"     'vc-annotate-show-changeset-diff-revision-at-line
         "t"     'vc-annotate-toggle-annotation-visibility
 
-        "g"     '(nil :wk "goto")
+        "g"     '(:wk "goto")
         "gg"    'vc-annotate-goto-line
         "gc"    'vc-annotate-revision-at-line
         "gp"    'vc-annotate-revision-previous-to-line
@@ -11747,7 +11743,7 @@
         "SPC" 'log-edit-done
         "DEL" 'log-edit-kill-buffer
 
-        "i"  '(nil :wk "insert")
+        "i"  '(:wk "insert")
         "ic" 'log-edit-insert-changelog
         "if" 'log-edit-insert-filenames
         "iC" 'log-edit-insert-changelog-entries
@@ -11756,7 +11752,7 @@
         "iF" 'log-edit-insert-filenames-without-changelog
         "im" 'log-edit-insert-message-template
 
-        "t"  '(nil :wk "toggle")
+        "t"  '(:wk "toggle")
         "ta" 'vc-git-log-edit-toggle-amend
         "ts" 'vc-git-log-edit-toggle-signoff)
 
@@ -11811,7 +11807,8 @@
         "M-j" 'vc-dir-next-directory
         "M-k" 'vc-dir-previous-directory)
        (:states  'motion
-        :keymaps '(vc-git-region-history-mode-map vc-git-log-view-mode-map)
+        :keymaps '(vc-git-region-history-mode-map
+                   vc-git-log-view-mode-map)
 
         "q" nil
         "d" 'log-view-diff
@@ -12146,6 +12143,9 @@
        ("RET" 'selectrum-repeat)
 
        :general
+       (:keymaps 'minibuffer-local-map
+        "C-r" 'selectrum-select-from-history
+        "C-s" 'selectrum-select-from-history)
        (:keymaps 'selectrum-minibuffer-map
         "C-j" 'next-line
         "C-q" 'selectrum-quick-select
@@ -12526,11 +12526,12 @@
          "sr" 'consult-ripgrep-no-project+
          "sb" 'consult-grep-no-project+
          "sv" 'consult-git-grep
+         "fs" '(:wk "search")
          "fsf" 'consult-find
          "kg" 'consult-kmacro
          "ry" 'consult-yank
 
-         "ps" '(nil :wk "search")
+         "ps" '(:wk "search")
          "psr" 'consult-ripgrep
          "psv" 'consult-git-grep
          "psg" 'consult-grep
@@ -13394,7 +13395,7 @@
                     +dot-goto-executable
                     +dot-open-bookmark)
          :leader
-         ("fd" '(nil :wk "dotfiles")
+         ("fd" '(:wk "dotfiles")
           "fdp" '+dot-goto-repo
           "fda" '+dot-goto-fsmap
           "fdf" '+dot-goto-fsmap
@@ -14308,7 +14309,7 @@
 
        :leader
        (:prefix leader-server-leader-prefix
-        "" '(nil :wk "server")
+        "" '(:wk "server")
         "l" 'eglot
         "e" 'eglot-events-buffer
         "x" 'eglot-shutdown)
@@ -14333,12 +14334,12 @@
         "o" 'eglot-reconnect
         "t" 'eglot-eldoc-toggle-order+
 
-        "g" '(nil :wk "goto")
+        "g" '(:wk "goto")
         "gg" 'eglot-find-implementation
         "gG" 'eglot-find-typeDefinition
         "gd" 'eglot-find-declaration
 
-        "w"  '(nil :wk "workspace")
+        "w"  '(:wk "workspace")
         "wf" 'eglot-forget-pending-continuations
         "wc" 'eglot-signal-didChangeConfiguration))
    #+END_SRC
@@ -14718,7 +14719,7 @@
      (use-package ggtags
        :straight t
        :leader
-       ("T"  '(nil :wk "tags")
+       ("T"  '(:wk "tags")
         "TD" 'ggtags-delete-tags
         "T/" 'ggtags-grep)
 
@@ -14859,7 +14860,7 @@
        (:mode 'lsp-mode
         :minor t
         :prefix leader-server-leader-prefix
-        "" '(nil :wk "server")
+        "" '(:wk "server")
 
         "?" 'lsp-describe-session
         "a" 'lsp-execute-code-action
@@ -14867,23 +14868,23 @@
         "h" 'lsp-describe-thing-at-point
         "x" 'lsp-disconnect
 
-        "w"  '(nil :wk "workspace")
+        "w"  '(:wk "workspace")
         "wR" 'lsp-restart-workspace
         "wa" 'lsp-workspace-folders-add
         "wr" 'lsp-workspace-folders-remove
         "ws" 'lsp-workspace-folders-switch
 
-        "l"  '(nil :wk "lens")
+        "l"  '(:wk "lens")
         "ll" 'lsp-lens-mode
         "ls" 'lsp-lens-show
         "lh" 'lsp-lens-hide
 
-        "r"  '(nil :wk "refactor")
+        "r"  '(:wk "refactor")
         "rr" 'lsp-format-buffer
         "ri" 'lsp-organize-imports
         "rc" 'lsp-rename
 
-        "g"  '(nil :wk "goto")
+        "g"  '(:wk "goto")
         "gg" 'lsp-goto-type-definition
         "gG" 'lsp-goto-implementation
         "gF" 'lsp-find-implementation
@@ -14896,7 +14897,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package lsp-ui
         :straight t
-        ;; :hook (lsp-mode-hook . lsp-ui-mode)
+        ;; :hook (lsp-mode . lsp-ui-mode)
         :after lsp-mode
         :config
         ;; only really installed for flycheck support
@@ -14907,7 +14908,7 @@
         (:mode 'lsp-mode
          :minor t
          :prefix leader-server-leader-prefix
-         "p"  '(nil :wk "peek")
+         "p"  '(:wk "peek")
          "pg" 'lsp-ui-peek-find-definitions
          "pG" 'lsp-ui-peek-find-definitions))
     #+END_SRC
@@ -14976,7 +14977,7 @@
         "s" 'magit-jump-to-staged
         "f" 'magit-jump-to-untracked
         "r" 'magit-show-refs
-        "y" '(nil :wk "copy")
+        "y" '(:wk "copy")
         "ys" 'magit-copy-section-value
         "yr" 'magit-copy-buffer-revision)
        (:mode 'magit-log-select-mode
@@ -14992,7 +14993,7 @@
         "r"  'magit-pop-revision-stack
         "a"  'git-commit-insert-pseudo-header
 
-        "i"  '(nil :wk "insert")
+        "i"  '(:wk "insert")
         "ia" 'git-commit-ack ;; knowledgement
         "iS" 'git-commit-suggested
         "im" 'git-commit-modified
@@ -15553,7 +15554,7 @@
         "i" 'notmuch-jump-search)
 
        (:mode 'notmuch-show
-        "t" '(nil :wk "toggles")
+        "t" '(:wk "toggles")
         "ti" 'notmuch-show-toggle-thread-indentation
         "td" (defun notmuch-show-toggle-delete+ ()
                (interactive)
@@ -15563,7 +15564,7 @@
                (notmuch-toggle-tag+ "flagged" "show"))
         "th" #'notmuch-show-toggle-visibility-headers)
        (:mode 'notmuch-tree-mode
-        "t" '(nil :wk "toggles")
+        "t" '(:wk "toggles")
         "td" (defun notmuch-tree-toggle-delete ()
                (interactive)
                (notmuch-toggle-tag+ "deleted" "tree"))
@@ -15574,7 +15575,7 @@
                (interactive)
                (notmuch-toggle-tag+ "flagged" "tree")))
        (:mode 'notmuch-search-mode
-        "t" '(nil :wk "toggles")
+        "t" '(:wk "toggles")
         "to" 'notmuch-search-toggle-order
         "td" (defun notmuch-search-toggle-delete ()
                (interactive)
@@ -15721,7 +15722,7 @@
         "p" 'pdf-view-printer-minor-mode
 
         ;; narrow to a subslice of the given page.
-        "s"  '(nil :wk "slice")
+        "s"  '(:wk "slice")
         "sm" 'pdf-view-set-slice-using-mouse
         "ss" 'pdf-view-set-slice-from-bounding-box
         "sr" 'pdf-view-reset-slice)
@@ -15877,7 +15878,7 @@
        :commands (piper-ui)
        :leader
        (:prefix "|"
-        ""    '(nil :wk "piper")
+        ""    '(:wk "piper")
         "RET" 'piper-ui
         "|"   'piper
         "o"   'piper-other
@@ -16246,7 +16247,7 @@
 
        :leader
        (:prefix leader-diff-leader-prefix
-        "" '(nil :wk "diff")
+        "" '(:wk "diff")
         "RET" 'vdiff-merge-conflict
         "d" 'vdiff-current-file
         "f" 'vdiff-files
@@ -16267,7 +16268,7 @@
         ">" 'vdiff-send-changes-and-step
         "<" 'vdiff-send-changes
 
-        "TAB"     '(nil :wk "refine")
+        "TAB"     '(:wk "refine")
         "TAB TAB" 'vdiff-refine-this-hunk
         "TAB DEL" 'vdiff-remove-refinements-in-hunk
         "TAB RET" 'vdiff-refine-all-hunks
@@ -16276,7 +16277,7 @@
         ;; 'vdiff-refine-all-hunks-symbol
         ;; 'vdiff-refine-all-hunks-word
 
-        "t"  '(nil :wk "toggle")
+        "t"  '(:wk "toggle")
         "ti" 'vdiff-toggle-case
         "tw" 'vdiff-toggle-whitespace)
 
@@ -16314,9 +16315,9 @@
 
        :leader
        (:prefix "v"
-        "" '(nil :wk "VLC")
-        "s" '(nil :wk "set")
-        "t" '(nil :wk "toggle")
+        "" '(:wk "VLC")
+        "s" '(:wk "set")
+        "t" '(:wk "toggle")
 
         "" vlc-rc-map)
 
@@ -16609,7 +16610,7 @@
         (:mode 'ycmd-mode
          :minor t
          :prefix leader-server-leader-prefix
-         ""  '(nil :wk "ycmd")
+         ""  '(:wk "ycmd")
          "y" 'ycmd-mode
          "Y" 'global-ycmd-mode
          "n" 'ycmd-open
@@ -16628,7 +16629,7 @@
          "C-r" 'ycmd-refactor-rename
          "C-c" 'ycmd-display-completions
 
-         "g"  '(nil :wk "jump")
+         "g"  '(:wk "jump")
          "gg" 'ycmd-goto
          "gG" 'ycmd-goto-imprecise
          "gt" 'ycmd-goto-type
@@ -16867,7 +16868,7 @@
           "p" 'pp-buffer
 
           ;; eval
-          "e"  '(nil :wk "eval")
+          "e"  '(:wk "eval")
           "eb" 'eval-buffer
           "ee" 'eval-last-sexp
           "eE" 'eval-replace-last-sexp
@@ -16992,7 +16993,7 @@
          ;; unbound: python-nav-forward-sexp[-safe]
          ;;          python-nav-backward-sexp[-safe]
 
-         "n"  '(nil :wk "navigate")
+         "n"  '(:wk "navigate")
          "nh" 'python-nav-forward-statement
          "nj" 'python-nav-forward-block
          "nk" 'python-nav-backward-block
@@ -17010,10 +17011,10 @@
          ;; "n M-0" 'python-nav-beginning-of-defun
          "n M-$" 'python-nav-end-of-defun
 
-         "h"  '(nil :wk "help")
+         "h"  '(:wk "help")
          "hp" 'python-eldoc-at-point
 
-         "e"  '(nil :wk "eval/exec")
+         "e"  '(:wk "eval/exec")
          "ed" 'python-shell-send-defun
          "eb" 'python-shell-send-buffer
          "ef" 'python-shell-send-file
@@ -17097,7 +17098,7 @@
         :straight t
         :leader
         (:mode 'python-mode
-         "i"  '(nil :wk "imports")
+         "i"  '(:wk "imports")
          "ii" 'pytimport-remove-unused
          "iu" 'pyimport-insert-missing))
     #+END_SRC
@@ -17110,7 +17111,7 @@
         :straight t
         :leader
         (:mode 'python-mode
-         "i"  '(nil :wk "imports")
+         "i"  '(:wk "imports")
          "is" 'py-isort-buffer
          "ir" 'py-isort-region))
     #+END_SRC
@@ -17190,12 +17191,12 @@
          "f" 'enh-ruby-find-file
          "e" 'enh-ruby-find-error
 
-         "i"  '(nil :wk "insert")
+         "i"  '(:wk "insert")
          "ie" 'enh-ruby-insert-end
          "it" 'enh-ruby-indent-exp
          "i TAB" 'enh-ruby-indent-exp
 
-         "n"  '(nil :wk "navigate")
+         "n"  '(:wk "navigate")
          "nh" 'enh-ruby-backward-sexp
          "nl" 'enh-ruby-forward-sexp
          "nk" 'enh-ruby-up-sexp
@@ -17240,7 +17241,7 @@
 
         :lazy-leader
         (:mode +ruby-mode
-         "r"  '(nil :wk "REPL")
+         "r"  '(:wk "REPL")
          "rr" 'inf-ruby
          "rg" 'inf-ruby-console-gem
          "rz" 'inf-ruby-console-zues
@@ -17261,7 +17262,7 @@
 
         :lazy-leader
         (:mode +ruby-mode
-         "i"  '(nil :wk "insert")
+         "i"  '(:wk "insert")
          "i:" 'ruby-tools-to-symbol
          "i{" 'ruby-tools-interpolate
          "i <backspace>" 'ruby-tools-clear-string
@@ -17275,7 +17276,7 @@
         :straight t
         :leader
         (:mode +ruby-mode
-         "b"  '(nil :wk "bundler")
+         "b"  '(:wk "bundler")
          "rb" 'bundle-console
          "bf" 'bundle-open
          "bi" 'bundle-install
@@ -17369,7 +17370,7 @@
          ;; "tw" 'web-mode-whitespace-show
 
          ;; insert
-         "i"  '(nil :wk "insert")
+         "i"  '(:wk "insert")
          "ia" 'web-mode-attribute-insert
          "ip" 'web-mode-element-wrap ; wrap current element in a new element with name from prompt
          "ic" 'web-mode-element-clone
@@ -17377,7 +17378,7 @@
          "ie" 'web-mode-element-insert-at-point ; converts word before point to tag
 
          ;; refactor/insert
-         "r"  '(nil :wk "refactor")
+         "r"  '(:wk "refactor")
          "rs" 'web-mode-tag-attributes-sort
          "r(" 'web-mode-element-extract  ; add linebreak before every tag in body
          "r)" 'web-mode-element-contract ; collapse tag into a single line
@@ -17389,13 +17390,13 @@
          "rF" 'web-mode-element-children-fold-or-unfold ; collapse the children of current tags body, not body itself
 
          ;; delete
-         "d"  '(nil :wk "delete")
+         "d"  '(:wk "delete")
          "da" 'web-mode-attribute-kill
          "de" 'web-mode-element-kill
          "dp" 'web-mode-element-vanish ; delete element, but move body up a level instead of erasing it
 
          ;; DOM
-         "D"  '(nil :wk "DOM")
+         "D"  '(:wk "DOM")
          "Da" 'web-mode-dom-apostrophes-replace
          "Ds" 'web-mode-dom-entities-replace
          "Dq" 'web-mode-dom-quotes-replace
@@ -17406,7 +17407,7 @@
          "hj" 'web-mode-jshint
 
          ;; mark
-         "m"  '(nil :wk "mark")
+         "m"  '(:wk "mark")
          "mT" 'web-mode-tag-select
                                               ; only works while between <>
          "mt" 'web-mode-element-select
@@ -17415,7 +17416,7 @@
          "mm" 'web-mode-mark-and-expand
 
          ;; navigation
-         "n"  '(nil :wk "navigate")
+         "n"  '(:wk "navigate")
          "n0" 'web-mode-element-beginning
          "n$" 'web-mode-element-end
          "nn" 'web-mode-tag-match
@@ -17425,13 +17426,13 @@
          "nh" 'web-mode-element-parent
          ;; "nt" 'web-mode-dom-traverse
 
-         "na"  '(nil :wk "attributes")
+         "na"  '(:wk "attributes")
          "na0" 'web-mode-attribute-beginning
          "na$" 'web-mode-attribute-end
          "nah" 'web-mode-attribute-previous
          "nal" 'web-mode-attribute-next
 
-         "nt"  '(nil :wk "tags")
+         "nt"  '(:wk "tags")
          "nt0" 'web-mode-tag-beginning
          "nt$" 'web-mode-tag-end
          "nth" 'web-mode-tag-previous
@@ -17454,7 +17455,7 @@
         (:mode 'emmet-mode
          :minor t
          :prefix leader-major-mode-prefix
-         "e" '(nil :wk "emmet")
+         "e" '(:wk "emmet")
          "." 'emmet-expand-line
          ;; "'" 'emmet-preview
          "ee" 'emmet-expand-line
@@ -17487,7 +17488,7 @@
         :after  web-mode
         :leader
         (:mode 'web-mode
-         "rb"  '(nil :wk "beautify")
+         "rb"  '(:wk "beautify")
          "rbh" 'web-beautify-htlm
          "rbj" 'web-beautify-js
          "rbc" 'web-beautify-css))
@@ -17559,13 +17560,13 @@
         "i" 'sql-show-sqli-buffer
         "t" 'sql-toggle-pop-to-buffer-after-send-region
 
-        "e"  '(nil :wk "eval")
+        "e"  '(:wk "eval")
         "eb" 'sql-send-buffer
         "ep" 'sql-send-paragraph
         "er" 'sql-send-region
         "es" 'sql-send-string
 
-        "l"  '(nil :wk "list")
+        "l"  '(:wk "list")
         "ll" 'sql-list-all
         "lt" 'sql-list-table)
        (:mode 'sql-interactive-mode
@@ -17587,7 +17588,7 @@
 
         :lazy-leader
         (:mode 'sql-mode
-         "u"  '(nil :wk "upcase")
+         "u"  '(:wk "upcase")
          "ur" 'sqlup-capitalize-keywords-in-region
          "ub" 'sqlup-capitalize-keywords-in-buffer))
     #+END_SRC
@@ -17640,12 +17641,12 @@
         "t"  'csv-transpose
         "u"  'csv-unalign-fields
 
-        "s" '(nil :wk "sort")
+        "s" '(:wk "sort")
         "sf" 'csv-sort-fields
         "sn" 'csv-sort-numeric-fields
         "so" 'csv-toggle-descending
 
-        "v" '(nil :wk "yank")
+        "v" '(:wk "yank")
         "vf" 'csv-yank-fields
         "vt" 'csv-yank-as-new-table)
 
@@ -17713,7 +17714,7 @@
          "i(" 'sh-function
          "i+" 'sh-add
 
-         "TAB"   '(nil :wk "indent")
+         "TAB"   '(:wk "indent")
          "TAB -" 'sh-learn-line-indent
          "TAB =" 'sh-set-indent
          "TAB |" 'sh-learn-buffer-indent
@@ -17792,7 +17793,7 @@
         "l" 'logview-refresh-buffer-as-needed
         "w" 'widen
 
-        "t" '(nil :wk "toggles")
+        "t" '(:wk "toggles")
         "t." 'logview-toggle-show-ellipses
         "tm" 'logview-toggle-search-only-in-messages
         "tD" 'logview-toggle-details-globally
@@ -17803,12 +17804,12 @@
         "th" 'logview-toggle-copy-visible-text-only
         "tg" 'logview-change-target-gap-length
 
-        "s" '(nil :wk "show")
+        "s" '(:wk "show")
         "se" 'logview-show-entries
         "sa" 'logview-reset-all-filters
         "sA" 'logview-reset-all-filters-restrictions-and-hidings
         "sv" 'logview-show-region-entries
-        "sl" '(nil :wk "levels")
+        "sl" '(:wk "levels")
         "sle" 'logview-show-only-errors
         "slw" 'logview-show-errors-and-warnings
         "sli" 'logview-show-errors-warnings-and-information
@@ -17820,7 +17821,7 @@
         "slI" 'logview-always-show-errors-warnings-and-information
         "slD" 'logview-always-show-errors-warnings-information-and-debug
 
-        "f" '(nil :wk "filter")
+        "f" '(:wk "filter")
         "fh" 'logview-hide-entry
         "fv" 'logview-hide-region-entries
         "fm" 'logview-add-include-message-filter
@@ -17832,7 +17833,7 @@
         "f>" 'logview-show-only-as-important
         "fe" 'logview-edit-filters
 
-        "v" '(nil :wk "view")
+        "v" '(:wk "view")
         "vj" 'logview-next-navigation-view-entry
         "vk" 'logview-previous-navigation-view-entry
         "vv" 'logview-switch-to-view
@@ -18011,7 +18012,7 @@
          "TAB" 'markdown-pre-region ;; preformat
 
          ;; complete/checks
-         "c"  '(nil :wk "check/complete")
+         "c"  '(:wk "check/complete")
          "cc" 'markdown-complete
          "cb" 'markdown-complete-buffer
          "cr" 'markdown-check-refs
@@ -18025,7 +18026,7 @@
          "O" 'markdown-other-window
 
          ;; insert
-         "i"  '(nil :wk "insert")
+         "i"  '(:wk "insert")
          "i TAB" 'markdown-insert-image
          "i*" 'markdown-insert-list-item
          "i!" 'markdown-insert-header-setext-1
@@ -18050,7 +18051,7 @@
          "iq" 'markdown-insert-blockquote
          "is" 'markdown-insert-strike-through
 
-         "ih"  '(nil :wk "header")
+         "ih"  '(:wk "header")
          "ih!" 'markdown-insert-header-setext-1
          "ih1" 'markdown-insert-header-atx-1
          "ih2" 'markdown-insert-header-atx-2
@@ -18064,21 +18065,21 @@
          "ihs" 'markdown-insert-header-setext-2
          "iht" 'markdown-insert-header-setext-1
 
-         "il"  '(nil :wk "link")
+         "il"  '(:wk "link")
          "ill" 'markdown-insert-link
          "ilf" 'markdown-insert-footnote
          "ilu" 'markdown-insert-uri
          "ilw" 'markdown-insert-wiki-link
 
          ;; delete/kill
-         "d"  '(nil :wk "delete")
+         "d"  '(:wk "delete")
          "dd" 'markdown-kill-thing-at-point
          "db" 'markdown-kill-block
          "do" 'markdown-kill-outline
          "dy" 'markdown-kill-ring-save
 
          ;; toggles
-         "M"  '(nil :wk "toggle")
+         "M"  '(:wk "toggle")
          "Mm" 'markdown-toggle-math
          "Mf" 'markdown-toggle-fontify-code-blocks-natively
          "Mi" 'markdown-toggle-inline-images
@@ -18088,31 +18089,31 @@
          "Ml" 'markdown-live-preview-mode
 
          ;; narrowing
-         "n"  '(nil :wk "narrow")
+         "n"  '(:wk "narrow")
          "nb" 'markdown-narrow-to-block
          "np" 'markdown-narrow-to-page
          "ns" 'markdown-narrow-to-subtree
          "nw" 'widen
 
          ;; marks
-         "m"  '(nil :wk "mark")
+         "m"  '(:wk "mark")
          "ms" 'markdown-mark-subtree
          "mb" 'markdown-mark-block
 
          ;; table
-         "t"  '(nil :wk "table")
+         "t"  '(:wk "table")
          "ts" 'markdown-table-sort-lines
          "tT" 'markdown-table-transpose
          "tt" 'markdown-insert-table
          "tn" 'markdown-insert-table
          "tc" 'markdown-table-convert-region
 
-         "ti"  '(nil :wk "insert")
+         "ti"  '(:wk "insert")
          "tir" 'markdown-table-insert-row
          "tic" 'markdown-table-insert-column
          "tit" 'markdown-insert-table
 
-         "td"  '(nil :wk "delete")
+         "td"  '(:wk "delete")
          "tdr" 'markdown-table-delete-row
          "tdc" 'markdown-table-delete-column)
 
@@ -18269,7 +18270,7 @@
        (:mode 'kotlin-mode
         "r" 'kotlin-repl
 
-        "e"     '(nil :wk "eval")
+        "e"     '(:wk "eval")
         "e-"    'kotlin-send-line
         "e|"    'kotlin-send-block
         "er"    'kotlin-send-region
@@ -18324,13 +18325,13 @@
        (:mode 'meghanada-mode
         :minor t
         :prefix leader-server-leader-prefix
-        ""  '(nil :wk "meghanada")
+        ""  '(:wk "meghanada")
         ""  meghanada-map+
 
-        "c" '(nil :wk "compile/run")
-        "t" '(nil :wk "test")
-        "S" '(nil :wk "server")
-        "i" '(nil :wk "insert/refactor"))
+        "c" '(:wk "compile/run")
+        "t" '(:wk "test")
+        "S" '(:wk "server")
+        "i" '(:wk "insert/refactor"))
 
        :general
        (:keymaps 'meghanada-map+
@@ -18435,12 +18436,12 @@
 
         :lazy-leader
         (:mode 'js2-mode
-         "i"  '(nil :wk "insert")
-         "h"  '(nil :wk "help")
+         "i"  '(:wk "insert")
+         "h"  '(:wk "help")
          "gg" 'js2-jump-to-definition
 
          ;; toggle hide-show
-         "H"  '(nil :wk "hide/show")
+         "H"  '(:wk "hide/show")
          "HH" 'js2-mode-show-all
          "Hw" 'js2-mode-toggle-warnings-and-errors
          "He" 'js2-mode-toggle-element
@@ -18448,14 +18449,14 @@
          "Hf" 'js2-mode-toggle-hide-functions
 
          ;; hide
-         "Hh" '(nil :wk "hide")
+         "Hh" '(:wk "hide")
          "Hhw" 'js2-mode-hide-warnings-and-errors
          "Hhe" 'js2-mode-hide-element
          "Hhc" 'js2-mode-show-comments
          "Hhf" 'js2-mode-hide-functions
 
          ;; show
-         "Hs" '(nil :wk "show")
+         "Hs" '(:wk "show")
          "Hsw" 'js2-mode-display-warnings-and-errors
          "Hse" 'js2-mode-show-element
          "Hsc" 'js2-mode-hide-comments
@@ -18528,7 +18529,7 @@
          "]" 'js2r-contract-node-at-point
 
          ;; doesn't work unless executed from within a function
-         "e"  '(nil :wk "extract")
+         "e"  '(:wk "extract")
          "ef" 'js2r-extract-function
          "em" 'js2r-extract-method
          "ev" 'js2r-extract-var
@@ -18745,18 +18746,18 @@
          "TAB"   'haskell-indent-cycle
          "S-TAB" 'haskell-delete-indentation
 
-         "r"  '(nil :wk "refactor")
+         "r"  '(:wk "refactor")
          "ri" 'haskell-mode-format-imports
          "rI" 'haskell-sort-imports
 
-         "i"  '(nil :wk "insert")
+         "i"  '(:wk "insert")
          "is" 'haskell-mode-toggle-scc-at-point
          "i|" 'haskell-indent-insert-guard
          "iw" 'haskell-indent-insert-where
          "io" 'haskell-indent-insert-other
          "i=" 'haskell-indent-insert-equal
 
-         "s"  '(nil :wk "session")
+         "s"  '(:wk "session")
          "sc" 'haskell-session-change
          "sC" 'haskell-session-change-target
          "sk" 'haskell-session-kill
@@ -18848,20 +18849,20 @@
        :lazy-leader
        (:mode 'go-mode
         ;; requires: go get github.com/rogpeppe/godef
-        "h" '(nil :wk "help/guru")
+        "h" '(:wk "help/guru")
         "hh" 'godoc-at-point
         "hH" 'godoc
 
-        "g" '(nil :wk "goto")
+        "g" '(:wk "goto")
         "gi" 'go-goto-imports
         "gc" 'go-coverage
 
-        "i" '(nil :wk "imports")
+        "i" '(:wk "imports")
         "ia" 'go-import-add
         "ig" 'go-goto-imports
         "ir" 'go-remove-unused-imports
 
-        "e" '(nil :wk "playground")
+        "e" '(:wk "playground")
         "eb" 'go-play-buffer
         "er" 'go-play-region
         "ed" 'go-download-play))
@@ -18950,18 +18951,18 @@
         "u" 'rustic-playpen
         "d" 'rustic-cargo-doc
 
-        "b" '(nil :wk "project")
+        "b" '(:wk "project")
         "bc" 'rustic-cargo-clean
         "bo" 'rustic-cargo-outdated
         "bd" 'rustic-cargo-build-doc
 
-        "t" '(nil :wk "test")
+        "t" '(:wk "test")
         "tt" 'rustic-cargo-test
         "tT" 'rustic-cargo-test-rerun
         "tb" 'rustic-cargo-bench
         "tc" 'rustic-cargo-check
 
-        "r" '(nil :wk "refactor")
+        "r" '(:wk "refactor")
         "rx" 'rustic-rustfix
         "rf" 'rustic-cargo-fmt
         "rc" 'rustic-cargo-clippy))
@@ -19183,7 +19184,7 @@
          "SPC" 'LaTeX-mark-environment                                                ; or LaTeX-mark-section
 
          ;; preview
-         "p"   '(nil :wk "preview")
+         "p"   '(:wk "preview")
          "pb"  'preview-buffer
          "pc"  'preview-clearout
          "pd"  'preview-document
@@ -19194,7 +19195,7 @@
          "ps"  'preview-section
 
          ;; fold
-         "z" '(nil :wk "fold")
+         "z" '(:wk "fold")
          "z=" 'TeX-fold-math
          "zz" 'TeX-fold-dwim
          "zb" 'TeX-fold-buffer
@@ -19210,21 +19211,21 @@
          "zc" 'TeX-fold-clearout-item
 
          ;; indentation
-         "TAB"   '(nil :wk "indent")
+         "TAB"   '(:wk "indent")
          "TAB b" 'LaTeX-fill-environ
          "TAB p" 'LaTeX-fill-paragra
          "TAB r" 'LaTeX-fill-region
          "TAB s" 'LaTeX-fill-section
 
          ;; modes
-         "M"  '(nil :wk "mode")
+         "M"  '(:wk "mode")
          "Mp" 'TeX-PDF-mode ;; toggle between PDF and DVI output.
          "Ms" 'TeX-source-correlate-mode
          "Mi" 'TeX-interactive-mode
          "Mm" 'LaTeX-math-mode
 
          ;; toggle
-         "T"  '(nil :wk "toggle")
+         "T"  '(:wk "toggle")
          "Tb" 'TeX-toggle-debug-bad-boxes
          "Td" 'TeX-toggle-debug-warnings
          "Ts" 'TeX-toggle-suppress-ignored-warnings)
@@ -19331,7 +19332,7 @@
         "o"   'bibtex-remove-OPT-or-ALT
         "C-o" 'bibtex-remove-OPT-or-ALT
 
-        "y" '(nil :wk "yank")
+        "y" '(:wk "yank")
         "ys" 'bibtex-copy-summary-as-kill
         "yf" 'bibtex-copy-field-as-kill
         "yy" 'bibtex-copy-entry-as-kill
@@ -19340,7 +19341,7 @@
         "f" 'bibtex-make-field
         "d" 'bibtex-kill-field
 
-        "i"    '(nil :wk "insert")
+        "i"    '(:wk "insert")
         "ii"   'bibtex-entry
         "ip"   'bibtex-Preamble
         "ia"   'bibtex-Article
@@ -19356,7 +19357,7 @@
         "iP"   'bibtex-InProceedings
         "i RET" 'bibtex-Manual
 
-        "it"    '(nil :wk "thesis")
+        "it"    '(:wk "thesis")
         "itP"   'bibtex-PhdThesis
         "itm"   'bibtex-MastersThesis)
 
@@ -19483,18 +19484,18 @@
          "F" 'ebib-view-file                                     ; open file referenced by current entry
          "!" 'ebib-generate-autokey
 
-         "e" '(nil :wk "edit")
+         "e" '(:wk "edit")
          "ee" 'ebib-edit-keyname
          "ep" 'ebib-edit-preamble
          "es" 'ebib-edit-strings
 
-         "f" '(nil :wk "filters")
+         "f" '(:wk "filters")
          "f" ebib-filters-map
 
-         "k" '(nil :wk "keywords")
+         "k" '(:wk "keywords")
          "k" ebib-keywords-map
 
-         "d" '(nil :wk "dependent")
+         "d" '(:wk "dependent")
          "d" ebib-dependent-map)
         (:mode 'ebib-entry-mode
          "f" 'ebib-view-file-in-field                                           ; TODO find out what this does
@@ -19839,7 +19840,7 @@
                        (propertize "disabled" 'face 'compilation-error)))))
 
         :leader
-        ("o"  '(nil :wk "org")
+        ("o"  '(:wk "org")
          "oc" 'org-capture
          "og" 'org-capture-goto-last-stored
          "oa" 'org-agenda
@@ -19902,7 +19903,7 @@
          "M-c" 'org-columns
          "M-p" 'org-delete-property
 
-         "c"  '(nil :wk "clock/calendar")
+         "c"  '(:wk "clock/calendar")
          "c<" 'org-date-from-calendar
          "c>" 'org-goto-calendar
          "cC" 'org-clock-out
@@ -19916,18 +19917,18 @@
          "c." 'hydra-org-clock/body
          "c C-c" 'org-clock-cancel
 
-         "e"  '(nil :wk "export")
+         "e"  '(:wk "export")
          "ee" 'org-export-dispatch
          "eh" 'org-html-export-to-html
          "ep" (lambda!
                 (org-latex-export-to-pdf org-export-in-background))
 
-         "h"  '(nil :wk "headings")
+         "h"  '(:wk "headings")
          "hI" 'org-insert-heading
          "hi" 'org-insert-heading-after-current
          "hs" 'org-insert-subheading
 
-         "I"  '(nil :wk "insert")
+         "I"  '(:wk "insert")
          "Ia" 'org-attach
          "If" 'org-footnote-new
          ;; "Ik" 'insert-keybinding-org
@@ -19935,25 +19936,25 @@
          ;; "Is" 'org-download-screenshot
          ;; "Iy" 'org-download-yank
 
-         "m"  '(nil :wk "mark/move")
+         "m"  '(:wk "mark/move")
          "ms" 'org-mark-subtree
          "me" 'org-mark-element
          "mb" 'org-babel-mark-block
          "mm." 'hydra-org-navigate/body
 
-         "n"  '(nil :wk "narrow")
+         "n"  '(:wk "narrow")
          "nb" 'org-narrow-to-block
          "ns" 'org-narrow-to-subtree
          "ne" 'org-narrow-to-element
          "nw" 'widen
 
-         "S"  '(nil :wk "subtrees")
+         "S"  '(:wk "subtrees")
          "Sh" 'org-promote-subtree
          "Sj" 'org-move-subtree-down
          "Sk" 'org-move-subtree-up
          "Sl" 'org-demote-subtree
 
-         "t" '(nil :wk "tables")
+         "t" '(:wk "tables")
          "t'"  'org-table-edit-field
          "ta"  'org-table-align
          "tb"  'org-table-blank-field
@@ -19975,22 +19976,22 @@
          "ts"  'org-table-sort-lines
          "tw"  'org-table-wrap-region
 
-         "td"  '(nil :wk "delete")
+         "td"  '(:wk "delete")
          "tdc" 'org-table-delete-column
          "tdr" 'org-table-delete-row
 
-         "ti"  '(nil :wk "insert")
+         "ti"  '(:wk "insert")
          "tic" 'org-table-insert-column
          "ti-" 'org-table-hline-and-move
          "tih" 'org-table-insert-hline
          "tir" 'org-table-insert-row
 
-         "tt"  '(nil :wk "toggle")
+         "tt"  '(:wk "toggle")
          "tta" 'org-toggle-async-export+
          "ttf" 'org-table-toggle-formula-debugger
          "tto" 'org-table-toggle-coordinate-overlays
 
-         ;; "x"  '(nil :wk "text")
+         ;; "x"  '(:wk "text")
          ;; "xb" 'org-bold
          ;; "xc" 'org-code
          ;; "xi" 'org-italic
@@ -20130,7 +20131,7 @@
          "C" 'org-agenda-columns
 
          ;;; filter/search
-         "/"  '(nil :wk "filter/search")
+         "/"  '(:wk "filter/search")
          "/c" 'org-agenda-filter-by-category
          "/e" 'org-agenda-filter-by-effort
          "//" 'org-agenda-filter-by-regexp
@@ -20144,7 +20145,7 @@
          "/u" 'org-agenda-bulk-unmark-all
 
          ;;; clock/calendar/diary
-         "c"  '(nil :wk "clock/calendar")
+         "c"  '(:wk "clock/calendar")
          "cp" 'org-agenda-date-prompt
          "cc" 'org-agenda-clock-in
          "co" 'org-agenda-clock-out
@@ -20153,7 +20154,7 @@
          "c M-c" 'org-agenda-convert-date
 
          ;;; agenda minor modes
-         "m"  '(nil :wk "modes")
+         "m"  '(:wk "modes")
          "ma" 'org-agenda-archives-mode
          "md" 'org-agenda-day-view
          "mc" 'org-agenda-clockreport-mode
@@ -20165,7 +20166,7 @@
          "mm" 'org-agenda-month-view
 
          ;;; priorities
-         "p"  '(nil :wk "priority")
+         "p"  '(:wk "priority")
          "pp" 'org-agenda-priority
          "pu" 'org-agenda-priority-up
          "pd" 'org-agenda-priority-down)
