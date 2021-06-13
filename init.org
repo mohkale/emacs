@@ -420,6 +420,19 @@
      (defvar +ruby-mode-hook (intern (concat (symbol-name +ruby-mode)    "-hook")))
    #+end_src
 
+   This is the command I use to kick-start on the fly linting. In general when
+   flycheck is enabled I prefer it, otherwise I go with the built-in flymake.
+
+   #+begin_src emacs-lisp
+     (defun +flylint ()
+       (interactive)
+       (call-interactively
+        (cond ((package! flycheck)
+               'flycheck-mode)
+              (t
+               'flymake-mode))))
+   #+end_src
+
    Lastly here's a little helper sourced from [[https://emacs.stackexchange.com/questions/16890/how-to-find-out-where-a-file-is-being-required][here]] which gives you a tree like
    overview of all the files emacs requires while starting up.
    It's helpful for figuring out what's forcing a deferred package to be loaded.
@@ -4998,8 +5011,8 @@
        :leader
        ("Me" 'emojify-mode
         "xe" 'emojify-insert-emoji
-        "he" 'emojify-apropos-emoji
-        "hde" 'emojify-describe-emoji)
+        "hE" 'emojify-apropos-emoji
+        "he" 'emojify-describe-emoji)
 
        :general
        (:keymaps 'emojify-list-mode-map
@@ -9313,22 +9326,23 @@
             (ov (goto-char (overlay-start ov)))
             (t (user-error "No flymake errors in the current buffer")))))
 
-       :general
-       (:keymaps 'flymake-mode-map
-        ; TODO implement
-        [remap flycheck-select-checker] (flymake-unsupported-command+ flycheck-select-checker)
-        [remap flycheck-describe-checker] (flymake-unsupported-command+ flycheck-describe-checker)
-        [remap flycheck-explain-error-at-point] (flymake-unsupported-command+ flycheck-explain-error-at-point)
-        [remap toggle-flycheck-messages] (flymake-unsupported-command+ toggle-flycheck-messages)
+       :leader
+       ("e." 'hydra-flymake/body
+        "ej" 'flymake-goto-next-error
+        "ek" 'flymake-goto-prev-error
+        "er" 'flymake-start
+        "ea" 'flymake-first-error+
+        "e$" 'flymake-last-error+
+        "el" 'flymake-show-diagnostics-buffer
+        "eL" 'flymake-switch-to-log-buffer
+        "ex" 'flymake-proc-stop-all-syntax-checks
+        ;; TODO implement
+        ;; (flymake-unsupported-command+ toggle-flycheck-messages)
+        "ed" (flymake-unsupported-command+ flycheck-explain-error-at-point)
+        "ec" (flymake-unsupported-command+ flycheck-select-checker)
+        "hde" (flymake-unsupported-command+ flycheck-describe-checker))
 
-        [remap hydra-flycheck/body] 'hydra-flymake/body
-        [remap flycheck-clear] 'flymake-proc-stop-all-syntax-checks
-        [remap flycheck-first-error] 'flymake-first-error+
-        [remap flycheck-last-error] 'flymake-last-error+
-        [remap flycheck-buffer] 'flymake-start
-        [remap flycheck-list-errors] 'flymake-show-diagnostics-buffer
-        [remap flycheck-next-error] 'flymake-goto-next-error
-        [remap flycheck-previous-error] 'flymake-goto-prev-error)
+       :general
        (:keymaps 'flymake-diagnostics-buffer-mode-map
         :states 'motion
         "RET" 'flymake-goto-diagnostic
@@ -14542,19 +14556,28 @@
          :modes python-mode)
        (add-to-list 'flycheck-checkers 'python-pycodestyle)
 
+       :config
+       (evil-set-command-property 'flycheck-next-error :jump t)
+       (evil-set-command-property 'flycheck-previous-error :jump t)
+
        :leader
-       ("e." 'hydra-flycheck/body
-        "ej" 'flycheck-next-error
-        "ek" 'flycheck-previous-error
-        "ex" 'flycheck-clear
-        "ed" 'flycheck-explain-error-at-point
-        "er" 'flycheck-buffer
-        "eh" 'flycheck-describe-checker
-        "ea" 'flycheck-first-error
-        "el" 'flycheck-list-errors
+       (:mode 'flycheck-mode :minor t
         ;; "eC" 'flycheck-set-checker-executable
         ;; "ev" 'flycheck-verify-setup
+        "ed" 'flycheck-explain-error-at-point
         "ec" 'flycheck-select-checker)
+
+       :general
+       (:keymaps 'flycheck-mode-map
+        [remap hydra-flymake/body] 'hydra-flycheck/body
+        [remap flymake-proc-stop-all-syntax-checks] 'flycheck-clear
+        [remap flymake-goto-next-error] 'flycheck-next-error
+        [remap flymake-goto-prev-error] 'flycheck-previous-error
+        [remap flymake-start] 'flycheck-buffer
+        [remap flymake-first-error+] 'flycheck-first-error
+        [remap flymake-last-error+] 'flycheck-last-error
+        [remap flymake-switch-to-log-buffer] 'flycheck-list-errors
+        [remap flycheck-describe-checker] 'flycheck-describe-checker)
 
        :lazy-leader
        (:mode 'flycheck-error-list-mode
@@ -16670,7 +16693,8 @@
 ** awk
    #+BEGIN_SRC emacs-lisp
      (use-package awk
-       :interpreter "gawk")
+       :interpreter "gawk"
+       :hook (awk-mode . +flylint))
    #+END_SRC
 
 ** Crystal
@@ -16937,7 +16961,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package python
         :straight (python :type built-in)
-        :hook (python-mode . flycheck-mode)
+        :hook (python-mode . +flylint)
         :custom
         (python-indent-guess-indent-offset-verbose nil
          "Disable annoying notification when indent guess fails")
@@ -17136,7 +17160,7 @@
     #+BEGIN_SRC emacs-lisp :tangle (if (eq +ruby-package 'ruby) "yes" "no")
       (use-package ruby-mode
         :mode ("\\.rb$" . ruby-mode)
-        :hook (ruby-mode . flycheck-mode)
+        :hook (ruby-mode . +flylint)
         :interpreter "ruby"
         :config
         (modify-syntax! '((?_ . "w")
@@ -17155,7 +17179,7 @@
         :straight t
         :mode ("\\.rb$" . enh-ruby-mode)
         :interpreter "ruby"
-        :hook (enh-ruby-mode . flycheck-mode)
+        :hook (ruby-mode . +flylint)
         :config
         (setq enh-ruby-deep-indent-paren nil
               enh-ruby-hanging-paren-deep-indent-level 2)
@@ -17486,7 +17510,7 @@
      (use-package json-mode
        :straight t
        :mode (rx ".json")
-       :hook (json-mode . flycheck-mode)
+       :hook (json-mode . +flylint)
 
        :lazy-leader
        (:mode 'json-mode
@@ -17505,11 +17529,10 @@
      (use-package vimrc-mode
        :straight t
        :mode (rx ".vim")
-       :hook (vimrc-mode . flycheck-mode)
        :delight (vimrc-mode " vim"))
    #+END_SRC
 
-** sql
+** SQL
    :PROPERTIES:
    :header-args+: :tangle (package-yes! sql)
    :END:
@@ -17518,7 +17541,7 @@
      (use-package sql
        :straight t
        :mode ("\\.sql" . sql-mode)
-       :hook (sql-mode . flycheck-mode)
+       :hook (sql-mode . +flylint)
        :config
        (setq sql-sqlite-options '("-interactive"))
        (push 'sql-interactive-mode whitespace-exempt-modes)
@@ -17578,7 +17601,7 @@
      (use-package yaml-mode
        :straight t
        :mode (rx "." (or "yaml" "yml"))
-       :hook (yaml-mode . flycheck-mode)
+       :hook (yaml-mode . +flylint)
        :config
        (push '(yaml-mode . 2) +indent-config)
        (modify-syntax! '((?_ . "w")
@@ -17659,7 +17682,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package sh-script
-        :hook ((sh-mode . flycheck-mode))
+        :hook (sh-script-mode . +flylint)
         :config
         (advice-add 'sh-set-shell :around 'inhibit-messages-wrapper!)
 
@@ -17913,7 +17936,7 @@
       (use-package markdown-mode
         :straight t
         :hook ((markdown-mode . display-line-numbers-mode)
-               (markdown-mode . flycheck-mode))
+               (markdown-mode . +flylint))
         :custom
         (markdown-indent-on-enter 'indent-and-new-item)
         (markdown-fontify-code-blocks-natively t)
@@ -18185,8 +18208,8 @@
      (use-package cc-mode
        :straight (cc-mode :type built-in)
        :mode ("\\.h$" . c++-mode)
-       :hook ((c-mode   . flycheck-mode)
-              (c++-mode . flycheck-mode))
+       :hook ((c-mode . +flylint)
+              (c++-mode . +flylint))
        :custom
        (c-default-style '((java-mode . "java")
                           (awk-mode . "awk")
@@ -18220,7 +18243,7 @@
       (use-package modern-cpp-font-lock
         :straight (modern-cpp-font-lock
                    :repo "ludwigpacifici/modern-cpp-font-lock")
-        :hook (c++-mode-hook . modern-c++-font-lock-mode))
+        :hook (c++-mode . modern-c++-font-lock-mode))
     #+END_SRC
 
 *** c/cpp-lsp
@@ -18372,8 +18395,8 @@
       (use-package js2-mode
         :straight t
         :mode (rx ".js")
-        :hook ((js2-mode . flycheck-mode)
-               (js2-mode . electric-layout-local-mode))
+        :hook ((js2-mode . electric-layout-local-mode)
+               (js2-mode . +flylint))
         :commands (js-jsdoc-return+)
 
         :config
@@ -18632,6 +18655,7 @@
 *** css-mode
     #+BEGIN_SRC emacs-lisp
       (use-package css-mode
+        :hook (css-mode . +flylint)
         :config
         (set-company-backend! 'css-mode
           'company-css)
@@ -18653,6 +18677,7 @@
 *** less-css-mode
     #+BEGIN_SRC emacs-lisp
       (use-package less-css-mode
+        :hook (scss-mode . +flylint)
         :config
         (set-company-backend! 'less-css-mode
           'company-css)
@@ -18892,6 +18917,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package rustic
        :straight t
+       :hook (rustic-mode . +flylint)
        :custom
        (rustic-format-trigget 'on-save)
        (rustic-lsp-client (cond
