@@ -120,7 +120,6 @@
          ;; tramp-term                                                     ; Make term work seamlessly in tramp sessions
          ibuffer-vc                                                        ; Filter ibuffer buffers by version-control repos
          ibuffer-tramp                                                     ; Only show ibuffer buffers in remote tramp sessions
-         ;; ibuffer-persp                                                  ; Filter ibuffer buffers by emacs perspectives
          ibuffer-projectile                                                ; Filter ibuffer buffers by active projects
          ;; company-emoji                                                  ; Show emojis in company-completion candidates
 
@@ -5255,7 +5254,6 @@
         ("r" winner-redo "redo" :exit t)
 
         ("w" hydra-eyebrowse/body "workgroups" :exit t)
-        ("p" hydra-perspectives/body "perspective" :exit t)
 
         ("m" window-zen "zen" :exit t)
         ("q" nil "quit" :exit t)
@@ -5322,7 +5320,6 @@
         ("?" (setq hydra-eyebrowse/verbose-p (not hydra-eyebrowse/verbose-p)))
         ("t" (setq hydra-eyebrowse/show-wconfig-names (not hydra-eyebrowse/show-wconfig-names)))
         ("m" hydra-winman/body :exit t)
-        ("p" hydra-persp/body :exit t)
 
         ("q" nil :exit t))
 
@@ -5342,7 +5339,7 @@
       Jump                        Actions
       ^^^^—————————————————————  —^—^———————————————————————————^—^————————————————
       [_0_.._9_] nth wconfig     [_c_] create new wconfig      [_m_] window-manager
-      [_TAB_] previous wconfig^^ [_d_] delete current wconfig  [_p_] perspectives
+      [_TAB_] previous wconfig^^ [_d_] delete current wconfig
       ^^^^                       [_r_] rename current wconfig
       [_h_/_N_] wconfig left
       [_l_/_n_] wconfig right    [_u_/_U_] undo/redo wconfig
@@ -5401,142 +5398,6 @@
                                     hydra-eyebrowse/heads))))
 
       (provide 'hydra-eyebrowse)
-    #+END_SRC
-
-*** hydra-persp
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-persp/body (lisp! "hydras" "hydra-persp.el") nil t)
-      (leader-set-keys
-        "Hl" '(hydra-persp/body :wk "hydra-persp")
-        "fl" '(hydra-persp/body :wk "hydra-layouts"))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-persp.el
-      (require 'persp-mode)
-
-      (defvar hydra-persp/verbose-p nil
-        "when true, hydra hint doesn't show keybindings")
-
-      (defvar hydra-persp/show-perspective-names t
-        "when true, wconfigs in the hydra header will includes names (when applicable)")
-
-      (defhydra hydra-persp (:hint nil)
-        ;; missing commands
-        ;;   * last-layout
-        ;;   * buffer in layout
-        ;;   * layout with helm/ivy
-        ;;   * add buffer
-        ;;   * add all from layout
-
-        ("1" (switch-to-persp-by-num 0) :exit t)
-        ("2" (switch-to-persp-by-num 1) :exit t)
-        ("3" (switch-to-persp-by-num 2) :exit t)
-        ("4" (switch-to-persp-by-num 3) :exit t)
-        ("5" (switch-to-persp-by-num 4) :exit t)
-        ("6" (switch-to-persp-by-num 5) :exit t)
-        ("7" (switch-to-persp-by-num 6) :exit t)
-        ("8" (switch-to-persp-by-num 7) :exit t)
-        ("9" (switch-to-persp-by-num 8) :exit t)
-        ("0" (switch-to-persp-by-num (read-number "perspective: ")) :exit t)
-
-        ("M-1" (switch-to-persp-by-num 0))
-        ("M-2" (switch-to-persp-by-num 1))
-        ("M-3" (switch-to-persp-by-num 2))
-        ("M-4" (switch-to-persp-by-num 3))
-        ("M-5" (switch-to-persp-by-num 4))
-        ("M-6" (switch-to-persp-by-num 5))
-        ("M-7" (switch-to-persp-by-num 6))
-        ("M-8" (switch-to-persp-by-num 7))
-        ("M-9" (switch-to-persp-by-num 8))
-        ("M-0" (switch-to-persp-by-num (read-number "perspective: ")))
-
-        ("c" persp-add-new) ;; create new perspective
-        ("C" persp-copy) ;; copy current perspective
-        ("k" persp-kill) ;; remove current perspective
-        ("d" persp-kill-current) ;; remove current perspective
-        ("r" persp-rename) ;; rename current perspective
-
-        ("?" (setq hydra-persp/verbose-p (not hydra-persp/verbose-p)))
-        ("t" (setq hydra-persp/show-perspective-names (not hydra-persp/show-perspective-names)))
-
-        ("b" persp-switch-to-buffer :exit t) ;; switch to buffer in perspective
-        ("B" persp-temporarily-display-buffer :exit t) ;; from outside of perspective
-
-        ("h" persp-prev)
-        ("l" persp-next)
-        ("p" persp-prev)
-        ("n" persp-next)
-
-        ("i" persp-import-win-conf) ;; import window configuration from perspecive
-        ("I" persp-import-buffers) ;; import buffers from perspective.
-
-        ("[" persp-window-switch) ;; create/switch to perspective in a window
-        ("]" persp-frame-switch) ;; create/switch to perspective
-
-        ("s" persp-save-state-to-file) ;; save perspectives to file.
-        ("S" persp-save-to-file-by-names) ;; save perspectives subset to file.
-        ("f" persp-load-state-from-file) ;; load perspectives from file.
-        ("F" persp-load-state-from-file-by-names) ;; load perspectives subset from file.
-
-        ("H" persp-move-layout-left)
-        ("<" persp-move-layout-left)
-        ("L" persp-move-layout-right)
-        (">" persp-move-layout-right)
-
-        ("o" mohkale/switch-to-custom-perspective :exit t)
-        ("w" hydra-eyebrowse/body :exit t)
-        ("q"   nil :exit t)
-        ("RET" nil :exit t))
-
-      (setq hydra-persp/complete-command-docstring
-        "
-      Go To                  ^^^^  Layouts                  ^^^   Actions
-      ^^^^———————————————————————  ^^^—————————————————————————   ^^^^^^—————————————————————————————————————
-      [_1_.._9_] nth/new layout    [_c_]^ create new layout       ^^[_b_/_B_] persp/temporarily switch buffer
-      [_0_] layout by number     ^^[_C_]^ clone current layout    ^^[_i_/_I_] import window-config/buffers
-      [_RET_] quit-to-layout     ^^[_k_]^ kill layout             ^^[_s_/_S_] save state to file/by-name
-      [_h_/_l_] layout left/right  [_d_]^ kill current layout     ^^[_f_/_F_] load state from file/by-name
-      [_H_/_<_] move layout left   [_r_]^ rename layout
-      [_L_/_>_] move layout right  [_[_/_]_]^ switch window/frame   [_o_]: custom [_w_]: workgroups [_q_]: quit
-      ")
-
-      (defface hydra-persp/active-perspective-face
-        '((t :inherit mode-line))
-        "face for inactive windows in the header string")
-
-      (defmacro hydra-persp/safe-persp-name (persp)
-        `(if ,persp (persp-name ,persp) "default"))
-
-      (setq hydra-persp/hint
-            '(let* ((persp-list (nreverse (persp-persps)))
-                    (current-persp (get-current-persp))
-                    (current-persp-name (hydra-persp/safe-persp-name current-persp))
-                    (persp-counter 0)
-                    header-s persp-item-s)
-               (dolist (persp persp-list)
-                 (let* ((persp-name (hydra-persp/safe-persp-name persp))
-                        (persp-is-current (string-equal persp-name
-                                                        current-persp-name)))
-                   (setq persp-item-s (if hydra-persp/show-perspective-names
-                                          (format "[%d:%s]" (1+ persp-counter) persp-name)
-                                        (format "[%d]" (1+ persp-counter))))
-                   (setq header-s (concat header-s
-                                          (if persp-is-current
-                                              (propertize persp-item-s 'face 'hydra-persp/active-perspective-face)
-                                            persp-item-s)
-                                          " ")))
-
-                 (cl-incf persp-counter))
-               (setq header-s (format "\n%s %s (_?_ help)\n" (propertize "Layouts:" 'face 'font-lock-string-face) (s-trim header-s)))
-
-               (eval (hydra--format nil
-                                    '(nil nil :hint nil)
-                                    (if hydra-persp/verbose-p
-                                        (concat header-s hydra-persp/complete-command-docstring)
-                                      header-s)
-                                    hydra-persp/heads))))
-
-      (provide 'hydra-persp)
     #+END_SRC
 
 *** hydra-flycheck
@@ -6429,283 +6290,6 @@
         "xrp/" 'rxt-explain-pcre
         "xrpe" 'rxt-pcre-to-elisp
         "xrpx" 'rxt-pcre-to-rx))
-   #+END_SRC
-
-** persp-mode
-   TODO refactor
-
-   #+BEGIN_SRC emacs-lisp
-     (use-package persp-mode
-       :straight t
-       :defer  150
-       :diminish persp-mode
-
-       ;; unbound functions:
-       ;;    persp-kill-buffer
-       ;;    persp-save-and-kill
-       :commands (find-file-new-perspective
-                  switch-to-persp-by-num
-                  persp-switch
-                  persp-kill-current
-                  persp-add-current-buffer
-                  persp-remove-current-buffer)
-
-       :leader
-       ("ba" 'persp-add-current-buffer
-        "bA" 'persp-add-buffer
-        "br" 'persp-remove-buffer
-        "bR" 'persp-remove-current-buffer
-        "f M-l" 'find-file-new-perspective)
-
-       :config
-       (require 'eyebrowse)
-
-       (setq persp-autokill-buffer-on-remove 'kill-weak
-             persp-save-dir (var! "perspectives/")
-
-             ;; disable
-             persp-auto-resume-time 0)
-
-       (persp-mode +1)
-
-       (defun find-file-new-perspective--action (file)
-         (let* ((name (if current-prefix-arg
-                          (let (done value)
-                            (while (not done)
-                              (setq value (read-string "Name for new perspective: "))
-                              (if (not (persp-with-name-exists-p value))
-                                  (setq done t) ;; break loop, valid name encountered
-                                (unless (y-or-n-p (format "persp with name '%s' already exists. try again: "
-                                                          value))
-                                  (setq done t)) ;; user no longer wishes to create persp
-                                (setq value nil) ;; unbind in case value being returned
-                                ))
-                            value)
-                        (file-name-nondirectory (string-trim-right file "/")))))
-           (when name
-             (persp-add-new name)
-             (persp-switch name)
-             (let ((buffer (find-file file)))
-               (switch-to-buffer buffer)
-               (persp-add-buffer buffer)))))
-
-       (defun find-file-new-perspective ()
-         (interactive)
-         (find-file-new-perspective--action (read-file-name "New persp file:")))
-
-       (defun switch-to-persp-by-num (index)
-         "switch to a perspective based on it's position in (persp-persps)
-     the first position is assumed to be associated with a perspective name `none'.
-     if a perspective at the given index doesn't exist, it's assumed you wish to
-     create a new one, so you'll be prompted to do so at the largest available index."
-         (let* ((persp-list (nreverse (persp-persps)))
-                (persp-count (length persp-list)))
-           ;; last value is nil persp with name none
-           (if (>= index persp-count)
-               (when (yes-or-no-p (format "no layout exists at %d, would you like to make a new layout:"
-                                          (1+ persp-count)))
-                 (call-interactively 'persp-add-new))
-             (let ((current-persp (get-current-persp))
-                   (dest-persp    (nth index persp-list)))
-               (unless (string-equal (safe-persp-name dest-persp)
-                                     (safe-persp-name current-persp))
-                 (persp-switch (safe-persp-name dest-persp)))))))
-
-       (defvar persp--copying-p nil
-         "true if persp-add-new is called with intent to copy current persp")
-
-       (defun persp-add-new--after (&rest _)
-         "hook which is run immeadiately after `persp-add-new'
-     this function sets the current persp to the new persp... unless
-     `persp-add-new' wasn't invoked interactively. It also kills all
-     displayed windows and returns to the home buffer... unless the
-     previous persp is being copied."
-         (let ((persp-list (nreverse (persp-persps)))
-               (start-persp (get-current-persp)))
-           (persp-switch (safe-persp-name (car (last persp-list))))
-
-           ;; (unless persp--copying-p
-           ;;   (kill-all-windows-and-return-to-home))
-
-           (unless (called-interactively-p 'any)
-             (persp-switch (safe-persp-name start-persp)))))
-
-       (advice-add 'persp-add-new :after #'persp-add-new--after)
-       (advice-add 'persp-copy :around (lambda (func &rest args)
-                                         (let ((persp--copying-p t))
-                                           (apply func args))))
-
-       (defun persp-kill-goto-previous+ (func &rest args)
-         "function which wraps around persp-kill
-     this function will ensure after a perspective is killed, the next
-     perspective you reach will be the one immeadiately before the erased
-     one. Not really necessary, but when you try to delete 3 perspectives
-     in a row, this'll make things easier. Besides, this is what you expect
-     to happen."
-         (let* ((perspectives (nreverse (persp-persps)))
-                (current-persp (get-current-persp))
-                (current-index (cl-position current-persp perspectives))
-                (next-persp (when (and current-index
-                                       (not (zerop current-index)))
-                              (nth (- current-index 1) perspectives))))
-           (apply func args)
-           (when next-persp
-             (persp-switch (persp-name next-persp)))))
-
-       (advice-add 'persp-kill :around #'persp-kill-goto-previous+)
-
-       (defun persp-kill-current ()
-         "kill the current perspective"
-         (interactive)
-         (persp-kill (safe-persp-name (get-current-persp))))
-
-       ;; (defun spacemacs//layout-contains-buffer-p (buffer)
-       ;;   "returns true if the given buffer is in the current layout"
-       ;;   (not (spacemacs//layout-not-contains-buffer-p buffer)))
-
-       (defun persp-add-current-buffer ()
-         "adds current buffer to current perspective"
-         (interactive)
-         (persp-add-buffer (current-buffer)))
-
-       (defun persp-remove-current-buffer ()
-         "removes current buffer from current persp"
-         (interactive)
-         (persp-remove-buffer (current-buffer)))
-
-       (defun persp-move-layout-left ()
-         (interactive)
-         ;; (let* ((current-persp (get-current-persp))
-         ;;        (current-persp-num (progn
-         ;;                             (let (value)
-         ;;                               (dolist (persp)))))
-         ;;        ))
-         (message "not yet implemented") ;; TODO implement
-         )
-
-       (defun persp-move-layout-right ()
-         (interactive)
-         (message "not yet implemented") ;; TODO implement
-         )
-
-       ;; thank you spacemacs for giving us perspective mode with eyebrowse... ergo, layouts :)
-       ;; https://github.com/syl20bnr/spacemacs/blob/master/layers/%2Bspacemacs/spacemacs-layouts/funcs.el
-       ;; the following is just a lazy translation of the spacemacs implementation from above for my config.
-       ;; some vocabulary notes:
-       ;;   * a workspace is a list of eyebrowse window configurations
-       ;;   * a layout is a perspective-mode perspective which has an associated workspace.
-       ;; for further elaborations on what those terms mean, see the README for perspective-mode and eyebrowse.
-
-       ;; XXXX TBH I don't really understand what most of this does, a lot of it I just copied and pasted from
-       ;;      spacemacs and changed spacemacs to layouts... if spacemacs ever realeases this as a standalone
-       ;;      package, like they did with spaceline, make sure to switch to that. In the meantime, the following
-       ;;      uses the same license as spacemacs... I.E. GPL v3
-       ;;      Reference Commit: b252d252b0e93249b51400f60a0c69a59aa140a4
-
-       (defun layouts//get-persp-workspace (&optional persp frame)
-         "Get the correct workspace parameters for perspective.
-     PERSP is the perspective, and defaults to the current perspective.
-     FRAME is the frame where the parameters are expected to be used, and
-     defaults to the current frame."
-         (let ((param-names (if (display-graphic-p frame)
-                                '(gui-eyebrowse-window-configs
-                                  gui-eyebrowse-current-slot
-                                  gui-eyebrowse-last-slot)
-                              '(term-eyebrowse-window-configs
-                                term-eyebrowse-current-slot
-                                term-eyebrowse-last-slot))))
-           (--map (persp-parameter it persp) param-names)))
-
-       (defun layouts//set-persp-workspace (workspace-params &optional persp frame)
-         "Set workspace parameters for perspective.
-     WORKSPACE-PARAMS should be a list containing 3 elements in this order:
-     - window-configs, as returned by (eyebrowse--get 'window-configs)
-     - current-slot, as returned by (eyebrowse--get 'current-slot)
-     - last-slot, as returned by (eyebrowse--get 'last-slot)
-     PERSP is the perspective, and defaults to the current perspective.
-     FRAME is the frame where the parameters came from, and defaults to the
-     current frame.
-     Each perspective has two sets of workspace parameters: one set for
-     graphical frames, and one set for terminal frames."
-         (let ((param-names (if (display-graphic-p frame)
-                                '(gui-eyebrowse-window-configs
-                                  gui-eyebrowse-current-slot
-                                  gui-eyebrowse-last-slot)
-                              '(term-eyebrowse-window-configs
-                                term-eyebrowse-current-slot
-                                term-eyebrowse-last-slot))))
-           (--zip-with (set-persp-parameter it other persp)
-                       param-names workspace-params)))
-
-       ;;  _                 _
-       ;; | |__   ___   ___ | | _____
-       ;; | '_ \ / _ \ / _ \| |/ / __|
-       ;; | | | | (_) | (_) |   <\__ \
-       ;; |_| |_|\___/ \___/|_|\_\___/
-       ;;
-
-       ;; spacemacs/save-eyebrowse-for-perspective
-       (defun layouts//save-eyebrowse-for-perspective (&optional frame)
-         "save FRAME's eyebrowse workspace to FRAME's perspective.
-     FRAME defaults to the current frame."
-         (layouts//set-persp-workspace (list (eyebrowse--get 'window-configs frame)
-                                             (eyebrowse--get 'current-slot frame)
-                                             (eyebrowse--get 'last-slot frame))
-                                       (get-frame-persp frame)
-                                       frame))
-
-       (add-hook 'eyebrowse-post-window-switch-hook #'layouts//save-eyebrowse-for-perspective)
-
-       ;; spacemacs/update-eyebrowse-for-perspective
-       (defun layouts//update-eyebrowse-for-perspective (&rest _args)
-         "update & save current frame's eyebrowse workspace to its perspective"
-         (let* ((current-slot (eyebrowse--get 'current-slot))
-                (current-tag (nth 2 (assoc current-slot (eyebrowse--get 'window-configs)))))
-           (eyebrowse--update-window-config-element
-            (eyebrowse--current-window-config current-slot current-tag)))
-         (layouts//save-eyebrowse-for-perspective))
-
-       (add-hook 'persp-before-switch-functions #'layouts//update-eyebrowse-for-perspective)
-       (add-hook 'persp-before-save-state-to-file-functions #'layouts//update-eyebrowse-for-perspective)
-
-       ;; spacemacs/load-eyebrowse-for-perspective
-       (defun layouts//load-eyebrowse-for-perspective (type &optional frame)
-         "load an eyebrowse workspace according to a perspective's parameters.
-     FRAME's perspective is the perspective that is considered, defaulting to
-     the current frame's perspective.
-     If the perspective doesn't have a workspace, create one."
-         (when (eq type 'frame)
-           (let* ((workspace-params (layouts//get-persp-workspace (get-frame-persp frame) frame))
-                  (window-configs (nth 0 workspace-params))
-                  (current-slot (nth 1 workspace-params))
-                  (last-slot (nth 2 workspace-params)))
-             (if window-configs
-                 (progn
-                   (eyebrowse--set 'window-configs window-configs frame)
-                   (eyebrowse--set 'current-slot current-slot frame)
-                   (eyebrowse--set 'last-slot last-slot frame)
-                   (eyebrowse--load-window-config current-slot))
-               (eyebrowse--set 'window-configs nil frame)
-               (eyebrowse-init frame)
-               (layouts//save-eyebrowse-for-perspective frame)))))
-
-       (add-hook 'persp-activated-functions #'layouts//load-eyebrowse-for-perspective)
-
-       ;; spacemacs/load-eyebrowse-after-loading-layout
-       (defun layouts//load-eyebrowse-after-perspective-load (_ _ persp-names)
-         "bridge between `persp-after-load-state-functions' and
-     `layouts//load-eyebrowse-for-perspective'.
-     PERSP-HASH is the hash were the loaded perspectives were placed, and
-     PERSP-NAMES are the names of these perspectives."
-         (let ((cur-persp (get-current-persp)))
-           ;; load eyebrowse for current perspective only if it was one of the loaded
-           ;; perspectives
-           (when (member (or (and cur-persp (persp-name cur-persp))
-                             persp-nil-name)
-                         persp-names)
-             (layouts//load-eyebrowse-for-perspective 'frame))))
-
-       (add-hook 'persp-after-load-state-functions #'layouts//load-eyebrowse-after-perspective-load))
    #+END_SRC
 
 ** project
@@ -9719,21 +9303,6 @@
         :general
         (:keymaps 'ibuffer-mode-map
          "s@" 'ibuffer-tramp))
-    #+END_SRC
-
-*** ibuffer-persp
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer ibuffer-persp)
-      (use-package ibuffer-persp
-        :straight (ibuffer-persp :host github :repo "rakshasa/ibuffer-persp")
-        :after ibuffer
-        :config
-        (defalias 'ibuffer-persp-current #'ibuffer-persp-set-filter-groups-by-persp-name-not-nil)
-        (defalias 'ibuffer-persp-other #'ibuffer-persp-set-filter-groups-by-other-persp-name-not-nil)
-
-        :general
-        (:keymaps 'ibuffer-mode-map
-         "sp" 'ibuffer-persp-current
-         "sP" 'ibuffer-persp-other))
     #+END_SRC
 
 *** ibuffer-projectile
