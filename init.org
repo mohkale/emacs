@@ -1276,8 +1276,8 @@
          "." 'repeat
          "u" 'universal-argument)
 
-       (leader-declare-prefix "a" "applications")
        (leader-set-keys
+         "a" '(:wk "applications")
          "a:" 'eshell
          "a*" 'calc-dispatch
          "ad" 'calendar
@@ -1299,8 +1299,8 @@
          "apz" 'straight-freeze-versions
          "apt" 'straight-thaw-versions)
 
-       (leader-declare-prefix "b" "buffers")
        (leader-set-keys
+         "b" '(:wk "buffers")
          "bb" 'switch-to-buffer
          "bB" 'switch-to-buffer-other-window
          "bd" 'kill-this-buffer
@@ -1318,8 +1318,8 @@
          "bM" 'switch-to-messages-buffer
          "by" 'yank-whole-buffer-as-kill)
 
-       (leader-declare-prefix "c" "compile/comments")
        (leader-set-keys
+         "c" '(:wk "compile/comments")
          "cx" 'kill-compilation
          "cr" 'recompile
          "ck" 'comment-kill
@@ -1329,16 +1329,14 @@
          "cy" 'yank-and-comment
          "cc" 'compile)
 
-       (leader-declare-prefix "e" "errors")
        (leader-set-keys
+         "e" '(:wk "errors")
          "e1" 'first-error
          "en" 'next-error
          "ep" 'previous-error)
 
-       (leader-declare-prefix
-        "h" "help"
-        "hd" "help-describe")
        (leader-set-keys
+         "h" '(:wk "help")
          "hh" 'display-local-help
          "hn" 'view-emacs-news
          "h/" 'apropos-command
@@ -1349,6 +1347,7 @@
          "ht" 'view-emacs-todo
          "h RET" 'view-order-manuals
 
+         "hd" '(:wk "help-describe")
          "hdo" 'describe-symbol
          "hdi" 'describe-input-method
          "hdL" 'describe-language-environment
@@ -1366,95 +1365,85 @@
          "hdf" 'describe-function
          "hdv" 'describe-variable)
 
-       (leader-declare-prefix "i" "insert")
        (leader-set-keys
+         "i" '(:wk "insert")
          "ij" 'custom-insert-line-below
          "ik" 'custom-insert-line-above
          "ic" 'insert-char)
 
-       (leader-declare-prefix
-        "M" "modes"
-        "Md" "dired")
        (leader-set-keys
-         "Mz" 'zone
-         "Ml" 'emacs-lisp-mode
-         "ML" 'lisp-interaction-mode
-         "Mc" 'c++-mode
-         "MC" 'c-mode
-         "Mf" 'flyspell-mode
-         "MF" 'follow-mode
-         "Mt" 'text-mode
-         "Mp" 'python-mode
-         "Mr" 'ruby-mode
-         "Ms" 'shell-script-mode
-         "Mw" 'whitespace-mode
-         "Mo" 'org-mode
-         "Mx" 'hexl-mode
-         "M?" 'toggle-rot13-mode
-         "Mv" 'visual-line-mode
-         "MD" 'decipher
-         "MF" 'flyspell-prog-mode
+         "tm" '(:wk "mode")
+         "tmz" 'zone
+         "tml" 'emacs-lisp-mode
+         "tmL" 'lisp-interaction-mode
+         "tmc" 'c++-mode
+         "tmC" 'c-mode
+         "tmf" 'flyspell-mode
+         "tmF" 'follow-mode
+         "tmt" 'text-mode
+         "tmp" 'python-mode
+         "tmr" 'ruby-mode
+         "tms" 'shell-script-mode
+         "tmw" 'whitespace-mode
+         "tmo" 'org-mode
+         "tmx" 'hexl-mode
+         "tm?" 'toggle-rot13-mode
+         "tmv" 'visual-line-mode
+         "tmD" 'decipher
+         "tmF" 'flyspell-prog-mode)
 
-         "Mdd" 'toggle-editable-dired
-         "Mde" 'invoke-editable-dired
-         "Md ESC" 'wdired-abort-changes
-         "Mdq" 'wdired-abort-changes)
-
-       (leader-declare-prefix "n" "narrrow/numbers")
        (leader-set-keys
+         "n" '(:wk "narrrow/numbers")
          "nr" 'narrow-to-region
          "np" 'narrow-to-page
          "nw" 'widen)
 
-       (leader-declare-prefix "x" "text")
        (leader-set-keys
+         "x" '(:wk "text")
          "xa" 'describe-text-properties
          "xf" 'list-faces
          "xt" 'delete-trailing-whitespace)
 
-       (leader-declare-prefix "s" "search/symbol")
        (leader-set-keys
+         "s" '(:wk "search/symbol")
          "sg" 'rgrep
          "sF" 'find-dired
          "sf" 'find-grep-dired
          "ss" 'isearch-forward)
 
-       (leader-declare-prefix "*" "calculator")
        (leader-set-keys
+         "*" '(:wk "calculator")
          "*." 'calc-dispatch
          "**" 'calc
          "*y" 'calc-copy-to-buffer)
 
-       (leader-declare-prefix "t" "toggles")
        (leader-set-keys
-         "tn" '(display-line-numbers-mode :wk "toggle-line-numbers")
-         "tl" 'toggle-truncate-lines
-         "tw" 'toggle-word-wrap
-         "t|" 'toggle-scroll-bar
-         "t-" 'toggle-horizontal-scroll-bar
-         "td" 'toggle-debug-on-error
-         "tq" 'toggle-debug-on-quit
-         "tf" 'toggle-frame-fullscreen
-         "tg" 'toggle-tool-bar-mode-from-frame
-         "tG" 'toggle-menu-bar-mode-from-frame
-         "tu" 'toggle-uniquify-buffer-names
-         "tb" 'toggle-indicate-empty-lines
+         "t" '(:wk "toggles")
+         "t-" 'toggle-buffer-header
          "ta" 'toggle-text-mode-auto-fill
-         "te" '(read-only-mode :wk "toggle-read-only")
+         "tb" 'toggle-indicate-empty-lines
          "tc" 'toggle-case-fold-search
+         "td" 'toggle-debug-on-error
+         "te" '(read-only-mode :wk "toggle-read-only")
          "ti" 'toggle-input-method
-         "t TAB" 'set-indent-offset
-         "th" 'toggle-buffer-header
          "tL" 'toggle-lexical-binding
-         "tr" 'toggle-relative-linum)
+         "tl" 'toggle-truncate-lines
+         "tn" '(display-line-numbers-mode :wk "toggle-line-numbers")
+         "tq" 'toggle-debug-on-quit
+         ;; "tr" 'toggle-relative-linum
+         "tr" '(auto-revert-mode :wk "toggle-auto-revert")
+         "tu" 'toggle-uniquify-buffer-names
+         "tw" 'toggle-word-wrap
+         "t TAB" 'set-indent-offset
 
-       (leader-declare-prefix
-        "f" "files/frames"
-        "fe" "emacs"
-        "fv" "variables"
-        "fvc" "copy"
-        "fvr" "remove")
+         "tg" '(:wk "gui")
+         "tg|" 'toggle-scroll-bar
+         "tg-" 'toggle-horizontal-scroll-bar
+         "tgt" 'toggle-tool-bar-mode-from-frame
+         "tgm" 'toggle-menu-bar-mode-from-frame)
+
        (leader-set-keys
+         "f" '(:wk "files/frames")
          "ff" 'find-file
          "f\"" 'recover-this-file
          "f'" 'recover-file
@@ -1474,28 +1463,31 @@
          "f TAB" 'other-frame
          "f DEL" 'save-buffers-kill-emacs
 
+         "fe" '(:wk "emacs")
          "fev" 'emacs-version
 
+         "fv" '(:wk "variables")
          "fvd" 'add-dir-local-variable
          "fvs" 'add-file-local-variable
          "fvl" 'add-file-local-variable-prop-line
 
+         "fvc" '(:wk "copy")
          "fvcf" 'copy-dir-locals-to-file-locals
          "fvcd" 'copy-file-locals-to-dir-locals
          "fvcl" 'copy-dir-locals-to-file-locals-prop-line
 
+         "fvr" '(:wk "remove")
          "fvrv" 'kill-local-variable
          "fvrd" 'delete-dir-local-variable
          "fvrf" 'delete-file-local-variable
          "fvrl" 'delete-file-local-variable-prop-line)
 
-       (leader-declare-prefix "j" "jump")
        (leader-set-keys
+         "j" '(:wk "jump")
          "jc" 'goto-char
          "jn" 'next-error
          "jp" 'previous-error
          "j TAB" 'move-to-column
-         "fj" '(dired-jump :wk "jump-to-directory")
          "jd" '(dired-jump :wk "jump-to-directory")
          "jD" '(dired-jump-other-window :wk "jump-to-directory-other-window"))
      #+end_src
@@ -6795,7 +6787,7 @@
        (advice-add 'projectile-cleanup-known-projects :around #'inhibit-messages-wrapper!)
 
        (defun projectile-compile--double-prefix-means-run-comint (func &optional _args)
-         "allow running compilation interactively when multiple prefixes are given.
+         "Allow running compilation interactively when multiple prefixes are given.
      with two prefixes (C-u C-u) runs default compilation command in interactive
      compilation buffer. with three prompts for command and then runs it in an
      interactive compilation buffer."
@@ -6888,48 +6880,44 @@
 
        :general
        (:keymaps 'projectile-mode-map
-        [remap org-capture]         'projectile-org-capture+
-        [remap counsel-org-capture] 'projectile-org-capture+
+        [remap org-capture]          'projectile-org-capture+
+        [remap counsel-org-capture]  'projectile-org-capture+
         [remap consult-org-capture+] 'projectile-org-capture+)
 
        :leader
-       ("fp"    'projectile-switch-project
-        "pP"    'projectile-switch-project
-        "pf"    'projectile-find-file
-        "pd"    'projectile-find-dir
-        "pb"    'projectile-switch-to-buffer
-        "po"    'projectile-org-project-file+
+       ("fp" 'projectile-switch-project
 
-        "p"  '(:wk "projectile")
+        "p" '(:wk "projectile")
         "p TAB" 'projectile-find-other-file
         "p!" 'projectile-run-shell-command-in-root
         "p%" 'projectile-replace-regexp
         "p&" 'projectile-run-async-shell-command-in-root
         "pa" 'projectile-toggle-between-implementation-and-test
         "pb" 'projectile-switch-to-buffer
+        "pb" 'projectile-switch-to-buffer
         "pc" 'projectile-compile-project
-        "ph" 'projectile-dired ;; dired in project home directory
-        "pd" 'projectile-find-dir
         "pD" 'projectile-discover-projects-in-directory
-        "pf" 'projectile-find-file
+        "pd" 'projectile-find-dir
         "pF" 'projectile-find-file-in-known-projects
+        "pf" 'projectile-find-file
         "pG" 'projectile-regenerate-tags
         "pg" 'projectile-find-tag
+        "ph" 'projectile-dired ;; dired in project home directory
         "pI" 'projectile-invalidate-cache
+        "pi" 'projectile-install-project
         "pk" 'projectile-kill-buffers
+        "po" 'projectile-org-project-file+
         "pp" 'projectile-run-project
         "pr" 'projectile-recentf
-        "p[" 'projectile-previous-project-buffer
-        "p]" 'projectile-next-project-buffer
-        "pt" 'projectile-test-project
-        "pi" 'projectile-install-project
         "pso" 'projectile-multi-occur
-        ;; "pxe" 'projectile-run-eshell
-        ;; "pxi" 'projectile-run-ielm
-        ;; "pxt" 'projectile-run-term
-        ;; "pxs" 'projectile-run-shell
-        ;; "pxv" 'projectile-run-vterm
-        "pv" 'projectile-run-vterm))
+        "pt" 'projectile-test-project
+        "p[" 'projectile-previous-project-buffer
+        "p]" 'projectile-next-project-buffer)
+       :init
+       (leader-set-keys
+         "pv" (if (package! vterm)
+                  'projectile-run-vterm
+                'projectile-run-term)))
    #+END_SRC
 
 *** project-types
@@ -8751,6 +8739,7 @@
          "u" 'dired-unmark
          "r" 'dired-change-marks
          "y" 'dired-copy-filename-as-kill
+         "RET" 'dired-find-file
 
          "M-<return>" 'dired-display-file
          "C-M-<return>" 'dired-find-alternate-file
@@ -8776,8 +8765,9 @@
          "C-k" 'dired-prev-subdir
          "C-l" 'dired-goto-max-subdir)
 
-        :leader
-        (:mode 'dired-mode
+        :lazy-leader
+        (:mode '(dired-mode
+                 wdired-mode)
          "?" 'dired-summary ;; like transient state
          "#" 'dired-clean-directory
          "o" 'browse-url-of-dired-file ;; open in external app
@@ -8789,6 +8779,8 @@
          "r"  '(:wk "rename")
          "ru" 'dired-upcase
          "rd" 'dired-downcase
+
+         "e" '(wdired-change-to-wdired-mode :wk "edit-directory")
 
          ;; Flag means mark delete
          "d"  '(:wk "delete")
@@ -8810,10 +8802,10 @@
          "m(" 'dired-mark-sexp
 
          ;; Emacs related bindings
-         "e"  '(:wk "emacs")
-         "ec" 'dired-do-byte-compile
-         "el" 'dired-do-load
-         "ef" 'dired-do-find-marked-files
+         "E"  '(:wk "emacs")
+         "Ec" 'dired-do-byte-compile
+         "El" 'dired-do-load
+         "Ef" 'dired-do-find-marked-files
 
          ;; Change fs property commands
          "c"  '(:wk "change")
@@ -8848,6 +8840,9 @@
          "f/|"    'dired-do-symlink-regexp
          "f/ C-|" 'dired-do-relsymlink-regexp
          "f/ M-|" 'dired-do-hardlink-regexp)
+        (:mode 'wdired-mode
+         "q" 'wdired-abort-changes
+         leader-major-mode-key 'wdired-finish-edit)
 
         :general
         (:keymaps 'dired-mode-map
@@ -9444,8 +9439,12 @@
    #+END_SRC
 
 ** ibuffer
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! ibuffer)
+   :END:
+
 *** ibuffer
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer)
+    #+BEGIN_SRC emacs-lisp
       (defvar ibuffer-show-buffer-icons+ nil
         "Whether to show icons alongside the buffer")
 
@@ -9501,16 +9500,16 @@
          "-"   'ibuffer-add-to-tmp-hide
          "."   'hydra-ibuffer/body
 
-         "A"   'ibuffer-auto-mode
+         "a"   'ibuffer-auto-mode
          "E"   'ibuffer-do-view-and-eval
          "e"   'ibuffer-do-eval
-         "R"   'ibuffer-redisplay
+         ;; "R"   'ibuffer-redisplay
          "r"   'ibuffer-do-rename-uniquely
-         "S"   'ibuffer-do-query-replace
-         "s"   'ibuffer-do-save
+         "s"   'ibuffer-do-query-replace
+         "w"   'ibuffer-do-save
          ;; "s"   'ibuffer-do-replace-regexp
-         "T"   'ibuffer-visit-tags-table
-         "F"   'ibuffer-find-file
+         "t"   'ibuffer-visit-tags-table
+         "f"   'ibuffer-find-file
          "X"   'ibuffer-kill-filter-group
          "P"   'ibuffer-yank-filter-group
          "x"   'ibuffer-kill-line
@@ -9568,9 +9567,12 @@
          "M-RET" 'ibuffer-visit-buffer-other-window-noselect
          "S-DEL" 'ibuffer-bury-buffer
 
+         [remap ibuffer-auto-mode] 'auto-revert-mode
          [remap revert-buffer] 'ibuffer-update
          "gu"                  'ibuffer-do-revert
          "gw"                  'ibuffer-do-save
+
+         "|" 'ibuffer-do-shell-command-pipe-replace
 
       ;;; marking
          "m" 'ibuffer-mark-forward
@@ -9594,8 +9596,12 @@
          "<S-tab>"   'ibuffer-backward-filter-group
          "<backtab>" 'ibuffer-backward-filter-group
 
+         [remap evil-write] 'ibuffer-do-save
+         [remap evil-write-all] 'ibuffer-do-save
          [remap evil-next-line] 'ibuffer-forward-line
          [remap evil-previous-line] 'ibuffer-backward-line
+         [remap imenu] 'ibuffer-jump-to-buffer
+
          "C-j"  'ibuffer-forward-next-marked
          "C-k"  'ibuffer-backwards-next-marked
 
@@ -9620,7 +9626,7 @@
     #+END_SRC
 
 *** ibuffer-filters
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer)
+    #+BEGIN_SRC emacs-lisp
       (use-package ibuf-ext
         :commands (ibuffer-filter-by-directory-path
                    ibuffer-filter-by-client-buffers)
@@ -9636,16 +9642,16 @@
             (string-prefix-p qualifier (file-truename it))))
 
         (define-ibuffer-filter client-buffers
-            "only show buffers for which there're open emacsclient clients."
+            "Only show buffers for which there're open emacsclient clients."
           (:description "emacsclient-buffers")
           (buffer-local-value 'server-buffer-clients buf))
 
         :leader
         (:mode 'ibuffer-mode
-         :prefix "f"
+         :prefix ","
          ""       '(:wk "filter")
+         "g"      'ibuffer-jump-to-filter-group
          "TAB"    'ibuffer-exchange-filters
-         "RET"    'ibuffer-filter-by-mode
          "DEL"    'ibuffer-delete-saved-filters
          "M-DEL"  'ibuffer-delete-saved-filter-groups
 
@@ -9655,27 +9661,6 @@
          "|"      'ibuffer-or-filter
          "o"      'ibuffer-or-filter
          "-"      'ibuffer-exchange-filters
-         "@"      'ibuffer-filter-by-client-buffers
-         "*"      'ibuffer-filter-by-starred-name
-         ","      'ibuffer-filter-by-used-mode
-         "."      'ibuffer-filter-by-file-extension
-         ">"      'ibuffer-filter-by-size-gt
-         "<"      'ibuffer-filter-by-size-lt
-         "b"      'ibuffer-filter-by-basename
-         "c"      'ibuffer-filter-by-predicate
-         "D"      'ibuffer-filter-by-directory-path
-         "d"      'ibuffer-filter-by-directory ; regexp
-         "f"      'ibuffer-filter-by-filename  ; regexp
-         "e"      'ibuffer-filter-by-modified
-         "M"      'ibuffer-filter-by-derived-mode
-         "m"      'ibuffer-filter-by-used-mode
-         "n"      'ibuffer-filter-by-name
-         "s"      'ibuffer-filter-by-content
-         "v"      'ibuffer-filter-by-visiting-file
-
-         "g"      'ibuffer-filters-to-filter-group
-         "("      'ibuffer-filters-to-filter-group
-
          "a"      'ibuffer-add-saved-filters
          "p"      'ibuffer-pop-filter
          "P"      'ibuffer-pop-filter-group
@@ -9686,7 +9671,27 @@
          "w"      'ibuffer-save-filters
          "W"      'ibuffer-save-filter-groups
          "x"      'ibuffer-filter-disable
-         "X"      'ibuffer-clear-filter-groups))
+         "X"      'ibuffer-clear-filter-groups
+
+         "@"      'ibuffer-filter-by-client-buffers
+         "*"      'ibuffer-filter-by-starred-name
+         ","      'ibuffer-filter-by-used-mode
+         "."      'ibuffer-filter-by-file-extension
+         ">"      'ibuffer-filter-by-size-gt
+         "<"      'ibuffer-filter-by-size-lt
+         "%"      'ibuffer-filter-by-basename
+         "k"      'ibuffer-filter-by-predicate
+         "D"      'ibuffer-filter-by-directory-path
+         "d"      'ibuffer-filter-by-directory ; regexp
+         "f"      'ibuffer-filter-by-filename  ; regexp
+         "e"      'ibuffer-filter-by-modified
+         "m"      'ibuffer-filter-by-derived-mode
+         "n"      'ibuffer-filter-by-name
+         "s"      'ibuffer-filter-by-content
+         "v"      'ibuffer-filter-by-visiting-file
+
+         "b"      'ibuffer-filters-to-filter-group
+         "("      'ibuffer-filters-to-filter-group))
     #+END_SRC
 
 *** ibuffer-vc
@@ -9717,7 +9722,7 @@
     #+END_SRC
 
 *** ibuffer-persp
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer-persp)
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer ibuffer-persp)
       (use-package ibuffer-persp
         :straight (ibuffer-persp :host github :repo "rakshasa/ibuffer-persp")
         :after ibuffer
@@ -9732,7 +9737,7 @@
     #+END_SRC
 
 *** ibuffer-projectile
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer-projectile)
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer ibuffer-projectile)
       (use-package ibuffer-projectile
         :straight t
         :after ibuffer
@@ -11072,6 +11077,17 @@
         "gj"    'forward-button
         "gk"    'backward-button))
    #+END_SRC
+
+** query-replace
+   #+begin_src emacs-lisp
+     (use-package query-replace
+       :custom
+       (query-replace-skip-read-only t)
+
+       :leader
+       ("sl" 'query-replace ; literal
+        "sq" 'query-replace-regexp))
+   #+end_src
 
 ** re-builder
    #+BEGIN_SRC emacs-lisp
@@ -14752,8 +14768,8 @@
        (add-hook 'magit-post-refresh-hook 'diff-hl-magit-post-refresh)
 
        :leader
-       ("tg" 'git-gutter-mode
-        "tG" 'global-git-gutter-mode))
+       ("th" 'git-gutter-mode
+        "tH" 'global-git-gutter-mode))
    #+end_src
 
    #+begin_src emacs-lisp
@@ -14774,7 +14790,7 @@
          :straight t)
 
        :leader
-       ("tg" 'diff-hl-mode))
+       ("th" 'diff-hl-mode))
    #+end_src
 
 ** hide-comnt
