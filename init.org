@@ -85,7 +85,6 @@
          ;; vi-tilde-fringe                                                ; Show tildes at the end of the buffer
          ;; vlc-rc                                                         ; Control [[https://www.videolan.org/vlc/index.en-GB.html][VLC]] from emacs
          ;; vterm                                                          ; A virtual terminal emulator... interfaced with emacs
-         ;; wakatime                                                       ; Track your habits using the [[wakatime][https://wakatime.com/]]
          ;; ztree                                                          ; Directory tree viewer, think NERDTree
          git-gutter                                                        ; Show version control information in the window fringe.
 
@@ -6906,6 +6905,7 @@
         "pI" 'projectile-invalidate-cache
         "pi" 'projectile-install-project
         "pk" 'projectile-kill-buffers
+        "pm" 'projectile-ibuffer
         "po" 'projectile-org-project-file+
         "pp" 'projectile-run-project
         "pr" 'projectile-recentf
@@ -15940,7 +15940,7 @@
        :straight t
        :commands (skeletor-expand-project+)
        :leader
-       ("pm" 'skeletor-expand-project+)
+       ("pn" 'skeletor-expand-project+)
 
        :custom
        (skeletor-user-directory (etc! "skeletor"))
@@ -16589,16 +16589,6 @@
 
       (provide '+vterm-commands)
     #+END_SRC
-
-** wakatime
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! wakatime)
-     (use-package wakatime-mode
-       :straight t
-       :hook (after-init-hook . global-wakatime-mode)
-       :config
-       ;; TODO move api key to private.
-       (setq wakatime-api-key "0fba4add-c2c4-4950-9528-927a0652d7a1"))
-   #+END_SRC
 
 ** ycmd
    :PROPERTIES:
