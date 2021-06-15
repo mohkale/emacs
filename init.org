@@ -69,7 +69,7 @@
          engine-mode                                                       ; Run a search on a given search engine and view in brower
          ;; eshell                                                         ; A nice lispy shell
          ;; expand-region                                                  ; Expand visual mode by semantic units
-         flycheck                                                          ; A better buffer linter and error-checker package
+         ;; flycheck                                                       ; A better buffer linter and error-checker package
          ;; frog-jump-buffer                                               ; Posframe to jump to a buffer
          ;; hide-comnt                                                     ; Minor mode to disable rendering of comments
          ;; notmuch                                                        ; Mail client and manager
@@ -422,13 +422,14 @@
    flycheck is enabled I prefer it, otherwise I go with the built-in flymake.
 
    #+begin_src emacs-lisp
-     (defun +flylint ()
-       (interactive)
-       (call-interactively
+     (defun +flylint (&optional arg)
+       (interactive "P")
+       (funcall
         (cond ((package! flycheck)
                'flycheck-mode)
               (t
-               'flymake-mode))))
+               'flymake-mode))
+        arg))
    #+end_src
 
    Lastly here's a little helper sourced from [[https://emacs.stackexchange.com/questions/16890/how-to-find-out-where-a-file-is-being-required][here]] which gives you a tree like
@@ -1423,6 +1424,7 @@
          "tc" 'toggle-case-fold-search
          "td" 'toggle-debug-on-error
          "te" '(read-only-mode :wk "toggle-read-only")
+         "tf" '(+flylint :wk "toggle-linting")
          "ti" 'toggle-input-method
          "tL" 'toggle-lexical-binding
          "tl" 'toggle-truncate-lines
@@ -8872,6 +8874,12 @@
        (flymake-warning-bitmap '(+dot-fringe-bitmap compilation-warning))
 
        :init
+       ;; Disable the legacy proc backend.
+       (setq-default flymake-diagnostic-functions nil)
+       (with-eval-after-load 'flymake-proc
+         (remove-hook 'flymake-diagnostic-functions 'flymake-proc-legacy-flymake))
+
+       :init
        (defmacro flymake-unsupported-command+ (name)
          `(lambda ()
             (interactive)
@@ -8912,9 +8920,9 @@
         "e$" 'flymake-last-error+
         "el" 'flymake-show-diagnostics-buffer
         "eL" 'flymake-switch-to-log-buffer
-        "ex" 'flymake-proc-stop-all-syntax-checks
         ;; TODO implement
         ;; (flymake-unsupported-command+ toggle-flycheck-messages)
+        "ex" (flymake-unsupported-command+ flycheck-clear)
         "ed" (flymake-unsupported-command+ flycheck-explain-error-at-point)
         "ec" (flymake-unsupported-command+ flycheck-select-checker)
         "hde" (flymake-unsupported-command+ flycheck-describe-checker))
@@ -8925,6 +8933,51 @@
         "RET" 'flymake-goto-diagnostic
         "o" 'flymake-show-diagnostic))
    #+END_SRC
+
+*** flymake-rest
+    #+begin_src emacs-lisp
+      (use-package flymake-rest
+        :straight (flymake-rest :host github
+                                :repo "mohkale/flymake-rest"
+                                :files ("*.el" "checkers/*.el"))
+        :hook (after-init . flymake-rest-hook-setup)
+        :custom
+        (flymake-rest-markdownlint-style
+         (join-path (xdg-config-home) "mdlstyle.rb"))
+
+        :init
+        (require 'flymake-rest-hook-use-package)
+
+        :leader
+        ("tF" 'flymake-rest-change-checker))
+
+      (use-package flymake-rest
+        :straight t
+        :flymake-hook
+        (python-mode
+         flymake-rest-pycodestyle
+         (flymake-mypy :disabled t)
+         (flymake-rest-pylint :disabled t))
+        (awk-mode flymake-rest-awk-gawk)
+        (c-mode
+         flymake-rest-clang
+         (flymake-rest-gcc :disabled t))
+        (c++-mode
+         flymake-rest-clang
+         (flymake-rest-gcc :disabled t))
+        (js-mode flymake-rest-eslint)
+        (js2-mode flymake-rest-eslint)
+        (typescript-mode flymake-rest-eslint)
+        (json-mode
+         flymake-rest-jq
+         (flymake-rest-jsonlint :disabled t))
+        (less-mode flymake-rest-less)
+        (markdown-mode flymake-markdownlint+)
+        (ruby-mode flymake-rest-rubocop)
+        (sh-mode flymake-rest-shellcheck)
+        (yaml-mode flymake-rest-yamllint)
+        (web-mode flymake-rest-html-tidy))
+    #+end_src
 
 *** flymake-diagnostics-at-point
     #+BEGIN_SRC emacs-lisp :tangle no
@@ -14073,14 +14126,12 @@
        :straight t
        :diminish flycheck-mode
        :custom
-       (flycheck-markdown-mdl-style (join-path (or (getenv "XDG_CONFIG_HOME")
-                                                   "~/.config/")
-                                               "mdlstyle.rb"))
        (flycheck-python-pycompile-executable "python3")
        (flycheck-disabled-checkers '(emacs-lisp-checkdoc))
        (flycheck-default-margin-str "•")
 
        :init
+       (defvaralias 'flycheck-markdown-mdl-style 'flymake-rest-markdownlint-style)
        (evil-set-initial-state 'flycheck-error-message-mode 'motion)
 
        :config ;; Use ● for all flycheck fringe indicators, instead of the defaults.
@@ -14151,19 +14202,20 @@
         ;; "eC" 'flycheck-set-checker-executable
         ;; "ev" 'flycheck-verify-setup
         "ed" 'flycheck-explain-error-at-point
-        "ec" 'flycheck-select-checker)
+        "ec" 'flycheck-select-checker
+        "ex" 'flycheck-clear)
 
        :general
        (:keymaps 'flycheck-mode-map
         [remap hydra-flymake/body] 'hydra-flycheck/body
-        [remap flymake-proc-stop-all-syntax-checks] 'flycheck-clear
         [remap flymake-goto-next-error] 'flycheck-next-error
         [remap flymake-goto-prev-error] 'flycheck-previous-error
         [remap flymake-start] 'flycheck-buffer
         [remap flymake-first-error+] 'flycheck-first-error
         [remap flymake-last-error+] 'flycheck-last-error
-        [remap flymake-switch-to-log-buffer] 'flycheck-list-errors
-        [remap flycheck-describe-checker] 'flycheck-describe-checker)
+        [remap flymake-show-diagnostics-buffer] 'flycheck-list-errors
+        ;; [remap flycheck-describe-checker] 'flycheck-describe-checker
+        )
 
        :lazy-leader
        (:mode 'flycheck-error-list-mode
@@ -14413,6 +14465,9 @@
        (lsp-headerline-breadcrumb-enable nil)
        (lsp-session-file (var! "lsp/session"))
        (lsp-server-install-dir (var! "lsp/servers"))
+       (lsp-diagnostics-provider (if (package! flycheck)
+                                     :flycheck
+                                   :flymake))
 
        :config
        (defun lsp-mode-server-exists-p+ (mode &optional all-workspaces)
@@ -17258,7 +17313,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package sh-script
-        :hook (sh-script-mode . +flylint)
+        :hook (sh-mode . +flylint)
         :config
         (advice-add 'sh-set-shell :around 'inhibit-messages-wrapper!)
 
@@ -18593,7 +18648,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package tex-mode
        :hook ((latex-mode . display-line-numbers-mode)
-              (latex-mode . flycheck-mode))
+              (latex-mode . +flylint))
        :custom
        (TeX-electric-math '("$" . "$"))
        (TeX-auto-save  t)
