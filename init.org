@@ -18496,9 +18496,8 @@
        :hook (rustic-mode . +flylint)
        :custom
        (rustic-format-trigget 'on-save)
-       (rustic-lsp-client (cond
-                           ((package! eglot)    'eglot)
-                           ((package! lsp-mode) 'lsp-mode)))
+       (rustic-lsp-client nil)
+
        :config
        (setq rustic-lsp-server (if (executable-find "rust-analyzer") 'rust-analyzer 'rls))
        (advice-add 'rustic-popup :around #'display-buffer-no-select-window-advice)
@@ -18557,6 +18556,14 @@
                         (setq compilation-was-open-p+ (when (get-buffer-window buf t)
                                                         t))))))
     #+END_SRC
+
+*** rust-analyzer
+    #+begin_src emacs-lisp :tangle (package-yes! rust :lsp)
+      (add-hook 'rustic-mode-hook +lsp-command)
+
+      (when (package! lsp-mdoe)
+        (add-hook 'rustic-mode-hook #'rustic-lsp-mode-setup))
+    #+end_src
 
 ** git
    :PROPERTIES:
