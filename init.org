@@ -580,8 +580,9 @@
 
    #+NAME: setup-paths
    #+BEGIN_SRC emacs-lisp
-     (let ((docs (or (getenv "XDG_DOCUMENTS_DIR")
-                     (expand-file-name "~/Documents"))))
+     (require 'xdg)
+
+     (let ((docs (xdg--dir-home "XDG_DOCUMENTS_DIR" "~/Documents")))
        (defconst +notes-home (join-path docs "notes")
          "Base directory containing notes files.")
 
@@ -598,8 +599,7 @@
       package-user-dir                                   (lisp! "elpa")
 
       auto-save-list-file-prefix                         (var! "auto-save" "sessions/")
-      auth-sources                                       (let ((default-directory (or (getenv "XDG_CONFIG_HOME")
-                                                                                      "~/.config/")))
+      auth-sources                                       (let ((default-directory (xdg-config-home)))
                                                            (append (list (expand-file-name "authinfo")
                                                                          (expand-file-name "authinfo.gpg")
                                                                          (expand-file-name "netrc"))
