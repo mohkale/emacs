@@ -8385,17 +8385,16 @@
     #+BEGIN_SRC emacs-lisp
       (use-package dired
         :straight (dired :type built-in)
+        :custom
+        (ls-lisp-dirs-first t)
+        (ls-lisp-use-insert-directory-program t)
+        (dired-listing-switches "-laXhv --group-directories-first")
+        (dired-auto-revert-buffer t)
+        (dired-hide-details-hide-symlink-targets nil)
+        (dired-recursive-copies t)
+
         :config
         (push '(dired-mode . 1) +indent-config)
-
-        (setq ls-lisp-dirs-first t
-              ls-lisp-use-insert-directory-program t
-              dired-listing-switches "-laXhv --group-directories-first"
-              dired-auto-revert-buffer t
-              dired-hide-details-hide-symlink-targets nil
-              dired-recursive-copies t
-              dired-recent-directories-file (state! "dired/recent.el"))
-
         (push 'dired-mode whitespace-exempt-modes)
 
         :commands (dired-goto-home-dir+
@@ -8431,12 +8430,10 @@
          leader-major-mode-key nil
          "g" nil)
         (:keymaps 'dired-mode-map
-         :states  'motion
-         ")" 'dired-omit-mode
+         :states  '(motion normal)
          "j" 'dired-next-line
          "k" 'dired-previous-line
          "~" 'dired-goto-home-dir+
-         "r" 'dired-do-redisplay
          "=" 'dired-diff
          "K" 'dired-do-kill-lines
          "'" 'dired-show-file-type ;; like file command
@@ -8469,47 +8466,51 @@
          "C-j" 'dired-next-subdir
          "C-k" 'dired-prev-subdir
          "C-l" 'dired-goto-max-subdir)
+        (:keymaps 'dired-mode-map
+         "#" nil "$" nil "%" nil "*" nil "." nil ":" nil "?" nil "~" nil "<" nil
+         "=" nil ">" nil "a" nil "A" nil "B" nil "c" nil "C-M-d" nil "C-M-n" nil
+         "C-M-p" nil "C-M-u" nil "C-o" nil "e" nil "f" nil "F" nil "g" nil "G" nil
+         "h" nil "H" nil "I" nil "j" nil "k" nil "l" nil "L" nil "M" nil "M-$" nil
+         "M-(" nil "M-{" nil "M-}" nil "M-DEL" nil "M-G" nil "n" nil "N" nil "O" nil
+         "p" nil "P" nil "Q" nil "s" nil "SPC" nil "0" nil "S-SPC" nil "t" nil "T" nil
+         "v" nil "V" nil "w" nil "W" nil "X" nil "y" nil "Y" nil "Z" nil "u" nil)
 
         :lazy-leader
         (:mode '(dired-mode
                  wdired-mode)
-         "?" 'dired-summary ;; like transient state
+         ;; "?" 'dired-summary                                                        ; Like transient state
          "#" 'dired-clean-directory
-         "o" 'browse-url-of-dired-file ;; open in external app
-         "v" 'dired-view-file          ;; TODO customize view mode
-         "g" 'dired-goto-file ;; prompt for file to visit in current buffer
-         "s" 'dired-sort-toggle-or-edit
+         "o" 'browse-url-of-dired-file                                                ; Open in external app
+         "v" 'dired-view-file                                                         ; find-file but make read-only
+         "g" 'dired-goto-file
+         "i" 'dired-sort-toggle-or-edit
+         "e" '(wdired-change-to-wdired-mode :wk "edit-directory")
 
          "r"  '(:ignore t :wk "rename")
          "ru" 'dired-upcase
          "rd" 'dired-downcase
 
-         "e" '(wdired-change-to-wdired-mode :wk "edit-directory")
-
          ;; Flag means mark delete
          "d"  '(:ignore t :wk "delete")
-         "d&" 'dired-flag-garbage-files
-         "d~" 'dired-flag-backup-files
-         "d/" 'dired-flag-files-regexp
+         "dj" 'dired-flag-garbage-files
+         "db" 'dired-flag-backup-files
+         "ds" 'dired-flag-files-regexp
          "d#" 'dired-flag-auto-save-files
 
          "m"  '(:ignore t :wk "mark")
-         "mm" 'dired-toggle-marks
-         "mu" 'dired-unmark
-         "m DEL" 'dired-unmark-backward
+         "mi" 'dired-toggle-marks
          "ml" 'dired-mark-symlinks
          "md" 'dired-mark-directories
-         "m!" 'dired-mark-executables
+         "mx" 'dired-mark-executables
          "mt" 'dired-mark-subdir-files
          "mg" 'dired-mark-files-containing-regexp ;; grep
          "ms" 'dired-mark-files-regexp
-         "m(" 'dired-mark-sexp
+         "me" 'dired-mark-sexp
 
-         ;; Emacs related bindings
-         "E"  '(:ignore t :wk "emacs")
-         "Ec" 'dired-do-byte-compile
-         "El" 'dired-do-load
-         "Ef" 'dired-do-find-marked-files
+         "x"  '(:ignore t :wk "emacs")
+         "xc" 'dired-do-byte-compile
+         "xl" 'dired-do-load
+         "xf" 'dired-do-find-marked-files
 
          ;; Change fs property commands
          "c"  '(:ignore t :wk "change")
@@ -8519,14 +8520,12 @@
 
          ;; Filesystem
          "f"  '(:ignore t :wk "filesystem")
-         "fg" 'dired-do-find-regexp             ;; grep marked files
-         "fs" 'dired-do-find-regexp-and-replace ;; substitute
-         "fi" 'dired-info
-         "fm" 'dired-man
+         "fg" 'dired-do-find-regexp                                                   ; grep marked files
+         "fs" 'dired-do-find-regexp-and-replace                                       ; regexp substitute marked files
+         "fi" 'dired-info                                                             ; run info on current file
+         "fm" 'dired-man                                                              ; run man on current file
          "fr" 'dired-do-run-mail
-         "ft" 'dored-do-touch
-         "fz" 'epa-dired-do-encrypt
-         "fZ" 'epa-dired-do-encrypt-to ;; compress as
+         "ft" 'dired-do-touch
 
          ;; EasyPG/GPG
          "fp"  '(:ignore t :wk "GPG")
@@ -8536,27 +8535,17 @@
          "fpv" 'epa-dired-do-verify
 
          ;; operations bound to regexp search
-         "f/"     '(:ignore t :wk "search")
-         "f/c"    'dired-do-copy-regexp
-         "f/r"    'dired-do-rename-regexp
-         "f/h"    'dired-do-hardlink-regexp
-         "f/s"    'dired-do-symlink-regexp
-         "f/|"    'dired-do-symlink-regexp
-         "f/ C-|" 'dired-do-relsymlink-regexp
-         "f/ M-|" 'dired-do-hardlink-regexp)
+         "s"     '(:ignore t :wk "search")
+         "sc"    'dired-do-copy-regexp
+         "sr"    'dired-do-rename-regexp
+         "sh"    'dired-do-hardlink-regexp
+         "ss"    'dired-do-symlink-regexp
+         "s|"    'dired-do-symlink-regexp
+         "s C-|" 'dired-do-relsymlink-regexp
+         "s M-|" 'dired-do-hardlink-regexp)
         (:mode 'wdired-mode
-         "q" 'wdired-abort-changes
-         leader-major-mode-key 'wdired-finish-edit)
-
-        :general
-        (:keymaps 'dired-mode-map
-         "#" nil "$" nil "%" nil "*" nil "." nil ":" nil "?" nil "~" nil "<" nil
-         "=" nil ">" nil "a" nil "A" nil "B" nil "c" nil "C-M-d" nil "C-M-n" nil
-         "C-M-p" nil "C-M-u" nil "C-o" nil "e" nil "f" nil "F" nil "g" nil "G" nil
-         "h" nil "H" nil "I" nil "j" nil "k" nil "l" nil "L" nil "M" nil "M-$" nil
-         "M-(" nil "M-{" nil "M-}" nil "M-DEL" nil "M-G" nil "n" nil "N" nil "O" nil
-         "p" nil "P" nil "Q" nil "s" nil "SPC" nil "0" nil "S-SPC" nil "t" nil "T" nil
-         "v" nil "V" nil "w" nil "W" nil "X" nil "y" nil "Y" nil "Z" nil "u" nil))
+         "q"                   'wdired-abort-changes
+         leader-major-mode-key 'wdired-finish-edit))
     #+END_SRC
 
 *** all-the-icons-dired
@@ -8568,6 +8557,10 @@
         :hook (dired-mode . all-the-icons-dired-mode)
         :custom
         (all-the-icons-dired-monochrome nil)
+        :config
+        (push '(dired-aux dired-upcase all-the-icons-dired--refresh-advice) all-the-icons-dired-advice-alist)
+        (push '(dired-aux dired-downcase all-the-icons-dired--refresh-advice) all-the-icons-dired-advice-alist)
+
         :config
         (advice-add 'all-the-icons-dired--refresh :around
                     (defun all-the-icons-dired-setup-tty-icons+ (func &rest args)
@@ -8586,29 +8579,32 @@
                         (apply func args)))))
     #+END_SRC
 
-*** hide
+*** dired-omit
     dired's file hiding functionality.
 
     #+BEGIN_SRC emacs-lisp
-       (use-package dired-x
-         :straight (dired-x :type built-in)
-         :hook (dired-mode . dired-omit-mode)
-         :config
-         (setq dired-omit-files (rx (or
-                                     ".#"
-                                     (and bol
-                                          (or "."
-                                              ".."
-                                              ".git"
-                                              ".bundle"
-                                              ".dired"
-                                              "__pycache__"
-                                              ".pytest_cache"
-                                              ".gradle"
-                                              ".sass-cache"
-                                              ".jekyll-cache"
-                                              "Pipfile")
-                                          eol)))))
+      (use-package dired-x
+        :straight (dired-x :type built-in)
+        :hook (dired-mode . dired-omit-mode)
+        :custom
+        (dired-omit-files (rx (or ".#"
+                                  (and bol
+                                       (or "."
+                                           ".."
+                                           ".git"
+                                           ".bundle"
+                                           ".dired"
+                                           "__pycache__"
+                                           ".pytest_cache"
+                                           ".gradle"
+                                           ".sass-cache"
+                                           ".jekyll-cache"
+                                           "Pipfile")
+                                       eol))))
+        :leader
+        (:mode '(dired-mode
+                 wdired-mode)
+         "." 'dired-omit-mode))
     #+END_SRC
 
 *** dired-fl
@@ -8622,15 +8618,14 @@
     #+END_SRC
 
 *** git-info
-    show the last commit log for files in the current dired buffer.
+    Show the last commit log for files in the current dired buffer.
 
     #+BEGIN_SRC emacs-lisp
       (use-package dired-git-info
         :straight t
         :general
         (:keymaps 'dired-mode-map
-         :states  'motion
-         "v" 'dired-git-info-mode))
+         ")" 'dired-git-info-mode))
     #+END_SRC
 
 ** image-dired
@@ -21775,6 +21770,24 @@
       ;;; dired
        `(dired-symlink ((,cls (:foreground ,blue))))
        `(dired-special ((,cls (:foreground ,purple))))
+
+       `(diredfl-dir-name ((,cls (:inherit dired-directory))))
+       `(diredfl-file-name ((,cls (:inherit default))))
+       `(diredfl-dir-heading ((,cls (:inherit dired-header))))
+       `(diredfl-number ((,cls (:inherit font-lock-function-name-face))))
+       `(diredfl-date-time ((,cls (:inherit shadow))))
+       `(diredfl-file-suffix ((,cls (:inherit default))))
+       `(diredfl-symlink ((,cls (:inherit font-lock-doc-face))))
+       `(diredfl-deletion ((,cls (:inherit error))))
+       `(diredfl-deletion-file-name ((,cls (:foreground ,red :inherit bold))))
+       `(diredfl-flag-mark ((,cls (:inherit diredfl-deletion-file-name))))
+       `(diredfl-flag-mark-line ((,cls (:foreground ,yellow))))
+       `(diredfl-no-priv ((,cls (:inherit shadow))))
+       `(diredfl-read-priv ((,cls (:foreground ,red))))
+       `(diredfl-write-priv ((,cls (:foreground ,green))))
+       `(diredfl-exec-priv ((,cls (:foreground ,yellow))))
+       `(diredfl-rare-priv ((,cls (:foreground ,blue :inherit bold))))
+       `(diredfl-dir-priv ((,cls (:foreground ,yellow :inherit bold))))
 
       ;;; dashboard
        `(dashboard-text-banner ((,cls (:foreground ,orange-int))))
