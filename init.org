@@ -8918,9 +8918,22 @@
          (with-display-buffer-no-select-window
            (eldoc-doc-buffer)))
 
+       (defun eldoc-cycle-doc-functions+ (&optional count)
+         (interactive "p")
+         (or count (setq count 1)) ;; TODO: count
+         (let* ((head (pop eldoc-documentation-functions)))
+           (add-to-list 'eldoc-documentation-functions head t))
+         (message "cycled: %s" eldoc-documentation-functions))
+
+       (defun eldoc-cycle-doc-functions-back+ (&optional count)
+         (interactive "p")
+         (eldoc-cycle-doc-functions+ (- count)))
+
        :leader
        ("hb" 'eldoc-doc-buffer
-        "ho" 'eldoc-doc-buffer-no-select+))
+        "ho" 'eldoc-doc-buffer-no-select+
+        "tj" '(eldoc-cycle-doc-functions+ :wk "cycle-eldoc")
+        "tk" '(eldoc-cycle-doc-functions-back+ :wk "cycle-eldoc-back")))
    #+END_SRC
 
 ** electric-pair
