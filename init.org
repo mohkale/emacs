@@ -54,7 +54,8 @@
    #+NAME: config-modules
    #+BEGIN_SRC emacs-lisp :tangle no
      (defvar +modules
-       '(magit                                                             ; It's git... but magical  ,
+       '(;; apheleia                                                       ; Automatic buffer formatting after save.
+         magit                                                             ; It's git... but magical  ,
          ;; ace-link                                                       ; Jump to links in the current buffer through an avy interface
          link-hint                                                         ; Jump to links in the current buffer through an avy interface
          ;; adaptive-wrap                                                  ; Visually wrap long lines. doesn't alter what you write.
@@ -13213,6 +13214,27 @@
                        (ace-link--compilation-action pt))))
              ace-link-fallback-alist+))
    #+END_SRC
+
+** apheleia
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! apheleia)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package apheleia
+       :straight t
+       :leader
+       ("tma" 'apheleia-mode)
+
+       :custom
+       (apheleia-formatters
+        '((black "black" "--stdin-filename" filepath "-")
+          (brittany "brittany" file)
+          (prettier npx "prettier" "--stdin-filepath" filepath)
+          (gofmt "gofmt")
+          (ocamlformat "ocamlformat" file)
+          (terraform "terraform" "fmt" "-"))))
+   #+end_src
 
 ** adaptive-wrap
    This package provides a mode such that when a paragraph you're inserting gets too
