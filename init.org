@@ -86,6 +86,7 @@
          ;; vi-tilde-fringe                                                ; Show tildes at the end of the buffer
          ;; vlc-rc                                                         ; Control [[https://www.videolan.org/vlc/index.en-GB.html][VLC]] from emacs
          ;; vterm                                                          ; A virtual terminal emulator... interfaced with emacs
+         ;; vimish-fold                                                    ; Fold regions of code just like vim.
          ;; ztree                                                          ; Directory tree viewer, think NERDTree
          git-gutter                                                        ; Show version control information in the window fringe.
 
@@ -431,14 +432,17 @@
    flycheck is enabled I prefer it, otherwise I go with the built-in flymake.
 
    #+begin_src emacs-lisp
-     (defun +flylint (&optional arg)
-       (interactive "P")
+     (defun +flylint ()
+       (interactive)
        (funcall
+        (if (called-interactively-p 'interactive)
+            #'funcall-interactively
+          #'funcall)
         (cond ((package! flycheck)
                'flycheck-mode)
               (t
                'flymake-mode))
-        arg))
+        'toggle))
    #+end_src
 
    Lastly here's a little helper sourced from [[https://emacs.stackexchange.com/questions/16890/how-to-find-out-where-a-file-is-being-required][here]] which gives you a tree like
@@ -886,7 +890,7 @@
       (defalias 'write-autosave 'do-auto-save)
     #+END_SRC
 
-*** variables
+*** options
      #+BEGIN_SRC emacs-lisp
        (setq delete-old-versions t                                                  ; delete excess backup versions silently
              version-control t                                                      ; use version control
@@ -915,6 +919,7 @@
              confirm-nonexistent-file-or-buffer nil                                 ; Don't require confirmation when creating a new file
              history-length 1000                                                    ; Maximum size of a history variable for completing-read
              recenter-positions '(top middle bottom)
+             recentf-auto-cleanup (* 60 60)
              user-mail-address "mohkale@kisara.moe"
              user-full-name "mohsin kaleem")
      #+END_SRC
@@ -1048,7 +1053,7 @@
       (and (file-exists-p custom-file) (load custom-file t t))
     #+END_SRC
 
-*** user-interface
+*** ui
     Disable GUI enhancements, some of these are taken care of in [[*early-init][early-init]].
 
     Let's stop the cursor blinking annoyingly.
@@ -1181,6 +1186,7 @@
             (define-key xterm-function-map "\e[57;5u"  (kbd "C-9"))
             (define-key xterm-function-map "\e[48;5u"  (kbd "C-0"))
             (define-key xterm-function-map "\e[32;2u"  (kbd "S-SPC"))
+            (define-key xterm-function-map "\e[37;4u"  (kbd "M-%"))
             (define-key xterm-function-map "\e[58;4u"  (kbd "M-:"))
             (define-key xterm-function-map "\e[58;6u"  (kbd "C-:"))
             (define-key xterm-function-map "\e[124;6u" (kbd "C-|"))
@@ -1199,6 +1205,9 @@
                                              (append (number-sequence 97 105)
                                                      '(107 106)                               ; for some reason, J & K are switched
                                                      (number-sequence 108 122)))
+                     do (define-key xterm-function-map
+                          (concat "\e[" (number-to-string i) ";2u")
+                          (kbd (concat "C-S-" (string char))))
                      do (define-key xterm-function-map
                           (concat "\e[" (number-to-string i) ";6u")
                           (kbd (concat "C-S-" (string char))))))
@@ -1250,6 +1259,11 @@
 
 *** leader
     Some variables related to prefixes in which leader keys should be placed.
+
+    TODO: Fix bug in spaceleader where if a keymap with override-state 'all is
+    activated and it ends up overriding the leader-key, then some of
+    the leader-key bindings are just non-existent in the buffer :?
+    For example see ~magit-blame-read-only-map~.
 
     #+BEGIN_SRC emacs-lisp
       (defconst leader-minor-mode-leader-prefix "q"
@@ -1342,11 +1356,12 @@
          "bm" 'buffer-menu
          "bn" 'next-buffer
          "bp" 'previous-buffer
-         "bc" 'rename-buffer
-         "bC" 'rename-uniquely
+         "br" 'rename-buffer
+         "bR" 'rename-uniquely
          "bo" 'occur
          "b DEL" 'bury-buffer
          "be" 'safe-erase-buffer
+         "bH" 'htmlfontify-buffer
          "bK" 'kill-this-buffer
          "bk" 'kill-this-buffer-and-window-maybe
          "bM" 'switch-to-messages-buffer
@@ -1401,8 +1416,6 @@
 
        (leader-set-keys
          "i" '(:ignore t :wk "insert")
-         "ij" 'custom-insert-line-below
-         "ik" 'custom-insert-line-above
          "ic" 'insert-char)
 
        (leader-set-keys
@@ -2519,7 +2532,7 @@
              (rx "*Org Export Dispatcher*")
              (rx "*eldoc*")
              (rx "*Completions*"))
-       "Regular expressions matching buffer names under which no trailing whitespace is shown.")
+       "Regexp matching buffer names where no trailing whitespace is shown.")
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
@@ -3265,6 +3278,7 @@
                     force-set-all-visible-windows-dedication
                     window-zen
                     window-zen-restore
+                    find-temp-file+
                     display-last-buffer
                     vertical-display-last-buffer
                     shell-command-on-buffer
@@ -3282,7 +3296,9 @@
           "SPC" 'set-window-dedication
           "M-d" 'set-window-dedication
           "o"   'vertical-display-last-buffer
-          "C-o" 'vertical-display-last-buffer))
+          "C-o" 'vertical-display-last-buffer)
+         :leader
+         ("ft" 'find-temp-file+))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
@@ -3290,6 +3306,20 @@
         "switches to messages buffer"
         (interactive)
         (switch-to-buffer (messages-buffer)))
+
+      (defun find-temp-file+ (path)
+        (interactive
+         (list (let ((default-directory
+                       (concat (xdg--dir-home "XDG_TEMP_DIR" "~/.local/temp") "/")))
+                 (concat default-directory
+                         (read-file-name
+                          "Make temp file: "
+                          default-directory
+                          (format-time-string "%Y%m%d.%H%M%S"))))))
+        (when-let ((dir (file-name-directory path)))
+          (unless (string-empty-p dir)
+            (mkdir dir t)))
+        (find-file path))
 
       (defun switch-to-last-buffer (&optional buffer)
         (interactive)
@@ -3793,12 +3823,13 @@
            ;; WARN binding to motion breaks things.
            :states  '(normal visual)
            :keymaps 'evil-matchit-mode-map
-           "%" 'evilmi-jump-items))
+           "%" 'evilmi-jump-items)))
 
+      (use-package evil-matchit-org
+        :straight (evil-matchit)
         :config
-        (with-eval-after-load 'evil-matchit-org
-          (push '(("begin_center") () ( "end_center") "MONOGAMY")
-                evilmi-org-match-tags)))
+        (push '(("begin_center") () ( "end_center") "MONOGAMY")
+              evilmi-org-match-tags))
     #+END_SRC
 
 *** evil-surround
@@ -3865,10 +3896,15 @@
     #+BEGIN_SRC emacs-lisp
       (use-package evil-snipe
         :straight t
+        :hook ((magit-status-mode . turn-off-evil-snipe-mode)
+               (evil-mode . evil-snipe-mode))
         :diminish
         evil-snipe-mode
         evil-snipe-local-mode
-        :hook (evil-mode . evil-snipe-mode)
+        :init
+        ;; Suppress creation because I can't seem to override it :?
+        (defvar evil-snipe-local-mode-map (make-sparse-keymap))
+
         :config
         (setq evil-snipe-scope 'buffer                                      ; how far can a snipe take place
               evil-snipe-repeat-scope 'buffer                               ; how far repeating previous snipe can take place.
@@ -3925,8 +3961,8 @@
         (advice-add 'evil-snipe--transient-map :override 'ignore)
 
         :general
-        (:keymaps '(override evil-snipe-mode-map)
-         :states  'motion
+        (:keymaps 'evil-snipe-mode-map
+         :states  '(normal motion)
          ;; S is inclusive, X is exclusive.
          "gT" 'evil-snipe-X
          "gt" 'evil-snipe-x
@@ -3937,12 +3973,7 @@
          "t"  'evil-snipe-t
          "T"  'evil-snipe-T
          ";"  'evil-snipe-repeat
-         "g;" 'evil-snipe-repeat-reverse)
-        ;; Unbind the default bindings
-        (:keymaps 'evil-snipe-mode-map
-         :states  '(motion normal)
-         "S" nil "s" nil
-         "X" nil "x" nil))
+         "g;" 'evil-snipe-repeat-reverse))
     #+END_SRC
 
 *** evil-exchange
@@ -4095,17 +4126,18 @@
     #+END_SRC
 
 *** vimish-fold
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! vimish-fold)
+    :END:
     Folding like vim
 
     #+BEGIN_SRC emacs-lisp
       (use-package vimish-fold
-        :straight (vimish-fold :host github :repo "mrkkrp/vimish-fold")
-        :hook ((text-mode . vimish-fold-mode)
-               (prog-mode . vimish-fold-mode)
-               (conf-mode . vimish-fold-mode))
+        :straight t
+        :hook (after-init . vimish-fold-global-mode)
         :config
         (setq vimish-fold-allow-nested t)
-        (setq vimish-fold-dir (var! "vimish-fold/"))
+        (setq vimish-fold-dir (state! "vimish-fold/"))
 
         (add-hook 'vimish-fold-mode-hook
                   (defun vimish-fold-setup-evil+ ()
@@ -4145,7 +4177,7 @@
             (vimish-fold-previous-fold)))
 
         :general
-        (;; :keymaps 'vimish-fold-mode-map
+        (:keymaps 'vimish-fold-mode-map
          :states '(normal motion)
          "zx" 'vimish-fold-toggle
          "zX" 'vimish-fold-toggle-recursively
@@ -4602,15 +4634,15 @@
         :states 'insert
         "M-SPC" 'company-complete)
        (:keymaps 'company-search-map
-        "C-1"    'company-complete-number
-        "C-2"    'company-complete-number
-        "C-3"    'company-complete-number
-        "C-4"    'company-complete-number
-        "C-5"    'company-complete-number
-        "C-6"    'company-complete-number
-        "C-7"    'company-complete-number
-        "C-8"    'company-complete-number
-        "C-9"    'company-complete-number
+        "C-1"    'company-complete-tooltip-row
+        "C-2"    'company-complete-tooltip-row
+        "C-3"    'company-complete-tooltip-row
+        "C-4"    'company-complete-tooltip-row
+        "C-5"    'company-complete-tooltip-row
+        "C-6"    'company-complete-tooltip-row
+        "C-7"    'company-complete-tooltip-row
+        "C-8"    'company-complete-tooltip-row
+        "C-9"    'company-complete-tooltip-row
         "C-f"    'company-search-toggle-filtering                                    ; show filtered/all
         "C-s"    'company-search-repeat-forward
         "C-r"    'company-search-repeat-backward
@@ -4621,14 +4653,14 @@
         "<override-state>" 'all
         "C-w"    nil                                                                 ; was company-show-location
         "ESC"    nil
-        "C-1"    'company-complete-number
-        "C-2"    'company-complete-number
-        "C-3"    'company-complete-number
-        "C-4"    'company-complete-number
-        "C-5"    'company-complete-number
-        "C-6"    'company-complete-number
-        "C-7"    'company-complete-number
-        "C-8"    'company-complete-number
+        "C-1"    'company-complete-tooltip-row
+        "C-2"    'company-complete-tooltip-row
+        "C-3"    'company-complete-tooltip-row
+        "C-4"    'company-complete-tooltip-row
+        "C-5"    'company-complete-tooltip-row
+        "C-6"    'company-complete-tooltip-row
+        "C-7"    'company-complete-tooltip-row
+        "C-8"    'company-complete-tooltip-row
         "M-l"    'company-complete-common-or-next-char+
         "C-j"    'company-select-next
         "C-k"    'company-select-previous
@@ -4777,13 +4809,12 @@
        (defun all-the-icons-insert-all ()
          (interactive)
          (cl-loop for family in all-the-icons-font-families
-                  with icons = nil
                   do (cl-loop for (name . icon) in (funcall (all-the-icons--data-name family))
                               do (insert "\n" icon "  " (symbol-name family) " - " name))))
 
        (defun all-the-icons-insert-all-icons ()
          (interactive)
-         (dolist (icon-list (list all-the-icons-icon-alist
+         (dolist (icon-list (list all-the-icons-regexp-icon-alist
                                   all-the-icons-dir-icon-alist
                                   all-the-icons-weather-icon-alist
                                   all-the-icons-mode-icon-alist
@@ -4881,7 +4912,7 @@
                               ((all-the-icons-alltheicon . "test-ruby")        .    (all-the-icons-nerd-oct    . "ruby"))
                               ((all-the-icons-fileicon   . "cljs")             .    (all-the-icons-nerd-dev    . "clojure"))
                               ((all-the-icons-fileicon   . "docker")           .    (all-the-icons-nerd-linux  . "docker"))
-                              ((all-the-icons-fileicon   . "bib")              .    (all-the-icons-nerd-mdi    . "bible"))
+                              ((all-the-icons-fileicon   . "bib")              .    (all-the-icons-nerd-fa     . "book"))
                               ((all-the-icons-fileicon   . "php")              .    (all-the-icons-nerd-dev    . "php"))
                               ((all-the-icons-fileicon   . "racket")           .    (all-the-icons-fileicon    . "lisp")))))
             ;; For each variable all-the-icons uses to lookup contextual icons.
@@ -5081,25 +5112,8 @@
    #+BEGIN_SRC emacs-lisp
      (use-package eyebrowse
        :straight t
-       :defer 30
        :config
-       (eyebrowse-mode +1)
-
-       (defun eyebrowse-switch-window-config--when-new-zen-current-window (func slot &rest args)
-         "by default, when you create a new window config it's a complete copy
-     of your current config. More often then not when you make a new config you
-     want to change the layout of the windows (and buffers) within it. Creating
-     a new config and then manuall deleting every other window is a pain, this
-     makes it so when you make a new config, you're current window is maximised
-     automatically."
-         (let ((slot-new-p (not (eyebrowse--window-config-present-p slot))))
-           (apply func slot args)
-           (when (and slot-new-p
-                      (> (length (window-list)) 1))
-             (window-zen))))
-
-       (advice-add 'eyebrowse-switch-to-window-config
-                   :around #'eyebrowse-switch-window-config--when-new-zen-current-window))
+       (eyebrowse-mode +1))
    #+END_SRC
 
 ** gitlink
@@ -5171,7 +5185,8 @@
        :leader
        ("H" '(:ignore t :wk ("hydras" . "cut off one head, two more shall take it's place"))))
 
-     (use-package pretty-hydra :straight t)
+     (use-package pretty-hydra
+       :straight t)
    #+END_SRC
 
     Changes the display of the the hydra popups from some region above the message area into a
@@ -6230,7 +6245,6 @@
 
        :general
        (:states 'normal
-        :keymaps 'override
         "g TAB" 'evil-ialign)
        (:keymaps 'ialign-minibuffer-keymap
         ;; "" 'ialign-toggle-repeat
@@ -6715,7 +6729,7 @@
               whitespace-exempt-modes)
 
        (advice-add 'undo-tree-save-history :before-until
-                   (defun undo-tree-save-history--respect-ignore+ (func &rest args)
+                   (defun undo-tree-save-history--respect-ignore+ (&rest _args)
                      "respect `undo-skip-autosave-regex+'.
      also suppresses undo-tree messages relating to saving files."
                      (not
@@ -6796,7 +6810,7 @@
      (use-package uuidgen
        :straight t
        :leader
-       ("iU" 'uuidgen
+       ("iu" 'uuidgen
         ;; "U1" 'uuidgen-1
         ;; "U4" 'uuidgen-4
         ;; "UU" 'uuidgen-U
@@ -6968,7 +6982,7 @@
         :defer  load-me-now-duration
         :diminish yas-minor-mode
         :leader
-        ("iSn" 'yas-new-snippet
+        ("isn" 'yas-new-snippet
          "fS" 'yas-visit-snippet-file)
 
         :config
@@ -7007,7 +7021,7 @@
       (use-package +yas-license
         :commands +insert-license
         :leader
-        ("ia" '+insert-license))
+        ("ih" '+insert-license))
     #+END_SRC
 
     #+begin_src emacs-lisp
@@ -7291,7 +7305,7 @@
 
         (aas-set-snippets 'org-mode
           :cond (lambda () (not (laas-mathp)))
-          "<<" (lambda! ()
+          "<<" (lambda!
                  (yas-expand-snippet
                   (concat "#+BEGIN_SRC $1\n"
                           "$0\n"
@@ -7447,10 +7461,15 @@
    #+END_SRC
 
 ** auto-insert
+   Can use skeletons, see [[info:autotype#Skeleton Language][Skeleton Language]].
+
    #+BEGIN_SRC emacs-lisp
      (use-package autoinsert
        :custom
-       (auto-insert-directory (etc! "auto-insert")))
+       (auto-insert-directory (etc! "auto-insert"))
+
+       :leader
+       ("ia" 'auto-insert))
    #+END_SRC
 
 ** auto-revert-mode
@@ -7751,6 +7770,9 @@
         (compilation-ask-about-save nil)
 
         :config
+        (evil-set-command-property 'next-error :jump t)
+        (evil-set-command-property 'previous-error :jump t)
+
         (push 'compilation-mode whitespace-exempt-modes)
 
         (setq compilation-read-command nil
@@ -8243,6 +8265,9 @@
 
        (advice-add 'diff-kill-applied-hunks :around #'diff-kill-applied-hunks--ensure-all-hunks-killed)
 
+       (advice-add #'diff-apply-hunk :around #'display-buffer-no-select-window-advice)
+       (advice-add #'diff-test-hunk :around #'display-buffer-no-select-window-advice)
+
        :leader
        (:prefix leader-diff-leader-prefix
         "" '(:ignore t :wk "diff")
@@ -8354,10 +8379,15 @@
           (call-interactively 'evil-scroll-up)
           (dired-move-to-filename))
 
+        :config
+        ;; This keeps getting reset by some package on load so defer it.
+        (general-define-key :keymaps 'dired-mode-map [override-state] 'all)
+
         :general
         (:keymaps 'dired-mode-map
-         ;; let map override any motion bindings
-         "<override-state>" 'motion)
+         leader-key nil
+         leader-major-mode-key nil
+         "g" nil)
         (:keymaps 'dired-mode-map
          :states  'motion
          ")" 'dired-omit-mode
@@ -8564,6 +8594,13 @@
 ** image-dired
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! image-dired)
      (use-package image-dired
+       ;; :custom
+       ;; (image-dired-db-file . (state! "image-dired" "db.el")) ; tag associations
+       ;; (image-dired-dir . (state! "image-dired/"))
+       ;; (image-dired-gallery-dir . (state! "image-dired" "gallery/"))
+       ;; (image-dired-temp-image-file . (state! "image-dired" "temp-image"))
+       ;; (image-dired-temp-rotate-image-file . (state! "image-dired" "temp-rotate-image"))
+
        :config
        (push 'image-dired-thumbnail-mode whitespace-exempt-modes)
 
@@ -8744,14 +8781,14 @@
                (window-configuration-to-register ediff-window-register)))
            (add-hook 'ediff-before-setup-hook #'ediff--restore-windows-before)
 
-           (defun ediff--restore-windows-after (&rest args)
+           (defun ediff--restore-windows-after (&rest _args)
              (if (not (funcall register-active))
                  (message "ediff-restore-windows : no previous window config found to restore")
                (jump-to-register ediff-window-register)
                (set-register ediff-window-register nil)))
            (add-hook 'ediff-quit-hook #'ediff--restore-windows-after))
 
-         (defun ediff--kill-ediff-temp-buffers (&rest args)
+         (defun ediff--kill-ediff-temp-buffers (&rest _args)
            "kills all the spawned ediff buffers... because
        there's way too many and their named so similairly that
        there's no point in them existing... Plus I keep ending
@@ -8785,7 +8822,7 @@
 
          (add-hook 'ediff-quit-hook #'ediff--kill-ediff-temp-buffers)
 
-         (defun ediff--customize-ediff-mode-map (&rest args)
+         (defun ediff--customize-ediff-mode-map (&rest _args)
            "give me back my leader keys damn it :P"
            (general-define-key
             :keymaps 'ediff-mode-map
@@ -8996,7 +9033,6 @@
         ("tF" 'flymake-rest-change-checker))
 
       (use-package flymake-rest
-        :straight t
         :flymake-hook
         (python-mode
          flymake-rest-pycodestyle
@@ -9179,7 +9215,7 @@
         :hook (ibuffer-mode . ibuffer-auto-revert-setup+)
         :commands (ibuffer-auto-revert-setup+)
         :config
-        (defun ibuffer-stale-p+ (&optional noconfirm)
+        (defun ibuffer-stale-p+ (&optional _noconfirm)
           ;; Let's reuse the variable that's used for 'ibuffer-auto-mode
           (frame-or-buffer-changed-p 'ibuffer-auto-buffers-changed))
 
@@ -9440,7 +9476,9 @@
           (ibuffer-projectile-set-filter-groups))
 
         (defgroup ibuffer-projectile-mode nil
-          "")
+          ""
+          :group 'projectile
+          :group 'ibuffer)
         (define-minor-mode ibuffer-projectile-mode
           "Generate ibuffer filters for projectile projects."
           :lighter nil
@@ -12031,6 +12069,8 @@
          "g" 'embark-find-definition
          "b" 'global-set-key
          "w" 'where-is)
+        (:keymaps 'embark-become-file+buffer-map
+         "t" 'find-temp-file+)
 
         :lazy-leader
         (:mode 'embark-collect-mode
@@ -12059,7 +12099,9 @@
         :straight t
         :commands (consult--read
                    consult-ripgrep-no-project+
-                   consult-grep-no-project+)
+                   consult-grep-no-project+
+                   consult--buffer-state
+                   consult--lookup-cdr)
         :custom
         (consult-project-root-function #'projectile-project-root)
         (consult-async-split-style 'slash)
@@ -12088,7 +12130,7 @@
                               :types ((?f "Functions" font-lock-function-name-face)
                                       (?m "Macros"    font-lock-function-name-face)
                                       (?p "Packages"  font-lock-constant-face)
-                                      (?c "Types"     font-lock-type-face)
+                                      (?t "Types"     font-lock-type-face)
                                       (?v "Variables" font-lock-variable-name-face)))
              ,@(cl-loop for mode in '(c++-mode c-mode)
                         collect (list mode :types '((?c "Class" font-lock-type-face)
@@ -12138,57 +12180,7 @@
         (consult-customize
          switch-to-scratch-buffer :state #'consult--buffer-state)
 
-        (defvar consult-font-lock-exclude+
-          '(Man-mode
-            adoc-mode
-            bbdb-mode
-            bongo-library-mode
-            bongo-mode
-            bongo-playlist-mode
-            bookmark-bmenu-mode
-            circe-channel-mode
-            circe-query-mode
-            circe-server-mode
-            deadgrep-mode
-            debbugs-gnu-mode
-            dired-mode
-            elfeed-search-mode
-            elfeed-show-mode
-            emms-playlist-mode
-            emms-stream-mode
-            erc-mode
-            eshell-mode
-            eww-mode
-            forth-block-mode
-            forth-mode
-            fundamental-mode
-            gnus-article-mode
-            gnus-group-mode
-            gnus-summary-mode
-            help-mode
-            helpful-mode
-            jabber-chat-mode
-            magit-popup-mode
-            matrix-client-mode
-            matrix-client-room-list-mode
-            mu4e-headers-mode
-            mu4e-view-mode
-            nix-mode
-            notmuch-search-mode
-            notmuch-tree-mode
-            occur-edit-mode
-            occur-mode
-            org-agenda-mode
-            package-menu-mode
-            rcirc-mode
-            sauron-mode
-            sieve-mode
-            treemacs-mode
-            twittering-mode
-            vc-dir-mode
-            w3m-mode
-            woman-mode
-            xref--xref-buffer-mode)
+        (defvar consult-font-lock-exclude+ nil
           "The equivalent of `swiper-font-lock-exclude'")
 
         (advice-add 'consult--line-candidates :around
@@ -12201,8 +12193,7 @@
                       "The equivalent of `swiper-font-lock-ensure-p'."
                       (unless (or (derived-mode-p 'magit-mode)
                                   (bound-and-true-p magit-blame-mode)
-                                  (memq major-mode consult-font-lock-exclude+)
-                                  (not (derived-mode-p 'prog-mode)))
+                                  (memq major-mode consult-font-lock-exclude+))
                         (apply func args))))
 
         (defmacro with-consult-ignore-project+ (func)
@@ -12557,7 +12548,7 @@
              :prompt "Candidate: "
              :lookup #'consult--lookup-cdr
              :sort nil
-             :group (consult--type-title narrow-assoc)
+             :group (consult--type-group narrow-assoc)
              :narrow
              ;; (consult--type-narrow narrow-assoc)
              (let* ((narrow (consult--type-narrow narrow-assoc))
@@ -13115,13 +13106,23 @@
 *** affe
     An experiment for asynchronous fuzzy finding in emacs based on consult.
 
-    #+BEGIN_SRC emacs-lisp :tangle no
+    #+BEGIN_SRC emacs-lisp
       (use-package affe
-        :straight (affe :host github :repo "minad/affe")
+        :straight t
+        :custom
+        (affe-find-command "find -type f")
+        (affe-count 100)
+
         :config
         (when (package! orderless)
           (setq affe-regexp-function #'orderless-pattern-compiler
-                affe-highlight-function #'orderless-highlight-matches)))
+                affe-highlight-function #'orderless-highlight-matches))
+        :leader
+        (:mode '(selectrum-mode
+                 vertico-mode)
+         :minor t
+         "fsF" 'affe-find
+         "fsr" 'affe-grep))
     #+END_SRC
 
 ** ace-link
@@ -13292,6 +13293,11 @@
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! bufler)
      (use-package bufler
        :straight t
+       :custom
+       (bufler-list-display-buffer-action
+        '((display-buffer-reuse-window
+           display-buffer-same-window)))
+
        :init
        (push 'bufler-list-mode whitespace-exempt-modes)
 
@@ -13301,15 +13307,6 @@
                    '(display-buffer-reuse-window
                      display-buffer-same-window))
              display-buffer-alist)
-
-       ;; Override the default bufler switch command to make sure it
-       ;; doesn't delete the bufler window. See [[https://github.com/alphapapa/bufler.el/issues/42][here]].
-       (bufler-define-buffer-command switch "Switch to buffer."
-         (lambda (buffer)
-           (let ((bufler-window (selected-window)))
-             (pop-to-buffer buffer '((display-buffer-reuse-window
-                                      display-buffer-same-window)))))
-         :refresh-p nil)
 
        :leader
        ("bm" 'bufler)
@@ -13323,6 +13320,7 @@
         "o" 'bufler-list-buffer-peek
         "RET" 'bufler-list-buffer-switch
         "d" 'bufler-list-buffer-kill
+        "s" 'bufler-list-buffer-save
         [remap revert-buffer] 'bufler))
    #+END_SRC
 
@@ -13818,7 +13816,12 @@
                          (pylint (enabled . t))
                          (jedi_completion
                           (fuzzy . t)
-                          (follow_builtin_imports . :json-false))))))
+                          (follow_builtin_imports . :json-false))))
+                       (:pylsp
+                        (configurationSources . ["pycodestyle"])
+                        (plugins
+                         (pydocstyle
+                          (enabled . t))))))
 
        :config
        (require 'yasnippet)                                                          ; needed or else snippet expansion won't happen.
@@ -14034,7 +14037,7 @@
                 do (setq engine id-str)
               do (progn
                    (when key
-                     (leader-set-keys key (cons engine id-sym)))
+                     (leader-set-keys key (list id-sym :wk engine)))
                    (autoload id-sym "engine-mode.el" nil t)))
 
      (with-eval-after-load 'engine-mode
@@ -14810,6 +14813,7 @@
         "N" 'evil-ex-search-previous)
        (:keymaps 'magit-status-mode-map
         :states '(motion visual)
+        "t" 'magit-tag
         "gz"  'magit-jump-to-stashes
         "gt"  'magit-jump-to-tracked
         "gn"  'magit-jump-to-untracked
@@ -14860,6 +14864,7 @@
         "gk" 'git-commit-prev-message "M-p" nil
         "gj" 'git-commit-next-message "M-n" nil)
        (:keymaps '(magit-mode-map
+                   magit-blame-mode-map
                    magit-blame-read-only-mode-map
                    magit-cherry-mode-map
                    magit-mode-map
@@ -14872,6 +14877,7 @@
                    magit-log-read-revs-map
                    magit-process-mode-map
                    magit-refs-mode-map)
+        leader-key nil                                                               ; GIVE ME BACK MY LEADER!!!
         "<override-state>" 'all)
        (:keymaps '(git-rebase-mode-map
                    magit-gh-pulls-mode-map)
@@ -17831,8 +17837,8 @@
      (use-package cc-mode
        :straight (cc-mode :type built-in)
        :mode ("\\.h$" . c++-mode)
-       :hook ((c-mode . +flylint)
-              (c++-mode . +flylint))
+       ;; :hook ((c-mode . +flylint)
+       ;;        (c++-mode . +flylint))
        :custom
        (c-default-style '((java-mode . "java")
                           (awk-mode . "awk")
@@ -18788,6 +18794,12 @@
              "zathura")
            TeX-view-program-list))
 
+        (add-hook 'org-src-mode-hook
+                  (defun org-src-setup-auctex+ ()
+                    (when (eq major-mode 'latex-mode)
+                      (apply #'TeX-run-style-hooks
+                             (mapcar #'cadr org-latex-packages-alist)))))
+
         :lazy-leader
         (:mode 'TeX-error-overview-mode
          "b" 'TeX-error-overview-toggle-debug-bad-boxes
@@ -19472,6 +19484,12 @@
                          (propertize "enabled" 'face 'compilation-info)
                        (propertize "disabled" 'face 'compilation-error)))))
 
+        :config
+        (advice-add #'org-src--contents-for-write-back :after
+                    (defun org-edit-src-write-back-clean-whitespace+ (buf)
+                      (with-current-buffer buf
+                        (delete-trailing-whitespace (point-min) (point-max)))))
+
         :leader
         ("o"  '(:ignore t :wk "org")
          "oc" 'org-capture
@@ -19526,8 +19544,9 @@
          "R" 'org-refile-goto-last-stored
          "s" 'org-schedule
          "T" 'org-show-todo-tree
-         "U" 'org-update-all-dblocks
-         "u" 'org-dblock-update
+         "X" 'org-update-all-dblocks
+         "x" 'org-dblock-update
+         "u" 'org-id-get-create
          ;; "C-h" 'org-shiftcontrolleft
          ;; "C-j" 'org-shiftcontroldown
          ;; "C-k" 'org-shiftcontrolup
@@ -19951,8 +19970,8 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! org)
       (use-package org-capture
-        ;; :custom
-        ;; (org-capture-bookmark nil)
+        :custom
+        (org-capture-bookmark nil)
 
         :config
         (require '+org-capture)
@@ -20413,8 +20432,8 @@
         :custom
         (org-roam-prefer-id-links t)
         (org-roam-completion-system 'default)
-        (org-id-link-to-org-use-id 'create-if-interactive)
-        (org-roam-db-location (var! "org-roam.db"))
+        (org-id-link-to-org-use-id 'use-existing)
+        (org-roam-db-location (state! "org-roam.db"))
 
         :config
         (org-roam-setup)
@@ -21697,3 +21716,4 @@
 # End:
 
 #  LocalWords:  config emacs src backend flymake flycheck restclient elisp JSON YAML
+#  LocalWords:  Apheleia ui
