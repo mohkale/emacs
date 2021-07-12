@@ -6796,22 +6796,54 @@
    #+END_SRC
 
 ** undo-fu
+   :PROPERTIES:
+   :header-args+: :tangle (package-no! undo-tree)
+   :END:
+
+   Emacs built-in undo is _weird_ and *wonderful*.
+
+   If you can understand it it'll certainly come in useful, however for most users
+   [[*undo-tree][undo-tree]] will be a much simpler and easier to use undoing package.
+
+   Alright, now to explain how undo and the helping wrapper package ~undo-fu~ works.
+   You may find it helpful to read [[https://www.reddit.com/r/emacs/comments/6yzwic/how_emacs_undo_works/][this]] before trying out ~undo-fu~.
+
+   Emacs implements undo as a chain of actions including undo itself. To redo an
+   action emacs actually undoes an undo, pushing this new reverse undo back onto
+   the undo history.
+   This means the emacs undo history is complete, every previous state the buffer
+   was in can be accessed, however the more changes you make (including undos or
+   redos) the more is pushed onto the undo history chain and the longer it'll take
+   to reverse to that state when redoing.
+
+   The general approach to undo with this new system is to either undo to the state
+   you want to get to or redo the undos from the end of the undo-history until you
+   reach your desired state.
+   In the former case the change you want is a concrete piece of the current undo
+   history and can be reached linearly by undoing.
+   In the latter case you want a revision in a separate undo history. For example
+   you make an edit, undo once, make an edit, and can now no longer access the
+   changes you undid with the initial undo.
+   The undo history in this case is ~A -> B -> C -> Undo -> Undo -> D -> E~. The final
+   text in the buffer is from the series of changes ~ADE~ and you can undo through
+   them easily. How do you get back to ~ABC~? By *redoing*. At state ~E~ you can redo to
+   reverse ~E~ and get to ~D~, then at ~D~ you redo to get back to ~A~, now redoing reverses
+   the undo that removed ~B~ and redoing once more undos the removal of ~C~ inserting it
+   back in. We get back to ~ABC~.
+   This linear structure of undo can extend upto an arbitrary depth, the only issue
+   is having to manoeuvre through intermittent histories as you navigate.
+
    #+BEGIN_SRC emacs-lisp :tangle (package-no! undo-tree)
      (use-package undo-fu
        :straight t
        :custom
-       (evil-undo-system 'undo-fu)
-
-       :general
-       (:states 'normal
-        "u" 'undo-fu-only-undo
-        "C-r" 'undo-fu-only-redo))
+       (evil-undo-system 'undo-fu))
 
      (use-package undo-fu-session
        :straight t
-       :hook (after-init-hook . global-undo-fu-session-mode)
+       :hook (after-init . global-undo-fu-session-mode)
        :custom
-       (undo-fu-session-directory (var! "undo-fu"))
+       (undo-fu-session-directory (state! "undo-fu"))
        (undo-fu-session-incompatible-files (list undo-skip-autosave-regex+)))
    #+END_SRC
 
