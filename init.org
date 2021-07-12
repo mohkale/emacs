@@ -9726,74 +9726,213 @@
    #+END_SRC
 
 ** minibuffer
-   There are a *tonne*of minibuffer-completion maps. See [[info:emacs#Minibuffer Maps][minibuffer maps]].
+   #+begin_src emacs-lisp
+     (use-package minibuffer
+       :init
+       (defun minibuffer-input+ ()
+         "Get the input to the last minibuffer prompt."
+         (cond ((package! selectrum)
+                selectrum--last-input)
+               ((package! vertico)
+                (car vertico--input))
+               (t (buffer-substring-no-properties
+                   (line-beginning-position)
+                   (line-end-position)))))
 
-   #+BEGIN_SRC emacs-lisp
-     (general-define-key
-      :keymaps 'minibuffer-local-map
-      "C-j" 'next-line
-      "C-k" 'previous-line
-      "C-h" 'backward-char
-      ;; "C-l" 'exit-minibuffer
-      "C-l" (defun minibuffer-forward-char-or-exit+ ()
-              (interactive)
-              (call-interactively (if (eolp)
-                                      'exit-minibuffer
-                                    'forward-char)))
-      "C-d" 'scroll-up-command
-      "C-u" 'scroll-down-command ;'minibuffer-scroll-down-command
-      "C-o" 'end-of-buffer
-      "M-o" 'beginning-of-buffer ; 'minibuffer-beginning-of-buffer
-      "M-j" 'next-history-element
-      "M-k" 'previous-history-element
-      "C-s" 'previous-matching-history-element
-      "C-r" 'next-matching-history-element
-      "C-a" 'move-beginning-of-line
-      "C-e" 'move-end-of-line
-      [C-i] "TAB"
-      "C-c C-u" 'universal-argument
-      "C-v" 'quoted-insert
-      "M-DEL" 'kill-whole-line
-      "C-w" 'backward-kill-word
-      "C-c C-j" 'forward-paragraph
-      "C-c C-k" 'backward-paragraph
+       (cl-defsubst +completion-metadata (&optional input)
+         (completion-metadata
+          (or input
+              (buffer-substring (minibuffer-prompt-end)
+                                (max (minibuffer-prompt-end) (point))))
+          minibuffer-completion-table
+          minibuffer-completion-predicate))
 
-      ;; "C-?" 'minibuffer-completion-help
-      ;; "M-h" 'backward-kill-sentence
-      ;; "M-l" 'kill-sentence
 
-      "M-l" 'minibuffer-recenter-top-bottom)
+       :init ;; Helpers to define completion category dependent bindings.
+       (defun define-minibuffer-key+ (key &rest defs)
+         "Define KEY conditionally in the minibuffer.
+     DEFS is a plist associating completion categories to commands."
+         (define-key minibuffer-local-map key
+           (list 'menu-item nil defs :filter
+                 (lambda (d)
+                   (let ((cat (completion-metadata-get
+                               (completion-metadata (minibuffer-contents)
+                                                    minibuffer-completion-table
+                                                    minibuffer-completion-predicate)
+                               'category)))
+                     (or (plist-get d cat)
+                         (plist-get d t)))))))
 
-     (general-define-key
-      :keymaps 'minibuffer-local-must-match-map
-      "TAB" 'minibuffer-complete
-      "<C-tab>" 'minibuffer-complete-and-exit
-      "C-j" nil)
+       :init ;; When completing file names I'd prefer if kill-word killed basename.
+       (defvar minibuffer-file-backward-kill-word-kills-basename nil
+         "When t trying to kill backwards in `find-file' kills the entire basename.")
 
-     (general-define-key
-      :keymaps '(minibuffer-local-map
-                 minibuffer-local-must-match-map
-                 minibuffer-inactive-mode-map
-                 minibuffer-local-ns-map
-                 minibuffer-local-completion-map)
-      "<escape>" 'abort-recursive-edit)
-   #+END_SRC
+       (defun minibuffer-backward-kill-file-name+ (input)
+         (interactive (list (minibuffer-input+)))
+         (setq input (substitute-in-file-name input))
+         (let (;; Append successive kills together instead of replacing them each time.
+               (last-command (if (eq last-command 'minibuffer-backward-kill-file-name+)
+                                 'kill-region
+                               last-command)))
+           (if (eq input "/")
+               (kill-region (point-max) (- (point-max) 1))
+             (let* ((dirname (or (file-name-directory input) ""))
+                    (basename (file-name-nondirectory input))
+                    (trailing-slash-p (string-suffix-p "/" dirname)))
+               (when trailing-slash-p
+                 (setq dirname (s-chop-suffix "/" dirname)))
 
-    Some more sage advice from the demigods at [[https://github.com/hlissner/doom-emacs/blob/develop/docs/faq.org#how-does-doom-start-up-so-quickly][doom]].
+               (cond
+                ((not (string-empty-p basename))
+                 (if minibuffer-file-backward-kill-word-kills-basename
+                     (kill-region (point-max) (- (point-max) (length basename)))
+                   (call-interactively #'backward-kill-word)))
+                ;; Handle edge cases with last directory or magic tilde.
+                ((string-equal dirname "~")
+                 (kill-region (point-max)
+                              (- (point-max) 1 (if trailing-slash-p 1 0)))
+                 (insert (file-name-directory (expand-file-name "~"))))
+                ;; Kill from EOL to the cut off point for the previous directory.
+                (t
+                 (kill-region (point-max)
+                              (- (point-max)
+                                 (-
+                                  (length dirname)
+                                  (length (or (file-name-directory dirname) ""))
+                                  (if trailing-slash-p -1 0))))))))))
 
-    #+BEGIN_SRC emacs-lisp
-      (defun defer-garbage-collection+ ()
-        (setq gc-cons-threshold most-positive-fixnum))
+       :config
+       (define-minibuffer-key+ (kbd "C-w")
+         'file #'minibuffer-backward-kill-file-name+
+         t #'backward-kill-word)
 
-      (defun restore-garbage-collection+ ()
-        ;; Deferred so that commands launched immediately after will enjoy the
-        ;; benefits.
-        (run-at-time
-         1 nil (lambda () (setq gc-cons-threshold default-gc-cons-threshold))))
+       :init
+       (defun minibuffer-forward-char-or-exit+ ()
+         (interactive)
+         (call-interactively (if (eolp)
+                                 'exit-minibuffer
+                               'forward-char)))
 
-      (add-hook 'minibuffer-setup-hook #'defer-garbage-collection+)
-      (add-hook 'minibuffer-exit-hook #'restore-garbage-collection+)
-    #+END_SRC
+       :init ;; Some more sage advice from the demigods at [[https://github.com/hlissner/doom-emacs/blob/develop/docs/faq.org#how-does-doom-start-up-so-quickly][doom]].
+       (defun defer-garbage-collection+ ()
+         (setq gc-cons-threshold most-positive-fixnum))
+
+       (defun restore-garbage-collection+ ()
+         ;; Deferred so that commands launched immediately after will enjoy the
+         ;; benefits.
+         (run-at-time
+          1 nil (lambda () (setq gc-cons-threshold default-gc-cons-threshold))))
+
+       (add-hook 'minibuffer-setup-hook #'defer-garbage-collection+)
+       (add-hook 'minibuffer-exit-hook #'restore-garbage-collection+)
+
+       :general
+       ;; There are a *tonne* of minibuffer-completion maps. See [[info:emacs#Minibuffer Maps][minibuffer maps]].
+       (:keymaps 'minibuffer-local-map
+        "C-j" 'next-line
+        "C-k" 'previous-line
+        "C-h" 'backward-char
+        "C-l" 'minibuffer-forward-char-or-exit+                                      ; exit-minibuffer
+        "C-d" 'scroll-up-command
+        "C-u" 'scroll-down-command                                                   ; minibuffer-scroll-down-command
+        "C-o" 'end-of-buffer
+        "M-o" 'beginning-of-buffer                                                   ; minibuffer-beginning-of-buffer
+        "M-j" 'next-history-element
+        "M-k" 'previous-history-element
+        "C-s" 'previous-matching-history-element
+        "C-r" 'next-matching-history-element
+        "C-a" 'move-beginning-of-line
+        "C-e" 'move-end-of-line
+        [C-i] "TAB"
+        "C-c C-u" 'universal-argument
+        "C-v" 'quoted-insert
+        "M-DEL" 'kill-whole-line
+        "C-c C-j" 'forward-paragraph
+        "C-c C-k" 'backward-paragraph
+
+        ;; "C-?" 'minibuffer-completion-help
+        ;; "M-h" 'backward-kill-sentence
+        ;; "M-l" 'kill-sentence
+
+        "M-l" 'minibuffer-recenter-top-bottom)
+       (:keymaps 'minibuffer-local-must-match-map
+        "TAB" 'minibuffer-complete
+        "<C-tab>" 'minibuffer-complete-and-exit
+        "C-j" nil)
+       (:keymaps '(minibuffer-local-map
+                   minibuffer-local-must-match-map
+                   minibuffer-inactive-mode-map
+                   minibuffer-local-ns-map
+                   minibuffer-local-completion-map)
+        "<escape>" 'abort-recursive-edit))
+   #+end_src
+
+*** sorting
+    This section declares custom sort functions for various completion categories.
+    For the most part I use the following alist to associate specific sorting
+    functions with completion categories.
+
+    #+begin_src emacs-lisp
+      (defvar +completion-category-sort-func-overrides nil
+        "Custom sort functions based on completion categories.")
+    #+end_src
+
+    When completing file-names or directories I'd rather have the directories come
+    before the files.
+    This matches the same format I have for ~ls~ or ~dired~.
+
+    #+begin_src emacs-lisp
+      (defun +directories-before-files (files)
+        (nconc (seq-filter (lambda (x) (string-suffix-p "/" x)) files)
+               (seq-remove (lambda (x) (string-suffix-p "/" x)) files)))
+
+      (push `(file . ,#'+directories-before-files)
+            +completion-category-sort-func-overrides)
+    #+end_src
+
+    And this is just a helper function that can be used by any completion UIs to find
+    out which sorting function I want for given completion metadata. By default if the
+    metadata specifies its own sort function then that takes priority. If this function
+    returns ~nil~ then you should use the default sorting function for your completion
+    framework.
+
+    #+begin_src emacs-lisp
+      (defun +completion-category-sort-func (metadata)
+        (or
+         (completion-metadata-get metadata 'display-sort-function)
+         (alist-get (completion-metadata-get metadata 'category)
+                    +completion-category-sort-func-overrides)))
+    #+end_src
+
+*** highlighting
+    This section declares custom highlight functions based on completion categories.
+
+    #+begin_src emacs-lisp
+      (defvar +completion-category-hl-func-overrides nil
+        "Custom highlight functions based on completion categories.")
+    #+end_src
+
+    File name completions have directories highlighted separately from files.
+
+    #+begin_src emacs-lisp
+      (defun +completion-category-highlight-files (cand)
+        (let ((len (length cand)))
+          (when (and (> len 0)
+                     (eq (aref cand (1- len)) ?/))
+            (add-face-text-property 0 len 'font-lock-function-name-face 'append cand)))
+        cand)
+
+      (push `(file . ,#'+completion-category-highlight-files)
+            +completion-category-hl-func-overrides)
+    #+end_src
+
+    This function associates a highlight function with the given completion metadata.
+
+    #+begin_src emacs-lisp
+      (defun +completion-category-hl-func (metadata)
+        (alist-get (completion-metadata-get metadata 'category)
+                   +completion-category-hl-func-overrides))
+    #+end_src
 
 ** minibuffer-depth-indication
    #+BEGIN_SRC emacs-lisp
@@ -11815,74 +11954,46 @@
      (use-package selectrum
        :straight t
        :hook (after-init . selectrum-mode)
-       :commands (selectrum-preprocess+
-                  selectrum-highlight+
-                  selectrum-smart-backward-kill-word+)
        :custom
        (selectrum-max-window-height 15)
        (selectrum-count-style 'current/matches)
        (selectrum-files-select-input-dirs t)
-       (selectrum-preprocess-candidates-function #'selectrum-preprocess+)
-       (selectrum-highlight-candidates-function #'selectrum-highlight+)
 
        :init
        (defvaralias 'selectrum-completion-in-region-styles 'completion-styles)
 
        :config
      ;;; Sorting configuration and workarounds
-       (defun selectrum-sort-cands+ (cands)
-         (cond
-          ;; Finding file-names should sort directories first.
-          ((eq minibuffer-completion-table 'read-file-name-internal)
-             ;; Only sort based on filename, with directories being first :-)
-             (sort cands
-                   (lambda (x y)
-                     (let ((x-dir (eq (aref x (- (length x) 1)) ?/))
-                           (y-dir (eq (aref y (- (length y) 1)) ?/)))
-                       (cond
-                        ((and x-dir y-dir)
-                        (string< (directory-file-name x) (directory-file-name y)))
-                        (x-dir t)
-                        (y-dir nil)
-                        (t (string< x y)))))))))
-
-       (defun selectrum-preprocess+ (cands)
-         (when selectrum-should-sort
-           (setq cands
-                 (or (selectrum-sort-cands+ cands)
-                     (when (bound-and-true-p selectrum-prescient-mode)
-                       (selectrum-prescient--preprocess cands))
-                     (selectrum-default-candidate-preprocess-function cands)
-                     cands)))
-         cands)
+       (setq selectrum-preprocess-candidates-function
+             (defun selectrum-preprocess+ (cands)
+               (when selectrum-should-sort
+                 (when-let ((sort-func (or (+completion-category-sort-func
+                                            (+completion-metadata))
+                                           (when (bound-and-true-p selectrum-prescient-mode)
+                                             #'selectrum-prescient--preprocess)
+                                           #'selectrum-default-candidate-preprocess-function)))
+                   (setq cands (funcall sort-func cands))))
+               cands))
 
      ;;; Update highlighting for certain completions
-       (defun selectrum-highlight-candidates+ (input cands)
-         (if (eq 'file (completion-metadata-get
-                        (completion-metadata
-                         input
-                         minibuffer-completion-table
-                         minibuffer-completion-predicate)
-                        'category))
-             (cl-loop for cand in cands
-                      for len = (length cand)
-                      if (and (> len 0)
-                              (eq (aref cand (1- len)) ?/))
-                        do (add-face-text-property 0 (length cand) 'font-lock-function-name-face 'append cand)
-                      end
-                      collect cand)
-           cands))
+       (defun selectrum-completion-highlight+ (input cands)
+         (when-let ((hl-func (+completion-category-hl-func
+                              (+completion-metadata input))))
+           (setq cands (mapcar hl-func cands)))
+         cands)
 
-       (defun selectrum-highlight+ (input cands)
-         (cl-reduce (lambda (cands func)
-                      (funcall func input cands))
-                    (delq nil (list #'selectrum-highlight-candidates+
-                                    (cond ((member 'orderless completion-styles)
-                                           #'orderless-highlight-matches)
-                                          ((bound-and-true-p selectrum-prescient-mode)
-                                           #'selectrum-prescient--highlight)
-                                          (t #'selectrum-candidates-identity))))
-                    :initial-value cands))
+       (setq selectrum-highlight-candidates-function
+             (defun selectrum-highlight+ (input cands)
+               (cl-reduce (lambda (cands func)
+                            (funcall func input cands))
+                          `(,#'selectrum-completion-highlight+
+                            ,@(cond ((member 'orderless completion-styles)
+                                     (list #'orderless-highlight-matches))
+                                    ((bound-and-true-p selectrum-prescient-mode)
+                                     (list #'selectrum-prescient--highlight))
+                                    (t
+                                     (list #'selectrum-candidates-identity))))
+                          :initial-value cands)))
 
        (defun selectrum-override-current-candidate-face-face-range+ (str overriding-faces)
          (cl-loop for i from 0 to (length str)
@@ -11955,44 +12066,6 @@
                    evil-ex-search-direction 'forward)
              (evil-ex-search-activate-highlight (list regexp t t)))))
 
-       (defvar selectrum-backward-kill-word-kills-basename nil
-         "When t trying to kill backwards in `find-file' kills the entire basename")
-
-       (defun selectrum-smart-backward-kill-word+ ()
-         "A smart variant of `backward-kill-word' for selectrum."
-         (interactive)
-         (if (eq selectrum--last-command 'find-file)
-             (let ((input (substitute-in-file-name selectrum--last-input))
-                   (last-command (if (eq last-command 'selectrum-smart-backward-kill-word+)
-                                     'kill-region
-                                   last-command)))
-               (if (eq input "/")
-                   (kill-region (point-max) (- (point-max) 1))
-                 (let* ((dirname (or (file-name-directory input) ""))
-                        (basename (file-name-nondirectory input))
-                        (trailing-slash-p (string-suffix-p "/" dirname)))
-                   (when trailing-slash-p
-                     (setq dirname (s-chop-suffix "/" dirname)))
-                   (cond
-                    ((not (string-empty-p basename))
-                     (if selectrum-backward-kill-word-kills-basename
-                         (kill-region (point-max) (- (point-max) (length basename)))
-                       (call-interactively #'backward-kill-word)))
-                    ;; Handle edge cases with last directory or magic tilde.
-                    ((string-equal dirname "~")
-                     (kill-region (point-max)
-                                  (- (point-max) 1 (if trailing-slash-p 1 0)))
-                     (insert (file-name-directory (expand-file-name "~"))))
-                    ;; Kill from EOL to the cut off point for the previous directory.
-                    (t
-                     (kill-region (point-max)
-                                  (- (point-max)
-                                     (-
-                                      (length dirname)
-                                      (length (or (file-name-directory dirname) ""))
-                                      (if trailing-slash-p -1 0)))))))))
-           (call-interactively #'backward-kill-word)))
-
        :leader
        ("RET" 'selectrum-repeat)
 
@@ -12014,7 +12087,6 @@
                                 'forward-char)))
         [remap next-matching-history-element] 'selectrum-select-from-history
         "C-i" 'selectrum-insert-current-candidate
-        [remap backward-kill-word] 'selectrum-smart-backward-kill-word+
         "<S-return>" 'selectrum-submit-exact-input))
    #+END_SRC
 
@@ -12053,6 +12125,22 @@
        (vertico-cycle t)
        (minibuffer-prompt-properties
         '(read-only t cursor-intangible t face minibuffer-prompt))
+
+       :config
+       (advice-add #'vertico--arrange-candidates :around
+                   (defun vertico-format-candidates+ (func metadata)
+                     (let ((hl-func (or (+completion-category-hl-func metadata)
+                                        #'identity)))
+                       (cl-letf* (((symbol-function 'actual-vertico-format-candidate)
+                                   (symbol-function #'vertico--format-candidate))
+                                  ((symbol-function #'vertico--format-candidate)
+                                   (lambda (cand &rest args)
+                                     (apply #'actual-vertico-format-candidate
+                                            (funcall hl-func cand) args))))
+                         (funcall func metadata)))))
+
+       (advice-add #'vertico--sort-function :before-until #'+completion-category-sort-func)
+       (advice-add #'vertico--tidy-shadowed-file :override #'ignore)                 ; Re-enable file-name shadowing.
 
        :general
        (:keymaps 'vertico-map
