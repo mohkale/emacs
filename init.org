@@ -6737,11 +6737,21 @@
                            (not (string-match-p undo-skip-autosave-regex+
                                                 buffer-file-name))))))
 
-       ;; (advice-add 'undo-tree-save-history :around
-       ;;             (defun undo-tree-save-history--suppress-message+ (func &rest args)
-       ;;               (let ((message-log-max nil)
-       ;;                     (save-silently t))
-       ;;                 (apply func args))))
+       (advice-add #'undo-tree-save-history :around
+                   (defun undo-tree-silence-save-history+ (func &rest args)
+                     "Suppress undo-file save messages.
+     By default undo-tree writes a message to the Messages buffer EVERY
+     time you save a file. This is highly diruptive, you can suppress the
+     messages by assigning `inhibit-message' but it still shows up in the
+     messages buffer. This redefines the `write-region' function and
+     forces it to not echo out that the files been saved."
+                     (cl-letf* ((actual-write-region
+                                (symbol-function 'write-region))
+                               ((symbol-function 'write-region)
+                                (lambda (&rest args)
+                                  (setcar (nthcdr 4 args) 'nomessage)
+                                  (apply actual-write-region args))))
+                       (apply func args))))
 
        (defun undo-tree-visualizer-set-and-exit-selection-mode ()
          (interactive)
