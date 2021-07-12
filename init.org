@@ -9215,6 +9215,32 @@
        (+set-compilation-bindings 'grep-mode 'grep-mode-map))
    #+END_SRC
 
+*** wgrep
+    Allows you to edit and persists changes to grep-buffers to the underlying
+    files... kinda like occur-mode.
+
+    #+begin_src emacs-lisp
+      (use-package wgrep
+        :straight t
+        :after grep
+        :custom
+        (wgrep-too-many-file-length 15)
+
+        :config
+        (advice-add #'wgrep-change-to-wgrep-mode :after #'evil-normal-state)
+        (advice-add #'wgrep-exit :after #'evil-motion-state)
+        (advice-add #'wgrep-finish-edit :after #'evil-motion-state)
+
+        :leader
+        (:mode 'grep-mode
+         "e" 'wgrep-change-to-wgrep-mode)
+        :general
+        (:keymaps 'wgrep-mode-map
+         :prefix leader-major-mode-key
+         "q" 'wgrep-abort-changes
+         "," 'wgrep-finish-edit
+         "s" 'wgrep-save-all-buffers))
+    #+end_src
 ** help
    #+BEGIN_SRC emacs-lisp
      (use-package help
