@@ -20659,6 +20659,9 @@
 
         ;; Restore the V1 display format for nodes (kind of).
         :custom (org-roam-node-display-template "${tags}${title}")
+
+        :commands (org-roam-create-new-img+)
+        :leader (:mode 'org-mode "f" 'org-roam-create-new-img+)
         :config
         (advice-add #'org-roam--tags-to-str :override
                     (defun org-roam-tags-to-str+ (tags)
@@ -20667,6 +20670,34 @@
                           (setq tags
                                 (propertize (concat "(" tags ") ") 'face 'bold)))
                         tags)))
+        (defun org-roam-create-new-img+ ()
+          (interactive)
+          (let* ((root (join-path default-directory "images"))
+                 (template (join-path root "template.svg"))
+                 (stamp (format-time-string "%Y%m%d%H%M%S"))
+                 (copy (join-path root (concat stamp ".svg"))))
+            (unless (file-exists-p template)
+              (user-error "Template not found at path: %s" template))
+            (copy-file template copy nil nil t t)
+
+            (let ((company-org-block-edit-style 'inline))
+              (company-org-block--wrap-point "src latex" "src"))
+            (let ((space (make-string (- (line-end-position) (line-beginning-position)) ? )))
+              (indent-region
+               (point)
+               (save-excursion
+                 (insert (format (s-join "\n"
+                                         `("\\begin{figure}[ht]"
+                                           ,(concat space "  \\centering")
+                                           ,(concat space "  \\incfig{%s}")
+                                           ,(concat space "\\end{figure}")))
+                                 stamp))
+                 (point)))
+              (next-line 2)
+              (forward-char 2))
+
+            (message "Opening new figure in inkscape.")
+            (start-process "inkscape" nil "inkscape" copy)))
 
         :leader
         ("ox" 'org-roam-capture
