@@ -31,20 +31,20 @@
   This is done using the /noweb/ reference syntax.
 
   *Note*: This branch only contains the *default* configuration options any permanent
-  ones must be placed in [[file:lisp/+config.el][lisp/+config.el]].
+  ones must be placed in [[elisp:(find-file (etc! "+config.el"))][etc/+config.el]].
 
   #+BEGIN_SRC emacs-lisp
-    <<eval-default-config()>>
-    <<load-config()>>
+    ;; <<setup-paths()>>
+    ;; <<eval-default-config()>>
+    ;; <<load-config()>>
   #+END_SRC
 
   #+NAME: eval-default-config
-  #+BEGIN_SRC emacs-lisp :results values :tangle lisp/+config-default.el
+  #+BEGIN_SRC emacs-lisp :results values :tangle (lisp! "+config-default.el")
     <<config-modules>>
     <<config-options>>
 
     (provide '+config-default)
-    nil
   #+END_SRC
 
 ** modules
@@ -53,7 +53,7 @@
 
    #+NAME: config-modules
    #+BEGIN_SRC emacs-lisp :tangle no
-     (defvar +packages
+     (defvar +modules
        '(magit                                                             ; It's git... but magical  ,
          ;; ace-link                                                       ; Jump to links in the current buffer through an avy interface
          link-hint                                                         ; Jump to links in the current buffer through an avy interface
@@ -110,7 +110,6 @@
          vdiff                                                             ; A diff tool inspired by [[https://github.com/justbur/emacs-vdiff][vimdiff]]
 
      ;;; Package Enhancements
-         ;; counsel-world-clock                                            ; Inspect the current time from ivy
          ;; diredfl                                                        ; Make dired /extra/ colorful
          ;; image-dired                                                    ; View images in dired like sessions
          ;; edit-indirect                                                  ; Edit regions of a buffer in another mode.
@@ -175,7 +174,8 @@
    Editor variables used for customisation.
 
    This branch declares and initialises these values so that their visible to the
-   emacs byte-compiler, but you can require and/or modify them in [[file:lisp/+config.el][lisp/+config.el]].
+   emacs byte-compiler, but you can require and/or modify them in your local config
+   file.
 
    #+NAME: config-options
    #+BEGIN_SRC emacs-lisp :tangle no
@@ -266,10 +266,17 @@
    I recommend trying to keep the following code-block bare. If it contains something
    that isn't needed while tangling, put that configuration into a separate code-block.
 
+   First we need to ensure paths are setup properly so subsequent requires can
+   find files on my system.
+
+   #+begin_src emacs-lisp
+     <<setup-paths>>
+   #+end_src
+
    #+NAME: load-config
    #+BEGIN_SRC emacs-lisp :results values
-     (unless (or (load (concat user-emacs-directory "lisp/+config") t)
-                 (load (concat user-emacs-directory "lisp/+config-default") t)
+     (unless (or (load (etc! "+config.el") t t)
+                 (require '+config-default nil t)
                  ;; See [[file:bin/emacs-tangle-targets][emacs-tangle-targets]] and [[file:bin/emacs-tangle][emacs-tangle]].
                  (bound-and-true-p checking-tangle-targets+)
                  (bound-and-true-p tangling+))
@@ -279,7 +286,7 @@
      ;; This section sets up a macro for quickly asserting whether an optional module
      ;; or feature needs to be enabled. This can let you selectively include or exclude
      ;; code-blocks from tangling based on the users emacs-configuration.
-     (defvar +packages)
+     (defvar +modules)
      (defun package-build-cond+ (pkgs)
        "Build conditions for `package!'.
      This isn't implemented directly in `package!' because that would require
@@ -305,14 +312,14 @@
                                ,(package-build-cond+ 'eglot))
                           res))
                    ((eq pkg :consult)
-                    (push `(or (member (quote consult) +packages)
+                    (push `(or (member (quote consult) +modules)
                                ,(package-build-cond+ 'selectrum)
                                ,(package-build-cond+ 'vertico))
                           res))
                    ((keywordp pkg)
                     (warn "`package!' got unknown keyword argument %s" pkg)
                     (push nil res))
-                   (t (push `(member (quote ,pkg) +packages) res)))))
+                   (t (push `(member (quote ,pkg) +modules) res)))))
          (if (eq 1 (length res))
              (car res)
            `(and ,@(nreverse res)))))
@@ -470,8 +477,8 @@
    ~early-init.el~ is loaded before my actual config and gccemacs is only relevent in
    versions after which ~early-init~ is supported, I can put it here with no troubles.
 
-   #+BEGIN_SRC emacs-lisp
-     (setq native-comp-eln-load-path (append (list (concat user-emacs-directory "var/eln-cache"))
+   #+BEGIN_SRC emacs-lisp :var cache-dir=(cache! "eln-cache")
+     (setq native-comp-eln-load-path (append (list cache-dir)
                                              (cdr (bound-and-true-p native-comp-eln-load-path))))
    #+END_SRC
 
@@ -535,10 +542,34 @@
    #+END_SRC
 
 ** paths
+   :PROPERTIES:
+   :header-args+: :tangle no
+   :END:
    Configure file system paths and try my utmost to keep my emacs home-directory as
-   clean as possible.
+   clean as possible. These utilities are tangled at the very beginning of my init
+   file but their placed here for brevity.
 
    Initialise shortcut functions for accessing different paths in my emacs directory.
+
+   #+NAME: setup-paths
+   #+begin_src emacs-lisp
+     <<setup-path-xdg>>
+     <<setup-path-builders>>
+     <<setup-path-defaults>>
+   #+end_src
+
+   #+NAME: setup-path-xdg
+   #+begin_src emacs-lisp
+     (require 'xdg)
+
+     (defun xdg-documents-dir ()
+       "Return the base directory for user specific cache files."
+       (xdg--dir-home "XDG_DOCUMENTS_DIR" "~/Documents"))
+
+     (defun xdg-state-home ()
+       "Return the base directory for user specific cache files."
+       (xdg--dir-home "XDG_STATE_HOME" "~/.local/state"))
+   #+end_src
 
    #+NAME: setup-path-builders
    #+BEGIN_SRC emacs-lisp
@@ -556,13 +587,18 @@
        "Initialise a constant for PATH and a function to join onto PATH.
      The function will be of the form dotemacs-join-PATH-TYPE-path and will have
      an alias of the form PATH-TYPE!"
+       (setq path (eval path))
        (let* ((path-type-name (symbol-name path-type))
               (alias (intern (concat path-type-name "!")))
               (path-sym (intern (concat "dotemacs-"      path-type-name "-path")))
               (func-sym (intern (concat "dotemacs-join-" path-type-name "-path"))))
          `(progn
             (defconst ,path-sym
-              (eval-when-compile (concat user-emacs-directory ,path)))
+              (eval-when-compile (join-path user-emacs-directory ,path)))
+
+            (eval-when-compile
+              (unless (file-exists-p ,path-sym)
+                (mkdir ,path-sym t)))
 
             (defun ,func-sym (path &rest args)
               ,(concat "join args onto directory: " path)
@@ -571,35 +607,34 @@
             (when (quote ,alias)
               (defalias (quote ,alias) (symbol-function (quote ,func-sym)))))))
 
-     (dotemacs-initialise-path! etc "etc")
      (dotemacs-initialise-path! bin "bin")
-     (dotemacs-initialise-path! var "var")
-     (dotemacs-initialise-path! lisp "lisp")
+     (dotemacs-initialise-path! etc "etc")
+     (dotemacs-initialise-path! share (join-path (xdg-data-home)  "emacs"))
+     (dotemacs-initialise-path! cache (join-path (xdg-cache-home) "emacs"))
+     (dotemacs-initialise-path! state (join-path (xdg-state-home) "emacs"))
+     (dotemacs-initialise-path! lisp  (cache! "site-lisp"))
    #+END_SRC
 
    Now let's set the default paths for a bunch of emacs builtins, see [[https://github.com/emacscollective/no-littering/blob/master/no-littering.el][no-littering.el]].
 
-   #+NAME: setup-paths
+   #+NAME: setup-path-defaults
    #+BEGIN_SRC emacs-lisp
-     (require 'xdg)
+     (defconst +notes-home (join-path (xdg-documents-dir) "notes")
+       "Base directory containing notes files.")
 
-     (let ((docs (xdg--dir-home "XDG_DOCUMENTS_DIR" "~/Documents")))
-       (defconst +notes-home (join-path docs "notes")
-         "Base directory containing notes files.")
+     (defconst +bib-home (join-path (xdg-documents-dir) "bibliography")
+       "Base directory containing bibliography files.")
 
-       (defconst +bib-home (join-path docs "bibliography")
-         "Base directory containing bibliography files.")
+     (setq org-roam-directory (join-path (xdg-documents-dir) "brain"))
 
-       (setq org-roam-directory (join-path docs "brain"))
-
-       (defconst +docs-home (join-path docs "pdfs/")
-         "Base directory containing bib documents."))
+     (defconst +docs-home (join-path (xdg-documents-dir) "pdfs/")
+       "Base directory containing bib documents.")
 
      (setq
      ;;; Package Directories
-      package-user-dir                                   (lisp! "elpa")
+      package-user-dir                                   (cache! "elpa")
 
-      auto-save-list-file-prefix                         (var! "auto-save" "sessions/")
+      auto-save-list-file-prefix                         (state! "auto-save/")
       auth-sources                                       (let ((default-directory (xdg-config-home)))
                                                            (append (list (expand-file-name "authinfo")
                                                                          (expand-file-name "authinfo.gpg")
@@ -607,40 +642,25 @@
                                                                    (bound-and-true-p auth-sources)))
       custom-file                                        (etc! "custom.el")
       custom-theme-directory                             (etc! "themes")
-      ;; eww-bookmarks-directory                            (var! "eww/")
-      ;; ido-save-directory-list-file                       (var! "ido-save-directory-list.el")
-      ;; image-dired-db-file                                (var! "image-dired" "db.el") ; tag associations
-      ;; image-dired-dir                                    (var! "image-dired/")
-      ;; image-dired-gallery-dir                            (var! "image-dired" "gallery/")
-      ;; image-dired-temp-image-file                        (var! "image-dired" "temp-image")
-      ;; image-dired-temp-rotate-image-file                 (var! "image-dired" "temp-rotate-image")
-      ;; kkc-init-file-name                                 (var! "kkc-init.el")
-      ;; newsticker-cache-filename                          (var! "newsticker/cache.el")
-      ;; newsticker-dir                                     (var! "newsticker/data/")
-      ;; nsm-settings-file                                  (var! "nsm-settings.el")
-      ;; omnisharp-cache-directory                          (var! "omnisharp/cache")
       org-directory                                      +notes-home
-      org-clock-persist-file                             (var! "org/clock-persist.el")
-      org-id-locations-file                              (var! "org/id-locations.el")
-      org-publish-timestamp-directory                    (var! "org/timestamps/")
-      org-registry-file                                  (var! "org/registry.el")
+      org-clock-persist-file                             (state! "org/clock-persist.el")
+      org-id-locations-file                              (state! "org/id-locations.el")
+      org-publish-timestamp-directory                    (state! "org/timestamps/")
+      org-registry-file                                  (state! "org/registry.el")
       org-default-notes-file                             (join-path +notes-home "index.org")
       projectile-org-projects-directory+                 (join-path +notes-home "projects/")
       org-projectile-projects-directory                  projectile-org-projects-directory+
       org-projectile-projects-file                       (join-path +notes-home "projects/global.org")
-      org-preview-latex-image-directory                  (var! "org/latex")
-      package-quickstart-file                            (var! "package-qs.el")
-      recentf-save-file                                  (var! "recentf.el")
-      server-auth-dir                                    (var! "server/")
-      shared-game-score-directory                        (var! "gamescore/")
-      tramp-auto-save-directory                          (var! "tramp/auto-save/")
-      tramp-persistency-file-name                        (etc! "private/tramp/history.el")
-      url-cache-directory                                (var! "url/cache/")
-      url-configuration-directory                        (var! "url/configuration/")
-      nsm-settings-file                                  (var! "network-security.data")
-
-     ;;; third party
-      request-storage-directory                          (var! "requests")
+      org-preview-latex-image-directory                  (cache! "org/latex")
+      package-quickstart-file                            (state! "package-qs.el")
+      recentf-save-file                                  (state! "recentf.el")
+      server-auth-dir                                    (state! "server/")
+      shared-game-score-directory                        (share! "gamescore/")
+      tramp-auto-save-directory                          (share! "tramp/auto-save/")
+      tramp-persistency-file-name                        (state! "private/tramp/history.el")
+      url-cache-directory                                (cache! "url/cache/")
+      url-configuration-directory                        (share! "url/configuration/")
+      nsm-settings-file                                  (share! "network-security.data")
       )
 
      (defconst +dashboard-banners-directory (etc! "banners/"))
@@ -775,13 +795,25 @@
 
    For my config I'll be using [[https://github.com/raxod502/straight.el][straight]], the modern package manager for emacs.
 
+   Now by default straight is a self hosting package manager, all of it is contained
+   within ~straight-base-dir~ but including version lockfiles, but I'm not a big fan of
+   having to commit configurations into runtime directories so I've advised straight
+   to place them in my ~dotmeacs-etc-path~.
+
    #+NAME: setup-straight-pacman
    #+BEGIN_SRC emacs-lisp
      (with-no-warnings
-       (defvaralias 'straight-base-dir 'dotemacs-lisp-path))
+       (defvaralias 'straight-base-dir 'dotemacs-cache-path)
+       (defvaralias 'straight-install-dir 'straight-base-dir))
 
-     (let ((bootstrap-file (lisp! "straight/repos/straight.el/bootstrap.el"))
-           (straight-install-dir straight-base-dir)
+     ;; Place lockfiles into etc instead of into lisp.
+     (defun straight-override-version-path (func &rest args)
+       (let ((straight-base-dir dotemacs-etc-path))                                  ; Goes to (etc! "straight/versions").
+         (apply func args)))
+     (advice-add #'straight--versions-dir  :around #'straight-override-version-path)
+     (advice-add #'straight--versions-file :around #'straight-override-version-path)
+
+     (let ((bootstrap-file (join-path straight-install-dir "straight/repos/straight.el/bootstrap.el"))
            (bootstrap-version 5))
        (unless (file-exists-p bootstrap-file)
          (message "Installing the straight package manager")
@@ -957,10 +989,10 @@
     #+BEGIN_SRC emacs-lisp
       (setq
        ;; where do autosave files get stored
-       auto-save-file-name-transforms `((".*" ,(var! "auto-save" "sessions/") t))
+       auto-save-file-name-transforms `((".*" ,(state! "auto-save" "sessions/") t))
 
        ;; where do backup files get stored
-       backup-directory-alist `(("." . ,(var! "backups/")))
+       backup-directory-alist `(("." . ,(state! "backups/")))
 
        ;; don't show files matching these regexps in recentf alist.
        recentf-exclude (list (rx (or (and bol
@@ -998,7 +1030,10 @@
            (and "[*Org Src")
            ;; match from the beginning of the line
            (and bol (or
-                     (eval dotemacs-var-path)
+                     (eval temporary-file-directory)
+                     (eval dotemacs-state-path)
+                     (eval dotemacs-cache-path)
+                     (eval dotemacs-share-path)
                      (eval (concat straight-base-dir "straight/"))
                      (eval package-user-dir)
                      (eval +dashboard-banners-directory)))))))
@@ -2040,7 +2075,7 @@
           (and (not (string= (buffer-name buffer) scratch-buffer-name))
                (scratch-buffer-p buffer)))
 
-        (setq persistent-scratch-save-file (var! "scratch.el")
+        (setq persistent-scratch-save-file (share! "scratch.el")
               persistent-scratch-autosave-interval 800
               persistent-scratch-scratch-buffer-p-function #'multiscratch-scratch-buffer-p)
 
@@ -2217,11 +2252,10 @@
    Remember my host configuration across systems.
 
    #+BEGIN_SRC emacs-lisp
-     (use-package +host
-       :commands (host!))
+     (autoload #'host! "+host" nil t)
    #+END_SRC
 
-   #+BEGIN_SRC emacs-lisp :tangle lisp/+host.el
+   #+BEGIN_SRC emacs-lisp :tangle (lisp! "+host.el")
      (defconst +hosts-alist
        (let ((hosts-file (etc! "hosts")))
          (if (file-exists-p hosts-file)
@@ -2269,11 +2303,12 @@
        (interactive "P")
        (cl-destructuring-bind (file . point)
            (or (unless arg
-                 (let ((conf (lisp! "+config.el")))
+                 (let ((conf (etc! "+config.el")))
                    (and (file-exists-p conf)
                         (cons conf nil))))
                (save-window-excursion
                  (find-dotemacs-org-file)
+                 (require 'imenu)
                  (cons (buffer-file-name)
                        (cdr (cl-assoc "* Config" (imenu--make-index-alist t) :test #'string-equal)))))
          (if file
@@ -2841,7 +2876,7 @@
 
 *** lib-misc
     :PROPERTIES:
-    :header-args+: :tangle lisp/lib/+lib-misc.el
+    :header-args+: :tangle (lisp! "lib/+lib-misc.el")
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle yes
@@ -2924,7 +2959,7 @@
 
 *** lib-text
     :PROPERTIES:
-    :header-args+: :tangle lisp/lib/+lib-text.el
+    :header-args+: :tangle (lisp! "lib/+lib-text.el")
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle yes
@@ -3121,7 +3156,7 @@
 
 *** lib-text-query
     :PROPERTIES:
-    :header-args+: :tangle lisp/lib/+lib-text-query.el
+    :header-args+: :tangle (lisp! "lib/+lib-text-query.el")
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle yes
@@ -3215,7 +3250,7 @@
 
 *** lib-buffer
     :PROPERTIES:
-    :header-args+: :tangle lisp/lib/+lib-buffer-control.el
+    :header-args+: :tangle (lisp! "lib/+lib-buffer-control.el")
     :END:
 
      #+BEGIN_SRC emacs-lisp :tangle yes
@@ -3500,7 +3535,7 @@
 
 *** lib-unpackaged
     :PROPERTIES:
-    :header-args+: :tangle lisp/lib/+lib-unpackaged.el
+    :header-args+: :tangle (lisp! "lib/+lib-unpackaged.el")
     :END:
 
     Many useful functions sourced from [[https://github.com/alphapapa/unpackaged.el/blob/master/unpackaged.el][unpackaged.el]].
@@ -3665,6 +3700,7 @@
         :demand t
         :custom
         (completion-styles '(orderless))
+
         :config
         (defun flex-if-twiddle (pattern _index _total)
           "Glob when trailing tilde."
@@ -3707,7 +3743,7 @@
         :demand t
         :custom
         (prescient-history-length 1000)
-        (prescient-save-file (var! "prescient-history.el"))
+        (prescient-save-file (state! "prescient-history.el"))
 
         :config
         (prescient-persist-mode +1))                                                  ; persist statistics between emacs sessions
@@ -4486,7 +4522,7 @@
        (company-tooltip-idle-delay nil)
        (company-idle-delay 0.4)
        (company-minimum-prefix-length 2)
-       (company-statistics-file (var! "company/statistics.el"))
+       (company-statistics-file (state! "company/statistics.el"))
        (company-tooltip-align-annotations t)
        (company-require-match nil)
        (company-tooltip-limit 12)
@@ -5002,7 +5038,7 @@
        (defalias 'remove-duplicates #'cl-remove-duplicates)
 
        :config
-       (setq emojify-emojis-dir (var! "emojify/"))
+       (setq emojify-emojis-dir (cache! "emojify/"))
 
        ;; make emojis work like prettify-symbols-mode
        (setq emojify-point-entered-behaviour 'uncover
@@ -5173,7 +5209,7 @@
         "x." '(hydra-text-zoom :wk "hydra-text-zoom"/body))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-text-zoom.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-text-zoom.el")
       (defhydra hydra-text-zoom ()
         ("+" text-scale-increase "increase")
         ("-" text-scale-decrease "decrease")
@@ -5196,7 +5232,9 @@
         "Hh" '(hydra-winman/body :wk "hydra-winman"))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-winman.el
+    TODO: Support left-right to winner-undo.
+
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-winman.el")
       (require 'evil)
       (require 'windmove)
       (require 'winner)
@@ -5286,7 +5324,7 @@
         "HL" '(hydra-eyebrowse :wk "hydra-eyebrowse"/body))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-eyebrowse.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-eyebrowse.el")
       (require 'eyebrowse)
 
       (defvar hydra-eyebrowse/verbose-p nil
@@ -5418,7 +5456,7 @@
         "He" '(hydra-flycheck/body :wk "hydra-flycheck"))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-flycheck.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-flycheck.el")
       (require 'flycheck)
 
       (defhydra hydra-flycheck
@@ -5443,7 +5481,7 @@
       (autoload 'hydra-flymake/body (lisp! "hydras" "hydra-flymake.el") nil t)
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-flymake.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-flymake.el")
       (require 'flymake)
 
       (defvar hydra-flymake--window nil
@@ -5469,7 +5507,7 @@
       (autoload 'hydra-ibuffer/body (lisp! "hydras" "hydra-ibuffer.el") nil t)
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/hydras/hydra-ibuffer.el" ibuffer)
+    #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "hydras/hydra-ibuffer.el") ibuffer)
       ;; source: https://github.com/abo-abo/hydra/wiki/Ibuffer
       (require 'ibuffer)
 
@@ -5581,7 +5619,7 @@
       (autoload 'hydra-org-agenda/body (lisp! "hydras" "hydra-org-agenda.el") nil t)
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-org-agenda.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-org-agenda.el")
       (require 'org-agenda)
 
       (defhydra hydra-org-agenda (:pre  (setq which-key-inhibit t)
@@ -5675,7 +5713,7 @@
         "Hc" '(hydra-org-clock/body :wk "hydra-org-clock"))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-org-clock.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-org-clock.el")
       (require 'org-clock)
 
       (defhydra hydra-org-clock (:color blue :hint nil)
@@ -5718,7 +5756,7 @@
       (autoload 'hydra-org-link/body (lisp! "hydras" "hydra-org-link.el") nil t)
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-org-link.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-org-link.el")
       (require 'org-link-edit)
 
       (defun org-link-unlinkify ()
@@ -5756,7 +5794,7 @@
       (autoload 'hydra-org-navigate/body (lisp! "hydras" "hydra-org-navigate.el") nil t)
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-org-navigate.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-org-navigate.el")
       (eval-when-compile
         (require 'org))
 
@@ -5858,7 +5896,7 @@
         "Hv" '(hydra-vlc-rc/body :wk "hydra-vlc"))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/hydras/hydra-vlc-rc.el" vlc-rc)
+    #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "hydras/hydra-vlc-rc.el") vlc-rc)
       ;; NOTE: comments with @ means add current value indicator
 
       (defhydra hydra-vlc-rc (:hint nil)
@@ -5926,7 +5964,7 @@
         "Hm" '(hydra-visual-move/body :wk "hydra-visual-move"))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-visual-move.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-visual-move.el")
       (require 'evil)
 
       (defhydra hydra-visual-move (:foreign-keys run)
@@ -5948,7 +5986,7 @@
         "H TAB" '(hydra-indent/body :wk "hydra-indent"))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-indent.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-indent.el")
       (defmacro hydra-indent--keep-visual-state-active (&rest body)
         "when body is invoked with evil-visual, restore the state after body"
         `(let ((visual-active (evil-visual-state-p)))
@@ -6068,7 +6106,7 @@
       (autoload 'hydra-vdiff/body (lisp! "hydras" "hydra-vdiff.el") nil t)
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/hydras/hydra-vdiff.el" vdiff)
+    #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "hydras/hydra-vdiff.el") vdiff)
       (defhydra vdiff-toggle-hydra (nil nil :hint nil)
         "
       Toggles
@@ -6121,7 +6159,7 @@
       (autoload 'hydra-evil-multiedit/body (lisp! "hydras" "hydra-evil-multiedit.el") nil t)
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-evil-multiedit.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-evil-multiedit.el")
       (defhydra hydra-evil-multiedit ()
         ("k" evil-multiedit-next "next")
         ("j" evil-multiedit-prev "prev")
@@ -6140,7 +6178,7 @@
       (autoload 'hydra-flyspell/body (lisp! "hydras" "hydra-flyspell.el") nil t)
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/hydras/hydra-flyspell.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-flyspell.el")
       (defhydra hydra-flyspell (nil nil :hint nil :foreign-keys run)
         "
       | ^M^ove       | ^R^echeck   | ^C^orrect      |
@@ -6310,7 +6348,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package project
        :custom
-       (project-list-file (var! "projects.el")))
+       (project-list-file (state! "projects.el")))
    #+END_SRC
 
 ** projectile
@@ -6338,25 +6376,18 @@
        (projectile-tags-backend 'xref) ;; opt into gtags
        (projectile-indexing-method 'alien) ;; never use native
        (projectile-tags-command "ctags -Re -f \"%s\" %s \"%s\"")
-       (projectile-cache-file (var! "projectile/cache.el"))
-       (projectile-known-projects-file (var! "projectile/known-projects.el"))
 
        :config
-       ;; `projectile-project-search-path' is just a basic PATH like variable
-       ;; that checks each directory in the PATH for a project. This doesn't
-       ;; pair well with $REPO_PATH so for now I try to deconstruct it here
-       ;; into a PATH like variable.
-       (setq projectile-project-search-path
-             (cl-loop for (path . depth) in (+repo-path (getenv "REPO_PATH"))
-                      if (eq depth 0)
-                        do (projectile-add-known-project path)
-                      else if (eq depth 1)
-                        collect path
-                      else
-                        append (-filter
-                                #'file-directory-p
-                                (file-expand-wildcards
-                                 (apply #'join-path path (-repeat (- depth 1) "*"))))))
+       (setq projectile-project-search-path (+repo-path (getenv "REPO_PATH")))
+
+       :custom
+       (projectile-cache-file (state! "projectile/cache.el"))
+       (projectile-known-projects-file (state! "projectile/known-projects.el"))
+       :config
+       (eval-when-compile
+         (let ((dir (state! "projectile")))
+           (unless (file-exists-p dir)
+             (mkdir dir t))))
 
        :config
        (require '+projectile-project-types)
@@ -6518,7 +6549,7 @@
 
 *** project-types
     :PROPERTIES:
-    :header-args+: :tangle lisp/+projectile-project-types.el
+    :header-args+: :tangle (lisp! "+projectile-project-types.el")
     :END:
 
     #+begin_src emacs-lisp
@@ -6577,7 +6608,7 @@
 
 *** projectile-commands
     :PROPERTIES:
-    :header-args+: :tangle lisp/+projectile-commands.el
+    :header-args+: :tangle (lisp! "+projectile-commands.el")
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle yes
@@ -6593,7 +6624,7 @@
       (require 'projectile)
     #+end_src
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/+projectile-commands.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "+projectile-commands.el")
       (defun projectile-show-and-copy-project-dir (&optional prefix)
         (interactive "P")
         (if (not (projectile-project-p))
@@ -6667,12 +6698,12 @@
 ** undo-tree
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! undo-tree)
      (use-package undo-tree
-       :straight (:fork (:host gitlab :repo "tsc25/undo-tree"))
+       :straight t
        :diminish
        :custom
        (evil-undo-system 'undo-tree)
        (undo-tree-auto-save-history t)
-       (undo-tree-history-directory-alist `(("." . ,(var! "undo-tree"))))
+       (undo-tree-history-directory-alist `(("." . ,(state! "undo-tree"))))
 
        :init
        (global-undo-tree-mode +1)
@@ -6920,13 +6951,12 @@
    Yet another snippets tool... but amazingly powerful. :-P. See the snippet [[https://joaotavora.github.io/yasnippet/snippet-development.html#org6796ab7][dev]] guide.
 
    #+BEGIN_SRC emacs-lisp
-     <<tangle-snippets()>>
+     ;; <<tangle-snippets()>>
    #+END_SRC
 
    #+NAME: tangle-snippets
-   #+BEGIN_SRC emacs-lisp :tangle no :results values
-     (org-babel-tangle-file "etc/snippets.org")
-     nil
+   #+BEGIN_SRC emacs-lisp :tangle no :exports none
+     (org-babel-tangle-file (etc! "snippets.org"))
    #+END_SRC
 
 *** yasnippet
@@ -6965,7 +6995,7 @@
 
 *** licenses
     :PROPERTIES:
-    :header-args+: :tangle lisp/+yas-license.el
+    :header-args+: :tangle (lisp! "+yas-license.el")
     :END:
 
     Use yas to generate and insert license headers, this isn't an automatic process
@@ -7064,7 +7094,7 @@
      :header-args+: :shebang :comments none
      :END:
 
-     #+BEGIN_SRC snippet :tangle etc/licenses/GPL-2.0.license
+     #+BEGIN_SRC snippet :tangle (etc! "licenses/GPL-2.0.license")
        Copyright (C) `(format-time-string "%Y")`  ${1:`(capitalize (+license-get-name "name"))`}
 
        This program is free software; you can redistribute it and/or
@@ -7082,7 +7112,7 @@
        Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
      #+END_SRC
 
-     #+BEGIN_SRC snippet :tangle etc/licenses/GPL-3.0.license
+     #+BEGIN_SRC snippet :tangle (etc! "licenses/GPL-3.0.license")
        Copyright (C) `(format-time-string "%Y")`  ${1:`(capitalize (+license-get-name "name"))`}
 
        This file is part of ${2:this program}.
@@ -7101,7 +7131,7 @@
        along with $2.  If not, see <https://www.gnu.org/licenses/>.
      #+END_SRC
 
-     #+BEGIN_SRC snippet :tangle etc/licenses/Apache-2.0.license
+     #+BEGIN_SRC snippet :tangle (etc! "licenses/Apache-2.0.license")
        Copyright `(format-time-string "%Y")` ${1:`(capitalize (+license-get-name "name"))`}
 
        Licensed under the Apache License, Version 2.0 (the "License");
@@ -7117,14 +7147,14 @@
        limitations under the License.
      #+END_SRC
 
-     #+BEGIN_SRC snippet :tangle etc/licenses/Boost.license
+     #+BEGIN_SRC snippet :tangle (etc! "licenses/Boost.license")
                 Copyright ${1:`(capitalize (+license-get-name "name"))`} `(format-time-string "%Y")` - ${2:`(format-time-string "%Y")`}.
        Distributed under the Boost Software License, Version 1.0.
           (See accompanying file LICENSE_1_0.txt or copy at
                 https://www.boost.org/LICENSE_1_0.txt)
      #+END_SRC
 
-     #+BEGIN_SRC snippet :tangle etc/licenses/MIT.license
+     #+BEGIN_SRC snippet :tangle (etc! "licenses/MIT.license")
        Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (+license-get-name "name"))`}
 
        Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -7146,7 +7176,7 @@
        SOFTWARE.
      #+END_SRC
 
-     #+BEGIN_SRC snippet :tangle etc/licenses/ISC.license
+     #+BEGIN_SRC snippet :tangle (etc! "licenses/ISC.license")
        Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (+license-get-name "name"))`} ${2:`user-mail-address`}
 
        Permission to use, copy, modify, and distribute this software for any
@@ -7162,7 +7192,7 @@
        OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
      #+END_SRC
 
-     #+BEGIN_SRC snippet :tangle etc/licenses/BSD.license
+     #+BEGIN_SRC snippet :tangle (etc! "licenses/BSD.license")
        Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (+license-get-name "name"))`}
 
        Redistribution and use in source and binary forms, with or without
@@ -7187,7 +7217,7 @@
        SUCH DAMAGE.
      #+END_SRC
 
-     #+BEGIN_SRC snippet :tangle etc/licenses/BSD-3c.license
+     #+BEGIN_SRC snippet :tangle (etc! "licenses/BSD-3c.license")
        Copyright (c) `(format-time-string "%Y")` ${1:`(capitalize (+license-get-name "name"))`}
 
        Redistribution and use in source and binary forms, with or without
@@ -7632,7 +7662,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package calendar
        :custom
-       (diary-file (var! "diary"))
+       (diary-file (share! "diary"))
 
        :config
        (push 'calendar-mode whitespace-exempt-modes)
@@ -7923,7 +7953,7 @@
         (+comint-set-leader-keys 'comint-mode))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/+comint-bindings.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "+comint-bindings.el")
       (defun comint-bol-point (&optional arg)
         (save-excursion
           (comint-bol arg)
@@ -8191,7 +8221,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package desktop
        :custom
-       (desktop-path (list (var! "desktop/"))))
+       (desktop-path (list (state! "desktop/"))))
    #+END_SRC
 
 ** diff
@@ -8295,7 +8325,7 @@
               dired-auto-revert-buffer t
               dired-hide-details-hide-symlink-targets nil
               dired-recursive-copies t
-              dired-recent-directories-file (var! "dired/recent.el"))
+              dired-recent-directories-file (state! "dired/recent.el"))
 
         (push 'dired-mode whitespace-exempt-modes)
 
@@ -9075,7 +9105,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package gamegrid
        :custom
-       (gamegrid-user-score-file-directory (var! "gamegrid/")))
+       (gamegrid-user-score-file-directory (share! "gamegrid/")))
    #+END_SRC
 
 ** hl-line
@@ -9677,7 +9707,8 @@
    #+BEGIN_SRC emacs-lisp
      (use-package message
        :custom
-       (message-auto-save-directory (var! "messages/"))
+       (message-auto-save-directory (share! "messages/"))
+       (message-signature "---\nMohsin")
 
        :leader
        ("ac" 'message-mail)
@@ -9718,7 +9749,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package smtpmail
         :custom
-        (smtpmail-queue-dir (var! "mail/queued")))
+        (smtpmail-queue-dir (share! "mail/queued")))
     #+END_SRC
 
     ~smtpmail-multi~ is an alternative to smtpmail which does support multiple
@@ -10806,7 +10837,7 @@
      (setq save-place-forget-unreadable-files nil
            save-place-version-control 'nospecial
            save-place-file (eval-when-compile
-                             (let ((save-dir (var! "save-place")))
+                             (let ((save-dir (state! "save-place")))
                                (unless (file-directory-p save-dir)
                                  (mkdir save-dir t))
 
@@ -10827,7 +10858,7 @@
        :straight (savehist :type built-in)
        :hook (after-init . savehist-mode)
        :custom
-       (savehist-file (var! "savehist.el"))
+       (savehist-file (state! "savehist.el"))
        (savehist-additional-variables
         '(kill-ring search-ring regexp-search-ring
           consult--line-history evil-ex-history
@@ -11050,8 +11081,8 @@
               ;;; disable company-mode in eshell-mode
               (eshell-mode . (lambda () (company-mode -1))))
        :custom
-       (eshell-directory-name (var! "eshell"))
-       (eshell-aliases-file (var! "eshell" "aliases"))
+       (eshell-directory-name (state! "eshell"))
+       (eshell-aliases-file (state! "eshell" "aliases"))
        (eshell-login-script (etc! "eshell" "loginrc"))
        (eshell-rc-script (etc! "eshell" "eshrc"))
        (eshell-banner-message "")
@@ -11618,11 +11649,11 @@
         :config
         (advice-add 'emacs-session-filename :override
                     (defun emacs-session-filename+ (session-id)
-                      (concat (var! "x-sessions/session.") session-id))))
+                      (concat (state! "x-sessions/session.") session-id))))
     #+END_SRC
 
 * Extensions
-  Optional [[*Packages][packages]] that users can opt to configure from the ~+packages~ variable.
+  Optional [[*Packages][packages]] that users can opt to configure from the ~+modules~ variable.
 
 ** selectrum
    :PROPERTIES:
@@ -12262,10 +12293,26 @@
         (:keymaps 'lsp-mode-map
          [remap xref-find-apropos] 'consult-lsp-symbols))
     #+END_SRC
+*** consult-eglot
+    :PROPERTIES:
+    :header-args+: :tangle (package-str! (lisp! "+consult-eglot.el") :consult eglot)
+    :END:
+
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! :consult eglot)
+      (use-package consult-eglot
+        :straight (consult-eglot :host github
+                                 :repo "mohkale/consult-eglot")
+        :init
+        (evil-set-command-property 'consult-eglot :jump t)
+
+        :general
+        (:keymaps 'eglot-mode-map
+         [remap xref-find-apropos] 'consult-eglot-symbols))
+    #+END_SRC
 
 *** consult-extensions
     :PROPERTIES:
-    :header-args+: :tangle (package-str! "lisp/+consult-custom.el" :consult)
+    :header-args+: :tangle (package-str! (lisp! "+consult-custom.el") :consult)
     :END:
 
     Consult is great but there's some commands its missing that I've had to implement
@@ -12375,7 +12422,7 @@
      #+END_SRC
 
 **** consult-org-ref
-     #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/+org-ref-consult-cite.el" :consult)
+     #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "+org-ref-consult-cite.el") :consult)
        (defvar org-ref-ivy-cite-keymap (make-sparse-keymap))
        (defvar org-ref-ivy-set-keywords-keymap (make-sparse-keymap))
        (require 'org-ref-ivy-cite) ; Provides `org-ref-cite-hydra', and other helpers.
@@ -12899,159 +12946,6 @@
        (add-to-list 'embark-keymap-alist '(yasnippet . embark-yasnippet-completion-actions))
      #+END_SRC
 
-**** consult-eglot
-     :PROPERTIES:
-     :header-args+: :tangle (package-str! "lisp/+consult-eglot.el" :consult eglot)
-     :END:
-
-     #+BEGIN_SRC emacs-lisp :tangle (package-yes! :consult eglot)
-       (autoload 'consult-eglot-symbols "+consult-eglot.el" nil t)
-
-       (with-eval-after-load 'evil
-         (evil-set-command-property 'consult-eglot :jump t))
-
-       (general-define-key
-        :keymaps 'eglot-mode-map
-        [remap xref-find-apropos] 'consult-eglot-symbols)
-     #+END_SRC
-
-     #+BEGIN_SRC emacs-lisp
-       (require 'eglot)
-
-       (defcustom consult-eglot--symbols--narrow
-         '(;; Lowercase classes
-           (?c . "Class")
-           (?f . "Function")
-           (?e . "Enum")
-           (?i . "Interface")
-           (?m . "Module")
-           (?n . "Namespace")
-           (?p . "Package")
-           (?s . "Struct")
-           (?t . "Type Parameter")
-           (?v . "Variable")
-
-           ;; Uppercase classes
-           (?A . "Array")
-           (?B . "Boolean")
-           (?C . "Constant")
-           (?E . "Enum Member")
-           (?F . "Field")
-           (?M . "Method")
-           (?N . "Number")
-           (?O . "Object")
-           (?P . "Property")
-           (?S . "String")
-
-           ;; Other. Any which aren't above are taken from here
-           (?o . "Other"))
-         "Narrow key configuration used with `consult-eglot-symbols'.
-       For the format see `consult--read', for the value types see the
-       values in `eglot--symbol-kind-names'.")
-
-       (defun consult-eglot--symbols--make-async-source (async server)
-         "Pipe a `consult--read' compatible async-source ASYNC to search for symbols in WORKSPACES."
-         (lambda (action)
-           (pcase-exhaustive action
-             ((or 'setup (pred stringp))
-              (let ((query (if (stringp action) action "")))
-                (jsonrpc-async-request
-                 server :workspace/symbol
-                 `(:query ,query)
-                 :success-fn
-                 (lambda (resp)
-                   (funcall async 'flush)
-                   (funcall async (append resp nil)))
-                 :error-fn
-                 (eglot--lambda ((ResponseError) code message)
-                   (message "%s: %s" code message))
-                 :timeout-fn
-                 (lambda ()
-                   (message "error: request timed out")))
-                (funcall async action)))
-             (_ (funcall async action)))))
-
-       (defun consult-eglot--symbols--transformer (symbol-info)
-         "Default transformer to produce a completion candidate from SYMBOL-INFO.
-       The produced candidate follows the same form as `consult--grep' however it
-       contains the SYMBOL-INFO as the second field instead of the file URI."
-         (eglot--dbind ((SymbolInformation) name kind location)
-             symbol-info
-           (eglot--dbind ((Location) uri range) location
-             (let* ((line (1+ (plist-get (plist-get range :start) :line)))
-                    (kind-name (alist-get kind eglot--symbol-kind-names))
-                    (uri-path (eglot--uri-to-path uri))
-                    (res (propertize
-                          (format "%-7s %s %s"
-                                  kind-name
-                                  name
-                                  (string-remove-suffix ":"
-                                   (consult--format-location
-                                    ;; If the src is relative to our project directory then use
-                                    ;; the path from there, otherwise use the absolute file path.
-                                    (let ((relative-uri-path (file-relative-name uri-path)))
-                                      (if (string-prefix-p ".." relative-uri-path)
-                                          (abbreviate-file-name uri-path)
-                                        relative-uri-path))
-                                    line)))
-                          'consult--type (or (car (rassoc kind-name consult-eglot--symbols--narrow))
-                                             (car (rassoc "Other" consult-eglot--symbols--narrow)))
-                          'consult--candidate symbol-info)))
-               res))))
-
-       (defun consult-eglot--symbol-information-to-grep-params (symbol-info)
-         (eglot--dbind ((SymbolInformation) location) symbol-info
-           (eglot--dbind ((Location) uri range) location
-             (list
-              (eglot--uri-to-path uri)                           ; URI
-              (1+ (plist-get (plist-get range :start) :line))    ; Line number
-              0                                                  ; Column number
-              )))
-         )
-
-       (defun consult-eglot--symbols--state ()
-         (let ((grep (consult--grep-state)))
-           (lambda (cand restore)
-             (cond
-              (restore (funcall grep nil restore))
-              (cand (funcall grep
-                             (consult-eglot--symbol-information-to-grep-params cand)
-                             restore))))))
-
-       (defun consult-eglot-symbols ()
-         (interactive)
-         ;; Set `default-directory' here so we can show file names
-         ;; relative to the project root.
-         (let* ((server (eglot--current-server-or-lose))
-                (default-directory (or (cdr (eglot--project server))
-                                       default-directory)))
-           (if (eglot--server-capable :workspaceSymbolProvider)
-               (cl-destructuring-bind (path line col)
-                   (consult-eglot--symbol-information-to-grep-params
-                    (consult--read
-                     (thread-first
-                         (consult--async-sink)
-                       (consult--async-refresh-immediate)
-                       (consult--async-map #'consult-eglot--symbols--transformer)
-                       (consult-eglot--symbols--make-async-source server)
-                       (consult--async-throttle)
-                       (consult--async-split))
-                     :history t
-                     :require-match t
-                     :prompt "LSP Symbols: "
-                     :initial consult-async-default-split
-                     :category 'consult-lsp-symbols
-                     :lookup #'consult--lookup-candidate
-                     :title (consult--type-title consult-eglot--symbols--narrow)
-                     :narrow (consult--type-narrow consult-eglot--symbols--narrow)
-                     :state (consult-eglot--symbols--state)))
-                 (find-file path)
-                 (goto-line line)
-                 (run-hooks 'consult-after-jump-hook))
-            (user-error "Server doesn't support symbol search."))))
-
-       (provide 'consult-eglot)
-     #+END_SRC
 
 **** consult-extensions-eob
      #+BEGIN_SRC emacs-lisp
@@ -13060,7 +12954,7 @@
 
 **** dotfiles
      :PROPERTIES:
-     :header-args+: :tangle lisp/+consult-dotfiles.el
+     :header-args+: :tangle (lisp! "+consult-dotfiles.el")
      :END:
 
      This branch defines commands to interface with scripts from my [[https://github.com/mohkale/dotfiles][dotfiles]].
@@ -14279,7 +14173,7 @@
 
 *** flycheck-commands
     :PROPERTIES:
-    :header-args+: :tangle lisp/+flycheck-commands.el
+    :header-args+: :tangle (lisp! "+flycheck-commands.el")
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle yes
@@ -14503,8 +14397,8 @@
        (lsp-eldoc-render-all nil)
        (lsp-enable-xref t)
        (lsp-headerline-breadcrumb-enable nil)
-       (lsp-session-file (var! "lsp/session"))
-       (lsp-server-install-dir (var! "lsp/servers"))
+       (lsp-session-file (state! "lsp/session"))
+       (lsp-server-install-dir (cache! "lsp/servers"))
        (lsp-diagnostics-provider (if (package! flycheck)
                                      :flycheck
                                    :flymake))
@@ -14613,9 +14507,7 @@
        (setq magit-revision-show-gravatars  '("^Author:     " . "^Commit:     ")
              ;; show magit status in a full screen window.
              magit-display-buffer-function 'magit-display-buffer-fullframe-status-v1)
-
-       :config
-       (setq magit-repository-directories (+repo-path (getenv "REPO_PATH")))
+       (defvaralias 'magit-repository-directories 'projectile-project-search-path)
 
        :config
        (add-hook 'magit-mode-hook
@@ -15053,7 +14945,7 @@
         :straight t
         :after magit
         :custom
-        (forge-database-file (var! "forge.db"))
+        (forge-database-file (state! "forge.db"))
         :general
         (:keymaps 'forge-issue-list-mode-map
          :states 'motion
@@ -15065,7 +14957,7 @@
       (use-package transient
         :straight t
         :config
-        (setq transient-history-file (var! "transient/history.el")
+        (setq transient-history-file (state! "transient/history.el")
               transient-values-file  (etc! "transient/values.el")
               transient-levels-file  (etc! "transient/levels.el"))
 
@@ -15329,7 +15221,7 @@
 
        ;; only accepts absolute paths and doesn't automatically append ".exe" when on windows.
        (eval-when-compile
-         (let ((epdfinfo-program (expand-file-name (var! "pdf-tools/epdfinfo"))))
+         (let ((epdfinfo-program (expand-file-name (cache! "pdf-tools/epdfinfo"))))
            (when (windows-p)
              (setq epdfinfo-program (concat epdfinfo-program ".exe")))
            (setq pdf-info-epdfinfo-program epdfinfo-program)))
@@ -15342,7 +15234,7 @@
    #+END_SRC
 
 *** bindings
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/+pdf-tools-bindings.el" pdf-tools)
+    #+BEGIN_SRC emacs-lisp :tangle (package-str! "(lisp! "+pdf-tools-bindings.el" pdf-tools"))
       (leader-set-keys-for-major-mode 'pdf-view-mode-map
         "g" 'pdf-outline)
 
@@ -15516,7 +15408,7 @@
          "G"  'pdf-view-goto-page-with-prefix))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! "lisp/+pdf-tools-commands.el" pdf-tools)
+    #+BEGIN_SRC emacs-lisp :tangle (package-str! "(lisp! "+pdf-tools-commands.el" pdf-tools"))
       ;; functions ripped from evil-collection
       (defun pdf-view-next-line-or-next-page-with-prefix (&optional count)
         "'evil' wrapper include a count argument to `pdf-view-next-line-or-next-page'"
@@ -15581,7 +15473,7 @@
 
        :custom
        (rake-completion-system 'default)
-       (rake-cache-file (var! "rake.cache"))
+       (rake-cache-file (state! "rake.cache"))
 
        :config
        (defalias 'rake-refresh #'rake-regenerate-cache))
@@ -15674,7 +15566,7 @@
 
 *** skeletor-templates
    :PROPERTIES:
-   :header-args+: :tangle (package-str! "lisp/+skeletor-templates.el" skeletor)
+   :header-args+: :tangle (package-str! (lisp! "+skeletor-templates.el") skeletor)
    :END:
 
    #+begin_src emacs-lisp
@@ -16273,7 +16165,7 @@
                        collect (list name cmd-sym))))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle lisp/+vterm-cmds.el
+    #+BEGIN_SRC emacs-lisp :tangle (lisp! "+vterm-cmds.el")
       (defun vterm-cmd-find-file (&rest paths)
         (cl-loop for path in (or paths (list default-directory))
                  do (find-file path)))
@@ -16756,7 +16648,7 @@
                (anaconda-mode . anaconda-eldoc-mode))
         :commands enable-anaconda-mode+
         :config
-        (setq anaconda-mode-installation-directory (var! "anaconda/"))
+        (setq anaconda-mode-installation-directory (cache! "anaconda/"))
 
         (defun enable-anaconda-mode+ ()
           "run anaconda-mode unless you're in a remote file."
@@ -17149,7 +17041,7 @@
     #+END_SRC
 
 *** emmet-mode
-    #+BEGIN_SRC emacs-lisp :tangle (or (package-yes! html) (package-yes! markdown))
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! (or html markdown xml))
       (use-package emmet-mode
         :straight t
         :hook ((web-mode      . emmet-mode)
@@ -17466,8 +17358,8 @@
        :hook ((logview-mode . read-only-mode)
               (logview-mode . auto-revert-tail-mode))
        :custom
-       (logview-views-file (var! "logview.views"))
-       (logview-cache-filename (var! "logview-cache.extmap"))
+       (logview-views-file (share! "logview.views"))
+       (logview-cache-filename (cache! "logview-cache.extmap"))
 
        :config
        (push '("python" . ((format . "LEVEL:NAME:MESSAGE")
@@ -17943,7 +17835,7 @@
    #+END_SRC
 
 *** modern-cpp-font-lock
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp (package-yes! c (not tree-sitter))
       (use-package modern-cpp-font-lock
         :straight (modern-cpp-font-lock
                    :repo "ludwigpacifici/modern-cpp-font-lock")
@@ -18014,7 +17906,7 @@
        :delight (meghanada-mode " MEG")
        :hook (java-mode . meghanada-mode)
        :custom
-       (meghanada-server-install-dir (var! "meghanada"))
+       (meghanada-server-install-dir (cache! "meghanada"))
 
        :config
        (require 'yasnippet)
@@ -18621,7 +18513,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package rustic
        :straight t
-       :hook (rustic-mode . +flylint)
+       ;; :hook (rustic-mode . +flylint)
        :custom
        (rustic-format-trigget 'on-save)
        (rustic-lsp-client nil)
@@ -18728,7 +18620,7 @@
        (TeX-parse-self t)
        (TeX-source-correlate-start-server t)
        (tex-print-file-extension ".pdf")
-       (TeX-auto-private (list (var! "auctex" "styles")))
+       (TeX-auto-private (list (etc! "auctex" "styles")))
 
        :init
        (defvaralias 'LaTeX-mode-hook 'latex-mode-hook)
@@ -18736,7 +18628,7 @@
        (defvar latex-modes+ '(latex-mode tex-mode)
          "list of tex related modes. used for leader and pretty symbols.")
 
-       (setq TeX-auto-local (var! "auctex" "auto"))                                  ; WARN this isn't supposed to be absolute
+       (setq TeX-auto-local (state! "auctex" "auto"))                                  ; WARN this isn't supposed to be absolute
 
        :config
        (push '(tex-mode   . 2) +indent-config)
@@ -18965,7 +18857,7 @@
        :custom
        (bibtex-align-at-equal-sign t)
        (bibtex-include-OPTkey t)
-       (orhc-bibtex-cache-file (var! "orhc-bibtex-cache"))
+       (orhc-bibtex-cache-file (cache! "orhc-bibtex-cache"))
        (bibtex-autokey-titleword-length nil)                                         ; use all available words and be as long as needed
        (bibtex-autokey-titlewords nil)
        (bibtex-field-delimiters 'double-quotes)                                      ; what I can I say, this just makes sense
@@ -19100,12 +18992,16 @@
         (bibtex-completion-library-path (list
                                          +docs-home
                                          (join-path +docs-home "unidocs/")))
-        (bibtex-completion-notes-path (join-path +notes-home "bibnotes"))
         (bibtex-completion-pdf-extension '(".pdf" ".epub" ".pptx" ".doc" ".docx"))
         (bibtex-completion-pdf-open-function 'xopen-url+)
 
         :init
         (defvaralias 'bibtex-completion-bibliography 'bibtex-files)
+
+        :config
+        ;; Something seems to be resetting this so I'm deferring its assignment
+        ;; for now.
+        (setq bibtex-completion-notes-path (join-path +notes-home "bibnotes"))
 
         :custom
         (bibtex-completion-additional-search-fields nil)
@@ -19160,14 +19056,14 @@
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ebib bibtex)
       (use-package ebib
         :straight t
-        :init
-        (setq ebib-notes-directory +notes-home)
+        :custom
+        (ebib-notes-directory +notes-home)
 
         :config
-        (mkdir (var! "ebib") t)
+        (mkdir (state! "ebib") t)
 
         (setq ebib-preload-bib-files bibtex-files
-              ebib-keywords (var! "ebib/keywords")
+              ebib-keywords (state! "ebib/keywords")
               ebib-reading-list-file (join-path +notes-home "reading-list.org"))
 
         ;; make ebib index use evil-motion-state
@@ -20013,7 +19909,7 @@
 
 *** org-capture
     :PROPERTIES:
-    :header-args+: :tangle lisp/+org-capture.el
+    :header-args+: :tangle (lisp! "+org-capture.el")
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! org)
@@ -20192,7 +20088,7 @@
 
 *** org-commands
     :PROPERTIES:
-    :header-args+: :tangle (package-str! "lisp/+org-commands.el" org)
+    :header-args+: :tangle (package-str! (lisp! "+org-commands.el") org)
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! org)
@@ -20835,14 +20731,14 @@
       (setq
        org-latex-pdf-process (list "latexmk -shell-escape -bibtex -f -pdf %f")
        org-babel-python-command "python3"
-       org-ditaa-jar-path (var! "org/bin/ditaa.jar")
-       org-ditaa-eps-jar-path (var! "org/bin/ditaaEps.jar")
-       org-plantuml-jar-path (var! "org/bin/plantuml.jar"))
+       org-ditaa-jar-path (cache! "org/bin/ditaa.jar")
+       org-ditaa-eps-jar-path (cache! "org/bin/ditaaEps.jar")
+       org-plantuml-jar-path (cache! "org/bin/plantuml.jar"))
     #+END_SRC
 
 **** org-async-init
      :PROPERTIES:
-     :header-args+: :tangle lisp/+org-async-init.el
+     :header-args+: :tangle (lisp! "+org-async-init.el")
      :END:
 
      ~init.el~ file for asynchronous org-mode export.
@@ -20857,7 +20753,6 @@
 
        (require 'ox)
 
-       <<setup-path-builders>>
        <<setup-paths>>
        <<org-latex-pkgs>>
        <<org-export-options>>
@@ -20895,7 +20790,6 @@
     (let ((early-init (concat user-emacs-directory "early-init.el")))
       (load early-init t t))
 
-    <<setup-path-builders>>
     <<setup-paths>>
     <<setup-straight-pacman>>
     <<setup-packages>>
@@ -21042,7 +20936,7 @@
 
 ** an-old-hope
    :PROPERTIES:
-   :header-args+: :tangle etc/themes/an-old-hope-theme.el
+   :header-args+: :tangle (etc! "themes/an-old-hope-theme.el")
    :END:
 
    #+NAME: an-old-hope-theme-description
