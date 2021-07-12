@@ -165,6 +165,7 @@
          sql
          ssh-config
          vimlang
+         xml
          yaml
          ;; yarn
          )
@@ -9019,7 +9020,9 @@
         (ruby-mode flymake-rest-rubocop)
         (sh-mode flymake-rest-shellcheck)
         (yaml-mode flymake-rest-yamllint)
-        (web-mode flymake-rest-html-tidy))
+        (web-mode flymake-rest-html-tidy)
+        (org-mode flymake-rest-proselint)
+        (nxml-mode flymake-rest-xmllint))
     #+end_src
 
 *** flymake-diagnostics-at-point
@@ -17068,7 +17071,9 @@
         :straight t
         :hook ((web-mode      . emmet-mode)
                (markdown-mode . emmet-mode)
-               (js2-jsx-mode  . emmet-mode))
+               (js2-jsx-mode  . emmet-mode)
+               (js2-jsx-mode  . emmet-mode)
+               (nxml-mode     . emmet-mode))
         :lazy-leader
         (:mode 'emmet-mode
          :minor t
@@ -20797,6 +20802,33 @@
         (org-appear-autolinks nil))
     #+END_SRC
 
+** xml
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! xml)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package nxml-mode
+       :hook (nxml-mode . +flylint)
+       :init
+       (push '(nxml-mode . 2) +indent-config)
+
+       (set-company-backend! 'nxml-mode #'company-nxml)
+
+       :config
+       ;; Technically its builtin so its better, but it doesn't cooperate with
+       ;; with flymake/flycheck and I'm not interested in re-learning how to
+       ;; navigate errors this new way.
+       (advice-add #'rng-nxml-mode-init :override #'ignore)
+
+       :lazy-leader
+       (:mode 'nxml-mode
+        "s" 'nxml-split-element)
+       :general
+       (:keymaps 'nxml-mode-map
+        :states 'insert
+        "/" 'nxml-electric-slash))
+   #+end_src
 * Script
   :PROPERTIES:
   :header-args+: :shebang "#!/usr/bin/env emacs-script\n;; -*- mode: emacs-lisp; lexical-binding: t -*-"
