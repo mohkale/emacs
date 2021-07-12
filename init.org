@@ -20657,19 +20657,22 @@
         ;; needed :-).
         (setq org-id-extra-files (directory-files org-roam-directory nil "\\.org$"))
 
-        ;; Restore the V1 display format for nodes (kind of).
-        :custom (org-roam-node-display-template "${tags}${title}")
+        :custom
+        (org-roam-node-display-template "${title}")
+        (org-roam-node-annotation-function #'org-roam-annotate-tag+)
+        :commands (org-roam-annotate-tag+)
+        :config
+        (defun org-roam-annotate-tag+ (node)
+          (let ((tags (org-roam--tags-to-str (org-roam-node-tags node))))
+            (unless (string-empty-p tags)
+              (concat
+               " "
+               (propertize " " 'display `(space :align-to (- right ,(+ 1 (length tags)))))
+               tags))))
 
         :commands (org-roam-create-new-img+)
         :leader (:mode 'org-mode "f" 'org-roam-create-new-img+)
         :config
-        (advice-add #'org-roam--tags-to-str :override
-                    (defun org-roam-tags-to-str+ (tags)
-                      (let ((tags (mapconcat (lambda (s) (concat s)) tags " ")))
-                        (unless (string-empty-p tags)
-                          (setq tags
-                                (propertize (concat "(" tags ") ") 'face 'bold)))
-                        tags)))
         (defun org-roam-create-new-img+ ()
           (interactive)
           (let* ((root (join-path default-directory "images"))
