@@ -56,7 +56,6 @@
      (defvar +modules
        '(;; apheleia                                                       ; Automatic buffer formatting after save.
          magit                                                             ; It's git... but magical  ,
-         ;; ace-link                                                       ; Jump to links in the current buffer through an avy interface
          link-hint                                                         ; Jump to links in the current buffer through an avy interface
          ;; adaptive-wrap                                                  ; Visually wrap long lines. doesn't alter what you write.
          anzu                                                              ; Show the number of search results incrementally
@@ -13383,100 +13382,6 @@
          "fsr" 'affe-grep))
     #+END_SRC
 
-** ace-link
-   :PROPERTIES:
-   :header-args+: :tangle (package-yes! ace-link)
-   :END:
-
-   Let's you use an [[*avy][avy]] like interface to jump to a link in the visible region of
-   the buffer.
-
-   #+BEGIN_SRC emacs-lisp
-     (use-package ace-link
-       :straight t
-       :commands (ace-link-fallback-function+)
-       :leader
-       ("j RET" 'ace-link)
-
-       :init
-       (defvar ace-link-fallback-alist+ nil
-         "major-mode to link function alist")
-
-       (setq ace-link-fallback-function
-             #'ace-link-fallback-function+)
-
-       :config
-       (defun ace-link-fallback-function+ ()
-         (cl-loop for (mode . func) in ace-link-fallback-alist+
-                  when (eq major-mode mode)
-                  return (funcall func))))
-   #+END_SRC
-
-   support [[*org-link-mode][org-link-mode]] as a fallback when no others are available link functions
-   exist for the current major mode.
-
-   #+BEGIN_SRC emacs-lisp
-     (use-package ace-link
-       :config
-       (advice-add ace-link-fallback-function :after-until
-                   (defun ace-link-org-link-minor-mode+ (&rest _)
-                     (when (bound-and-true-p org-link-minor-mode)
-                       (ace-link-org)
-                       t))))
-   #+END_SRC
-
-    fix =rustic-compilation-mode= isn't supported by ace-link.
-
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! rust ace-link)
-     (use-package ace-link
-       :after rustic
-       :config
-       (defun rustic-compilation-error-p+ (str)
-         (string-match-p
-          (rx
-           (or (regexp (car rustic-compilation-error))
-               (regexp (car rustic-compilation-warning))
-               (regexp (car rustic-compilation-info))
-               (regexp (car rustic-compilation-panic))))
-          str))
-
-       (defun ace-link-rustic-compilation-collect-links+ ()
-         "return all error links within the visible region."
-         (save-excursion
-           (let (markers
-                 (min-point (window-start))
-                 (max-point (window-end)))
-             ;; guarantee you're before the first error
-             (goto-char (max 0 (- min-point 1)))
-
-             ;; for the weird edge case where the first line
-             ;; is an error.
-             (when (and (>= (point) min-point)
-                        (<= (point) max-point)
-                        (zerop (rustic-compilation-error-p+ (buffer-string))))
-               (push (point-marker) markers))
-
-             (condition-case nil
-                 (while t
-                   (compilation-next-error 1)
-                   (cond
-                    ((< (point) min-point)) ;; continue
-                    ((> (point) max-point)
-                     (user-error "break"))
-                    (t (push (point-marker) markers))))
-               (user-error nil))
-             markers)))
-
-       (push (cons 'rustic-compilation-mode
-                   (defun ace-link-rustic-compilation-mode+ ()
-                     (let ((pt (avy-with ace-link-compilation
-                                         (avy-process
-                                          (ace-link-rustic-compilation-collect-links+)
-                                          (avy--style-fn avy-style)))))
-                       (ace-link--compilation-action pt))))
-             ace-link-fallback-alist+))
-   #+END_SRC
-
 ** apheleia
    :PROPERTIES:
    :header-args+: :tangle (package-yes! apheleia)
@@ -14645,7 +14550,7 @@
    #+END_SRC
 
 ** link-hint
-   An alternative to [[*ace-link][ace-link]] with support for more flexible link sources.
+   Jump to links through an avy interface.
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! link-hint)
      (use-package link-hint
