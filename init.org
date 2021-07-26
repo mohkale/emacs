@@ -16003,6 +16003,19 @@
          (skeletor-shell-command "gradle wrapper" dir)))
    #+END_SRC
 
+   A basic Makefile variant for java.
+
+   #+begin_src emacs-lisp
+     (skeletor-define-template "java-make"
+       :title "Java [make]"
+       :requires-executables '(("javac" . "https://openjdk.java.net/")
+                               ("java" . "https://openjdk.java.net/")
+                               ("make" . "https://www.gnu.org/software/make/"))
+       :substitutions
+       '(("__MAIN-CLASS__" . (lambda ()
+                               (read-string "Main class: " "Main")))))
+   #+end_src
+
    #+BEGIN_SRC emacs-lisp
    (provide '+skeletor-templates)
    #+END_SRC
