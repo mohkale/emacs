@@ -18960,13 +18960,13 @@
 
      ;;; Extend prettify-symbol symbols from `tex--prettify-symbols-alist'.
        (eval
-        `(configure-presym! ',latex-modes+
+        `(configure-presym! '(,@latex-modes+ org-mode)
            ,@(cl-loop
               for tuple in tex--prettify-symbols-alist
               append (list (car tuple) (cdr tuple)))))
 
        :leader
-       (:mode latex-modes+
+       (:mode `(,@latex-modes+ org-mode)
         "{" 'latex-insert-block
         "}" 'latex-close-block)
 
@@ -19071,6 +19071,10 @@
                       (apply #'TeX-run-style-hooks
                              (mapcar #'cadr org-latex-packages-alist)))))
 
+        :leader
+        (:mode `(,@latex-modes+ org-mode)
+         "\\" 'TeX-insert-macro)
+
         :lazy-leader
         (:mode 'TeX-error-overview-mode
          "b" 'TeX-error-overview-toggle-debug-bad-boxes
@@ -19089,7 +19093,6 @@
          "h" 'TeX-doc
          "RET" 'TeX-command-run-all
          "t" 'TeX-font
-         "\\" 'TeX-insert-macro
          "i" 'TeX-insert-macro
          "s" 'LaTeX-section
          "m" 'latex-insert-math+
@@ -19796,7 +19799,7 @@
          "#" 'org-priority
          "`" 'org-toggle-latex-fragment
          "^" 'org-sort
-         "\\" 'org-match-sparse-tree
+         ;; "\\" 'org-match-sparse-tree
          "A" 'org-agenda
          "a" 'org-archive-subtree
          "b" 'org-tree-to-indirect-buffer
@@ -20808,12 +20811,15 @@
     #+END_SRC
 
 *** org-ref
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! org bibtex)
+    :END:
     Support citations, references and links in org mode documents.
 
     WARN for bibliographies to show up you have to specify a biliographystyle (use
     unsrt when unsure).
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! org bibtex)
+    #+BEGIN_SRC emacs-lisp
       (use-package org-ref
         :straight t
         :after org
@@ -20839,6 +20845,18 @@
                                       (if (listp path) (car path) path))
               org-ref-latex-bib-resolve-func #'expand-file-name))
     #+END_SRC
+
+**** citeproc-org
+     #+begin_src emacs-lisp
+       (use-package citeproc-org
+         :straight t
+         :demand t
+         :after org-ref
+         :custom
+         (citeproc-org-ignore-backends '(beamer))
+         :config
+         (citeproc-org-setup))
+     #+end_src
 
 *** org-links
     View org links in non-org buffers as you would in org buffers.
@@ -20938,6 +20956,12 @@
 
      #+NAME: org-bib-pdf-link
      #+BEGIN_SRC emacs-lisp :tangle (package-yes! org bibtex)
+       (defvar +org-pdf-bib-regex (rx (group (minimal-match (one-or-more any)))
+                                      (optional
+                                       "::"
+                                       (group (one-or-more (any digit))))
+                                       eol))
+
        (defun +org-pdf-bib-complete-link (&optional arg)
          (concat
           "pdfbib:"
@@ -20945,15 +20969,14 @@
            ((package! :consult)
             (consult-bibtex-read-entry+ arg))
            (t (user-error "No bibtex key reader found")))
-          "::"
-          (read-from-minibuffer "Page: " "1" nil nil +org-pdf-complete-link-page-history)))
+          ;; I want to be able to omit a page number but read-number doesn't allow that :cry:.
+          (let ((page (read-from-minibuffer "Page: " nil nil nil +org-pdf-complete-link-page-history)))
+            (unless (string-empty-p)
+              (concat "::" page)))))
 
        (defun +org-pdf-bib-open (link)
          (save-match-data
-           (unless (string-match (rx (group (one-or-more any))
-                                     "::"
-                                     (group (zero-or-more (any digit))))
-                                 link)
+           (unless (string-match +org-pdf-bib-regex link)
              (warn "Failed to extract path/page from: %s" link))
 
            (if-let* ((key (match-string 1 link))
@@ -20965,7 +20988,7 @@
          "Export the pdfview LINK with DESCRIPTION for FORMAT from Org files."
          (let* (key page)
            (save-match-data
-             (if (string-match "\\(.+\\)::\\(.*\\)" link)
+             (if (string-match +org-pdf-bib-regex link)
                  (progn
                    (setq key  (match-string 1 link)
                          page (match-string 2 link)))
@@ -20988,6 +21011,27 @@
                                   :complete #'+org-pdf-bib-complete-link
                                   :export   #'+org-pdf-bib-export
                                   :eldoc    #'+org-pdf-bib-eldoc))
+
+       (with-eval-after-load 'org-ref
+         (push "pdfbib" org-ref-cite-types))
+
+       (with-eval-after-load 'citeproc-org
+         (advice-add #'citeproc-org-setup :after
+                     (lambda ()
+                       (add-hook 'org-export-before-parsing-hook
+                                 (defun citeproc-fix-pdfbib+ (_backend)
+                                   "Replace pdfbib links with their equivalent org-ref variants in citeproc style."
+                                   (let ((inhibit-message t))
+                                     (save-excursion
+                                       (goto-char (point-min))
+
+                                       (replace-regexp (rx "["
+                                                           "[pdfbib:" (group (minimal-match (one-or-more (or any "\n")))) (optional "::" (group (one-or-more digit))) "]"
+                                                           (optional (group "[" (minimal-match (one-or-more (or any "\n"))) "]"))
+                                                           "]")
+                                                       (query-replace-compile-replacement
+                                                        "[[cite:\\1][see page \\2\\,(if \\3 (concat \", \" \\3) \"\")]]"
+                                                        t)))))))))
      #+END_SRC
 
 **** org-ref
@@ -21065,14 +21109,19 @@
     These are the latex packages emacs should always require when using latex export.
 
     #+NAME: org-latex-packages
-    | Options | Package  |
-    |---------+----------|
-    |         | mathdots |
-    |         | fourier  |
-    |         | yfonts   |
-    | super   | nth      |
-    |         | siunitx  |
-    |         | color    |
+    | Options | Package    |
+    |---------+------------|
+    |         | mathdots   |
+    |         | fourier    |
+    |         | yfonts     |
+    | super   | nth        |
+    |         | siunitx    |
+    |         | color      |
+    |         | amssymb    |
+    |         | amsthm     |
+    |         | tikz       |
+    |         | graphics   |
+    |         | pgfplots   |
 
     #+NAME: org-latex-pkgs
     #+BEGIN_SRC emacs-lisp :var pkgs=org-latex-packages
@@ -21105,7 +21154,7 @@
      #+END_SRC
 
      #+BEGIN_SRC emacs-lisp :var pkgs=org-latex-packages
-       (load (concat user-emacs-directory "early-init.el"))
+       (load (concat user-emacs-directory "early-init.el") nil t)
 
        (require 'ox)
 
@@ -21114,6 +21163,8 @@
        <<org-export-options>>
        <<org-pdf-link>>
        <<org-bib-pdf-link>>
+       (require 'org-id)
+       (org-id-locations-load)
 
        <<setup-straight-pacman>>
        (straight-use-package 'org-ref)
