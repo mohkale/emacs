@@ -12074,22 +12074,6 @@
                    (apply-partially #'minibuffer-override-face+
                                     'selectrum-current-candidate))
 
-       (defun selectrum-update-regexp-search-ring+ (&rest _args)
-         "Update search rings based on the last `selectrum--read' command.
-     This works for isearch and evil and can automatically detect and compile
-     regexp when an external package (eg. orderless) is used."
-         (when-let ((input selectrum--last-input)
-                    (regexp (cond ((member 'orderless completion-styles)
-                                   (eval
-                                    `(rx (or ,@(cl-loop for regexp in (orderless-pattern-compiler input)
-                                                        collect `(regexp ,regexp))))))
-                                  (t selectrum--previous-input-string))))
-           (push regexp regexp-search-ring)
-           (when (boundp 'evil-ex-search-pattern)
-             (setq evil-ex-search-pattern (list regexp t t)
-                   evil-ex-search-direction 'forward)
-             (evil-ex-search-activate-highlight (list regexp t t)))))
-
        :leader
        ("RET" 'selectrum-repeat)
 
@@ -12128,11 +12112,6 @@
                     (setq selectrum-preprocess-candidates-function #'selectrum-preprocess+
                           selectrum-highlight-candidates-function #'selectrum-highlight+))))
     #+END_SRC
-
-*** consult-selectrum
-   #+begin_src emacs-lisp
-     (advice-add 'consult-line :after #'selectrum-update-regexp-search-ring+)
-   #+end_src
 
 ** vertico
    :PROPERTIES:
@@ -12429,6 +12408,25 @@
 
         (with-consult-ignore-project+ consult-ripgrep)
         (with-consult-ignore-project+ consult-grep)
+
+        :config
+        (advice-add 'consult-line :after
+                    ;; From the venerable [[https://github.com/minad/consult/issues/318#issuecomment-882067919][noctuid]].
+                    (defun consult-line-evil-history+ (&rest _)
+                      "Add latest `consult-line' search pattern to the evil search history ring."
+                      (when (and (bound-and-true-p evil-mode)
+                                 (eq evil-search-module 'evil-search))
+                        (let* ((input (car consult--line-history))
+                               (pattern (cond ((member 'orderless completion-styles)
+                                               (eval
+                                                `(rx (or ,@(cl-loop for regexp in (orderless-pattern-compiler input)
+                                                                    collect `(regexp ,regexp))))))
+                                              (t input))))
+                          (add-to-history 'evil-ex-search-history pattern)
+                          (setq evil-ex-search-pattern (list pattern t t)
+                                evil-ex-search-direction 'forward)
+                          (when evil-ex-search-persistent-highlight
+                            (evil-ex-search-activate-highlight evil-ex-search-pattern))))))
 
         :leader
         (:mode '(selectrum-mode
