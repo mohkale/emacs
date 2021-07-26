@@ -9929,6 +9929,84 @@
                    +completion-category-hl-func-overrides))
     #+end_src
 
+    Here's something unconventional. Ivy has this thing where the current candidate
+    overrides any local faces of the candidate and only shows up using the current
+    candidate face (configured by each completion framework) and any faces for the
+    query matches. This is actually pretty great for themes that use strong colors
+    that may not contrast on each other very well. However this doesn't translate
+    well to selectrum or orderless which simply append a new face to the existing
+    face spec.
+
+    The following code block makes the current candidate face *override* the existing
+    faces of the candidate and then overrides any query faces such as orderless or
+    prescient on top of that to make it appear closer to ivy. This has a pretty
+    obvious performance hit (especially for long candidates) however because it's
+    only done on at most one candidate it should be negligible. That said if you have
+    any performance issues you can set ~minibuffer-override-faces+~ to ~nil~ to disable
+    this.
+
+    #+begin_src emacs-lisp
+      (defvar minibuffer-override-faces+ '(orderless-match-face-0
+                                           orderless-match-face-1
+                                           orderless-match-face-2
+                                           orderless-match-face-3
+                                           ;; For some reason `consult' async commands and some regular
+                                           ;; commnads such as `completion-in-region' don't use orderless
+                                           ;; highlighting.
+                                           selectrum-prescient-primary-highlight
+                                           selectrum-prescient-secondary-highlight)
+        "The faces that should remain on top of the current candidate face.
+      Set to nil to disable face overriding.")
+
+      (defvar minibuffer-override-face-ignore+ '(face)
+        "List of completion categories to avoid face overriding in.")
+
+      (defun minibuffer-override-face-chunks+ (str)
+        "Find regions in STR where a different face should be applied."
+        (cl-loop for i from 0 to (length str)
+                 with last-face = nil
+                 with current-face = nil
+                 do (setq current-face
+                          (when-let ((face (get-text-property i 'face str)))
+                            (if (listp face) (car face) face)))
+                 with seq-range = nil
+                 when (and current-face (member current-face minibuffer-override-faces+))
+                   when seq-range
+                     when (eq current-face last-face)
+                       ;; Incremenet existing sequence
+                       do (setcdr seq-range i)
+                     else
+                       ;; Finished previous sequence and started a new one
+                       collect (cons last-face seq-range)
+                       and do (setq seq-range (cons i i))
+                     end
+                   else
+                     do (setq seq-range (cons i i))
+                   end
+                 else when seq-range
+                   collect (cons last-face seq-range)
+                   and do (setq seq-range nil)
+                 end
+                 do (setq last-face current-face)))
+
+      (defun minibuffer-override-face+ (current-face str)
+        (when (and minibuffer-override-faces+
+                   (not (member (completion-metadata-get (+completion-metadata) 'category)
+                                minibuffer-override-face-ignore+)))
+          (let ((copied (copy-sequence str)))
+            (if (version< emacs-version "27")
+                (font-lock-prepend-text-property 0 (length copied) 'face current-face copied)
+              (add-face-text-property 0 (length copied) current-face nil copied))
+
+            (dolist (seq (minibuffer-override-face-chunks+ str))
+              (cl-destructuring-bind (face . (start . end))
+                  seq
+                (if (version< emacs-version "27")
+                    (font-lock-prepend-text-property start end 'face face copied)
+                  (add-face-text-property start (1+ end) face nil copied))))
+            copied)))
+    #+end_src
+
 ** minibuffer-depth-indication
    #+BEGIN_SRC emacs-lisp
      (use-package mb-depth
@@ -11990,60 +12068,11 @@
                                      (list #'selectrum-candidates-identity))))
                           :initial-value cands)))
 
-       (defun selectrum-override-current-candidate-face-face-range+ (str overriding-faces)
-         (cl-loop for i from 0 to (length str)
-                  with last-face = nil
-                  with current-face = nil
-                  do (setq current-face
-                           (when-let ((face (get-text-property i 'face str)))
-                             (if (listp face) (car face) face)))
-                  with seq-range = nil
-                  when (and current-face (member current-face overriding-faces))
-                    when seq-range
-                      when (eq current-face last-face)
-                        ;; Incremenet existing sequence
-                        do (setcdr seq-range i)
-                      else
-                        ;; Finished previous sequence and started a new one
-                        collect (cons last-face seq-range)
-                        and do (setq seq-range (cons i i))
-                      end
-                    else
-                      do (setq seq-range (cons i i))
-                    end
-                  else when seq-range
-                    collect (cons last-face seq-range)
-                    and do (setq seq-range nil)
-                  end
-                  do (setq last-face current-face)))
-
        (advice-add 'selectrum--selection-highlight :before-until
-                   (defun selectrum-override-current-candidate-face+ (str)
-                     "Use `selectrum-current-candidate' but keep match highlighting.
-     This is a workaround until [[https://github.com/raxod502/selectrum/issues/353][#353]] gets resolved."
-                     (unless (eq selectrum--last-command #'describe-face)
-                       (let ((face 'selectrum-current-candidate)
-                             (copied (copy-sequence str)))
-                         (if (version< emacs-version "27")
-                             (font-lock-prepend-text-property 0 (length copied) 'face face copied)
-                           (add-face-text-property 0 (length copied) face nil copied))
-
-                         (dolist (seq (selectrum-override-current-candidate-face-face-range+
-                                       str '(orderless-match-face-0
-                                             orderless-match-face-1
-                                             orderless-match-face-2
-                                             orderless-match-face-3
-                                             ;; For some reason `consult' async commands and some regular
-                                             ;; commnads such as `completion-in-region' don't use orderless
-                                             ;; highlighting.
-                                             selectrum-prescient-primary-highlight
-                                             selectrum-prescient-secondary-highlight)))
-                           (cl-destructuring-bind (face . (start . end))
-                               seq
-                             (if (version< emacs-version "27")
-                                 (font-lock-prepend-text-property start end 'face face copied)
-                               (add-face-text-property start (1+ end) face nil copied))))
-                         copied))))
+                   ;; Use `selectrum-current-candidate' but keep match highlighting.
+                   ;; This is a workaround until [[https://github.com/raxod502/selectrum/issues/353][#353]] gets resolved.
+                   (apply-partially #'minibuffer-override-face+
+                                    'selectrum-current-candidate))
 
        (defun selectrum-update-regexp-search-ring+ (&rest _args)
          "Update search rings based on the last `selectrum--read' command.
@@ -12130,8 +12159,12 @@
                                    (symbol-function #'vertico--format-candidate))
                                   ((symbol-function #'vertico--format-candidate)
                                    (lambda (cand &rest args)
-                                     (apply #'actual-vertico-format-candidate
-                                            (funcall hl-func cand) args))))
+                                     (or (and (eq (nth 2 args) vertico--index)
+                                              (minibuffer-override-face+
+                                               'vertico-current
+                                               (apply #'actual-vertico-format-candidate cand args)))
+                                         (apply #'actual-vertico-format-candidate
+                                                (funcall hl-func cand) args)))))
                          (funcall func metadata)))))
 
        (advice-add #'vertico--sort-function :before-until #'+completion-category-sort-func)
@@ -19128,9 +19161,11 @@
        (bibtex-autokey-titlewords nil)
        (bibtex-field-delimiters 'double-quotes)                                      ; what I can I say, this just makes sense
 
+       :init
+       (defvaralias 'bibtex-files 'org-cite-global-bibliography)
+
        :config
        (evil-set-initial-state 'bibtex-mode 'normal)
-       (setq bibtex-files (directory-files +bib-home t ".bib"))
 
      ;;; configure bibtex autokey structure: YEARauthor-paper-name
        (defvar bibtex-autokey-year-name-separator+ bibtex-autokey-name-year-separator
@@ -19262,7 +19297,7 @@
         (bibtex-completion-pdf-open-function 'xopen-url+)
 
         :init
-        (defvaralias 'bibtex-completion-bibliography 'bibtex-files)
+        (defvaralias 'bibtex-completion-bibliography 'org-cite-global-bibliography)
 
         :config
         ;; Something seems to be resetting this so I'm deferring its assignment
@@ -19325,11 +19360,13 @@
         :custom
         (ebib-notes-directory +notes-home)
 
+        :init
+        (defvaralias 'ebib-preload-bib-files 'org-cite-global-bibliography)
+
         :config
         (mkdir (state! "ebib") t)
 
-        (setq ebib-preload-bib-files bibtex-files
-              ebib-keywords (state! "ebib/keywords")
+        (setq ebib-keywords (state! "ebib/keywords")
               ebib-reading-list-file (join-path +notes-home "reading-list.org"))
 
         ;; make ebib index use evil-motion-state
@@ -19556,6 +19593,7 @@
 
         :config
         (setq org-babel-default-header-args:emacs-lisp '((:lexical . "yes")))
+        (setq org-cite-global-bibliography (directory-files +bib-home t ".bib"))
 
         :init
         (modify-syntax-hook! 'org-mode
@@ -20775,8 +20813,8 @@
         ("ov" 'doi-utils-add-bibtex-entry-from-doi)
 
         :init
-        (defvaralias 'reftex-default-bibliography 'bibtex-files)
-        (defvaralias 'org-ref-default-bibliography 'bibtex-files)
+        (defvaralias 'reftex-default-bibliography 'org-cite-global-bibliography)
+        (defvaralias 'org-ref-default-bibliography 'org-cite-global-bibliography)
         (defvaralias 'org-ref-bibliography-notes 'bibtex-completion-notes-path)
 
         :custom
