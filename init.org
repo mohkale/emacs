@@ -352,7 +352,7 @@
    [[*lsp-mode][lsp]] refers to the language-server-protocol and it's how editors such as [[https://code.visualstudio.com/][VSCode]]
    provide such fast and performant language support across so many languages.
    Emacs has 2 packages for this but I don't like kick-starting a language-server
-   every time I start a file. The ~+lsp-maybe-connect~ configuration option lets you
+   every time I visit a file. The ~+lsp-maybe-connect~ configuration option lets you
    conditionally connect to a server depending on the current workspace and whether
    or not a server is already running. These helper methods initialise this feature.
 
@@ -419,8 +419,9 @@
                 collect (cons (string-remove-suffix "/" path) depth)))
    #+end_src
 
-   Declares some variables to streamline access to my preferred ruby language
-   package.
+   Emacs has two modes for ruby, one built-in and the other external. Here I just
+   declare some variables to streamline access to which-ever mode I'm using in my
+   configuration.
 
    #+begin_src emacs-lisp
      (defvar +ruby-mode      (intern (concat (symbol-name +ruby-package) "-mode")))
@@ -508,7 +509,7 @@
    #+END_SRC
 
    Let's disable some of the unecessary GUI enhancements, you can re-enable them at
-   runtime+, but I don't like them anyways+. Disabling them early also prevents GUI
+   runtime +but I don't like them anyways+. Disabling them early also prevents GUI
    enhancements being partially visible at startup and then immeadiately disabled.
 
    #+BEGIN_SRC emacs-lisp
@@ -518,9 +519,8 @@
       (push '(vertical-scroll-bars) default-frame-alist)
    #+END_SRC
 
-   We should also make sure these enhancements persists even in older emacs versions.
-   We also have to disable ~scroll-bar-mode~ the direct way, not just in ~early-init~,
-   or else spaceline gets truncated on the right hand side.
+   We have to disable ~scroll-bar-mode~ the direct way, not just in ~early-init~, or else
+   spaceline gets truncated on the right hand side.
 
    #+BEGIN_SRC emacs-lisp :tangle init.el
      (scroll-bar-mode -1)   ; scroll bar shown on frames right side
@@ -627,12 +627,12 @@
      (defconst +notes-home (join-path (xdg-documents-dir) "notes")
        "Base directory containing notes files.")
 
-     (defconst +bib-home (join-path (xdg-documents-dir) "bibliography")
+     (defconst +bib-home (join-path (xdg-documents-dir) "bib")
        "Base directory containing bibliography files.")
 
      (setq org-roam-directory (join-path (xdg-documents-dir) "brain"))
 
-     (defconst +docs-home (join-path (xdg-documents-dir) "pdfs/")
+     (defconst +docs-home (join-path (xdg-documents-dir) "books/")
        "Base directory containing bib documents.")
 
      (setq
@@ -675,7 +675,6 @@
    #+END_SRC
 
 ** utils
-
    Define some macros and helpers to assist with later configurations.
 
    Check emacs versions:
@@ -766,7 +765,7 @@
 
    Some packages are out of date and thus their PGP signatures don't work.
    I could go over them manually, but for the sake of my sanity, let's just
-   disable signature checks. WARN this isn't safe, proceed at your own risk.
+   disable signature checks. *WARN* this isn't safe, proceed at your own risk.
 
    #+BEGIN_SRC emacs-lisp
      (setq package-check-signature nil)
@@ -801,7 +800,7 @@
    For my config I'll be using [[https://github.com/raxod502/straight.el][straight]], the modern package manager for emacs.
 
    Now by default straight is a self hosting package manager, all of it is contained
-   within ~straight-base-dir~ but including version lockfiles, but I'm not a big fan of
+   within ~straight-base-dir~ including version lockfiles, but I'm not a big fan of
    having to commit configurations into runtime directories so I've advised straight
    to place them in my ~dotmeacs-etc-path~.
 
@@ -845,28 +844,6 @@
        (straight-use-package pkg)
        (require pkg))
    #+END_SRC
-
-*** use-package-extensions
-    Where I define extensions to use-package.
-
-    The =:only= extension is like the builtin =:if= extension except it skips installation
-    when the condition passed to it fails as well.
-
-    #+BEGIN_SRC emacs-lisp
-      ;; WARN: keep this at the start of `use-package-keywords' lest chaos
-      ;; befall you.
-      (push :only use-package-keywords)
-
-      (defun use-package-normalize/:only (_ keyword args)
-        (use-package-only-one (symbol-name keyword) args
-          (lambda (_ arg) arg)))
-
-      (defun use-package-handler/:only (name-symbol _ condition rest state)
-        (let ((body (use-package-process-keywords name-symbol rest state)))
-          `((when ,condition ,@body))))
-
-      (enable-theme 'use-package)                                           ; see [[https://github.com/jwiegley/use-package/pull/881][here]].
-    #+END_SRC
 
 ** editor
    Make emacs a saner, friendlier development environment.
@@ -928,22 +905,22 @@
      #+BEGIN_SRC emacs-lisp
        (setq-default
         ;; default-fill-column 150                                                ; toggle wrapping text at given character
-        fill-column 85                                                         ; the default line length allowed by auto-fill-mode
+        fill-column 85                                                            ; the default line length allowed by auto-fill-mode
         )
      #+END_SRC
 
-    Backup behaviour of emacs. NOTE ~kept-new-versions~ and ~kept-old-versions~ are
-    both used to determine the allowed number of backups. emacs will keep at most
+    Backup behaviour of emacs. *NOTE* ~kept-new-versions~ and ~kept-old-versions~ are
+    both used to determine the allowed number of backups. Emacs will keep at most
     ~kept-new-versions~ + ~kept-old-versions~ backups.
 
     #+BEGIN_SRC emacs-lisp
       (setq
-       kept-new-versions 15                                                   ; keep this many latest versions of file
-       kept-old-versions 5                                                    ; keep this many early versions of file
+       kept-new-versions 15                                                   ; keep this many latest versions of file.
+       kept-old-versions 5                                                    ; keep this many early versions of file.
        )
     #+END_SRC
 
-    The default major mode; use for eg. in newly made files with an unknown extension.
+    The default major mode; used for eg. in newly made files with an unknown file-type.
 
     #+BEGIN_SRC emacs-lisp
       (setq-default major-mode 'text-mode)
@@ -959,15 +936,23 @@
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
-      (setq-default indent-tabs-mode nil                                           ; use spaces, not tabs
+      (setq-default indent-tabs-mode nil                                           ; Use spaces, not tabs
                     show-trailing-whitespace nil
-                    truncate-lines t                                               ; don't split long lines onto next lines
-                    scroll-conservatively 101                                      ; smooth... enough scrolling going line by line
+                    truncate-lines t                                               ; Don't split long lines onto next lines
+                    scroll-conservatively 101                                      ; Smooth... enough scrolling going line by line
                     scroll-preserve-screen-position t
-                    cursor-in-non-selected-windows nil                             ; don't show the cursor in inactive windows
-                    echo-keystrokes 0.02                                           ; print inputted prefix keys after a pause.
+                    cursor-in-non-selected-windows nil                             ; Don't show the cursor in inactive windows
+                    echo-keystrokes 0.02                                           ; Print inputted prefix keys after a pause.
                     )
     #+END_SRC
+
+    Completion ignored extensions lets you exclude files or directories suffixed with
+    certain patterns. This is useful for omitting stuff you'll never want to find like
+    c object files.
+
+    #+begin_src emacs-lisp
+      (push "node_modules/" completion-ignored-extensions)
+    #+end_src
 
     Set the string shown on the title bar of emacs frames.
 
@@ -979,8 +964,7 @@
             ;; include variables anywhere in the string, including sublists, but no functions.
             ;;
             ;; See the format guide here: https://www.emacswiki.org/emacs/FrameTitle
-            `(;;,(user-login-name)
-              "emacs@"
+            `("emacs@"
               ,(system-name)
               " [%*] %m"
               (:eval (when (derived-mode-p 'pdf-view-mode)
@@ -1052,7 +1036,7 @@
       (and (file-exists-p custom-file) (load custom-file t t))
     #+END_SRC
 
-*** ui
+*** user-interface
     Disable GUI enhancements, some of these are taken care of in [[*early-init][early-init]].
 
     Let's stop the cursor blinking annoyingly.
@@ -1071,7 +1055,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (setq command-error-function
-            (defun command-error-function! (data context caller)
+            (defun command-error-function+ (data context caller)
               "hide some error message"
               (when (not (memq (car data) '(;; buffer-read-only
                                             beginning-of-buffer
@@ -1125,7 +1109,7 @@
     | [X]       | return    |  13 | RET  | Ctrl+m       |                             |
     | [X]       | escape    |  27 | ESC  | Ctrl+[       |                             |
 
-    NOTE: in GUI, the behaviour shouldn't have changed. The following keys haven't
+    *NOTE*: in GUI, the behaviour shouldn't have changed. The following keys haven't
     been reclaimed, but the GUI variants override the term versions anyways, so you
     shouldn't really notice.
 
@@ -1228,18 +1212,18 @@
         (add-hook 'emacs-startup-hook #'term-setup-frame-bindings+))
     #+END_SRC
 
-    Try to enable clipboard support, these settings should do something... but to
+    Try to enable clipboard support, these settings should do something... but
     they don't seem to work for me :cry:.
 
     #+BEGIN_SRC emacs-lisp :tangle no
-      (setq x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING)
+      (setq x-select-request-type     '(UTF8_STRING COMPOUND_TEXT TEXT STRING)
             x-select-enable-clipboard t
             x-select-enable-primary   t
             x-stretch-cursor          t)
     #+END_SRC
 
     As a last resort, let's defer to an excellent external package which takes care
-    of this for you automatically... assuming you have the right tools on your device.
+    of this for you automatically... assuming you have the right tools on your host.
 
     #+BEGIN_SRC emacs-lisp
       (use-package xclip
@@ -1253,7 +1237,7 @@
     thought to be confusing.
 
     #+BEGIN_SRC emacs-lisp
-    (put 'narrow-to-region 'disabled nil)
+      (put 'narrow-to-region 'disabled nil)
     #+END_SRC
 
 *** leader
@@ -1351,7 +1335,6 @@
          "bb" 'switch-to-buffer
          "bB" 'switch-to-buffer-other-window
          "bd" 'kill-this-buffer
-         "bE" 'erase-buffer
          "bm" 'buffer-menu
          "bn" 'next-buffer
          "bp" 'previous-buffer
@@ -1359,7 +1342,7 @@
          "bR" 'rename-uniquely
          "bo" 'occur
          "b DEL" 'bury-buffer
-         "be" 'safe-erase-buffer
+         "bE" 'safe-erase-buffer
          "bH" 'htmlfontify-buffer
          "bK" 'kill-this-buffer
          "bk" 'kill-this-buffer-and-window-maybe
@@ -1555,7 +1538,7 @@
 *** bindings
     where I put global bindings.
 
-    WARN never bind ESC, it BREAKS *EVERYTHING!*.
+    *WARN*: never bind ESC, it *BREAKS EVERYTHING!*.
 
     Firstly, specify some defaults for the bindings I reclaimed from the terminal,
     this should just be the same keys they would have if they were not reclaimed.
@@ -1576,8 +1559,7 @@
     Let's also make some terminal exclusive bindings have the same affect in GUI emacs.
 
     #+BEGIN_SRC emacs-lisp
-      (general-define-key
-       "C-S-v" 'yank)
+      (general-define-key "C-S-v" 'yank)
     #+END_SRC
 
     Now let's unbind some undesired emacs global keys
@@ -1679,30 +1661,13 @@
     #+END_SRC
 
     A command that inserts a character without moving point.
-    TODO do I really need this?
-
-    #+BEGIN_SRC emacs-lisp :tangle no
-      (defmacro defun-save-excursion-insert-char (char-name char)
-        (setq char (eval char))
-
-        (let* ((char-name (symbol-name char-name))
-               (func-name (intern (concat "save-excursion-insert-" char-name))))
-          `(defun ,func-name (prefix)
-             (interactive "P")
-             (save-excursion
-               (insert-char ,char (prefix-numeric-value prefix))))))
-
-      (general-define-key
-       :states leader-nnorm-states
-       "S-M-SPC" (defun-save-excursion-insert-char space ? ))
-    #+END_SRC
 
 *** hooks
     Run a hook on buffer change
 
     #+BEGIN_SRC emacs-lisp
       (defvar switch-to-buffer-hook nil
-        "hook run when you switch to a buffer.")
+        "Hook run when you switch to a buffer.")
 
       (advice-add 'switch-to-buffer
                   :after (defun switch-to-buffer--execute-hook (&rest args)
@@ -1759,7 +1724,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (defun display-buffer-left (buffer alist)
-        "display a buffer to the left of the current buffer.
+        "Display a buffer to the left of the current buffer.
       (1) If `buffer` is already displayed, then display it again in the same window.
       (2) If `buffer` is not already displayed, and if there is a window to the left,
           then display that `buffer` in said window.
@@ -1779,7 +1744,7 @@
           (window--display-buffer buffer window 'window alist)))
 
       (defun display-buffer-right (buffer alist)
-        "display a buffer to the right of the current buffer.
+        "Display a buffer to the right of the current buffer.
       (1) If `buffer` is already displayed, then display it again in the same window.
       (2) If `buffer` is not already displayed, and if there is a window to the right,
           then display that `buffer` in said window.
@@ -1803,7 +1768,7 @@
     focus to windows after displaying-them. Personally I prefer this because it
     makes quitting windows easier (often just ~q~ after it pops up).
 
-    NOTE: You can also get this affect by simply setting
+    *NOTE*: You can also get this affect by simply setting
     ~(body-function . select-window)~ in the configuration alist for a display-buffer
     action, but these give you the flexibility to select with one action or not select
     with another.
@@ -1855,7 +1820,6 @@
       ;; probably have to defer to one of the display+select actions defined
       ;; above.
       (setq display-buffer-fallback-action
-            ;; by default, focus on displayed windows
             `(,@display-buffer-fallback-action
               (body-function . select-window)))
     #+END_SRC
@@ -2009,8 +1973,8 @@
     An extension of the persistent scratch function which provides functions to create a new
     scratch buffer and interactively switch to one.
 
-    WARN multiscratch doesn't save the first scratch buffer. That's a real scratch buffer,
-    which's expected to get erased every time emacs is killed. All other scratch buffers
+    *WARN* multiscratch doesn't save the first scratch buffer. That's a real scratch buffer,
+    which is expected to get erased every time emacs is killed. All other scratch buffers
     are properly restored though.
 
     First we define what a scratch buffer should look like, and add facilities for
@@ -2159,7 +2123,6 @@
         ls1))
   #+end_src
 
-
   Wrapper that suppresses emacs attempts to write a message.
 
   #+begin_src emacs-lisp
@@ -2184,7 +2147,6 @@
       "Return t if BUFFER is killed."
       (not (buffer-name buffer)))
   #+end_src
-
 
   String truncation functions.
 
@@ -2229,7 +2191,6 @@
              (let ,assign-vars
                ,@body)))))
   #+end_src
-
 
 ** plist-bind
    #+BEGIN_SRC emacs-lisp
@@ -2740,49 +2701,6 @@
                          (funcall method indent-point state))))))))
 
      (setq lisp-indent-function #'+emacs-lisp-indent-function)
-   #+END_SRC
-
-** minibuffer-clear
-   Auto clear the echo area after a certain idle interval. Why? because emacs has a tendency
-   to hang when doing a lot of tasks (eg. updating packages). When this package installation
-   finished emacs keeps the last message in the minibuffer meaning the only way to tell if
-   emacs is ready to carry on is to hit a key. I can't count the number of times I've just
-   stood around for 2 minutes wondering when it'll be done, only to find it finished a while
-   ago and I just didn't recieve any notification :angry:.
-
-   #+BEGIN_SRC emacs-lisp :tangle no
-     (defun clear-echo-area ()
-       (message nil))
-
-     (defvar auto-clear-echo-area-interval 5
-       "clear the echo area after this many seconds have elapsed.
-     set to nil to not disable echo area auto clear.")
-
-     (defvar auto-clear-echo-area--timer nil)
-
-     (advice-add 'message :after
-                 (defun auto-clear-echo-area (string &rest args)
-                   (when (and string
-                              auto-clear-echo-area-interval)
-                     (when auto-clear-echo-area--timer
-                       (cancel-timer auto-clear-echo-area--timer))
-
-                     (setq auto-clear-echo-area--timer
-                           (run-with-idle-timer
-                            auto-clear-echo-area-interval
-                            nil
-                            #'clear-echo-area)))))
-
-     ;; eldoc should't be removed after idle delay... it's designed to be looked at.
-     (advice-add 'eldoc-message :around
-                 (defun eldoc-message--disable-auto-clear-echo-area (func &rest args)
-                   (when auto-clear-echo-area--timer
-                     ;; cancel any existing timers beforehand.
-                     (cancel-timer auto-clear-echo-area--timer)
-                     (setq auto-clear-echo-area--timer nil))
-
-                   (let (auto-clear-echo-area-interval) ;; disable interval
-                     (apply func args))))
    #+END_SRC
 
 ** yank-indent-adjust
@@ -3961,7 +3879,7 @@
 
         :general
         (:keymaps 'evil-snipe-mode-map
-         :states  '(normal motion)
+         :states  '(normal motion visual)
          ;; S is inclusive, X is exclusive.
          "gT" 'evil-snipe-X
          "gt" 'evil-snipe-x
@@ -5178,9 +5096,9 @@
    #+BEGIN_SRC emacs-lisp
      (use-package hydra
        :straight t
-       :commands defhydra
-       :config
-       (setq lv-use-separator t)
+       :custom
+       (lv-use-separator t)
+
        :leader
        ("H" '(:ignore t :wk ("hydras" . "cut off one head, two more shall take it's place"))))
 
@@ -5972,7 +5890,6 @@
       (provide 'hydra-vlc-rc)
     #+END_SRC
 
-
 *** hydra-visual-move
     #+BEGIN_SRC emacs-lisp
       (autoload 'hydra-visual-move/body (lisp! "hydras" "hydra-visual-move.el") nil t)
@@ -6747,9 +6664,8 @@
                      (cl-letf* ((actual-write-region
                                 (symbol-function 'write-region))
                                ((symbol-function 'write-region)
-                                (lambda (&rest args)
-                                  (setcar (nthcdr 4 args) 'nomessage)
-                                  (apply actual-write-region args))))
+                                (lambda (start end filename &optional append &rest args)
+                                  (apply actual-write-region start end filename append 'nomessage (cdr args)))))
                        (apply func args))))
 
        (defun undo-tree-visualizer-set-and-exit-selection-mode ()
@@ -7343,6 +7259,10 @@
           "mod"   "\\mod"
           ;; "<<"    nil
           )
+
+        ;; Needed until [[https://github.com/tecosaur/LaTeX-auto-activating-snippets/issues/16][#16]] gets resolved.
+        (aas-set-snippets 'laas-mode
+          ". " nil)
 
         (aas-set-snippets 'org-mode
           :cond (lambda () (not (laas-mathp)))
@@ -8594,6 +8514,7 @@
                                            ".bundle"
                                            ".dired"
                                            "__pycache__"
+                                           "node_modules"
                                            ".pytest_cache"
                                            ".gradle"
                                            ".sass-cache"
@@ -9067,7 +8988,6 @@
                              (let ((ix (seq-position diag-deltas (seq-min diag-deltas))))
                                (forward-line ix))))))))
 
-
        :leader
        ("e." 'hydra-flymake/body
         "ej" 'flymake-goto-next-error
@@ -9128,7 +9048,9 @@
          flymake-rest-jq
          (flymake-rest-jsonlint :disabled t))
         (less-mode flymake-rest-less)
-        (markdown-mode flymake-markdownlint+)
+        (markdown-mode
+         flymake-rest-markdownlint
+         flymake-rest-proselint)
         (ruby-mode flymake-rest-rubocop)
         (sh-mode flymake-rest-shellcheck)
         (yaml-mode flymake-rest-yamllint)
@@ -9147,8 +9069,6 @@
 ** flyspell
    On the fly spell checker. Spawns an aspell subprocess and passes any words you write
    to it; any mispellings or unknown words will be highlighted to indicate they're mispelled.
-
-   TODO try [[https://github.com/emacsmirror/undo-fu][undo-fu]].
 
    #+BEGIN_SRC emacs-lisp
      (use-package flyspell
@@ -9194,10 +9114,12 @@
                     (lambda (fp) fp)))
            (apply func args)))
 
-       (advice-add 'ispell-internal-change-dictionary :around
-                   #'ispell--prevent-absolute-path)
-       (advice-add 'flyspell-large-region :around
-                   #'ispell--prevent-absolute-path))
+       (advice-add 'ispell-internal-change-dictionary :around #'ispell--prevent-absolute-path)
+       (advice-add 'flyspell-large-region             :around #'ispell--prevent-absolute-path)
+
+       (add-hook 'kill-emacs-hook
+                 (defun ispell-save-pdict-on-quit+ ()
+                   (ispell-pdict-save t))))
    #+END_SRC
 
 ** grep
@@ -9741,7 +9663,6 @@
           minibuffer-completion-table
           minibuffer-completion-predicate))
 
-
        :init ;; Helpers to define completion category dependent bindings.
        (defun define-minibuffer-key+ (key &rest defs)
          "Define KEY conditionally in the minibuffer.
@@ -10069,7 +9990,7 @@
      (use-package message
        :custom
        (message-auto-save-directory (share! "messages/"))
-       (message-signature "---\nMohsin")
+       (message-signature "Mohsin")
 
        :leader
        ("ac" 'message-mail)
@@ -10529,8 +10450,8 @@
        (defun +mode-line--update-flymake-text (&rest _)
          ;; See [[https://www.gnu.org/software/emacs/manual/html_node/flymake/Syntax-check-statuses.html#Syntax-check-statuses][here]].
          (setq +mode-line-flymake-text
-               (let* ((known (and flymake--backend-state
-                                  (hash-table-keys flymake--backend-state)))
+               (let* (;; (known (and flymake--backend-state
+                      ;;             (hash-table-keys flymake--backend-state)))
                       (running (flymake-running-backends))
                       (disabled (flymake-disabled-backends))
                       (reported (flymake-reporting-backends))
@@ -12128,6 +12049,14 @@
        (minibuffer-prompt-properties
         '(read-only t cursor-intangible t face minibuffer-prompt))
 
+       :hook (vertico-mode . vertico-enable-consult-completion-in-region+)
+       :init
+       (defun vertico-enable-consult-completion-in-region+ ()
+         (setq completion-in-region-function
+               (if vertico-mode
+                   #'consult-completion-in-region
+                 #'completion--in-region)))
+
        :config
        (advice-add #'vertico--arrange-candidates :around
                    (defun vertico-format-candidates+ (func metadata)
@@ -12537,6 +12466,7 @@
         (:keymaps 'lsp-mode-map
          [remap xref-find-apropos] 'consult-lsp-symbols))
     #+END_SRC
+
 *** consult-eglot
     :PROPERTIES:
     :header-args+: :tangle (package-str! (lisp! "+consult-eglot.el") :consult eglot)
@@ -13197,7 +13127,6 @@
 
        (add-to-list 'embark-keymap-alist '(yasnippet . embark-yasnippet-completion-actions))
      #+END_SRC
-
 
 **** consult-extensions-eob
      #+BEGIN_SRC emacs-lisp
@@ -13874,10 +13803,8 @@
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! edit-indirect)
      (use-package edit-indirect
        :straight t
-       :commands (edit-indirect-region
-                  edit-indirect-commit
-                  edit-indirect-save
-                  edit-indirect-abort)
+       :leader
+       ("be" 'edit-indirect-region)
        :lazy-leader
        (:mode 'edit-indirect--overlay
         :minor t
@@ -14018,7 +13945,7 @@
      workspace."
          (seq-find
           (lambda (server)
-            (eq (eglot--major-mode server) mode))
+            (derived-mode-p mode (eglot--major-mode server)))
           (if all-workspaces
               (-flatten (hash-table-values eglot--servers-by-project))
             (gethash (or (project-current) `(transient . ,default-directory))
@@ -15382,7 +15309,6 @@
                                  olivetti-hide-fringe+)
                             '(0 0)
                           '(8 8))))))
-
 
        :leader
        ("M'" 'olivetti-mode)
@@ -17796,6 +17722,9 @@
           (evil-declare-change-repeat 'markdown-cycle)
           (evil-declare-change-repeat 'markdown-shifttab))
 
+        :config
+        (push '("make" . makefile-mode) markdown-code-lang-modes)
+
         :lazy-leader
         (:mode 'markdown-mode
          ;; unbound commands:
@@ -18016,7 +17945,7 @@
        ;; :hook ((c-mode . +flylint)
        ;;        (c++-mode . +flylint))
        :custom
-       (c-default-style '((java-mode . "java")
+       (c-default-style '((java-mode . "linux")
                           (awk-mode . "awk")
                           (other . "k&r")))
 
@@ -20696,7 +20625,8 @@
          "os" 'org-roam-rg)
 
         :general
-        (:keymaps 'org-roam-node-map
+        (:keymaps '(org-roam-node-map
+                    org-roam-preview-map)
          "SPC" nil)
         (:keymaps 'org-roam-node-map
          :states 'motion
@@ -21493,7 +21423,8 @@
        `(tree-sitter-hl-face:string.special ((,cls (:inherit font-lock-string-face))))
        `(tree-sitter-hl-face:type.parameter ((,cls (:inherit font-lock-variable-name-face))))
        `(tree-sitter-hl-face:function.special ((,cls (:inherit font-lock-builtin-face))))
-       `(tree-sitter-hl-face:variable.special ((,cls (:inherit (italic font-lock-variable-name-face)))))
+       `(tree-sitter-hl-face:variable.special ((,cls (:inherit (;italic
+                                              font-lock-variable-name-face)))))
 
        ;; Fringe has a different background on the GUI and the terminal, because the default bg
        ;; on the terminal is taken from the terminal bg. We apply a variant color for the fringe
@@ -21506,6 +21437,7 @@
        `(line-number-current-line ((,cls (:foreground ,blue :inherit line-number))))
        `(vertical-border ((,cls (:foreground ,grey))))
        `(internal-border ((,cls (:foreground ,white :background ,white))))
+       `(completions-annotations ((,cls (:inherit shadow))))
        `(minibuffer-prompt ((,cls (:foreground ,yellow-256 :weight bold))))
        `(minibuffer-depth-indicator ((,cls (:foreground ,yellow-256 :weight bold))))
        `(tooltip ((,cls (:background ,dark-grey :foreground ,very-light-grey))))

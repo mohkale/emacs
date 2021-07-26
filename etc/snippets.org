@@ -2,7 +2,7 @@
 #+PROPERTY: header-args :tangle-mode (identity #o644) :mkdirp yes :noweb yes :hlines no :shebang "# -*- mode: snippet -*-" :tangle no
 
 #+NAME: strip-trailing-new-lines
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC emacs-lisp :lexical yes
   ;; Inspired by [[https://emacs.stackexchange.com/questions/61108/make-tangle-dont-add-a-newline-at-the-end-of-the-file][here]], this prevents org from tangling snippets with trailing
   ;; newlines interfering with their expansions.
 
@@ -12,12 +12,17 @@
       (delete-char -1)
       (save-buffer)))
 
-  ;; (setq-local org-babel-post-tangle-hook org-babel-post-tangle-hook)
   (add-hook 'org-babel-post-tangle-hook #'org-zap-newline-at-eob+)
+  ;; Ensure temporarily tangled file is deleted on exit.
+  (add-hook 'kill-emacs-hook
+            (let ((f (concat (file-name-sans-extension (buffer-file-name)) ".el")))
+              (lambda ()
+                (ignore-errors
+                  (delete-file f)))))
   nil
 #+END_SRC
 
-#+BEGIN_SRC emacs-lisp :exports results
+#+BEGIN_SRC emacs-lisp :tangle yes
 <<strip-trailing-new-lines()>>
 #+END_SRC
 
@@ -1143,6 +1148,17 @@
 
       import * as ${2:alias} from '${1:module}'$0
    #+END_SRC
+
+** function
+   #+begin_src snippet :tangle snippets/js-mode/function
+     # name: function
+     # contributor: Mohsin Kaleem <mohkale@kisara.moe>
+     # key: def
+     # --
+     function ${1:name}(${2:params}) {
+         $0
+     }
+   #+end_src
 
 * js2-mode
   #+BEGIN_SRC text :tangle snippets/js2-mode/.yas-parent :shebang
