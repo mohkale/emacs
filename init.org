@@ -84,6 +84,7 @@
          ;; rake                                                           ; Run rake tasks
          ;; vi-tilde-fringe                                                ; Show tildes at the end of the buffer
          ;; vlc-rc                                                         ; Control [[https://www.videolan.org/vlc/index.en-GB.html][VLC]] from emacs
+         ;; tab-bar                                                        ; Enable browser like tabs showing buffer information
          ;; vterm                                                          ; A virtual terminal emulator... interfaced with emacs
          ;; vimish-fold                                                    ; Fold regions of code just like vim.
          ;; ztree                                                          ; Directory tree viewer, think NERDTree
@@ -11523,6 +11524,148 @@
        :straight (visual-line :type built-in)
        :delight " Ⓛ")
    #+END_SRC
+
+** tab-bar-mode
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! tab-bar)
+   :END:
+
+   #+begin_src emacs-lisp
+     (defun s-center-with+ (len s &rest props)
+       (let ((extra (max 0 (- len (length s)))))
+         (concat
+          (apply #'propertize (make-string (ceiling extra 2) ? ) props)
+          s
+          (apply #'propertize (make-string (floor extra 2) ? ) props))))
+
+     (use-package tab-bar
+       :hook (after-init . tab-bar-mode)
+       :leader
+       ("tt" 'tab-bar-mode)
+       :general
+       (:prefix "C-t"
+        :states '(normal motion)
+        "" '(nil :wk "tab-bar")
+        "C-n" 'tab-bar-switch-to-next-tab
+        "C-p" 'tab-bar-switch-to-prev-tab
+        "C-t" 'tab-bar-new-tab
+        "C-c" 'tab-bar-duplicate-tab
+        "r" 'tab-bar-rename-tab
+        "g" 'tab-bar-select-tab-by-name
+        "h" 'toggle-frame-tab-bar
+        "C-w" 'tab-bar-close-tab
+        "x" 'tab-bar-close-tab
+        "X" 'tab-bar-close-other-tabs
+        "<left>" 'tab-bar-history-back
+        "<right>" 'tab-bar-history-forward
+        ;; tab-bar-history-mode
+        ;; tab-bar-move-tab
+        ;; tab-bar-new-tab-to
+        ;; tab-bar-move-tab-to
+        ;; tab-bar-close-group-tabs
+        ;; tab-bar-change-tab-group
+        ;; tab-bar-move-tab-to-frame
+        ;; tab-bar-move-tab-to-group
+        ;; tab-bar-close-tab-by-name
+        ;; tab-bar-rename-tab-by-name
+        ;; tab-bar-switch-to-last-tab
+        ;; tab-bar-switch-to-recent-tab
+        )
+       :custom
+       (tab-bar-new-button-show t)
+       (tab-bar-tab-name-truncated-max 20)
+       (tab-bar-tab-name-ellipsis "…")
+       (tab-bar-new-button-show nil)
+
+       :config
+       (require 'all-the-icons)
+       (setq tab-bar-close-button (propertize "  " 'display (get-text-property 0 'display tab-bar-close-button))
+             tab-bar-back-button (all-the-icons-pad-on-tty-advice+ (all-the-icons-nerd-fa "arrow-circle-left"))
+             tab-bar-forward-button  (all-the-icons-pad-on-tty-advice+ (all-the-icons-nerd-fa "arrow-circle-right")))
+
+       :preface
+       (defvar tab-bar-separator+ "▌" ;; '("▌" . "▐")
+         "Left and right separator for active tab-bar indicators.")
+
+       (defvar tab-bar-inactive-separator+ "▏" ;; '("▏" . "▕")
+         "Left and right separator for inactive tab-bar indicators.")
+
+       (setq tab-bar-separator tab-bar-inactive-separator+)
+
+       (defvar tab-bar-show-tab-icons+ +icons-available
+         "Shows icons for tab-bar indicators.")
+
+       :custom
+       (tab-bar-format '(tab-bar-format-history
+                         tab-bar-format-tabs
+                         tab-bar-separator
+                         tab-bar-format-add-tab))
+       :config
+       (setq tab-bar-tab-name-format-function
+             (defun tab-bar-tab-name-format-function+ (tab i)
+               (let* ((current-p (eq (car tab) 'current-tab))
+                      (face (funcall tab-bar-tab-face-function tab))
+                      (name (propertize (alist-get 'name tab) 'face face))
+                      (icon (all-the-icons-pad-on-tty-advice+
+                             (propertize
+                              (or (ignore-errors
+                                    (and name
+                                         (with-current-buffer name
+                                           (all-the-icons-icon-for-buffer))))
+                                  (all-the-icons-nerd-mdi "buffer"))
+                              'face face)
+                             (propertize " " 'face face))))
+                 (concat (propertize (if tab-bar-tab-hints (format "%d " i) "") 'face face)
+                         (propertize
+                          (if (< (length name) tab-bar-tab-name-truncated-max)
+                              (s-center-with+ (+ (length icon) 1 tab-bar-tab-name-truncated-max)
+                                              (concat icon (propertize " " 'face face) name)
+                                              'face face)
+                            (concat icon (propertize " " 'face face)
+                                    (s-truncate tab-bar-tab-name-truncated-max name
+                                                (propertize tab-bar-tab-name-ellipsis 'face face))))
+                          'help-echo name)))))
+
+       (defun tab-bar--format-tab+ (tab i)
+         (let ((current-tab-p (eq (car tab) 'current-tab))
+               (face (funcall tab-bar-tab-face-function tab)))
+           (append
+            (when-let ((sep (cond
+                             (current-tab-p (propertize tab-bar-separator+ 'face 'tab-bar-separator))
+                             ((eq i 1) (propertize " " 'face face))
+                             (t (propertize tab-bar-inactive-separator+ 'face 'tab-bar-inactive-separator)))))
+              `((,(intern (format "sep-%i" i)) menu-item ,sep ignore)))
+            (let ((name (funcall tab-bar-tab-name-format-function tab i)))
+              (cond
+               (current-tab-p
+                `((current-tab menu-item ,name ignore :help "Current tab")))
+               (t
+                `((,(intern (format "tab-%i" i))
+                   menu-item
+                   ,name
+                   ,(or
+                     (alist-get 'binding tab)
+                     `(lambda ()
+                        (interactive)
+                        (tab-bar-select-tab ,i)))
+                   :help "Click to visit tab")))))
+            `((,(if current-tab-p 'C-current-tab (intern (format "C-tab-%i" i)))
+               menu-item ,(propertize
+                           (or (and tab-bar-close-button-show
+                                    (not (eq tab-bar-close-button-show
+                                             (if current-tab-p 'non-selected 'selected)))
+                                    tab-bar-close-button)
+                               "")
+                           'face face)
+               ,(or
+                 (alist-get 'close-binding tab)
+                 `(lambda ()
+                    (interactive)
+                    (tab-bar-close-tab ,i)))
+               :help "Close tab")))))
+
+       (advice-add #'tab-bar--format-tab :override #'tab-bar--format-tab+))
+   #+end_src
 
 ** tabulated-list-mode
    #+BEGIN_SRC emacs-lisp
