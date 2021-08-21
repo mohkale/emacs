@@ -159,6 +159,7 @@
          ;; nim
          org
          python
+         ;; php
          ;; powershell
          ;; restclient
          ruby
@@ -18662,6 +18663,25 @@
 
       (add-hook 'haskell-mode-hook +lsp-command)
     #+END_SRC
+
+** php
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! php)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package php-mode
+       :straight t)
+
+     (use-package php-eldoc
+       :straight t
+       :hook (eldoc-mode . php-eldoc-enable))
+   #+end_src
+
+*** php-language-server                                                 :lsp:
+    #+begin_src emacs-lisp :tangle (package-yes! php :lsp)
+      (add-hook 'php-mode-hook +lsp-command)
+    #+end_src
 
 ** nim
    :PROPERTIES:
