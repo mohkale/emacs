@@ -1,5 +1,13 @@
 #+TITLE: init.org
 #+STARTUP: content
+#
+#  _______ _______ _______    _______ _______ _______ ______ _______
+# |     __|    |  |   |   |  |    ___|   |   |   _   |      |     __|
+# |    |  |       |   |   |  |    ___|       |       |   ---|__     |
+# |_______|__|____|_______|  |_______|__|_|__|___|___|______|_______|
+#
+# On the planet emacs in the holy control tower and among the stars aboard
+# the evil flagship. -- Spacemacs
 
 #+PROPERTY: header-args :tangle init.el :comments link :mkdirp yes :noweb yes :hlines no :shebang ";; -*- lexical-binding: t -*-"
 
@@ -397,8 +405,8 @@
                        #'lsp-mode-server-all-p+)
                   (lsp-deferred)))))
        "Command used to start a language server.
-          Can be attached as a mode-hook and will decide how best to start a language
-          server in the current mode.")
+     Can be attached as a mode-hook and will decide how best to start a language
+     server in the current mode.")
    #+end_src
 
    ~$REPO_PATH~ is a ~PATH~ like environment variable and it's how I like to reference
@@ -824,6 +832,7 @@
 
      (let ((bootstrap-file (join-path straight-install-dir "straight/repos/straight.el/bootstrap.el"))
            (bootstrap-version 5))
+       bootstrap-version
        (unless (file-exists-p bootstrap-file)
          (message "Installing the straight package manager")
          (with-current-buffer
@@ -885,7 +894,6 @@
              hl-line-sticky-flag nil                                                ; only highlight line in active window
              auto-save-interval 50                                                  ; auto-save as frequently as possible
              backup-by-copying t                                                    ; don't clobber symlinks
-             which-key-enable-extended-define-key t                                 ; let's you pass a cons to define-key
              kill-whole-line t                                                      ; kill-line includes eol
              help-window-select t                                                   ; always select the help window when it pops up
              enable-recursive-minibuffers t                                         ; allow entering minibuffer, when already in minibuffer
@@ -957,6 +965,7 @@
 
     #+begin_src emacs-lisp
       (push "node_modules/" completion-ignored-extensions)
+      (push "__pycache__/" completion-ignored-extensions)
     #+end_src
 
     Set the string shown on the title bar of emacs frames.
@@ -1184,6 +1193,7 @@
             (define-key xterm-function-map "\e[62;4u"  (kbd "M->"))
             (define-key xterm-function-map "\e[62;6u"  (kbd "C->"))
             (define-key xterm-function-map "\e[60;6u"  (kbd "C-<"))
+            (define-key xterm-function-map "\e[38;4u"  (kbd "M-&"))
             (define-key xterm-function-map "\e[105;7u" (kbd "C-M-i"))
             (define-key xterm-function-map "\e[27;3u"  (kbd "M-ESC"))
             (define-key xterm-function-map "\e[27;5u"  (kbd "C-ESC"))
@@ -1302,7 +1312,7 @@
 
      #+begin_src emacs-lisp
        (leader-set-keys
-         "TAB" '(switch-to-last-buffer :wk "last-buffer")
+         "TAB" '(switch-to-last-buffer+ :wk "last-buffer")
          "SPC" '(execute-extended-command :wk "M-x")
          "<escape>" 'abort-recursive-edit
          "DEL"      'exit-recursive-edit
@@ -1347,12 +1357,12 @@
          "bR" 'rename-uniquely
          "bo" 'occur
          "b DEL" 'bury-buffer
-         "bE" 'safe-erase-buffer
+         "bE" 'safe-erase-buffer+
          "bH" 'htmlfontify-buffer
-         "bK" 'kill-this-buffer
-         "bk" 'kill-this-buffer-and-window-maybe
-         "bM" 'switch-to-messages-buffer
-         "by" 'yank-whole-buffer-as-kill)
+         "bk" 'kill-this-buffer
+         "bK" 'kill-this-buffer-and-window-maybe+
+         "bM" 'switch-to-messages-buffer+
+         "by" 'yank-whole-buffer-as-kill+)
 
        (leader-set-keys
          "c" '(:ignore t :wk "compile/comments")
@@ -1585,15 +1595,10 @@
 
     #+BEGIN_SRC emacs-lisp
       (general-define-key
-       ;; Control     for comamnd,
-       ;; Meta        for command on region
-       ;; Control-Alt for command on buffer
-       "C-|"   'shell-command
-       "M-|"   'shell-command-on-region
-       "C-M-|" 'shell-command-on-buffer
-       "C-&"   'async-shell-command
-       "M-&"   'async-shell-command-on-region
-       "C-M-&" 'async-shell-command-on-buffer
+       "C-!" 'shell-command
+       "M-!" 'async-shell-command
+       "C-|" 'shell-command-on-region+
+       "M-|" 'async-shell-command-on-region+
        "C-:" 'completion-at-point)
     #+END_SRC
 
@@ -1649,11 +1654,11 @@
 
       (general-define-key
        :keymaps 'emacs-window-map
-       "m"   'window-zen
-       "RET" 'window-zen
-       [C-m] 'window-zen
-       "M"   'window-zen-restore
-       "M-m" 'window-zen-restore)
+       "m"   'window-zen+
+       "RET" 'window-zen+
+       [C-m] 'window-zen+
+       "M"   'window-zen-restore+
+       "M-m" 'window-zen-restore+)
 
       ;; tmux leader compatability
       (general-define-key
@@ -2054,7 +2059,7 @@
         :straight t
         :init
         (defun multiscratch-scratch-buffer-p (&optional buffer)
-          "persist all but the main scratch buffer."
+          "Persist all but the main scratch buffer."
           (and (not (string= (buffer-name buffer) scratch-buffer-name))
                (scratch-buffer-p buffer)))
 
@@ -2595,8 +2600,10 @@
      (use-package editorconfig
        :straight t
        :demand t
+       :custom
+       (editorconfig-lisp-use-default-indent t)
+
        :config
-       (setq editorconfig-lisp-use-default-indent t)
        (push '(plantuml-mode plantuml-indent-level)
              editorconfig-indentation-alist))
    #+end_src
@@ -2662,6 +2669,7 @@
    #+BEGIN_SRC emacs-lisp
      (defun +emacs-lisp-indent-function (indent-point state)
        "A replacement for `lisp-indent-function'.
+
      Indents plists more sensibly. Adapted from
      https://emacs.stackexchange.com/questions/10230/how-to-indent-keywords-aligned"
        (let ((normal-indent (current-column))
@@ -2837,6 +2845,9 @@
                                            (propertize "enabled" 'face 'compilation-info)
                                          (propertize "disabled" 'face 'compilation-error))))
 
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
       (defvar-local header-line-actual-format nil
         "value of `header-line-format' before being modified by `toggle-buffer-header'.")
 
@@ -2853,7 +2864,9 @@
                       header-line-actual-format nil))
             (setq header-line-actual-format header-line-format
                   header-line-format nil))))
+    #+END_SRC
 
+    #+BEGIN_SRC emacs-lisp
       (defun toggle-relative-linum (&optional arg)
         "toggle relative line numbers in the current buffer
       when ARG is given and is 0, then relative line numbers are disabled,
@@ -2867,7 +2880,9 @@
                (arg 'relative)
                (t
                 (if (eq display-line-numbers 'relative) t 'relative)))))
+    #+END_SRC
 
+    #+BEGIN_SRC emacs-lisp
       (defun keymaps-at-point ()
         "List entire keymaps present at point."
         (interactive)
@@ -2899,14 +2914,13 @@
     :header-args+: :tangle (lisp! "lib/+lib-text.el")
     :END:
 
+    Manipulate chunks of text.
+
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package +lib-text
         :commands (dos2unix
                    unix2dos
                    toggle-comment-at-point
-                   tab-to-tab-stop-with-prefix
-                   indent-back-to-normal
-                   back-to-tab-stop
                    toggle-comment-at-point-alt
                    custom-insert-line
                    custom-insert-line-below
@@ -2914,47 +2928,17 @@
                    evil-join-backwards))
     #+END_SRC
 
-    Manipulate chunks of text, such as leading indentation or sequential padding.
-
     #+BEGIN_SRC emacs-lisp
       (defun dos2unix ()
         "Not exactly but it's easier to remember"
         (interactive)
         (set-buffer-file-coding-system 'unix 't))
+    #+END_SRC
 
+    #+BEGIN_SRC emacs-lisp
       (defun unix2dos ()
         (interactive)
         (set-buffer-file-coding-system 'dos 't))
-
-      ;; (defun remove-indentation-spaces ()
-      ;;   "remove TAB-WIDTH spaces from the beginning of this line"
-      ;;   (interactive)
-      ;;   (if (save-excursion (re-search-backward "[^ \t]" (line-beginning-position) t))
-      ;;       (delete-backward-char 1)
-      ;;     (indent-rigidly (line-beginning-position) (line-end-position) (- tab-width))))
-
-      (defun indent-back-to-normal (&optional column)
-        "indents the current line using indent region.
-      this'll either reset indentation to it's normal position, or
-      bring you to the beginning of an empty line. Specify a column
-      value to force that column to be used by indent region."
-        (interactive "P")
-
-        (let ((inhibit-message t))
-          (indent-region (line-beginning-position) (1+ (line-end-position)) column)))
-
-      ;; https://emacs.stackexchange.com/questions/32816/backwards-tab-to-tab-stop
-      (defun tab-to-tab-stop-with-prefix (&optional prev)
-        "Like `tab-to-tab-stop', but toggle direction with prefix."
-        (interactive "P")
-        (let ((nexttab (indent-next-tab-stop (current-column) prev)))
-          (delete-horizontal-space t)
-          (indent-to nexttab)))
-
-      (defun back-to-tab-stop ()
-        (interactive)
-        (let ((current-prefix-arg 1))
-          (call-interactively #'tab-to-tab-stop-with-prefix)))
     #+END_SRC
 
     Comment regions of text or by default, the current line.
@@ -3098,13 +3082,11 @@
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package +lib-text-query
-        :commands (line-width
-                   column-number
+        :commands (column-number
                    in-comment-p
                    in-font-lock-comment-p
                    line-beginning-column
                    yank-and-comment
-                   point-to-coordinates
                    line-empty-p
                    list-faces))
     #+END_SRC
@@ -3113,31 +3095,12 @@
     relevent information.
 
     #+BEGIN_SRC emacs-lisp
-      (defun line-width (char-pos)
-        "returns the number of columns on the line at char-pos"
-        (interactive (if current-prefix-arg
-                         (list current-prefix-arg)
-                       (list (point))))
-        (save-excursion
-          (if (not (eql char-pos (point)))
-            (goto-char char-pos))
-          (let ((line-width (max (- (line-end-position) (line-beginning-position) 1) 0)))
-            (if (called-interactively-p 'any)
-                (message (format "Line Width: %03d" line-width)))
-
-            line-width)))
-
       (defun column-number (point)
         "returns the column number at point"
         (interactive "")
         (save-excursion
           (goto-char point)
           (current-column)))
-
-      (defun point-to-coordinates (&optional point)
-        "convert a point to an XY coordinate alist"
-        (or point (setq point (point)))
-        `(,(line-number-at-pos point) . ,(column-number point)))
 
       (defun line-empty-p (&optional point)
         (save-excursion
@@ -3193,42 +3156,49 @@
      #+BEGIN_SRC emacs-lisp :tangle yes
        (use-package +lib-buffer-control
          :defer 30
-         :commands (kill-this-buffer-and-window-maybe
-                    switch-to-last-buffer
-                    halt-and-catch-fire
-                    switch-to-messages-buffer
-                    force-set-all-visible-windows-dedication
-                    window-zen
-                    window-zen-restore
+         :commands (kill-this-buffer-and-window-maybe+
+                    switch-to-last-buffer+
+                    switch-to-messages-buffer+
+                    force-set-all-visible-windows-dedication+
+                    window-zen+
+                    window-zen-restore+
                     find-temp-file+
-                    display-last-buffer
-                    vertical-display-last-buffer
-                    shell-command-on-buffer
-                    set-window-dedication
-                    async-shell-command-on-buffer
-                    safe-erase-buffer
-                    yank-whole-buffer-as-kill
-                    split-window-right-and-focus
-                    split-window-below-and-focus)
+                    display-last-buffer+
+                    vertical-display-last-buffer+
+                    shell-command-on-region+
+                    async-shell-command-on-region+
+                    set-window-dedication+
+                    safe-erase-buffer+
+                    yank-whole-buffer-as-kill+
+                    split-window-right-and-focus+
+                    split-window-below-and-focus+)
          :general
          (:keymaps 'emacs-window-map
-          "T"   'force-set-all-visible-windows-dedication
-          "O"   'display-last-buffer
-          "M-o" 'display-last-buffer
-          "SPC" 'set-window-dedication
-          "M-d" 'set-window-dedication
-          "o"   'vertical-display-last-buffer
-          "C-o" 'vertical-display-last-buffer)
+          "T"   'force-set-all-visible-windows-dedication+
+          "O"   'display-last-buffer+
+          "M-o" 'display-last-buffer+
+          "SPC" 'set-window-dedication+
+          "M-d" 'set-window-dedication+
+          "o"   'vertical-display-last-buffer+
+          "C-o" 'vertical-display-last-buffer+)
          :leader
          ("ft" 'find-temp-file+))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp
-      (defun switch-to-messages-buffer ()
-        "switches to messages buffer"
+    Commands to switch to various buffers.
+
+    #+begin_src emacs-lisp
+      (defun switch-to-messages-buffer+ ()
+        "Switches to messages buffer."
         (interactive)
         (switch-to-buffer (messages-buffer)))
 
+      (defun switch-to-last-buffer+ (&optional buffer)
+        (interactive)
+        (switch-to-buffer buffer))
+    #+end_src
+
+    #+begin_src emacs-lisp
       (defun find-temp-file+ (path)
         (interactive
          (list (let ((default-directory
@@ -3242,57 +3212,57 @@
           (unless (string-empty-p dir)
             (mkdir dir t)))
         (find-file path))
+    #+end_src
 
-      (defun switch-to-last-buffer (&optional buffer)
-        (interactive)
-        (switch-to-buffer buffer))
-
-      (defun kill-this-buffer-and-window-maybe ()
-        "kills the currently open buffer and the window if another is open"
+    #+BEGIN_SRC emacs-lisp
+      (defun kill-this-buffer-and-window-maybe+ ()
+        "Kills the currently open buffer and the window if another is open"
         (interactive)
         (let ((window-count (length (window-list))))
           (if (> window-count 1)
               (kill-buffer-and-window)
             (kill-this-buffer))))
+    #+END_SRC
 
-      (defun force-set-all-visible-windows-dedication (&optional dedicate)
-        "allows you to set the dedication of all visible windows
-      dedicate if truthy, will result in all windows recieving a dedication.
-      if falsy, all windows will have their dedication removed"
+    ~window-zen+~ lets you quickly zoom into the current window and then zoom back out.
+    The gist of it is that when you call ~window-zen+~ with multiple windows it saves
+    the current window configuration and then erases all the other windows. If you
+    call it again when in only a single window it restores the previous configuration.
+
+    It's implemented as a stack tied to the current frame. Meaning each frame has
+    its own history of zens. You can zen repeatedly, one after the other and then
+    jump back through your saved configurations using ~window-zen-restore+~.
+
+    #+BEGIN_SRC emacs-lisp
+      (defun window-zen+ (&optional prefix)
         (interactive "P")
-        ;; TODO require persp-mode here
-        (and dedicate (setq dedicate t))      ; rationalise value as bool
-        (or  dedicate (setq dedicate nil))    ; rationalise value as nil
+        (if (or prefix
+                (= (length (window-list)) 1))
+            (window-zen-restore+)
+          (set-frame-parameter (frame-focus) 'window-zen-history
+                               (append
+                                (list (current-window-configuration))
+                                (frame-parameter (frame-focus) 'window-zen-history)))
+          (delete-other-windows)))
 
-        (dolist (window (window-list))
-          (when (not (eq dedicate (window-dedicated-p window)))
-            (set-window-dedicated-p window dedicate))))
+      (defun window-zen-restore+ ()
+        (interactive)
+        (let* ((current-frame (frame-focus))
+               (configs (frame-parameter current-frame 'window-zen-history)))
+          (unless configs
+            (user-error "No previous zens found for the current frame."))
+          (unwind-protect
+              (save-excursion
+                (set-window-configuration (pop configs)))
+            (set-frame-parameter current-frame 'window-zen-history configs))))
+    #+END_SRC
 
-      (let ((window-zen-register ?_))
-        (defun window-zen (&optional prefix)
-          "Maximize buffer or undo maximize buffer
-      pass prefix to also restore original point."
-          ;; from [[https://gist.github.com/3402786][here]].
-          (interactive "P")
-          (if (and (= 1 (length (window-list)))
-                   (assoc window-zen-register register-alist))
-              (window-zen-restore prefix)
-            (window-configuration-to-register window-zen-register)
-            (delete-other-windows)))
+    Emacs has some cool built-in commands for running shell commands but there
+    doesn't seem to be straightforward ways to pass the current buffer as standard
+    input to those commands. So here are variants that let you do this.
 
-        (defun window-zen-restore (&optional prefix)
-          "force restoration of window, instead of replacement of previous zen.
-      like `window-zen' pass prefix argument to save excursion"
-          (interactive)
-          (unless (assoc window-zen-register register-alist)
-            (user-error "no previous zen found."))
-
-          (if prefix
-              (jump-to-register window-zen-register)
-            (save-excursion
-              (jump-to-register window-zen-register)))))
-
-      (defun shell-command-on-buffer (&optional prefix)
+    #+BEGIN_SRC emacs-lisp
+      (defun shell-command-on-buffer+ (&optional prefix)
         "Asks for a command and executes it in inferior shell with current buffer
       as input. if prefix is given, output of command is inserted in current buffer
       at point."
@@ -3303,7 +3273,9 @@
             (setq output-buffer (current-buffer))
 
             (with-current-buffer input-buffer
-              (shell-command-on-region (point-min) (point-max) command output-buffer nil output-buffer))
+              (shell-command-on-region
+               (point-min) (point-max)
+               command output-buffer nil output-buffer))
 
             (setq process-output (buffer-string)))
 
@@ -3311,18 +3283,17 @@
               (insert process-output)
             (message process-output))))
 
-      (defun async-shell-command-on-region (&optional start end)
-        "same as `async-shell-command', but also sends the current region
-      as stdin to the process."
-        (interactive "r\n")
-        (require 'subr-x) ;; needed for string-empty-p
-
+      (defun async-shell-command-on-region+ (start end)
+        "`async-shell-command' variant which uses the region as standard input."
+        (interactive (list (if (region-active-p)
+                               (list (region-beginning) (region-end))
+                             (list (point-min) (point-max)))))
         (unless (eq start end) ;; region is not active
           (let ((command (read-shell-command "Async shell command on buffer: ")))
-            (unless (string-empty-p command)
+            (if (string-empty-p command)
+                (user-error "Must supply a non-empt shell command.")
               (async-shell-command command) ;; XXX WHY??? don't you return the process :P
               (let ((program-buffer (get-buffer "*Async Shell Command*")))
-
                 (process-send-region (get-buffer-process program-buffer) start end)
 
                 (with-current-buffer program-buffer
@@ -3332,13 +3303,10 @@
                     (funcall-interactively 'initial-major-mode)))
 
                 (display-buffer program-buffer))))))
+    #+END_SRC
 
-      (defun async-shell-command-on-buffer ()
-        "same as `async-shell-command-on-region' but sends whole buffer as region"
-        (interactive)
-        (async-shell-command-on-region (point-min) (point-max)))
-
-      (defun safe-erase-buffer (&optional prefix)
+    #+BEGIN_SRC emacs-lisp
+      (defun safe-erase-buffer+ (&optional prefix)
         "prompts to really erase and then erases the current buffer"
         (interactive "P")
         (barf-if-buffer-read-only)
@@ -3347,23 +3315,30 @@
                                     (buffer-name)
                                     " ?")))
             (erase-buffer)))
+    #+END_SRC
 
-      (defun split-window-right-and-focus ()
+    #+BEGIN_SRC emacs-lisp
+      (defun split-window-right-and-focus+ ()
         (interactive)
         (split-window-horizontally)
         (other-window 1))
 
-      (defun split-window-below-and-focus ()
+      (defun split-window-below-and-focus+ ()
         (interactive)
         (split-window-vertically)
         (other-window 1))
 
-      (defun yank-whole-buffer-as-kill (buffer)
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp
+      (defun yank-whole-buffer-as-kill+ (buffer)
         (interactive (list (current-buffer)))
         (with-current-buffer buffer
           (copy-region-as-kill (point-min) (point-max))))
+    #+END_SRC
 
-      (defun display-last-buffer ()
+    #+BEGIN_SRC emacs-lisp
+      (defun display-last-buffer+ ()
         (interactive)
         (display-buffer
          (other-buffer)
@@ -3372,7 +3347,7 @@
             display-buffer-use-some-window-and-focus
             display-buffer-pop-up-frame-and-focus))))
 
-      (defun vertical-display-last-buffer ()
+      (defun vertical-display-last-buffer+ ()
         (interactive)
         (display-buffer
          (other-buffer)
@@ -3382,94 +3357,30 @@
                  display-buffer-pop-up-frame-and-focus)
                '((side . right)
                  (window-width . 0.5)))))
+    #+END_SRC
 
-      ;; (cl-defmacro window-route (&rest paths)
-      ;;   "macro to see which window exists at the end of a route
-      ;; from the current window.
+    #+BEGIN_SRC emacs-lisp
+      (defun force-set-all-visible-windows-dedication+ (&optional dedicate)
+        "Allows you to set the dedication of all visible windows
+      DEDICATE if truthy, will result in all windows recieving a dedication.
+      if falsy, all windows will have their dedication removed."
+        (interactive "P")
+        ;; TODO require persp-mode here
+        (and dedicate (setq dedicate t))      ; rationalise value as bool
+        (or  dedicate (setq dedicate nil))    ; rationalise value as nil
 
-      ;; Accepts up, down, left & right as direction markers & every
-      ;; route begins from the top left hand side of the current window."
-      ;;   `(let ((paths ',paths))
-      ;;      (if (not paths)
-      ;;          (selected-window)
-      ;;        (condition-case err
-      ;;            (save-excursion
-      ;;              ;; goto start to ensure route begins from
-      ;;              ;; top left hand side of current window.
-      ;;              (goto-char (max (point-min) (window-start)))
-      ;;              (goto-char (line-beginning-position))
-      ;;              (save-selected-window
-      ;;                (let (head)
-      ;;                  ;; TODO check whether to goto top left hand side here.
-      ;;                  (while (setq head (pop paths))
-      ;;                    (cond
-      ;;                     ((eq head 'up)    (windmove-up))
-      ;;                     ((eq head 'down)  (windmove-down))
-      ;;                     ((eq head 'left)  (windmove-left))
-      ;;                     ((eq head 'right) (windmove-right))))
-      ;;                  (selected-window))) )
-      ;;          (user-error (message "window-route: %s" err))))))
+        (dolist (window (window-list))
+          (when (not (eq dedicate (window-dedicated-p window)))
+            (set-window-dedicated-p window dedicate))))
+    #+END_SRC
 
-      ;; (defun window-expand-up ()
-      ;;   "Expand current window into region of window above.
-
-      ;;                          Begun from 3           Begun from 2
-      ;; +---------------+      +---------------+      +---------------+
-      ;; | 1             |      | 1        | 3  |      | 2        | 1  |
-      ;; |               |  |-> |          |    |  |-> |          |    |
-      ;; |---------+-----|      |----------+    |      |          +----|
-      ;; | 2       | 3   |      | 2        |    |      |          | 3  |
-      ;; +---------------+      +---------------+      +---------------+
-
-      ;; "
-      ;;   )
-
-      ;; (defun window-expand-down ()
-      ;;   "Expand current window into region of window below.
-
-      ;;                          Begun from 2           Begun from 1
-      ;; +---------------+      +---------------+      +---------------+
-      ;; | 1       | 2   |      | 1        | 2  |      | 1        | 2  |
-      ;; |         |     |  |-> |          |    |  |-> |          |    |
-      ;; |---------+-----|      |----------+    |      |          +----|
-      ;; | 3             |      | 3        |    |      |          | 3  |
-      ;; +---------------+      +---------------+      +---------------+
-      ;; "
-      ;;   )
-
-      ;; (defun window-expand-right ()
-      ;;   "Expand current window into region of window to the right.
-
-      ;;                          Begun from 1           Begun from 3
-      ;; +---------------+      +---------------+      +---------------+
-      ;; | 1       | 2   |      | 1             |      | 1        | 2  |
-      ;; |         |     |  |-> |               |  |-> |          |    |
-      ;; |---------+     |      |----------+----|      |----------+----|
-      ;; | 3       |     |      | 3        | 2  |      | 3             |
-      ;; +---------------+      +---------------+      +---------------+
-      ;; "
-      ;;   )
-
-      ;; (defun window-expand-left ()
-      ;;   "Expand current window into region of window to the left.
-
-      ;;                          Begun from 2           Begun from 3
-      ;; +---------------+      +---------------+      +---------------+
-      ;; | 1       | 2   |      | 2             |      | 1        | 2  |
-      ;; |         |     |  |-> |               |  |-> |          |    |
-      ;; |         +-----|      |----------+----|      |----------+----|
-      ;; |         | 3   |      | 1        | 3  |      | 3             |
-      ;; +---------------+      +---------------+      +---------------+
-      ;; "
-      ;;   )
-
-      (defun set-window-dedication (&optional prefix window)
+    #+BEGIN_SRC emacs-lisp
+      (defun set-window-dedication+ (&optional prefix window)
         "Set the dedication value for the current window.
       By default it toggles the dedication. Supply a prefix arg
       to explicitly enable or disable.
 
-      When a window is dedicated, you can't change the buffer for it.
-      "
+      When a window is dedicated, you can't change the buffer for it."
         (interactive "P")
         (when (and prefix
                    (listp prefix))
@@ -3654,8 +3565,10 @@
         :demand t
         :custom
         (completion-styles '(orderless))
+        (completion-category-overrides
+         '((file (styles partial-completion))))
 
-        :config
+        :preface
         (defun flex-if-twiddle (pattern _index _total)
           "Glob when trailing tilde."
           (when (string-suffix-p "~" pattern)
@@ -3670,17 +3583,20 @@
           (when (string-prefix-p "!" pattern)
             `(orderless-without-literal . ,(substring pattern 1))))
 
-        (setq orderless-matching-styles '(orderless-regexp)
-              orderless-style-dispatchers '(flex-if-twiddle
-                                            literal-if-equals
-                                            without-if-bang))
+        :custom
+        (orderless-matching-styles '(orderless-regexp))
+        (orderless-style-dispatchers '(flex-if-twiddle
+                                       literal-if-equals
+                                       without-if-bang))
+
+        :config
+        (defun orderless-company-fix-face+ (fn &rest args)
+          (let ((orderless-match-faces [completions-common-part]))
+            (apply fn args)))
 
         (with-eval-after-load 'company
           ;; Fixes face issues in tooltip, see [[https://github.com/oantolin/orderless/tree/d97a91f6e12ace638e65bdccefd14d1e638a2dae#company][here]].
-          (advice-add 'company-capf--candidates :around
-                      (defun orderless-company-fix-face+ (fn &rest args)
-                        (let ((orderless-match-faces [completions-common-part]))
-                          (apply fn args))))))
+          (advice-add 'company-capf--candidates :around #'orderless-company-fix-face+)))
     #+END_SRC
 
 *** prescient
@@ -3739,7 +3655,7 @@
       (use-package evil-matchit
         :straight t
         :hook (evil-mode . global-evil-matchit-mode)
-        :init
+        :preface
         (defun evilmi-customize-keybinding ()
           (general-define-key
            ;; WARN binding to motion breaks things.
@@ -3759,7 +3675,7 @@
       (use-package evil-surround
         :straight t
         :hook (evil-mode . global-evil-surround-mode)
-        :config
+        :init
         (setq-default evil-surround-pairs-alist
                       '((?\( . ("(" . ")"))
                         (?\[ . ("[" . "]"))
@@ -3823,26 +3739,27 @@
         :diminish
         evil-snipe-mode
         evil-snipe-local-mode
+
         :init
-        ;; Suppress creation because I can't seem to override it :?
-        (defvar evil-snipe-local-mode-map (make-sparse-keymap))
+        (defvar evil-snipe-local-mode-map (make-sparse-keymap))                       ; Suppress creation because I can't seem to override it :?
+
+        :custom
+        (evil-snipe-scope 'buffer)                                                    ; how far can a snipe take place
+        (evil-snipe-repeat-scope 'buffer)                                             ; how far repeating previous snipe can take place.
+        (evil-snipe-enable-highlight nil)                                             ; don't highlight after jump
+        (evil-snipe-repeat-keys nil)                                                  ; sniping after a snipe, repeats the last snipe
+        (evil-snipe-enable-incremental-highlight t)                                   ; do highlight matching snipe locations
+        (evil-snipe-skip-leading-whitespace t)                                        ; whitespace at start of line is ignored
+        (evil-snipe-smart-case t)                                                     ; case sensetive until it's not, like ivy
+        (evil-snipe-tab-increment t)                                                  ; hit tab to raise amount of snipes left
+        (evil-snipe-override-evil-repeat-keys nil)                                    ; don't replace ; and , with evil keys
+        (evil-snipe-auto-disable-substitute nil)                                      ; keep my substitute key available
+
+        :preface
+        (defvar evil-snipe-find-scopes-to-line+ nil
+          "When true, evil-snipe-{f,F,t,T} (I.E. for single finds) only extends to EOL.")
 
         :config
-        (setq evil-snipe-scope 'buffer                                      ; how far can a snipe take place
-              evil-snipe-repeat-scope 'buffer                               ; how far repeating previous snipe can take place.
-              evil-snipe-enable-highlight nil                               ; don't highlight after jump
-              evil-snipe-repeat-keys nil                                    ; sniping after a snipe, repeats the last snipe
-              evil-snipe-enable-incremental-highlight t                     ; do highlight matching snipe locations
-              evil-snipe-skip-leading-whitespace t                          ; whitespace at start of line is ignored
-              evil-snipe-smart-case t                                       ; case sensetive until it's not, like ivy
-              evil-snipe-tab-increment t                                    ; hit tab to raise amount of snipes left
-              evil-snipe-override-evil-repeat-keys nil                      ; don't replace ; and , with evil keys
-              evil-snipe-auto-disable-substitute nil                        ; keep my substitute key available
-              )
-
-        (defvar evil-snipe-find-scopes-to-line+ nil
-          "when true, evil-snipe-{f,F,t,T} (I.E. for single finds) only extends to EOL.")
-
         (defmacro evil-snipe-with-normalised-settings (&rest body)
           `(let ((evil-snipe-enable-highlight nil)                           ; don't highlight jump matches after jump
                  (evil-snipe-enable-incremental-highlight nil)               ; don't highlight jump matches while searching
@@ -3856,21 +3773,20 @@
              ,@body))
 
         (defun evil-snipe--normalise-single-snipes+ (func &rest args)
-          "normalise snipes with count 1 to match `evil-find-char'.
+          "Normalise snipes with count 1 to match `evil-find-char'.
       don't want highlighting, or a prompt or other feature enhancements.
       just simple, jump to char.
 
       NOTE this function updates settings during the input reading phase
-           only; which is taken care of in the interactive section prior
-           to method body invocation.
-      "
+      only; which is taken care of in the interactive section prior to
+      method body invocation."
           (if (eq evil-snipe--match-count 1)
               (evil-snipe-with-normalised-settings
                 (apply func args))
             (apply func args)))
 
         (defun evil-snipe--normalise-single-snipes-wrapper+ (func &rest args)
-          "specify normalisation for the body of the given function."
+          "Specify normalisation for the body of the given function."
           (evil-snipe-with-normalised-settings (apply func args)))
 
         (advice-add 'evil-snipe--collect-keys :around 'evil-snipe--normalise-single-snipes+)
@@ -3985,11 +3901,12 @@
     #+BEGIN_SRC emacs-lisp
       (use-package evil-args
         :straight t
-        :hook ((emacs-lisp-mode       . evil-args-adjust-for-elisp+)
-               (lisp-interaction-mode . evil-args-adjust-for-elisp+))
-        :init
+
+        :preface
         (defun evil-args-adjust-for-elisp+ ()
           (setq evil-args-delimiters '(" ")))
+        :hook ((emacs-lisp-mode       . evil-args-adjust-for-elisp+)
+               (lisp-interaction-mode . evil-args-adjust-for-elisp+))
 
         :leader
         ("j[" 'evil-backward-arg
@@ -4057,10 +3974,11 @@
       (use-package vimish-fold
         :straight t
         :hook (after-init . vimish-fold-global-mode)
-        :config
-        (setq vimish-fold-allow-nested t)
-        (setq vimish-fold-dir (state! "vimish-fold/"))
+        :custom
+        (vimish-fold-allow-nested t)
+        (vimish-fold-dir (state! "vimish-fold/"))
 
+        :config
         (add-hook 'vimish-fold-mode-hook
                   (defun vimish-fold-setup-evil+ ()
                     (if vimish-fold-mode
@@ -4124,15 +4042,6 @@
       (use-package evil
         :straight t
         :demand t
-        :init
-        (defun evil-set-initial-state+ (mode state)
-          (with-eval-after-load 'evil
-            (evil-set-initial-state mode state)
-            (dolist (buffer (buffer-list))
-              (with-current-buffer buffer
-                (when (eq major-mode mode)
-                  (evil-change-state state))))))
-
         :config
         (evil-mode 1)
 
@@ -4143,7 +4052,7 @@
         (with-no-warnings
           (defvaralias 'evil-ex-search-history 'regexp-search-ring))
 
-        ;; from [[https://github.com/hlissner/doom-emacs/blob/develop/modules/editor/evil/config.el#L137][doom]].
+        ;; From [[https://github.com/hlissner/doom-emacs/blob/develop/modules/editor/evil/config.el#L137][doom]].
         (advice-add #'evil-global-marker-p :before-until
                     (defun evil--make-numbered-markers-global+ (char)
                       (and (>= char ?2) (<= char ?9))))
@@ -4162,7 +4071,7 @@
              (evil-change-state -last-evil-state)))
         (put 'with-evil-adjust-to-eol 'lisp-indent-function 'defun)
 
-        ;; force state for buffer if it already exists
+        ;; Force state for buffer if it already exists.
         (let ((buffer (get-buffer "*Messages*")))
           (when buffer
             (with-current-buffer buffer
@@ -4213,8 +4122,6 @@
          "<tab>"           'indent-for-tab-command
          "TAB"             "<tab>"
          "C-c TAB"         'indent-relative
-         "<S-tab>"         'indent-back-to-normal
-         "<S-iso-lefttab>" 'indent-back-to-normal
          "<S-backspace>"   'evil-delete-char
 
          "C-y" 'yank
@@ -4262,6 +4169,7 @@
          "C-e" 'move-end-of-line
          "C-M-q" 'quit-window)
         (:keymaps 'emacs-window-map
+         [remap window-configuration-to-register] 'evil-save-window-config+
          "+" 'evil-window-increase-height
          "-" 'evil-window-decrease-height
          "<" 'evil-window-decrease-width
@@ -4292,10 +4200,10 @@
          "M-s" 'evil-window-split
          "v"   'evil-window-vsplit
          "M-v" 'evil-window-vsplit
-         "S"   'split-window-below-and-focus
-         "C-s" 'split-window-below-and-focus
-         "V"   'split-window-right-and-focus
-         "C-v" 'split-window-right-and-focus
+         "S"   'split-window-below-and-focus+
+         "C-s" 'split-window-below-and-focus+
+         "V"   'split-window-right-and-focus+
+         "C-v" 'split-window-right-and-focus+
          "d"   'evil-window-delete
          "C-d" 'evil-window-delete
          "h"   'evil-window-left
@@ -4411,6 +4319,14 @@
       ;;   (if (display-graphic-p)
       ;;       (clipboard-yank)
       ;;     (insert (shell-command-to-string "xclipl -o -selection clipboard"))))
+
+      ;; TODO: Save directly to evil registers, not emacs registers.
+      (evil-define-command evil-save-window-config+ (reg)
+        (interactive "<x>")
+        (window-configuration-to-register
+         (or reg
+             (register-read-with-preview
+                          "Save window config to register: "))))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
@@ -4475,7 +4391,8 @@
        global-company-mode
        :custom
        ;; show the completion tooltip without any delay.
-       (company-tooltip-idle-delay nil)
+       (company-tooltip-idle-delay nil
+        "Show the completion tooltip without any delay.")
        (company-idle-delay 0.4)
        (company-minimum-prefix-length 2)
        (company-statistics-file (state! "company/statistics.el"))
@@ -4515,13 +4432,11 @@
           (t "•" shadow)))
 
        :init
-       (defalias 'case #'cl-case) ; TODO remove when company fixes cl issues.
-
-       :config
-       ;; don't let display steal focus
+       ;; Don't let display steal focus
        (advice-add 'company-show-location   :around 'display-buffer-no-select-window-advice)
        (advice-add 'company-show-doc-buffer :around 'display-buffer-no-select-window-advice)
 
+       :config
        (global-company-mode +1)
 
        (defun company-complete-next-char+ (&optional count)
@@ -4675,8 +4590,8 @@
       (use-package company-quickhelp
         :straight t
         ;; :hook (company-mode . company-quickhelp-mode)
-        :config
-        (setq company-quickhelp-delay 0.5)
+        :custom
+        (company-quickhelp-delay 0.5)
 
         :general
         (:keymaps 'company-active-map
@@ -4708,12 +4623,12 @@
        ("xi" 'all-the-icons-insert
         "xI" 'all-the-icons-insert-all)
 
-       :init
+       :custom
+       (inhibit-compacting-font-caches t)
+
+       :preface
        (defsubst all-the-icons-pad+ (icon &optional suffix)
-         (let ((props (text-properties-at 0 icon)))
-           (apply 'propertize
-                  (concat (substring-no-properties icon) (or suffix " "))
-                  props)))
+         (concat icon (or suffix " ")))
 
        (defun all-the-icons-pad-on-tty-advice+ (value &optional suffix)
          ":filter-return advice for all-the-icons functions which appends
@@ -4724,7 +4639,6 @@
            value))
 
        :config
-       (setq inhibit-compacting-font-caches t)
        (push '(rustic-mode all-the-icons-alltheicon "rust") all-the-icons-mode-icon-alist)
        (push '(web-mode    all-the-icons-faicon     "html5") all-the-icons-mode-icon-alist)
 
@@ -4863,6 +4777,7 @@
        :straight t
        :custom
        (avy-single-candidate-jump nil)
+
        :leader
        ("jj" 'avy-goto-char
         "jk" 'avy-goto-char-2
@@ -4989,19 +4904,15 @@
               (markdown-mode         . emojify-mode)
               (lisp-interaction-mode . emojify-mode)
               (scss-mode             . emojify-mode))
-       :init
-       (defalias 'remove-duplicates #'cl-remove-duplicates)
-
-       :config
-       (setq emojify-emojis-dir (cache! "emojify/"))
-
-       ;; make emojis work like prettify-symbols-mode
-       (setq emojify-point-entered-behaviour 'uncover
-             emojify-emoji-styles '(unicode github)
-             emojify-display-style 'unicode)
+       :custom
+       (emojify-emojis-dir (cache! "emojify/"))
+       ;; Make emojis work like `prettify-symbols-mode'.
+       (emojify-point-entered-behaviour 'uncover)
+       (emojify-emoji-styles '(unicode) github)
+       (emojify-display-style 'unicode)
 
        :leader
-       ("Me" 'emojify-mode
+       ("tme" 'emojify-mode
         "xe" 'emojify-insert-emoji
         "hE" 'emojify-apropos-emoji
         "he" 'emojify-describe-emoji)
@@ -5025,9 +4936,9 @@
         :init
         (set-company-backend! 'text-mode 'company-emoji)
 
-        :config
-        ;; never insert emojis as their unicode symbols.
-        (setq company-emoji-insert-unicode nil))
+        :custom
+        (company-emoji-insert-unicode nil
+         "Never insert emojis as their unicode symbols."))
     #+END_SRC
 
 ** eyebrowse
@@ -5042,9 +4953,8 @@
    #+BEGIN_SRC emacs-lisp
      (use-package git-link
        :straight t
-       :init
-       ;; default is to open the generated link
-       (setq git-link-open-in-browser nil)
+       :custom
+       (git-link-open-in-browser nil)                                                ; default is to open the generated link
 
        :leader
        ("gy"  '(:ignore t :wk "links")
@@ -5120,23 +5030,24 @@
         :after hydra
         :init
         (when (display-graphic-p)
-          ;; only use posframe when on graphical display
+          ;; Only use posframe when on graphical display
           ;; my terminals always too short for it to be
           ;; useful on there.
           (add-hook 'after-init-hook #'hydra-posframe-mode))
 
         :config
-        ;; source for following section [[https://github.com/jerrypnz/.emacs.d/blob/master/config/jp-base.el][here]].
+        ;; Source for following section [[https://github.com/jerrypnz/.emacs.d/blob/master/config/jp-base.el][here]].
         (defun posframe-frame-bottom-poshandler+ (info)
           (cons (car (posframe-poshandler-frame-center info))
                 (- (cdr (posframe-poshandler-frame-bottom-left-corner info)) 20)))
 
-        (setq hydra-posframe-poshandler 'posframe-frame-bottom-poshandler+
-              hydra-posframe-parameters '((alpha 100 100)
-                                          (left-fringe . 10)
-                                          (right-fringe . 10)
-                                          (x-pixel-offset 4)
-                                          (internal-border-width . 2))))
+        :custom
+        (hydra-posframe-poshandler 'posframe-frame-bottom-poshandler+)
+        (hydra-posframe-parameters '((alpha 100 100)
+                                     (left-fringe . 10)
+                                     (right-fringe . 10)
+                                     (x-pixel-offset 4)
+                                     (internal-border-width . 2))))
     #+END_SRC
 
 *** hydra-text-zoom
@@ -5195,8 +5106,8 @@
         ("c" evil-window-create)
         ("s" evil-window-split)
         ("v" evil-window-vsplit)
-        ("S" split-window-below-and-focus)
-        ("V" split-window-right-and-focus)
+        ("S" split-window-below-and-focus+)
+        ("V" split-window-right-and-focus+)
 
         ("h" evil-window-left)
         ("k" evil-window-up)
@@ -5243,7 +5154,7 @@
 
         ("w" hydra-eyebrowse/body "workgroups" :exit t)
 
-        ("m" window-zen "zen" :exit t)
+        ("m" window-zen+ "zen" :exit t)
         ("q" nil "quit" :exit t)
         ("<escape>" nil "quit" :exit t)) ;; prevent evil-escape
 
@@ -6153,7 +6064,7 @@
        :commands evil-ialign
 
        :config
-       ;; run ialign using evil motions
+       ;; Run ialign using evil motions.
        (evil-define-operator evil-ialign (beg end)
          :type        line
          :repeat      nil
@@ -6208,8 +6119,8 @@
      (use-package miniedit
        :straight (miniedit :host github :repo "emacsorphanage/miniedit")
        :delight (miniedit-mode " MiniEdit")
-       :config
-       (setq miniedit-show-help-p nil) ;; thanks... but no thanks
+       :custom
+       (miniedit-show-help-p nil)                                                    ; thanks... but no thanks
 
        :lazy-leader
        (:mode 'miniedit-mode
@@ -6224,8 +6135,8 @@
                    minibuffer-local-must-match-map)
         "M-e" 'miniedit)
        (:keymaps 'evil-ex-search-keymap
-        "M-e" nil) ; miniedit and evil don't seem to get along.
-       )
+        ; Miniedit and evil don't seem to get along.
+        "M-e" nil))
    #+END_SRC
 
 ** page-break-lines
@@ -6245,7 +6156,6 @@
               (emacs-lisp-compilation-mode . page-break-lines-mode)
               (lisp-interaction-mode       . page-break-lines-mode)
               (emacs-lisp-mode             . page-break-lines-mode))
-       :commands (page-break-lines-mode)
        :diminish
        page-break-lines-mode)
    #+END_SRC
@@ -6947,11 +6857,11 @@
         ("isn" 'yas-new-snippet
          "fS" 'yas-visit-snippet-file)
 
-        :config
-        (setq yas-triggers-in-field t
-              yasnippet-snippets-dir (etc! "snippets/")
-              yas-snippet-dirs '(yasnippet-snippets-dir))
+        :custom
+        (yas-triggers-in-field t)
+        (yas-snippet-dirs (list (etc! "snippets/")))
 
+        :config
         (yas-global-mode 1)
 
         (leader-set-keys-for-major-mode 'snippet-mode
@@ -7253,8 +7163,10 @@
         :hook ((org-mode . aas-activate-for-major-mode)
                (org-mode . laas-mode)
                (LaTeX-mode . laas-mode))
-        :config
+        :init
         (put 'aas-set-snippets 'lisp-indent-function 'defun)
+
+        :config
         (aas-set-snippets 'laas-mode
           :cond #'laas-mathp
           "On"    "\\mathcal{O}(n)"
@@ -7290,10 +7202,10 @@
    #+BEGIN_SRC emacs-lisp
      (use-package prog-mode
        :delight  (prettify-symbols-mode " λ")
-       :init
-       (setq lisp-prettify-symbols-alist nil
-             ;; don't need to keep symbolifying it whilst I'm on it
-             prettify-symbols-unprettify-at-point t))
+       :custom
+       (lisp-prettify-symbols-alist nil)
+       (prettify-symbols-unprettify-at-point t
+        "Don't need to keep symbolifying it whilst I'm on it."))
    #+END_SRC
 
 *** configure-presym
@@ -7393,7 +7305,7 @@
 
        :config
        (defun set-word-wrap-column (&optional arg)
-         "set the maximum wanted length for a line in this buffer.
+         "Set the maximum wanted length for a line in this buffer.
      This function enables `auto-fill-mode' in this buffer and sets
      the fill column value.
 
@@ -7651,7 +7563,7 @@
        :custom
        (diary-file (share! "diary"))
 
-       :config
+       :init
        (push 'calendar-mode whitespace-exempt-modes)
 
        :general
@@ -7734,6 +7646,7 @@
         (compilation-skip-threshold 0)
         (next-error-verbose nil)
         (compilation-ask-about-save nil)
+        (compilation-message-face 'default)
 
         :config
         (evil-set-command-property 'next-error :jump t)
@@ -7857,7 +7770,7 @@
                       (when-let* ((buf (get-buffer buf-name)))
                         (with-current-buffer buf
                           (setq compilation-was-open-p+
-                                (when (get-buffer-window buf 'visible)
+                                (when (get-buffer-window buf t)
                                   t)))))))
 
       (defun compilation-safely-close-window+ (buffer)
@@ -8220,6 +8133,9 @@
    #+BEGIN_SRC emacs-lisp
      (use-package diff-mode
        :commands (diff-mode diff-buffer-with-file)
+       :custom
+       (diff-advance-after-apply-hunk nil)
+
        :config
        (push 'diff-mode whitespace-exempt-modes)
 
@@ -8877,7 +8793,7 @@
 ** electric-layout
    #+BEGIN_SRC emacs-lisp
      (use-package electric
-       :init
+       :preface
        (defvar electric-layout-mode-rules+ nil
          "Alist mapping from major-modes to `electric-layout-rules'.
      Each entry should be a cons of (MODE . RULES) where
@@ -8993,6 +8909,13 @@
                              (let ((ix (seq-position diag-deltas (seq-min diag-deltas))))
                                (forward-line ix))))))))
 
+       :init
+       (with-eval-after-load 'evil
+         (evil-declare-motion 'flymake-goto-next-error)
+         (evil-declare-motion 'flymake-goto-prev-error)
+         (evil-declare-motion 'flymake-first-error+)
+         (evil-declare-motion 'flymake-last-error+))
+
        :leader
        ("e." 'hydra-flymake/body
         "ej" 'flymake-goto-next-error
@@ -9059,6 +8982,9 @@
         (lua-mode
          flymake-rest-luacheck
          (flymake-rest-lua :disabled t))
+        (sql-mode
+         flymake-rest-sql-lint
+         (flymake-rest-sqlint :disabled t))
         (ruby-mode flymake-rest-rubocop)
         (sh-mode flymake-rest-shellcheck)
         (yaml-mode flymake-rest-yamllint)
@@ -9805,9 +9731,30 @@
     This matches the same format I have for ~ls~ or ~dired~.
 
     #+begin_src emacs-lisp
+      (defvar +directories-before-files-stable nil
+        "When true sort directories before files stably.
+      This means that when using prescient or a completion framework
+      that remembers and re-orders candidates based on frecency, you
+      can maintain this relative ordering while still partitioning
+      files from directories.
+
+      When disabled the sorting should be closer to ls or [[man:sort][sort]] -V.")
+
       (defun +directories-before-files (files)
-        (nconc (seq-filter (lambda (x) (string-suffix-p "/" x)) files)
-               (seq-remove (lambda (x) (string-suffix-p "/" x)) files)))
+        (if +directories-before-files-stable
+            (nconc (seq-filter (lambda (x) (string-suffix-p "/" x)) files)
+                   (seq-remove (lambda (x) (string-suffix-p "/" x)) files))
+          (sort files
+                (lambda (x y)
+                  (let ((x-dir (eq (aref x (- (length x) 1)) ?/))
+                        (y-dir (eq (aref y (- (length y) 1)) ?/)))
+                    (cond
+                     ((and x-dir y-dir)
+                      (string< (directory-file-name x)
+                               (directory-file-name y)))
+                     (x-dir t)
+                     (y-dir nil)
+                     (t (string< x y))))))))
 
       (push `(file . ,#'+directories-before-files)
             +completion-category-sort-func-overrides)
@@ -9878,6 +9825,8 @@
                                            orderless-match-face-1
                                            orderless-match-face-2
                                            orderless-match-face-3
+                                           completions-common-part
+                                           completions-first-difference
                                            ;; For some reason `consult' async commands and some regular
                                            ;; commnads such as `completion-in-region' don't use orderless
                                            ;; highlighting.
@@ -9935,7 +9884,7 @@
             copied)))
     #+end_src
 
-** minibuffer-depth-indication
+** minibuffer-depth
    #+BEGIN_SRC emacs-lisp
      (use-package mb-depth
        :demand t
@@ -10151,7 +10100,6 @@
                       (format-mode-line "%b")
                       +mode-line-buffer-id-ellipses)
           'face '+mode-line-buffer-name))
-
      #+END_SRC
 
 *** buffer-encoding
@@ -10491,7 +10439,7 @@
      #+END_SRC
 
 *** language-server
-    Emacs has a few language-server packages. More recent variants are implementation
+    Emacs has a few language-server packages. More recent variants are implementations
     of the [[https://microsoft.github.io/language-server-protocol/][lsp-protocol]] for which emacs has 2 mainstream client implementations [[https://microsoft.github.io/language-server-protocol/][lsp-mode]]
     and [[https://github.com/joaotavora/eglot][eglot]]. There's also some +older+ *more-established* language server packages such
     [[https://github.com/mopemope/meghanada-emacs][meghanada-mode]] or [[https://github.com/pythonic-emacs/anaconda-mode][anaconda-mode]].
@@ -10502,7 +10450,7 @@
 
     Much of these were partially adapted from: [[https://github.com/seagle0128/doom-modeline/blob/af5f61888e7eb0aa521d2d29b42221302b717915/doom-modeline-segments.el#L1871][doom-modeline]].
 
-**** lsp
+**** lsp-mode
      #+BEGIN_SRC emacs-lisp
        (defvar-local +mode-line-lsp-text nil)
        (defun +mode-line--update-lsp ()
@@ -10686,6 +10634,7 @@
                          (format " %dW" (count-words beg end)))))
              'face 'mode-line-emphasis))))
     #+END_SRC
+
 *** format
     My personal mode-line configuration (distinct from both doom and spacemacs).
     This was mostly inspired by [[https://gitlab.com/jessieh/mood-line/-/tree/master][mood-line]], a fork of doom-modeline with a much
@@ -11759,6 +11708,9 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package tramp
+       :custom
+       (tramp-default-method "sshx")
+
        :config
        ;; google cloud integration... curtesy of:
        ;;   https://qiita.com/tanatana/items/218b19808f2428b125fe
@@ -12190,9 +12142,14 @@
 
    #+begin_src emacs-lisp
      (use-package vertico
+       ;; TODO: Wait until you can install extensions through MELPA.
+       :straight (vertico :repo "minad/vertico"
+                          :branch "main"
+                          :files (:defaults
+                                  "extensions/vertico-quick.el"
+                                  "extensions/vertico-repeat.el"))
        :hook ((after-init . vertico-mode)
               (minibuffer-setup . cursor-intangible-mode))
-       :straight t
        :custom
        (vertico-count 15)
        (vertico-cycle t)
@@ -12225,10 +12182,11 @@
                          (funcall func metadata)))))
 
        (advice-add #'vertico--sort-function :before-until #'+completion-category-sort-func)
-       (advice-add #'vertico--tidy-shadowed-file :override #'ignore)                 ; Re-enable file-name shadowing.
 
        :general
        (:keymaps 'vertico-map
+        "C-c C-n" 'vertico-next-group
+        "C-c C-p" 'vertico-previous-group
         "<S-return>" 'vertico-exit-input
         [remap minibuffer-forward-char-or-exit+]
         (defun vertico-forward-char-or-exit+ ()
@@ -12236,6 +12194,21 @@
           (call-interactively (if (eolp)
                                   'vertico-exit
                                 'forward-char)))))
+   #+end_src
+
+   #+begin_src emacs-lisp
+     (use-package vertico-quick
+       ;; :straight t
+       :general
+       (:keymaps 'minibuffer-local-map
+        "C-q" 'vertico-quick-exit))
+   #+end_src
+
+   #+begin_src emacs-lisp
+     (use-package vertico-repeat
+       ;; :straight t
+       :leader
+       ("RET" 'vertico-repeat))
    #+end_src
 
 ** minibuffer
@@ -12275,15 +12248,19 @@
     #+BEGIN_SRC emacs-lisp
       (use-package embark
         :straight t
-        :config
-        (setq embark-action-indicator
-              (lambda (map _target)
-                (which-key--show-keymap "Embark" map nil nil 'no-paging)
-                #'which-key--hide-popup-ignore-command)
-              embark-become-indicator embark-action-indicator)
-
+        :init
         (push 'embark-collect-mode whitespace-exempt-modes)
 
+        :custom
+        (embark-indicators
+         (list
+          (lambda ()
+            (lambda (&optional map _target _prefix)
+              (if (not map)
+                  (which-key--hide-popup-ignore-command)
+                (which-key--show-keymap "Embark" map nil nil 'no-paging))))))
+
+        :config
         (advice-add 'embark-export           :around #'display-buffer-no-select-window-advice)
         (advice-add 'embark-collect-live     :around #'display-buffer-no-select-window-advice)
         (advice-add 'embark-collect-snapshot :around #'display-buffer-no-select-window-advice)
@@ -12338,7 +12315,7 @@
          "<C-return>" 'embark-act)
         (:keymaps 'embark-general-map
          "w" nil
-         "y" 'embark-save)
+         "y" 'kill-new)
         (:keymaps 'embark-file-map
          "=" 'vdiff-files
          "W" nil
@@ -12352,6 +12329,12 @@
          "w" 'where-is)
         (:keymaps 'embark-become-file+buffer-map
          "t" 'find-temp-file+)
+        (:keymaps 'embark-face-map
+         "I" nil
+         "i" nil
+         "i" 'embark-insert
+         "/" 'make-face-italic
+         "?" 'make-face-unitalic)
 
         :lazy-leader
         (:mode 'embark-collect-mode
@@ -12367,8 +12350,7 @@
       (use-package embark-consult
         :straight t
         :after (embark consult)
-        :demand t
-        :hook (embark-collect-mode . embark-consult-preview-minor-mode))
+        :demand t)
     #+END_SRC
 
 *** consult
@@ -12379,6 +12361,7 @@
       (use-package consult
         :straight t
         :commands (consult--read
+                   consult-find-no-project+
                    consult-ripgrep-no-project+
                    consult-grep-no-project+
                    consult--buffer-state
@@ -12394,8 +12377,8 @@
            (perl :initial "#" :type perl)))
         (consult-fontify-max-size 100000)
         (register-preview-function #'consult-register-preview)
-        (consult-ripgrep-command                                                      ; Variant command which disregards no-matches
-         "ignore-exit 1 rg --null --line-buffered --color=always --max-columns=500 --smart-case --no-heading --line-number . -e OPTS ARG")
+        (consult-ripgrep-args                                                      ; Variant command which disregards no-matches
+         "ignore-exit 1 rg --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number .")
         (consult-async-refresh-delay 0.05)
         (consult-narrow-key (kbd "M-SPC"))
         (consult-widen-key (kbd "S-SPC"))
@@ -12451,12 +12434,11 @@
 
         (consult-customize consult-recent-file :sort nil)
 
-        (setq consult-async-default-split "/")
         ;; Async commands that produce a lot of output so it's useful for them to be async
         ;; but once produced you won't be re-running the command again.
         (consult-customize
-         consult-find +dot-goto-repo +dot-goto-executable +dot-goto-fsmap +dot-open-bookmark
-         :initial (concat consult-async-default-split "*" consult-async-default-split))
+         consult-find consult-find-no-project+ +dot-goto-repo +dot-goto-executable +dot-goto-fsmap +dot-open-bookmark
+         :initial (concat "/*/"))
 
         (consult-customize
          switch-to-scratch-buffer :state #'consult--buffer-state)
@@ -12486,6 +12468,7 @@
 
         (with-consult-ignore-project+ consult-ripgrep)
         (with-consult-ignore-project+ consult-grep)
+        (with-consult-ignore-project+ consult-find)
 
         :config
         (advice-add 'consult-line :after
@@ -12526,15 +12509,16 @@
          "sb" 'consult-grep-no-project+
          "sv" 'consult-git-grep
          "fs" '(:ignore t :wk "search")
-         "fsf" 'consult-find
+         "fsf" 'consult-find-no-project+
          "kg" 'consult-kmacro
-         "ry" 'consult-yank
+         "ry" 'consult-yank-pop
 
          "ps" '(:ignore t :wk "search")
          "psr" 'consult-ripgrep
+         "psf" 'consult-find
          "psv" 'consult-git-grep
          "psg" 'consult-grep
-         "psi" 'consult-project-imenu)
+         "psi" 'consult-imenu-multi)
         (:mode '(org-mode
                  outline-mode
                  magit-log-mode)
@@ -12543,9 +12527,10 @@
 
         :general
         (:keymaps 'org-mode-map
-         [remap consult-imenu] 'consult-org-heading)
+         [remap consult-imenu] 'consult-org-heading
+         [remap imenu] 'consult-org-heading)
         ([remap imenu] 'consult-imenu
-         [remap imenu-anywhere] 'consult-project-imenu
+         [remap imenu-anywhere] 'consult-imenu-multi
          [remap switch-to-buffer] 'consult-buffer
          [remap multi-occur] 'consult-multi-occur
          [remap apropros-command] 'consult-apropos
@@ -12727,12 +12712,12 @@
                       (cand (concat
                              (concat (propertize file 'face 'consult-file) ":"
                                      (propertize (number-to-string line) 'face 'consult-location)
-                                     " ")
+                                     ":")
                              (consult--region-with-cursor beg end (point-marker)))))
                  (put-text-property 0 1 'consult--grep-file file cand)
-                 `(,cand ,file ,line 0))))))
+                 cand)))))
 
-       (defun consult-evil-jumps+ (arg)
+       (defun consult-evil-jumps+ (&optional arg)
          "Jump to an evil-mode jump.
        When ARG is given only jump to marks in the current buffer."
          (interactive "P")
@@ -12744,10 +12729,11 @@
            (consult--read
             cands
             :prompt "Evil jump: "
-            :lookup #'consult--lookup-cdr
+            :lookup #'consult--lookup-member
             :category 'consult-location
             :sort nil
             :require-match t
+            :group #'consult--grep-group
             :history '(:input consult--line-history)
             :add-history (thing-at-point 'symbol)
             :state (consult--grep-state))))
@@ -13097,7 +13083,7 @@
                                     ,@(and consult-bibtex-note-narrow-key+
                                            `((,consult-bibtex-note-narrow-key+ . "With Notes")))
                                     ,@consult-bibtex-narrow+)))
-                          :history '(:input consult-bibtex-history+))))
+                          :history consult-bibtex-history+)))
 
        (defun consult-bibtex+ (&optional arg)
          (interactive "P")
@@ -13312,7 +13298,12 @@
          "List repositories using my [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-repos][ls-projects]] script and ask for one to jump to."
          (interactive
           (list (consult--read
-                 (consult--async-command "ls-projects")
+                 (consult--async-command
+                     (lambda (input)
+                       (pcase-let ((`(,arg . ,opts) (consult--command-split input)))
+                         (unless (string-blank-p arg)
+                           (list :command `("ls-projects" ,arg ,@opts)
+                                 :highlight (cdr (consult--default-regexp-compiler input 'basic)))))))
                  :prompt "Repo: "
                  :category 'project-file
                  :require-match t
@@ -13331,7 +13322,12 @@
          "List and jump to an executable using [[https://github.com/mohkale/dotfiles/blob/master/bin/ls-exec][ls-exec]]."
          (interactive
           (list (consult--read
-                 (consult--async-command "ls-exec")
+                 (consult--async-command
+                     (lambda (input)
+                       (pcase-let ((`(,arg . ,opts) (consult--command-split input)))
+                         (unless (string-blank-p arg)
+                           (list :command `("ls-exec" ,arg ,@opts)
+                                 :highlight (cdr (consult--default-regexp-compiler input 'basic)))))))
                  :prompt "Find executable: "
                  :category 'file
                  :require-match t
@@ -13346,31 +13342,40 @@
                                         (?s . "Symlink")
                                         (?u . "Unknown")))
 
-       (defun +dot-goto-fsmap-format-lines (lines)
-         (save-match-data
-           (cl-loop for fsmap in lines
-                    when (string-match (rx bol
-                                           (group (one-or-more (not whitespace)))
-                                           ":"
-                                           (group (one-or-more anychar))
-                                           eol)
-                                       fsmap)
-                      collect
-                      (let* ((alias (match-string 1 fsmap))
-                             (path  (match-string 2 fsmap))
-                             str)
-                        (setq str (concat (propertize alias 'face 'font-lock-type-face)
-                                          " "
-                                          path))
-                        (add-text-properties 0 1 `(consult--type
-                                                   ,(or (let ((type (file-attribute-type (file-attributes (file-chase-links path)))))
-                                                          (cond
-                                                           ((eq type t) ?d)
-                                                           ((eq type nil) ?f)
-                                                           ((stringp type) ?s)))
-                                                        ?u))
-                                             str)
-                        (list str (expand-file-name path) 1 1)))))
+       (defun +dot-goto-fsmap-format-lines (async builder)
+         (let ((highlight))
+           (lambda (action)
+             (cond ((stringp action)
+                    (setq highlight (plist-get (funcall builder action) :highlight))
+                    (funcall async action))
+                   ((consp action)
+                    (let (result)
+                      (save-match-data
+                        (dolist (fsmap action)
+                          (when (string-match (rx bol
+                                                  (group (one-or-more (not whitespace)))
+                                                  ":"
+                                                  (group (one-or-more anychar))
+                                                  eol)
+                                              fsmap)
+                            (push (let* ((alias (match-string 1 fsmap))
+                                         (path  (match-string 2 fsmap))
+                                         str)
+                                    (setq str (concat (propertize alias 'face 'font-lock-type-face)
+                                                      " "
+                                                      path))
+                                    (add-text-properties 0 1 `(consult--type
+                                                               ,(or (let ((type (file-attribute-type (file-attributes (file-chase-links path)))))
+                                                                      (cond
+                                                                       ((eq type t) ?d)
+                                                                       ((eq type nil) ?f)
+                                                                       ((stringp type) ?s)))
+                                                                    ?u))
+                                                         str)
+                                    (list str (expand-file-name path) 1 1))
+                                  result))))
+                      (funcall async (nreverse result))))
+                   (t (funcall async action))))))
 
        (defvar +dot-goto-fsmap-history nil)
 
@@ -13378,60 +13383,79 @@
          "List file system maps (using [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-fsmaps][here]]) and find one in emacs."
          (interactive
           (list (car
-                 (consult--read
-                  (consult--async-command "ls-fsmaps -er"
-                    (consult--async-transform +dot-goto-fsmap-format-lines))
-                  :prompt "File system map: "
-                  :lookup #'consult--lookup-cdr
-                  :state (consult--grep-state)
-                  :require-match t
-                  :group
-                  (consult--type-group +dot-goto-fsmap-narrow)
-                  :narrow
-                  ;; (consult--type-narrow +dot-goto-fsmap-narrow)
-                  (let* ((narrow (consult--type-narrow +dot-goto-fsmap-narrow))
-                         (pred (plist-pop! narrow :predicate)))
-                    `(:predicate
-                      ,(lambda (cand)
-                         (funcall pred (car cand)))
-                      ,@narrow))
-                  :history '(:input +dot-goto-fsmap-history)
-                  :initial (consult--async-split-initial "*")))))
+                 (let ((builder (lambda (input)
+                                  (pcase-let* ((`(,arg . ,opts) (consult--command-split input)))
+                                    (unless (string-blank-p arg)
+                                      (list :command `("ls-fsmaps" "-er" ,arg ,@opts)
+                                            :highlight (cdr (consult--default-regexp-compiler input 'basic))))))))
+                   (consult--read
+                    (consult--async-command builder
+                      (+dot-goto-fsmap-format-lines builder))
+                    :prompt "File system map: "
+                    :lookup #'consult--lookup-cdr
+                    :require-match t
+                    :group
+                    (consult--type-group +dot-goto-fsmap-narrow)
+                    :narrow
+                    ;; (consult--type-narrow +dot-goto-fsmap-narrow)
+                    (let* ((narrow (consult--type-narrow +dot-goto-fsmap-narrow))
+                           (pred (plist-pop! narrow :predicate)))
+                      `(:predicate
+                        ,(lambda (cand)
+                           (funcall pred (car cand)))
+                        ,@narrow))
+                    :history '(:input +dot-goto-fsmap-history)
+                    :initial (consult--async-split-initial "*"))))))
          (find-file file))
      #+END_SRC
 
      #+BEGIN_SRC emacs-lisp
-       (defun +dot-open-bookmark-format-lines (lines)
-         (cl-loop for row in lines
-                  do (setq row (split-string row "\t"))
-                  with url   = nil
-                  with tags  = nil
-                  with title = nil
-                  do (setq url   (nth 0 row)
-                           tags  (nth 1 row)
-                           title (nth 2 row))
-                  when (string-prefix-p "http" url)
-                    collect (cons
-                             (concat (unless (string-empty-p tags)
-                                       (propertize (concat "(" tags ") ") 'face 'bold))
-                                     title
-                                     (when url
-                                       (when-let ((domain (url-domain (url-generic-parse-url url))))
-                                         (concat " [" (propertize domain 'face 'font-lock-preprocessor-face) "]"))))
-                             url)))
+       (defun +dot-open-bookmark-format-lines (async builder)
+         (let (highlight)
+           (lambda (action)
+             (cond ((stringp action)
+                    (setq highlight (plist-get (funcall builder action) :highlight))
+                    (funcall async action))
+                   ((consp action)
+                    (funcall async
+                     (cl-loop for row in action
+                              do (setq row (split-string row "\t"))
+                              with url   = nil
+                              with tags  = nil
+                              with title = nil
+                              do (setq url   (nth 0 row)
+                                       tags  (nth 1 row)
+                                       title (nth 2 row))
+                              when (string-prefix-p "http" url)
+                                collect (cons
+                                         (concat (unless (string-empty-p tags)
+                                                   (propertize (concat "(" tags ") ") 'face 'bold))
+                                                 title
+                                                 (when url
+                                                   (when-let ((domain (url-domain (url-generic-parse-url url))))
+                                                     (concat " [" (propertize domain 'face 'font-lock-preprocessor-face) "]"))))
+                                         url))))
+                   (t (funcall async action))))))
 
        (defvar +dot-open-bookmark-history nil)
 
        (defun +dot-open-bookmark (bookmark)
          "List system bookmarks (using [[https://github.com/mohkale/dotfiles/blob/master/bin/ls-bookmarks][this]]) and open it in your default browser."
          (interactive
-          (list (consult--read (consult--async-command "ls-bookmarks"
-                                 (consult--async-transform +dot-open-bookmark-format-lines))
-                               :prompt "Bookmark: "
-                               :lookup #'consult--lookup-cdr
-                               :require-match t
-                               :history '(:input +dot-open-bookmark-history)
-                               :initial (consult--async-split-initial "*"))))
+          (list
+           (let ((builder (lambda (input)
+                            (pcase-let* ((`(,arg . ,opts) (consult--command-split input)))
+                              (unless (string-blank-p arg)
+                                (list :command `("ls-bookmarks" ,arg ,@opts)
+                                      :highlight (cdr (consult--default-regexp-compiler input 'basic))))))))
+             (consult--read
+              (consult--async-command builder
+                (+dot-open-bookmark-format-lines builder))
+              :prompt "Bookmark: "
+              :lookup #'consult--lookup-cdr
+              :require-match t
+              :history '(:input +dot-open-bookmark-history)
+              :initial (consult--async-split-initial "*")))))
          (xopen-url+ bookmark))
      #+END_SRC
 
@@ -13842,7 +13866,7 @@
                                               (length package-activated-list))
                                              ((bound-and-true-p straight--profile-cache)
                                               (let ((count 0))
-                                                (maphash (lambda (key val)
+                                                (maphash (lambda (_key val)
                                                            (when val (setq count (1+ count))))
                                                          straight--success-cache)
                                                 count)))))
@@ -13953,6 +13977,18 @@
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! edit-indirect)
      (use-package edit-indirect
        :straight t
+       :init
+       (push `(,(rx bol "*edit-indirect ")
+                (display-buffer-reuse-window
+                 display-buffer-same-window))
+             display-buffer-alist)
+
+       :general
+       (:keymaps 'edit-indirect-mode-map
+        [remap evil-write] 'edit-indirect-save
+        [remap evil-save-and-close] 'edit-indirect-commit
+        [remap evil-quit-all-with-error-code] 'edit-indirect-abort)
+
        :leader
        ("be" 'edit-indirect-region)
        :lazy-leader
@@ -14140,9 +14176,6 @@
        (push '((css-mode scss-mode) "css-languageserver" "--stdio")
              eglot-server-programs)
 
-       (push '((c++-mode c-mode) "clangd")                                           ; Prefer clang to ccls.
-             eglot-server-programs)
-
        (push '((nim-mode nimscript-mode)
                "nimlsp")
              eglot-server-programs)
@@ -14163,13 +14196,13 @@
         ;; aliases for gg and gG
         "jy" 'eglot-find-implementation
         "jY" 'eglot-find-typeDefinition
-        "hy" 'eglot-help-at-point)
+        "hy" 'eldoc-doc-buffer)
        (:mode 'eglot--managed-mode
         :minor t
         :prefix leader-server-leader-prefix
         ;; unbound 'eglot-clear-status
         "a" 'eglot-code-actions
-        "h" 'eglot-help-at-point
+        "h" 'eldoc-doc-buffer
         "2" 'eglot-stderr-buffer
         "r" 'eglot-rename
         "f" 'eglot-format
@@ -16108,9 +16141,12 @@
    #+END_SRC
 
 ** tree-sitter
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! tree-sitter)
+   :END:
    TODO: Finish [[https://ubolonton.github.io/emacs-tree-sitter/syntax-highlighting/customization/][guide]].
 
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! tree-sitter)
+   #+BEGIN_SRC emacs-lisp
      (use-package tree-sitter
        :delight (tree-sitter-mode " T")
        :straight t
@@ -16129,9 +16165,35 @@
        :after tree-sitter
        :demand t
        :config
-       (push '(typescript-react-mode . typescript) tree-sitter-major-mode-language-alist)
-       (push '(web-mode . html) tree-sitter-major-mode-language-alist))
+       (push '(typescript-react-mode . typescript)
+             tree-sitter-major-mode-language-alist)
+       (push '(web-mode . html)
+             tree-sitter-major-mode-language-alist))
    #+END_SRC
+
+*** evil-textobj-treesitter
+    #+begin_src emacs-lisp
+      (use-package evil-textobj-treesitter
+        :straight (evil-textobj-treesitter
+                   :type git
+                   :host github
+                   :repo "meain/evil-textobj-treesitter"
+                   :files (:defaults "queries"))
+        :after (evil tree-sitter)
+        :demand t
+        :config
+        (general-define-key
+         :predicate '(bound-and-true-p tree-sitter-mode)
+         :keymaps 'evil-outer-text-objects-map
+         "f" (evil-textobj-treesitter-get-textobj "function.outer")
+         "c" (evil-textobj-treesitter-get-textobj "class.outer"))
+
+        (general-define-key
+         :predicate '(bound-and-true-p tree-sitter-mode)
+         :keymaps 'evil-inner-text-objects-map
+         "f" (evil-textobj-treesitter-get-textobj "function.inner")
+         "c" (evil-textobj-treesitter-get-textobj "class.inner")))
+    #+end_src
 
 ** rainbow-mode
    highlights hex color strings in their appropriate color.
@@ -16420,7 +16482,7 @@
        (advice-add 'counsel-yank-pop-action :around
                    #'vterm-counsel-yank-pop-action)
 
-       (advice-add 'switch-to-last-buffer :filter-args
+       (advice-add 'switch-to-last-buffer+ :filter-args
                    (defun switch-to-last-buffer--bury-vterm-buffers (&rest args)
                      "prevent `switch-to-last-buffer' oferring vterm.
      unless there's LITERALLY no other buffer you could possibly mean to go to."
@@ -16439,7 +16501,7 @@
                        (list (or buffer
                                  (other-buffer))))))
 
-       (advice-add 'switch-to-last-buffer :before-until
+       (advice-add 'switch-to-last-buffer+ :before-until
                    (defun switch-to-last-buffer--pop-vterm-window-config ()
                      "when switching to last buffer from a maximized vterm buffer
      instead switch to the window config from before the "
@@ -16659,7 +16721,13 @@
    #+BEGIN_SRC emacs-lisp
      (use-package awk
        :interpreter "gawk"
-       :hook (awk-mode . +flylint))
+       :hook (awk-mode . +flylint)
+
+       :preface
+       (defun awk-mode-reset-electric-pair+ ()
+         (setq-local electric-pair-inhibit-predicate
+                     #'electric-pair-default-inhibit))
+       :hook (awk-mode . awk-mode-reset-electric-pair+))
    #+END_SRC
 
 ** Crystal
@@ -16783,38 +16851,9 @@
 
         (evil-set-initial-state 'inferior-emacs-lisp-mode 'emacs) ;; ielm
 
-        ;;   (defun elisp-transcript ()
-        ;;     ;; source https://www.emacswiki.org/emacs/LispInteractionMode
-        ;;     "Make an Emacs Lisp interactive transcript.
-        ;; In a new buffer, make a transcript of the Emacs Lisp code by
-        ;; evaluating each line and printing the result under it (/a la/
-        ;;   TODO fix last sexp in the buffer isn't transcripted
-        ;;   `eval-print-last-sexp')."
-        ;;     (interactive)
-        ;;     (let* ((eval-expression-print-length nil)
-        ;;            (eval-expression-print-level nil)
-        ;;            (input-buffer (current-buffer))
-        ;;            (dest-buffer (get-buffer-create (concat "*Transcript for "
-        ;;                                                    (buffer-name input-buffer)
-        ;;                                                    "*"))))
-        ;;       (save-current-buffer
-        ;;         (set-buffer dest-buffer)
-        ;;         (lisp-interaction-mode)
-        ;;         (delete-region (point-min) (point-max))
-        ;;         (insert-buffer-substring input-buffer) ;; `slurp!'
-        ;;         (goto-char (point-min))
-        ;;         (forward-sexp 1)
-        ;;         (while (> (point-max) (point))
-        ;;           (condition-case err
-        ;;               (evil-adjust-eval-print-last-sexp)
-        ;;             (error
-        ;;              (insert (format "%s" err))
-        ;;              (newline)))
-        ;;           (forward-sexp 1)))
-        ;;       (display-buffer dest-buffer)))
-
-        (push '(emacs-lisp-mode . 2) +indent-config)
-        (push '(lisp-interaction-mode . 2) +indent-config)
+        ;; Allows for smarter indentation based on the lisp syntax.
+        (push '(emacs-lisp-mode . nil) +indent-config)
+        (push '(lisp-interaction-mode . nil) +indent-config)
 
         :leader
         ("fk" 'emacs-lisp-byte-compile)
@@ -16994,9 +17033,9 @@
          "<tab>" 'tab-to-tab-stop))
     #+END_SRC
 
-*** python-lsp
-    Your going to need a python language server, I recommend [[https://github.com/palantir/python-language-server][this]] one that's based on
-    [[https://github.com/davidhalter/jedi][jedi]]. There's also a microsoft based [[https://github.com/microsoft/python-language-server][server]], and the newer/faster [[https://github.com/microsoft/pyright][pyright]] (but be
+*** python-lsp-server                                                   :lsp:
+    Your going to need a python language server, I recommend [[https://github.com/python-lsp/python-lsp-server][this]] one that's based on
+    [[https://github.com/davidhalter/jedi][jedi]]. There's also a Microsoft based [[https://github.com/microsoft/python-language-server][server]], and the newer/faster [[https://github.com/microsoft/pyright][pyright]] (but be
     forewarned, there be [[https://github.com/microsoft/pylance-release/issues/4][dragons]] there).
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! python :lsp (not anaconda))
@@ -17107,18 +17146,8 @@
    :END:
 
    #+BEGIN_SRC emacs-lisp
-     (defvar +ruby-use-lsp 'projectile
-       "Whether to use `lsp-mode' with ruby-mode.
-     Set to 'projectile to only activate if in a projectile project with a Gemfile.
-
-     NOTE solargraph... and basically every other ruby completion framework is
-          useless if your project doesn't have a Gemfile... that means for simple
-          scripts like ~/.emacs.d/bin/tangle, solargraph won't be of any use.
-     ")
-
      (push (cons +ruby-mode 2) +indent-config)
-
-     (leader-set-keys "Mr" +ruby-mode)
+     (leader-set-keys "tmr" +ruby-mode)
    #+END_SRC
 
 *** ruby-mode
@@ -17181,8 +17210,13 @@
          "C-{" 'enh-ruby-toggle-block))
     #+END_SRC
 
-*** ruby-lsp/solargraph
+*** solargraph                                                          :lsp:
     Language server implementation for ruby.
+
+    Solargraph appears to be the only language-server implementation available for
+    ruby although like ruby it's somewhat obtuse. For one you can't use it outside
+    of a =bundle= managed project. If your project lacks a Gemfile Solargraph will just
+    kill itself meaning it's useless for general purpose ruby scripts.
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ruby :lsp)
       (push
@@ -17307,7 +17341,7 @@
                       (web-mode-guess-engine-and-content-type))))
 
         :leader
-        ("Mh" 'web-mode)
+        ("tmh" 'web-mode)
         (:mode 'web-mode
          ;; unbound:
          ;;   * web-mode-buffer-highlight
@@ -17509,10 +17543,14 @@
        :straight t
        :mode ("\\.sql" . sql-mode)
        :hook (sql-mode . +flylint)
-       :config
-       (setq sql-sqlite-options '("-interactive"))
-       (push 'sql-interactive-mode whitespace-exempt-modes)
+       :custom
+       (sql-sqlite-options '("-interactive"))
 
+       :init
+       (push 'sql-interactive-mode whitespace-exempt-modes)
+       (push '(sql-mode . 2) +indent-config)
+
+       :config
        (evil-set-initial-state 'sql-interactive-mode 'emacs)
 
        :lazy-leader
@@ -17652,6 +17690,9 @@
         :hook (sh-mode . +flylint)
         :config
         (advice-add 'sh-set-shell :around 'inhibit-messages-wrapper!)
+        (modify-syntax! '((?_ . "w")
+                          (?- . "w"))
+          sh-mode-syntax-table)
 
         :lazy-leader
         (:mode 'sh-mode
@@ -17687,9 +17728,7 @@
          "TAB ?" 'sh-show-indent))
     #+END_SRC
 
-*** sh-lsp
-    Enable the bash language server when it's on my system.
-
+*** bash-language-server                                                :lsp:
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! sh-script :lsp)
       (add-hook 'sh-mode-hook +lsp-command)
     #+END_SRC
@@ -17912,8 +17951,8 @@
         (modify-syntax! '((?_ . "w")) markdown-mode-syntax-table)
 
         (advice-add 'markdown-insert-list-item :before
-                    (defun markdown-insert-list-item--adjust-line+ (&rest args)
-                      "by default, inserting a new list item goes below the current item."
+                    (defun markdown-insert-list-item--adjust-line+ (&rest _args)
+                      "By default, inserting a new list item goes below the current item."
                       (when (markdown-list-item-at-point-p)
                         (save-excursion
                           (goto-char (line-end-position))
@@ -17922,7 +17961,7 @@
                         (markdown-forward-paragraph))))
 
         (advice-add 'markdown-insert-list-item :after
-                    (defun markdown-insert-list-item--force-evil-insert+ (&rest args)
+                    (defun markdown-insert-list-item--force-evil-insert+ (&rest _args)
                       (if (eq (char-before)
                               ?\ )
                           (evil-insert nil)
@@ -18184,9 +18223,9 @@
                           (awk-mode . "awk")
                           (other . "k&r")))
 
-       :config
-       (add-transient-hook! 'c-mode-hook (c-toggle-auto-newline))
-       (add-transient-hook! 'c++-mode-hook (c-toggle-auto-newline))
+       ;; :hook
+       ;; ((c-mode . c-toggle-auto-newline)
+       ;;  (c++-mode . c-toggle-auto-newline))
 
        ;; WARN never do this, it breaks commenting in weird places.
        ;; (c-toggle-comment-style +1)
@@ -18201,6 +18240,7 @@
         "D" 'c-display-defun-name
         "m" 'c-mark-function
         "r" 'c-indent-defun
+        "g" 'imenu
         "/" 'c-backslash-region
         "\\" 'c-toggle-comment-style
         "DEL" 'c-hungry-delete-forward
@@ -18215,7 +18255,7 @@
         :hook (c++-mode . modern-c++-font-lock-mode))
     #+END_SRC
 
-*** c/cpp-lsp
+*** clangd/ccls                                                         :lsp:
     LSP implementation for C++/C.
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! c :lsp)
@@ -18249,7 +18289,7 @@
         "eB"    'kotlin-send-buffer-and-focus))
    #+END_SRC
 
-*** kotlin-lsp
+*** kotlin-language-server                                              :lsp:
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! kotlin :lsp)
       (add-hook 'kotlin-mode-hook +lsp-command)
     #+END_SRC
@@ -18259,15 +18299,14 @@
    :header-args+: :tangle (package-yes! java)
    :END:
 
-   java, the language *everyone* tolerates.
+   Java, the language *everyone* tolerates.
 
    #+BEGIN_SRC emacs-lisp
      (use-package cc-mode
-       :init
-       :config
-       (add-hook 'java-mode-hook
-                 (defun +java-mode-fix-indentation ()
-                   (c-set-offset 'inexpr-class 0))))
+       :hook (java-mode . +java-mode-fix-indentation)
+       :preface
+       (defun +java-mode-fix-indentation ()
+         (c-set-offset 'inexpr-class 0)))
    #+END_SRC
 
 *** meghanada
@@ -18385,8 +18424,8 @@
                                     (line-end-position)))
                      (start-regexp (rx bol (zero-or-more blank) "/**"))
                      (continue-regexp (rx bol (one-or-more blank) "*"))
-                     start-p continue-p)
-                (when (or (setq continue-p (string-match-p continue-regexp current-line))
+                     start-p)
+                (when (or (string-match-p continue-regexp current-line)
                           (setq start-p    (string-match-p start-regexp    current-line)))
                   (setq inserted t)
                   (let ((start-column (line-beginning-column)))
@@ -18440,7 +18479,7 @@
          "RET"      'newline))
     #+END_SRC
 
-*** javascript-lsp
+*** typescript-language-server                                          :lsp:
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! javascript :lsp)
       (push (cons 'js2-mode
                   (defun javascript-enable-lsp-in-projects+ ()
@@ -18455,12 +18494,6 @@
     #+BEGIN_SRC emacs-lisp
       (use-package js-doc
         :straight t
-        :config
-        ;; (general-define-key
-        ;;   :keymaps 'js2-mode-map
-        ;;   :states 'insert
-        ;;   "@" 'js-doc-insert-tag)
-
         :config
         (advice-add 'js-doc-insert-function-doc-snippet :after
                     (lambda (&rest _)
@@ -18513,74 +18546,6 @@
          "b" 'js2r-forward-barf))
     #+END_SRC
 
-*** xref-js2
-    #+BEGIN_SRC emacs-lisp
-      (use-package xref-js2
-        :straight t
-        :hook (xref-backend-functions . xref-js2-xref-backend)
-        :config
-        (setq xref-js2-search-program 'rg))
-    #+END_SRC
-
-*** skewer-mode
-    #+BEGIN_SRC emacs-lisp :tangle no
-      (use-package skewer-mode
-        :straight t
-        :delight
-        (skewer-css-mode "skewerC")
-        (skewer-html-mode "skewerH")
-        :init
-        (setq skewer-leader-prefix (concat leader-major-mode-prefix "S"))
-
-        :config
-        ;; once required, enable skewer in all
-        ;; compatible buffers
-        (add-hook 'js2-mode-hook 'skewer-mode)
-        (add-hook 'css-mode-hook 'skewer-css-mode)
-        (add-hook 'html-mode-hook 'skewer-html-mode)
-
-        ;; (run-skewer) ;; and begin server
-
-        :lazy-leader
-        (:mode 'skewer-mode
-         :minor t
-         :prefix skewer-leader-prefix
-         "e" 'skewer-eval-last-expression
-         "E" 'skewer-eval-print-last-expression
-         "(" 'skewer-eval-defun
-         "b" 'skewer-load-buffer
-
-         "R" 'skewer-repl
-         "L" 'skewer-bower-load
-         "B" 'skewer-bower-refresh
-         "p" 'skewer-run-phantomjs
-         "P" 'skewer-phantomjs-kill)
-        (:mode 'skewer-html-mode
-         :minor t
-         :prefix skewer-leader-prefix
-         "s" 'skewer-html-fetch-selector-into-buffer
-         "e" 'skewer-html-eval-tag
-
-         "R" 'skewer-repl
-         "L" 'skewer-bower-load
-         "B" 'skewer-bower-refresh
-         "p" 'skewer-run-phantomjs
-         "P" 'skewer-phantomjs-kill)
-        (:mode 'skewer-css-mode
-         :minor t
-         :prefix skewer-leader-prefix
-         "e" 'skewer-css-eval-current-rule
-         "b" 'skewer-css-eval-buffer
-         "c" 'skewer-css-clear-all
-         "d" 'skewer-css-eval-current-declaration
-
-         "R" 'skewer-repl
-         "L" 'skewer-bower-load
-         "B" 'skewer-bower-refresh
-         "p" 'skewer-run-phantomjs
-         "P" 'skewer-phantomjs-kill))
-    #+END_SRC
-
 ** typescript
    :PROPERTIES:
    :header-args+: :tangle (package-yes! javascript typescript)
@@ -18591,30 +18556,41 @@
    #+BEGIN_SRC emacs-lisp
      (use-package typescript-mode
        :straight t
-       :commands (typescript-react-mode)
-       :mode ("\\.tsx" . typescript-react-mode)
+       :init
+       (push '(typescript-mode . 2) +indent-config)
+
        :general
        (:keymaps 'typescript-mode-map
-        [remap indent-new-comment-line] 'js-jsdoc-return+)
-       :config
-       (define-derived-mode typescript-react-mode typescript-mode
-         "TypescriptReact")
-
-       (put 'typescript-react-mode 'eglot-language-id "typescriptreact"))
+        [remap indent-new-comment-line] 'js-jsdoc-return+))
    #+END_SRC
 
-   #+BEGIN_SRC emacs-lisp
-     (when +lsp-command
-       (add-hook 'typescript-mode-hook       +lsp-command)
-       (add-hook 'typescript-react-mode-hook +lsp-command))
+*** typescript-react
+    #+begin_src emacs-lisp
+      (use-package typescript-mode
+        :straight t
+        :mode ("\\.tsx" . typescript-react-mode)
+        :hook ((typescript-react-mode . emmet-mode)
+               (typescript-react-mode . typescript-react-setup-tsx+))
+        :preface
+        (defun typescript-react-setup-tsx+ ()
+          (setq-local emmet-expand-jsx-className? t))
 
-     (push '(typescript-mode       . 2) +indent-config)
-     (push '(typescript-react-mode . 2) +indent-config)
-     (add-hook 'typescript-react-mode-hook
-               (defun typescriptreact-setup-tsx+ ()
-                 (emmet-mode +1)
-                 (setq-local emmet-expand-jsx-className? t)))
-   #+END_SRC
+        :init
+        (push '(typescript-react-mode . 2) +indent-config)
+
+        :commands (typescript-react-mode)
+        :config
+        (define-derived-mode typescript-react-mode typescript-mode
+          "TypescriptReact")
+
+        (put 'typescript-react-mode 'eglot-language-id "typescriptreact"))
+    #+end_src
+
+*** typescript-language-server                                          :lsp:
+    #+begin_src emacs-lisp :tangle (package-yes! javascript typescript :lsp)
+      (add-hook 'typescript-mode-hook       +lsp-command)
+      (add-hook 'typescript-react-mode-hook +lsp-command)
+    #+end_src
 
 ** css/less
    :PROPERTIES:
@@ -18635,7 +18611,7 @@
          "b" 'web-beautify-css))
     #+END_SRC
 
-*** css-lsp
+*** vscode-css-languageserver-bin                                       :lsp:
     Requires ~npm install --global vscode-css-languageserver-bin~.
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! css :lsp)
@@ -18692,6 +18668,7 @@
         :init
         (push 'haskell-interactive-mode whitespace-exempt-modes)
         (push 'inferior-haskell-mode whitespace-exempt-modes)
+
         (defalias 'haskell-repl #'run-haskell)
 
         :config
@@ -18735,15 +18712,13 @@
         (:keymaps 'haskell-mode-map "C-M-i" nil))
     #+END_SRC
 
-*** haskell-lsp
+*** haskell-language-server                                             :lsp:
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! haskell :lsp)
-      (when (eq +lsp-command 'lsp)
+      (when (package! lsp-mode)
         (use-package lsp-haskell
           :straight t
-          :after haskell-mode
-          :demand t
-          :config
-          (setq lsp-haskell-process-args-hie (list "-d" "-l" (make-temp-file "hie." nil ".log")))))
+          :after (lsp haskell-mode)
+          :demand t))
 
       (add-hook 'haskell-mode-hook +lsp-command)
     #+END_SRC
@@ -18799,7 +18774,7 @@
         "c" 'nim-compile))
    #+END_SRC
 
-*** nim-lsp
+*** nimlsp
     Firstly in case lsp is not available, lets rely on the builtin nim help
     facilities curtesy of [[https://nim-lang.org/docs/nimsuggest.html][nimsuggest]].
 
@@ -18822,16 +18797,17 @@
    #+BEGIN_SRC emacs-lisp
      (use-package go-mode
        :straight t
-       :config
-       ;; Only run when current buffer is in go-mode
-       (add-hook 'before-save-hook 'gofmt-before-save)
+       :hook (go-mode . go-mode-setup+)
+       :preface
+       (defun go-mode-setup+ ()
+         ;; Recommended by the official style guide for golang.
+         (setq indent-tabs-mode t))
 
-       (add-hook 'go-mode-hook
-                 (defun go-mode-setup+ ()
-                   ;; recommended by the official style guide for golang.
-                   (setq indent-tabs-mode t)))
-
+       :init
        (push '(go-mode . 4) +indent-config)
+
+       :config
+       (add-hook 'before-save-hook 'gofmt-before-save)                               ; Only run when current buffer is in go-mode
 
        :lazy-leader
        (:mode 'go-mode
@@ -18858,16 +18834,18 @@
 *** go-guru
     requires: ~go get golang.org/s/using-guru~
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! (not :lsp))
+    Only used when lsp based language support is not available.
+
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! golang (not :lsp))
       (use-package go-guru
-        ;; only use when lsp based language support is not available
         :straight t
         :after go-mode
-        :init
-        (add-hook 'go-guru-output-mode-hook
-                  (defun go-guru-preserve-compilation-window+ ()
-                    "Prevent my `compilation-hook' settings interfering with go-guru."
-                    (setq-local compilation-auto-kill-window+ nil)))
+
+        :preface
+        (defun go-guru-preserve-compilation-window+ ()
+          "Prevent my `compilation-hook' settings interfering with go-guru."
+          (setq-local compilation-auto-kill-window+ nil))
+        :hook (go-guru-output-mode . go-guru-preserve-compilation-window+)
 
         :lazy-leader
         (:mode 'go-mode
@@ -18886,7 +18864,7 @@
          "gf" 'go-guru-freevars))
     #+END_SRC
 
-*** go-lsp
+*** gopls                                                               :lsp:
     The golang language server.
     requires: ~GO111MODULE=on  go get -u golang.org/x/tools/gopls@latest~.
 
@@ -18905,28 +18883,32 @@
    #+BEGIN_SRC emacs-lisp
      (use-package rustic
        :straight t
-       ;; :hook (rustic-mode . +flylint)
        :custom
        (rustic-format-trigget 'on-save)
        (rustic-lsp-client nil)
 
-       :config
-       (setq rustic-lsp-server (if (executable-find "rust-analyzer") 'rust-analyzer 'rls))
-       (advice-add 'rustic-popup :around #'display-buffer-no-select-window-advice)
+       :commands (rustic-compile
+                  rustic-cargo-test
+                  rustic-cargo-run)
+       :init
+       (with-eval-after-load 'projectile
+         (projectile-update-project-type 'rust-cargo
+                                         :marker-files '("Cargo.toml")
+                                         :compile #'rustic-compile
+                                         :test    #'rustic-cargo-test
+                                         :run     #'rustic-cargo-run))
 
+       :custom
+       (rustic-lsp-server 'rust-analyzer)
+
+       :init
        (push 'rustic-popup-mode whitespace-exempt-modes)
-       (evil-set-initial-state 'rustic-popup-mode 'emacs)
-
        ;; (push 'rustic-compilation-mode compilation-auto-kill-ignore-modes+)
        (push 'rustic-cargo-test-mode compilation-auto-kill-ignore-modes+)
 
-       (with-eval-after-load 'projectile
-         (assoc-pop! 'rust-cargo projectile-project-types)
-
-         (projectile-register-project-type 'rust-cargo '("Cargo.toml")
-                                           :compile #'rustic-compile
-                                           :test    #'rustic-cargo-test
-                                           :run     #'rustic-cargo-run))
+       :config
+       (evil-set-initial-state 'rustic-popup-mode 'emacs)
+       (advice-add 'rustic-popup :around #'display-buffer-no-select-window-advice)
 
        :lazy-leader
        (:mode 'rustic-mode
@@ -18969,11 +18951,13 @@
                                                         t))))))
     #+END_SRC
 
-*** rust-analyzer
+*** rust-analyzer                                                       :lsp:
     #+begin_src emacs-lisp :tangle (package-yes! rust :lsp)
       (add-hook 'rustic-mode-hook +lsp-command)
+    #+end_src
 
-      (when (package! lsp-mdoe)
+    #+begin_src emacs-lisp :tangle (package-yes! rust lsp-mode)
+      (when (package! lsp-mode)
         (add-hook 'rustic-mode-hook #'rustic-lsp-mode-setup))
     #+end_src
 
@@ -19014,34 +18998,36 @@
        (tex-print-file-extension ".pdf")
        (TeX-auto-private (list (etc! "auctex" "styles")))
 
-       :init
+       :preface
        (defvaralias 'LaTeX-mode-hook 'latex-mode-hook)
 
        (defvar latex-modes+ '(latex-mode tex-mode)
          "list of tex related modes. used for leader and pretty symbols.")
 
+       :init
        (setq TeX-auto-local (state! "auctex" "auto"))                                  ; WARN this isn't supposed to be absolute
 
-       :config
        (push '(tex-mode   . 2) +indent-config)
        (push '(latex-mode . 2) +indent-config)
 
        (push 'TeX-output-mode  whitespace-exempt-modes)
        (push 'TeX-special-mode whitespace-exempt-modes)
 
-       (setq latex-standard-block-names (append latex-standard-block-names
-                                                (list "align")))
+       :config
+       (setq latex-standard-block-names
+             (append latex-standard-block-names
+                     (list "align")))
 
        (unless (file-exists-p TeX-auto-local)
          (mkdir TeX-auto-local t))
 
-     ;; Show process output buffer on error
+     ;; Show process output buffer on error.
        (advice-add 'TeX-command-sentinel :after
                    (defun TeX-process-error-handler+ (p _msg)
                      (unless (zerop (process-exit-status p))
                        (TeX-recenter-output-buffer nil))))
 
-       ;; for some reason, focus switches back to tex buffer
+       ;; for some reason, focus switches back to tex buffer.
        (advice-add 'TeX-recenter-output-buffer :after
                    (defun TeX-recenter-focus (&rest _)
                      (TeX-pop-to-buffer (TeX-active-buffer))))
@@ -19263,7 +19249,7 @@
        (bibtex-autokey-titlewords nil)
        (bibtex-field-delimiters 'double-quotes)                                      ; what I can I say, this just makes sense
 
-       :init
+       :preface
        (defvaralias 'bibtex-files 'org-cite-global-bibliography)
 
        :config
@@ -19398,7 +19384,7 @@
         (bibtex-completion-pdf-extension '(".pdf" ".epub" ".pptx" ".doc" ".docx"))
         (bibtex-completion-pdf-open-function 'xopen-url+)
 
-        :init
+        :preface
         (defvaralias 'bibtex-completion-bibliography 'org-cite-global-bibliography)
 
         :config
@@ -19791,7 +19777,6 @@
          '((emacs-lisp . t)
            (awk        . t)
            (C          . t)
-           (awk        . t)
            (haskell    . t)
            (latex      . t)
            (java       . t)
@@ -20788,14 +20773,16 @@
     note taking system centred around org-mode. you can tag notes using the
     ~roam_tags~ keyword and you can reference sources using ~roam_key~.
 
-    NOTE: protocol installation requires some manual setup, see [[https://www.orgroam.com/manual/Installation-_00281_0029.html#Installation-_00281_0029][here]].
+    *Note*: protocol installation requires some manual setup, see [[https://www.orgroam.com/manual/Installation-_00281_0029.html#Installation-_00281_0029][here]].
 
     #+BEGIN_SRC emacs-lisp
       (use-package org-roam
-        :straight (:branch "v2")
+        :straight t
         :hook ((org-roam-file-setup . flyspell-mode))
         :commands org-roam-rg
-        :init
+        :preface
+        (setq org-roam-v2-ack t)
+
         :custom
         (org-roam-prefer-id-links t)
         (org-roam-completion-system 'default)
@@ -20821,12 +20808,12 @@
         (setq org-id-extra-files (directory-files org-roam-directory nil "\\.org$"))
 
         :custom
-        (org-roam-node-display-template "${title}")
+        (org-roam-node-display-template "${title} ${tags:0}")
         (org-roam-node-annotation-function #'org-roam-annotate-tag+)
         :commands (org-roam-annotate-tag+)
         :config
         (defun org-roam-annotate-tag+ (node)
-          (let ((tags (org-roam--tags-to-str (org-roam-node-tags node))))
+          (let ((tags (org-roam-node-read--tags-to-str (org-roam-node-tags node))))
             (unless (string-empty-p tags)
               (concat
                " "
@@ -20887,17 +20874,22 @@
          "RET" 'org-roam-visit-thing))
     #+END_SRC
 
-    Org-roam server doesn't support org-roam v2 yet.
+**** org-roam-ui
+     #+BEGIN_SRC emacs-lisp
+       (use-package simple-httpd :straight t)
+       (use-package websocket :straight t)
 
-    #+BEGIN_SRC emacs-lisp :tangle no
-      (use-package org-roam-server
-        :straight t
-        :leader
-        ("oG" 'org-roam-server-mode)
+       (use-package org-roam-ui
+         :straight (org-roam-ui :host github :repo "org-roam/org-roam-ui" :files ("*.el" "out"))
+         :config
+         (require 'org-roam)
 
-        :custom
-        (org-roam-server-port 8967))
-    #+END_SRC
+         :leader
+         ("oG" 'org-roam-ui-mode)
+
+         :custom
+         (org-roam-ui-port 8967))
+     #+END_SRC
 
 *** org-ref
     :PROPERTIES:
@@ -21079,12 +21071,11 @@
 
        (defun +org-pdf-bib-export (link description format)
          "Export the pdfview LINK with DESCRIPTION for FORMAT from Org files."
-         (let* (key page)
+         (let* (key)
            (save-match-data
              (if (string-match +org-pdf-bib-regex link)
                  (progn
-                   (setq key  (match-string 1 link)
-                         page (match-string 2 link)))
+                   (setq key  (match-string 1 link)))
                (setq key link)))
 
            (cond ((eq format 'latex)
@@ -21877,6 +21868,8 @@
        ;; Not avy, but avy like enough
        `(selectrum-quick-keys-highlight ((,cls (:background "#B00303" :foreground ,white))))
        `(selectrum-quick-keys-match ((,cls (:background "#124FCA" :foreground ,white))))
+       `(vertico-quick1 ((,cls (:background "#B00303" :foreground ,white))))
+       `(vertico-quick1 ((,cls (:background "#124FCA" :foreground ,white))))
 
        `(frog-menu-border ((,cls (:background ,white :foreground ,white))))
        `(frog-menu-posframe-background-face ((,cls (:background ,very-dark-grey))))
@@ -21970,6 +21963,8 @@
        `(orderless-match-face-1 ((,cls (:background "#777777"))))
        `(orderless-match-face-2 ((,cls (:background "#7777ff"))))
        `(orderless-match-face-3 ((,cls (:background "#8a498a"))))
+       `(completions-common-part ((,cls (:background "#555555"))))
+       `(completions-first-difference ((,cls )))
 
       ;;; swiper
        `(swiper-match-face-1 ((,cls (:background "#555555"))))
@@ -22091,6 +22086,10 @@
 
       ;;; marginalia
        `(marginalia-documentation ((,cls (:inherit font-lock-comment-face))))
+
+      ;;; embark
+       `(embark-target ((,cls (:foreground ,blue :inherit bold))))
+       `(embark-keybinding ((,cls (:foreground ,green-int :inherit bold))))
 
       ;;; term
        `(term-color-black ((,cls (:foreground ,dark-grey :background ,dark-grey))))
@@ -22233,4 +22232,4 @@
 # End:
 
 #  LocalWords:  config emacs src backend flymake flycheck restclient elisp JSON YAML
-#  LocalWords:  Apheleia ui
+#  LocalWords:  Apheleia ui Spacemacs lsp Solargraph Gemfile
