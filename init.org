@@ -124,6 +124,7 @@
          ibuffer-tramp                                                     ; Only show ibuffer buffers in remote tramp sessions
          ibuffer-projectile                                                ; Filter ibuffer buffers by active projects
          ;; company-emoji                                                  ; Show emojis in company-completion candidates
+         ;; citeproc                                                       ; Standard for citation links used with org-ref
 
      ;;; language-support
          ;; ggtags                                                         ; GNU Global source code tagging system
@@ -20934,17 +20935,21 @@
               org-ref-latex-bib-resolve-func #'expand-file-name))
     #+END_SRC
 
-**** citeproc-org
-     #+begin_src emacs-lisp
-       (use-package citeproc-org
-         :straight t
-         :demand t
-         :after org-ref
-         :custom
-         (citeproc-org-ignore-backends '(beamer))
-         :config
-         (citeproc-org-setup))
-     #+end_src
+*** citeproc-org
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! org bibtex citeproc)
+    :END:
+
+    #+begin_src emacs-lisp
+      (use-package citeproc-org
+        :straight t
+        :demand t
+        :after org-ref
+        :custom
+        (citeproc-org-ignore-backends '(beamer))
+        :config
+        (citeproc-org-setup))
+    #+end_src
 
 *** org-links
     View org links in non-org buffers as you would in org buffers.
