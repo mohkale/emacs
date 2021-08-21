@@ -72,6 +72,7 @@
          ;; flycheck                                                       ; A better buffer linter and error-checker package
          ;; frog-jump-buffer                                               ; Posframe to jump to a buffer
          ;; hide-comnt                                                     ; Minor mode to disable rendering of comments
+         ;; neotree                                                        ; Tree like directory viewer for emacs
          ;; notmuch                                                        ; Mail client and manager
          imenu                                                             ; Interactively jump to points of interest in this buffer
          ;; olivetti                                                       ; A nice writing environment for emacs
@@ -4713,12 +4714,12 @@
                   (concat (substring-no-properties icon) (or suffix " "))
                   props)))
 
-       (defun all-the-icons-pad-on-tty-advice+ (value)
+       (defun all-the-icons-pad-on-tty-advice+ (value &optional suffix)
          ":filter-return advice for all-the-icons functions which appends
      an extra space to the icon when displaying icons on the tty."
-         (if (and (not (display-graphic-p))
-                  value)
-             (all-the-icons-pad+ value)
+         (if (and value
+                  (not (display-graphic-p)))
+             (all-the-icons-pad+ value suffix)
            value))
 
        :config
@@ -15240,6 +15241,88 @@
          "<escape>" 'transient-quit-one))
     #+END_SRC
 
+** neotree
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! neotree)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package neotree
+       :straight t
+       :leader
+       ("t RET" 'neotree-toggle)
+
+       :init
+       (push '(neotree-mode . 1) +indent-config)
+
+       :custom
+       (neo-display-action
+        '((display-buffer-reuse-window
+           display-buffer-in-side-window)
+          (side . left)
+          (body-function . nil)
+          (window-parameters (mode-line-format . none)))
+        "Remove the mode-line format and prevent auto-selection.")
+
+       :custom
+       (neo-theme 'dev-icons
+        "Make neotree use nerd-fonts for a better rendering experience.")
+       :config
+       (defun neo-buffer--insert-fold-symbol+ (name &optional node-name)
+         (when (eq neo-theme 'dev-icons)
+           (cl-destructuring-bind (chevron . icon)
+               (cl-case name
+                 (open
+                  (cons (all-the-icons-nerd-mdi "chevron-down")
+                        (all-the-icons-icon-for-dir (directory-file-name node-name))))
+                 (close
+                  (cons (all-the-icons-nerd-mdi "chevron-right")
+                        (all-the-icons-icon-for-dir (directory-file-name node-name))))
+                 (t ; leaf
+                  (cons nil (all-the-icons-icon-for-file node-name))))
+             (setq icon (all-the-icons-pad-on-tty-advice+ icon))
+             (insert
+              (if chevron
+                  (format "\t%s\t%s\t" chevron icon)
+                (format "\t\t\t%s\t" icon))))
+           t))
+
+       (advice-add #'neo-buffer--insert-fold-symbol :before-until
+                   #'neo-buffer--insert-fold-symbol+)
+
+       :lazy-leader
+       (:mode 'neotree-mode
+        "a" 'neotree-stretch-toggle
+        "." 'neotree-hidden-file-toggle
+        "o" 'notree-open-file-in-system-application
+        "h" 'neotree-collapse-all
+        "c" 'neotree-change-root
+        "x" 'neotree-delete-node
+        "t" 'neotree-create-node
+        "p" 'neotree-copy-node
+        "r" 'neotree-rename-node)
+
+       :preface (setq neotree-mode-map (make-sparse-keymap))
+       :general
+       (:keymaps 'neotree-mode-map
+        :states 'motion
+        [remap evil-next-line] 'neotree-next-line
+        [remap evil-previous-line] 'neotree-previous-line
+        [remap revert-buffer] 'neotree-refresh
+        [remap quit-window] 'neotree-hide
+        "M-RET" 'neotree-quick-look
+        "gh" 'neotree-select-up-node
+        "gl" 'neotree-select-down-node                                               ; goto last node in current directory tree.
+        "gk" 'neotree-select-previous-sibling-node
+        "gj" 'neotree-select-next-sibling-node)
+       :config
+       (general-define-key
+        :keymaps 'neotree-mode-map
+        :states 'motion
+        "TAB" (neotree-make-executor :dir-fn  'neo-open-dir)
+        [remap evil-ret] (neotree-make-executor :file-fn 'neo-open-file :dir-fn  'neo-open-dir)))
+   #+end_src
+
 ** notmuch
    :PROPERTIES:
    :header-args+: :tangle (package-yes! notmuch)
@@ -21957,6 +22040,15 @@
        `(diredfl-exec-priv ((,cls (:foreground ,yellow))))
        `(diredfl-rare-priv ((,cls (:foreground ,blue :inherit bold))))
        `(diredfl-dir-priv ((,cls (:foreground ,yellow :inherit bold))))
+
+      ;;; neotree
+       `(neo-dir-link-face ((,cls (:inherit dired-directory))))
+       `(neo-root-dir-face ((,cls (:inherit dired-header))))
+       `(neo-banner-face ((,cls (:inherit dired-header))))
+       `(neo-header-face ((,cls (:inherit dired-header))))
+       `(neo-vc-added-face ((,cls (:inherit green-int))))
+       `(neo-vc-edited-face ((,cls (:inherit purple-int))))
+       `(neo-vc-ignored-face ((,cls (:inherit shadow))))
 
       ;;; dashboard
        `(dashboard-text-banner ((,cls (:foreground ,orange-int))))
