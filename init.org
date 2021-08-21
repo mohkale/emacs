@@ -153,6 +153,7 @@
          ;; glsl
          log
          latex
+         ;; lua
          makefile
          markdown
          ;; nim
@@ -9052,6 +9053,9 @@
         (markdown-mode
          flymake-rest-markdownlint
          flymake-rest-proselint)
+        (lua-mode
+         flymake-rest-luacheck
+         (flymake-rest-lua :disabled t))
         (ruby-mode flymake-rest-rubocop)
         (sh-mode flymake-rest-shellcheck)
         (yaml-mode flymake-rest-yamllint)
@@ -14138,6 +14142,9 @@
 
        (push '((nim-mode nimscript-mode)
                "nimlsp")
+             eglot-server-programs)
+
+       (push '(lua-mode "lua-language-server")
              eglot-server-programs)
 
        :leader
@@ -21187,6 +21194,40 @@
         :states 'insert
         "/" 'nxml-electric-slash))
    #+end_src
+
+** lua
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! org lua)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package lua-mode
+       :straight t
+       :hook (lua-mode . +flylint)
+       :init
+       (push '(lua-mode . 2) +indent-config)
+
+       :leader
+       (:mode 'lua-mode
+        "h" '(:ignore t :wk "help")
+        "hd" 'lua-search-documentation
+
+        "s" '(:ignore t :wk "REPL")
+        "sb" 'lua-send-buffer
+        "sf" 'lua-send-defun
+        "sl" 'lua-send-current-line
+        "sr" 'lua-send-region
+        "'"  'lua-show-process-buffer))
+   #+end_src
+
+*** company-lua
+    #+begin_src emacs-lisp
+      (use-package company-lua
+        :straight t
+        :init
+        (set-company-backend! 'lua-mode 'company-lua))
+    #+end_src
+
 * Script
   :PROPERTIES:
   :header-args+: :shebang "#!/usr/bin/env emacs-script\n;; -*- mode: emacs-lisp; lexical-binding: t -*-"
