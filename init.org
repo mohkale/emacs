@@ -8013,7 +8013,8 @@
        (evil-set-initial-state 'Custom-mode 'normal)
 
        :lazy-leader
-       (:mode 'Custom-mode
+       (:mode '(Custom-mode
+                notmuch-hello-mode)
         "SPC" 'customize-apropos
         "g" 'customize-group
         "f" 'customize-face
@@ -8043,7 +8044,9 @@
         "gk" 'widget-backward
 
         ;; quit
-        [remap quit-window] 'Custom-buffer-done))
+        [remap quit-window] 'Custom-buffer-done)
+       (:keymaps 'widget-field-keymap
+        "<override-state>" 'insert))
    #+END_SRC
 
 ** abbrev
@@ -15451,13 +15454,24 @@
        :commands (notmuch-toggle-tag+)
        :custom
        (notmuch-search-oldest-first nil)
-       (notmuch-maildir-use-notmuch-insert nil) ; messes up fcc paths with spaces in them (eg: Gmail).
+       (notmuch-maildir-use-notmuch-insert nil)                                      ; messes up fcc paths with spaces in them (eg: Gmail).
+       (notmuch-show-indent-messages-width 2)
+       (notmuch-hello-thousands-separator ",")
+       (notmuch-search-line-faces
+        '(("unread" . notmuch-search-unread-face)
+          ("H" . notmuch-search-H-face+)
+          ("flagged" . notmuch-search-flagged-face)))
+       (notmuch-show-all-tags-list t)
+
+       :preface
+       (defface notmuch-search-H-face+ '((t (:foreground "#FF6EB4")))
+         "Face for lines tagged H in the `notmuch-search-mode' buffer.")
 
        :config
        (evil-set-initial-state 'notmuch-show-mode 'motion)
        (evil-set-initial-state 'notmuch-search-mode 'motion)
        (evil-set-initial-state 'notmuch-tree-mode 'motion)
-       (evil-set-initial-state 'notmuch-hello-mode 'emacs)
+       (evil-set-initial-state 'notmuch-hello-mode 'normal)
 
        (push 'notmuch-show-mode whitespace-exempt-modes)
 
@@ -15471,17 +15485,54 @@
                  (,(rx "mohkale@kisara.moe") . ,(expand-file-name "kisara/Sent"))
                  (,(rx any) . ,(expand-file-name "local/Sent")))))
 
-       (defun notmuch-toggle-tag+ (tag mode &optional next-function)
-         "Toggle TAG tag for message in MODE."
-         (let ((get (intern (format "notmuch-%s-get-tags" mode)))
-               (set (intern (format "notmuch-%s-tag" mode)))
-               (next (or next-function (intern (format "notmuch-%s-next-message" mode)))))
-           (funcall set (list (concat (if (member tag (funcall get))
-                                          "-" "+")
-                                      tag)))
+       (cl-defun notmuch-tag+ (tag-changes
+                               &optional (next
+                                          '((notmuch-search-mode . notmuch-search-next-thread))))
+         (cl-case major-mode
+           (notmuch-show-mode (notmuch-show-tag tag-changes))
+           (notmuch-search-mode (notmuch-search-tag tag-changes))
+           (notmuch-tree-mode (notmuch-tree-tag tag-changes))
+           (t (user-error "No tag command known for %s" major-mode)))
+
+         (when-let ((next (alist-get major-mode next)))
            (funcall next)))
 
-       ;; (advice-add #'notmuch-show-insert-headerline :override #'ignore)
+       (defun notmuch-toggle-tag+ (tag-changes &optional next)
+         "Toggle TAG tag for messages."
+         (let ((tags (cl-case major-mode
+                       (notmuch-show-mode (notmuch-show-get-tag tag-changes))
+                       ((notmuch-search-mode
+                         notmuch-tree-mode)
+                        (user-error "Toggle tag not yet supported in %s" major-mode))
+                       (t (user-error "No tag-get command known for %s" major-mode)))))
+           (notmuch-tag+
+            (cl-loop for tag in tag-changes collect
+                     (concat (if (member tag tags) "-" "+")
+                             tag))
+            next)))
+
+       ;; Make notmuch buffers support `auto-revert-mode'.
+       :hook ((notmuch-search-mode notmuch-tree-mode) .
+              notmuch-setup-auto-revert-mode+)
+       :preface
+       (defun notmuch-setup-auto-revert-mode+ ()
+         (setq-local buffer-stale-function #'notmuch-buffer-stale-function+
+                     revert-buffer-function #'notmuch-revert-buffer-function+))
+       :config
+       (defun notmuch-buffer-stale-function+ (&optional no-confirm)
+         (unless (get-buffer-process (current-buffer))
+           (ignore-errors
+             (not
+              (eq (string-to-number
+                   (car (process-lines notmuch-command "count"
+                                       (if (bound-and-true-p notmuch-tree-mode)
+                                           "--output=messages"
+                                         "--output=threads")
+                                       notmuch-search-query-string)))
+                  (1- (count-lines (point-min) (point-max))))))))
+
+       (defun notmuch-revert-buffer-function+ (&optional ignore-auto no-confirm)
+         (notmuch-refresh-this-buffer))
 
        :general
        ([remap message-mail] 'notmuch)
@@ -15490,58 +15541,69 @@
         [remap quit-window] 'notmuch-bury-or-kill-this-buffer
         [remap revert-buffer] 'notmuch-refresh-this-buffer)
        (:keymaps 'notmuch-common-keymap
-        :states '(motion emacs)
+        :states 'motion
         "s" 'notmuch-search
         "S" 'notmuch-tree
+        "J" 'notmuch-jump-search
+        "K" 'notmuch-tag-jump
+
         "g?" 'notmuch-help
         "gA" 'notmuch-refresh-all-buffers
         "gR" 'notmuch-poll-and-refresh-this-buffer
-        "C" 'notmuch-mua-new-mail           ; like mu4e
-        "cc" 'notmuch-mua-new-mail          ; like mu4e
-        "ch" 'goto-address-at-point         ; compose for mail at point
-        "J" 'notmuch-jump-search
-        "K" 'notmuch-tag-jump)
 
-       (:keymaps 'notmuch-hello-mode-map
-        :states 'emacs
-        "q" 'notmuch-bury-or-kill-this-buffer)
+        "C" 'notmuch-mua-new-mail                                                    ; like mu4e
+        "cc" 'notmuch-mua-new-mail                                                   ; like mu4e
+        "ch" 'goto-address-at-point                                                  ; compose for mail at point
+        )
 
-       (:keymaps 'notmuch-show-mode-map
-        [remap quit-window] 'notmuch-bury-or-kill-this-buffer)
+       (:keymaps '(notmuch-hello-mode-map
+                   notmuch-show-mode-map)
+        [remap quit-buffer] 'notmuch-bury-or-kill-this-buffer)
+
        (:keymaps 'notmuch-show-mode-map
         :states 'motion
         "p" 'notmuch-show-save-attachments  ; like mu4e
         "A" 'notmuch-show-archive-thread-then-next
-        "S" 'notmuch-show-filter-thread
-        "K" 'notmuch-tag-jump
-        "C" 'notmuch-mua-new-mail           ; like mu4e
-        "cc" 'notmuch-mua-new-mail          ; like mu4e
-        "cR" 'notmuch-show-reply
-        "cf" 'notmuch-show-forward-message
-        "cr" 'notmuch-show-reply-sender
         "X" 'notmuch-show-archive-thread-then-exit
         "x" 'notmuch-show-archive-message-then-next-or-exit
-        "zv" 'notmuch-tree-from-show-current-query ; like mu4e-conversation
+        "." 'notmuch-show-part-map
+
+        "TAB"       'notmuch-show-next-button
+        "<backtab>" 'notmuch-show-previous-button
+        "RET"       'notmuch-show-toggle-message
+
+        "S" 'notmuch-show-filter-thread
+        "K" 'notmuch-tag-jump
+
+        "C" 'notmuch-mua-new-mail                                                    ; like mu4e
+        "cc" 'notmuch-mua-new-mail                                                   ; like mu4e
+        "cf" 'notmuch-show-forward-message
+        "cr" 'notmuch-show-reply-sender
+        "cR" 'notmuch-show-reply
+
+        "zv" 'notmuch-tree-from-show-current-query                                   ; like mu4e-conversation
         "a" 'notmuch-show-archive-message-then-next-or-next-thread
-        "gj" 'notmuch-show-next-open-message
-        "gk" 'notmuch-show-previous-open-message
-        "]]" 'notmuch-show-next-message
-        "[[" 'notmuch-show-previous-message
+
+        "]]"  'notmuch-show-next-open-message
+        "[["  'notmuch-show-previous-open-message
+        "gj"  'notmuch-show-next-message
+        "gk"  'notmuch-show-previous-message
         "C-j" 'notmuch-show-next-message
         "C-k" 'notmuch-show-previous-message
+
+        "gn"  'notmuch-show-next-thread-show
+        "gp"  'notmuch-show-previous-thread-show
         "M-j" 'notmuch-show-next-thread-show
         "M-k" 'notmuch-show-previous-thread-show
+
         "|" 'notmuch-show-pipe-message
         "*" 'notmuch-show-tag-all
         "-" 'notmuch-show-remove-tag
-        "+" 'notmuch-show-add-tag
-        "TAB" 'notmuch-show-next-button
-        "<backtab>" 'notmuch-show-previous-button
-        "RET" 'notmuch-show-toggle-message
-        "." 'notmuch-show-part-map)
+        "+" 'notmuch-show-add-tag)
 
        (:keymaps 'notmuch-tree-mode-map
         [remap quit-window] 'notmuch-tree-quit)
+
        (:keymaps 'notmuch-tree-mode-map
         :states 'motion
         "gh" 'notmuch-show-previous-button
@@ -15549,25 +15611,32 @@
         "gk" 'notmuch-show-previous-button
         "gl" 'notmuch-show-next-button
         "g?" 'notmuch-help
-        "S" 'notmuch-tree-to-search
-        "C" 'notmuch-mua-new-mail ; like mu4e
-        "cc" 'notmuch-mua-new-mail ; like mu4e
-        "cr" 'notmuch-show-reply-sender ; like mu4e
-        "cR" 'notmuch-show-reply
+
+        "s" 'notmuch-tree-to-tree
+        "S" 'notmuch-tree-filter
         "J" 'notmuch-jump-search
         "K" 'notmuch-tag-jump
-        "zv" 'notmuch-search-from-tree-current-query ; like mu4e-conversation
+        "t" 'notmuch-tree-filter-by-tag
+
+        "C" 'notmuch-mua-new-mail                                                    ; like mu4e
+        "cc" 'notmuch-mua-new-mail                                                   ; like mu4e
+        "cr" 'notmuch-show-reply-sender                                              ; like mu4e
+        "cR" 'notmuch-show-reply
+
+        "zv" 'notmuch-search-from-tree-current-query                                 ; like mu4e-conversation
         "RET" 'notmuch-tree-show-message
         [mouse-1] 'notmuch-tree-show-message
+
         "A" 'notmuch-tree-archive-thread
         "a" 'notmuch-tree-archive-message-then-next
-        "s" 'notmuch-tree-to-tree
+
         "gj" 'notmuch-tree-next-matching-message
         "gk" 'notmuch-tree-prev-matching-message
         "]]" 'notmuch-tree-next-message
         "[[" 'notmuch-tree-prev-message
         "C-k" 'notmuch-tree-prev-thread
         "C-j" 'notmuch-tree-next-thread
+
         "|" 'notmuch-show-pipe-message
         "-" 'notmuch-tree-remove-tag
         "+" 'notmuch-tree-add-tag
@@ -15578,59 +15647,102 @@
         [remap quit-window] 'notmuch-bury-or-kill-this-buffer)
        (:keymaps 'notmuch-search-mode-map
         :states '(motion visual)
-        "C" 'notmuch-mua-new-mail           ; like mu4e
-        "cc" 'notmuch-mua-new-mail          ; like mu4e
+        "C" 'notmuch-mua-new-mail                                                    ; like mu4e
+        "cc" 'notmuch-mua-new-mail                                                   ; like mu4e
         "cr" 'notmuch-search-reply-to-thread-sender
         "cR" 'notmuch-search-reply-to-thread
+
+        "s" 'notmuch-search
+        "S" 'notmuch-search-filter
         "J" 'notmuch-jump-search
         "K" 'notmuch-tag-jump
-        "S" 'notmuch-search-filter
-        "zv" 'notmuch-tree-from-search-current-query
-        "*" 'notmuch-search-tag-all
-        "a" 'notmuch-search-archive-thread
         "t" 'notmuch-search-filter-by-tag
-        [mouse-1] 'notmuch-search-show-thread
+
+        "zv" 'notmuch-tree-from-search-current-query
+
+        "*" 'notmuch-search-tag-all
         "-" 'notmuch-search-remove-tag
         "+" 'notmuch-search-add-tag
-        "RET" 'notmuch-search-show-thread)
+        "a" 'notmuch-search-archive-thread
 
-       :leader
-       (:mode 'notmuch-hello-map
-        "i" 'notmuch-jump-search)
+        "RET"     'notmuch-search-show-thread
+        [mouse-1] 'notmuch-search-show-thread)
 
-       (:mode 'notmuch-show
-        "t" '(:ignore t :wk "toggles")
+       :preface
+       (defvar notmuch-action-map+
+         (let ((map (make-sparse-keymap)))
+           (define-key map leader-major-mode-key
+             (defun notmuch-tag-all+ ()
+               (interactive)
+               "Tag all selected threads based on `major-mode'.
+     Works exactly like notmuch-*-add-tag and notmuch-*-remove-tag which
+     are bound to + and - respectively, except in `notmuch-show-mode'
+     where it tags *all* the messages in the current thread instead of
+     just the current one."
+               (call-interactively
+                (cl-case major-mode
+                  (notmuch-show-mode #'notmuch-show-tag-all)
+                  (notmuch-search-mode #'notmuch-search-tag)
+                  (notmuch-tree-mode #'notmuch-tree-tag)
+                  (t (user-error "No tag command known for %s" major-mode))))))
+
+           (define-key map "d"
+             (defun notmuch-tag-set-delete+ ()
+               (interactive)
+               (notmuch-tag+ '("+deleted" "-inbox" "-unread"))))
+
+           (define-key map "s"
+             (defun notmuch-tag-set-spam+ ()
+               (interactive)
+               (notmuch-tag+ '("+spam" "-inbox" "-unread"))))
+
+           (define-key map "f"
+             (defun notmuch-tag-set-flagged+ ()
+               (interactive)
+               (notmuch-tag+ '("+flagged") nil)))
+
+           map)
+         "Keymap containing commands to act upon emails.")
+
+       :lazy-leader
+       (:mode 'notmuch-hello-mode
+        leader-major-mode-key 'notmuch-jump-search
+        "j" 'notmuch-jump-search
+        "c" 'notmuch-mua-new-mail
+        "G" 'notmuch-poll-and-refresh-this-buffer
+        "s" 'notmuch-search
+        "t" 'notmuch-search-by-tag
+        "z" 'notmuch-tree)
+
+       (:mode '(notmuch-show-mode
+                notmuch-tree-mode
+                notmuch-search-mode)
+        leader-major-mode-key notmuch-action-map+)
+
+       (:mode 'notmuch-show-mode
+        "a" 'notmuch-show-advance-and-archive
+        "#" 'notmuch-show-print-message
+        "$" 'notmuch-show-toggle-process-crypto
+        "u" 'notmuch-show-browse-urls
+        "F" 'notmuch-show-forward-open-messages
+        "G" 'notmuch-poll-and-refresh-this-buffer
+        "z" 'notmuch-tree-from-show-current-query
+        "v" 'notmuch-tree-from-show-current-query                                    ; like mu4e-conversation
+
+        "t" '(:ignore t :wk "toggle")
         "ti" 'notmuch-show-toggle-thread-indentation
-        "td" (defun notmuch-show-toggle-delete+ ()
-               (interactive)
-               (notmuch-toggle-tag+ "deleted" "show"))
-        "t=" (defun evil-collection-notmuch-show-toggle-flagged ()
-               (interactive)
-               (notmuch-toggle-tag+ "flagged" "show"))
-        "th" #'notmuch-show-toggle-visibility-headers)
+        "th" 'notmuch-show-toggle-visibility-headers
+        "te" 'notmuch-show-toggle-elide-non-matching
+        "t TAB" 'notmuch-show-toggle-thread-indentation)
+
        (:mode 'notmuch-tree-mode
-        "t" '(:ignore t :wk "toggles")
-        "td" (defun notmuch-tree-toggle-delete ()
-               (interactive)
-               (notmuch-toggle-tag+ "deleted" "tree"))
-        "t!" (defun notmuch-tree-toggle-delete ()
-               (interactive)
-               (notmuch-toggle-tag+ "unread" "tree"))
-        "t=" (defun notmuch-tree-toggle-delete ()
-               (interactive)
-               (notmuch-toggle-tag+ "flagged" "tree")))
+        "v" 'notmuch-search-from-tree-current-query)
+
        (:mode 'notmuch-search-mode
-        "t" '(:ignore t :wk "toggles")
-        "to" 'notmuch-search-toggle-order
-        "td" (defun notmuch-search-toggle-delete ()
-               (interactive)
-               (notmuch-toggle-tag+ "deleted" "search" 'notmuch-search-next-thread))
-        "t!" (defun notmuch-search-toggle-unread ()
-               (interactive)
-               (notmuch-toggle-tag+ "unread" "search" 'notmuch-search-next-thread))
-        "t=" (defun notmuch-search-toggle-flagged ()
-               (interactive)
-               (notmuch-toggle-tag+ "flagged" "search" 'notmuch-search-next-thread))))
+        "v" 'notmuch-tree-from-search-current-query
+
+        "t" '(:ignore t :wk "toggle")
+        "to" 'notmuch-search-toggle-order))
    #+END_SRC
 
 ** olivetti
