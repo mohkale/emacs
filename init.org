@@ -13600,9 +13600,9 @@
    #+END_SRC
 
 ** dashboard
-*** quotes
-    a random quote from the following list will be chosen at startup and set as the
-    footer for the dashboard.
+*** footer
+    A random quote and icon from the following lists will be chosen at startup and
+    set as the footer for the dashboard.
 
     #+NAME: dashboard-displayed-quotes
     - The one true editor, Emacs!
@@ -13706,10 +13706,6 @@
     - 640K ought to be enough for anybody
     - If it keeps up, man will atrophy all his limbs but the push-button finger
 
-*** icons
-    a random icon from the following table will be chosen at startup and used for the
-    footer on the dashboard.
-
     #+NAME: dashboard-footer-icons
     | source     | name           |
     |------------+----------------|
@@ -13735,8 +13731,26 @@
     | alltheicon | java           |
     | alltheicon | python         |
 
+    #+begin_src emacs-lisp :var dashboard-footer-icon-associations=dashboard-footer-icons dashboard-quotes=dashboard-displayed-quotes
+      ;; Determine appropriate footer icon to display alongside quote.
+      (with-eval-after-load 'all-the-icons
+        (when-let ((footer-item (seq-random-elt dashboard-footer-icon-associations)))
+          (setq dashboard-footer-icon
+                (all-the-icons-pad-on-tty-advice+
+                 (funcall
+                  (all-the-icons--function-name (intern (nth 0 footer-item)))
+                  (nth 1 footer-item) :height 0.75 :v-adjust -0.05
+                  :face 'font-lock-keyword-face)))))
+
+      (setq dashboard-footer (car (seq-random-elt dashboard-quotes)))
+    #+end_src
+
 *** dashboard
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! dashboard) :var dashboard-footer-icon-associations=dashboard-footer-icons dashboard-quotes=dashboard-displayed-quotes
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! dashboard)
+    :END:
+
+    #+BEGIN_SRC emacs-lisp
       (use-package dashboard
         :straight t
         :demand t
@@ -13753,7 +13767,7 @@
         (dashboard-show-shortcuts t)
         (dashboard-set-heading-icons nil)
 
-        :init
+        :preface
         (push 'dashboard-mode whitespace-exempt-modes)
 
         (defmacro dashboard-defun-shortcut-function+ (shortcut-char search-label &optional no-next-line)
@@ -13767,6 +13781,12 @@
                    '((forward-line 1)))
                (back-to-indentation))))
 
+        :init
+        (when (< (length command-line-args) 2)
+          (setq initial-buffer-choice #'goto-dashboard+)
+          (add-hook 'after-init-hook #'dashboard-insert-startupify-lists)
+          (add-hook 'emacs-startup-hook #'goto-home-buffer+))
+
         :config
         (require 'all-the-icons)
 
@@ -13778,43 +13798,11 @@
                            (dashboard-insert-startupify-lists)))
                       (switch-to-buffer dashboard-buffer-name)))
 
-        (setq initial-buffer-choice (when (< (length command-line-args) 2)
-                                      #'goto-dashboard+))
-        (dashboard-setup-startup-hook)
-
+        :config
         ;; When agenda has been loaded include it in the dashboard.
         (with-eval-after-load 'org-agenda
           (add-to-list 'dashboard-items '(agenda . 5) t))
 
-        ;; determine the appropriate banner to display on the dashboard
-        (defun dashboard-select-random-banner+ (&optional arg)
-          "Toggle another banner to be used on the dashboard."
-          (setq dashboard-startup-banner
-                (if (and (not arg) (display-graphic-p))
-                    'official                                                         ; prefer official cover.
-                  ;; You can create more banners using [[https://lachlanarthur.github.io/Braille-ASCII-Art/][this]] site.
-                  (seq-random-elt
-                   (or (cl-remove dashboard-startup-banner
-                                  (file-expand-wildcards
-                                   (concat +dashboard-banners-directory "*.txt"))
-                                  :test #'string-equal)
-                       '(1 2 3))))))
-
-        ;; For some reason, the font-lock rules for the dashboard don't seem to
-        ;; be correct on startup?
-        (add-hook 'emacs-startup-hook
-                  (lambda (&rest _)
-                    (when-let ((dash (get-buffer dashboard-buffer-name)))
-                      (with-current-buffer dash
-                        (dashboard-refresh-buffer)))))
-
-        ;; Ensure a random banner is chosen everytime we reload the dashboard.
-        (advice-add 'dashboard-refresh-buffer :before
-                    (lambda (&rest _)
-                      (dashboard-select-random-banner+)))
-        (dashboard-select-random-banner+)                                             ; choose initial banner
-
-        ;; set the navigator button
         (setq dashboard-navigator-buttons
               `((;; line 01
                  (,(all-the-icons-pad-on-tty-advice+
@@ -13843,39 +13831,133 @@
                  (,(propertize "?" 'face '(:inherit default)) ;; needs a face attribute
                   "" "emacs FAQ" #'view-emacs-faq font-lock-builtin-face))))
 
-        ;; determine appropriate footer icon to display alongside quote.
-        (when-let ((footer-item (seq-random-elt dashboard-footer-icon-associations)))
-          (setq dashboard-footer-icon
-                (all-the-icons-pad-on-tty-advice+
-                 (funcall
-                  (all-the-icons--function-name (intern (nth 0 footer-item)))
-                  (nth 1 footer-item) :height 0.75 :v-adjust -0.05
-                  :face 'font-lock-keyword-face))))
-        (setq dashboard-footer (car (seq-random-elt dashboard-quotes)))
+        ;; Clear any minibuffer messages that're still visible.
+        :config (add-hook 'dashboard-mode-hook (lambda () (message nil)))
 
-        (add-hook 'dashboard-mode-hook (lambda () (message nil)))
+        ;; Update the init-time message at the top of the dashboard buffer.
+        :preface
+        (defun dashboard-startup-handler+ ()
+          "Update initial dashboard information."
+          (setq dashboard-init-info
+                (concat
+                 "Emacs loaded "
+                 (when-let ((count
+                             (cond ((bound-and-true-p package-alist)
+                                    (length package-activated-list))
+                                   ((bound-and-true-p straight--profile-cache)
+                                    (let ((count 0))
+                                      (maphash (lambda (_key val)
+                                                 (when val (setq count (1+ count))))
+                                               straight--success-cache)
+                                      count)))))
+                   (format "%d packages " count))
+                 "in " (emacs-init-time)))
 
+          ;; don't switch to dashboard on error buffer
+          (unless (eq 1 (length (window-list)))
+            (winum-select-window-1)))
+        :hook (emacs-startup . dashboard-startup-handler+)
+
+        :preface
+        (defvar dashboard-prefer-text-banners+ nil
+          "When true we use text banners even on GUI frames.")
+
+        ;; Determine the appropriate banner to display on the dashboard.
+        :config
+        (defun dashboard-select-random-banner+ (&optional arg)
+          "Toggle another banner to be used on the dashboard."
+          (setq dashboard-startup-banner
+                (if (and (not dashboard-prefer-text-banners+) (display-graphic-p))
+                    'official
+                  ;; You can create more banners using [[https://lachlanarthur.github.io/Braille-ASCII-Art/][this]] site.
+                  (seq-random-elt
+                   (or (let ((files (ignore-errors
+                                      (file-expand-wildcards
+                                       (join-path (xdg-config-home) "banners" "*")))))
+                         (if (stringp dashboard-startup-banner)
+                             (cl-remove dashboard-startup-banner files :test #'string-equal)
+                           files))
+                       '(1 2 3))))))
+
+        ;; Basically had to rewrite this from scratch because extension
+        ;; may be omitted when using a me-style banner instead of the
+        ;; expected kinds.
+        (advice-add #'dashboard-insert-banner :override
+                    (defun dashboard-insert-banner+ ()
+                      (goto-char (point-max))
+                      (let ((banner (dashboard-choose-banner))
+                            (buffer-read-only nil))
+                        (when banner
+                          (or
+                           (when-let ((ext (file-name-extension banner)))
+                             (when (image-type-available-p (intern ext))
+                               (dashboard-insert-image-banner banner)
+                               t))
+                           (dashboard-insert-ascii-banner-centered banner))
+                          (dashboard-insert-navigator)
+                          (dashboard-insert-init-info)))))
+
+        ;; Ensure a random banner is chosen everytime we reload the dashboard and initially.
+        (advice-add 'dashboard-refresh-buffer :before
+                    (lambda (&rest _)
+                      (dashboard-select-random-banner+)))
+        (dashboard-select-random-banner+)
+
+        :config
+        (advice-add #'dashboard-choose-banner :before-until
+                    (defun dashboard-choose-banner+ ()
+                      "Support custom text-based banners."
+                      (when (and (stringp dashboard-startup-banner)
+                                 (file-exists-p dashboard-startup-banner))
+                        dashboard-startup-banner)))
+
+        (defun dashboard-read-banner+ (path)
+          "Load a banner from my ~/.config/banners directory."
+          (with-temp-buffer
+            (insert-file path)
+            (save-excursion
+              (goto-char (point-min))
+              (cons (save-match-data
+                      (if (search-forward-regexp
+                           (rx bol (group (+ digit)) ":" (group (+ digit)) eol)
+                           (line-end-position) t)
+                          (prog1
+                              (cons (string-to-number (match-string 1))
+                                    (string-to-number (match-string 2)))
+                            (next-line 1))
+                        (cons 0 0)))
+                    (ansi-color-apply
+                     (buffer-substring (save-excursion
+                                         (line-beginning-position))
+                                       (point-max)))))))
+
+        (advice-add #'dashboard-insert-ascii-banner-centered :before-until
+                    (defun dashboard-insert-ascii-banner-centered+ (path)
+                      (unless (string-suffix-p ".txt" path)
+                        (when-let (banner (dashboard-read-banner+ path))
+                          (insert
+                           (let ((width  (car (car banner)))
+                                 (height (cdr (car banner)))
+                                 (content (cdr banner)))
+                             (with-temp-buffer
+                               (insert content)
+                               (goto-char (point-min))
+                               (let* ((margin (max 0 (floor (/ (- dashboard-banner-length width) 2))))
+                                      (padding (make-string margin ?\ )))
+                                 (while (not (eobp))
+                                   (insert padding)
+                                   (forward-line 1)))
+                               (buffer-string)))))
+                        t)))
+
+        :config
+        ;; For some reason, the font-lock rules for the dashboard don't seem to
+        ;; be correct on startup?
         (add-hook 'emacs-startup-hook
-                  (defun dashboard--startup-handler ()
-                    "update dashboard init info."
-                    (setq dashboard-init-info
-                          (concat
-                           "Emacs loaded "
-                           (when-let ((count
-                                       (cond ((bound-and-true-p package-alist)
-                                              (length package-activated-list))
-                                             ((bound-and-true-p straight--profile-cache)
-                                              (let ((count 0))
-                                                (maphash (lambda (_key val)
-                                                           (when val (setq count (1+ count))))
-                                                         straight--success-cache)
-                                                count)))))
-                             (format "%d packages " count))
-                           "in " (emacs-init-time)))
-
-                      ;; don't switch to dashboard on error buffer
-                      (unless (eq 1 (length (window-list)))
-                        (winum-select-window-1))))
+                  (lambda (&rest _)
+                    (when-let ((dash (get-buffer dashboard-buffer-name)))
+                      (with-current-buffer dash
+                        (dashboard-refresh-buffer)))))
 
         :general
         (:keymaps 'dashboard-mode-map
