@@ -11449,28 +11449,32 @@
     #+END_SRC
 
 ** smerge
-   minor mode in buffers that have git merge issues; it highlights diff indicators
+   Minor mode in buffers that have git merge issues; it highlights diff indicators
    and offers methods to quickly jump from them.
 
    #+BEGIN_SRC emacs-lisp
      (use-package smerge-mode
-       :init
-       (leader-set-keys
-         "gi" 'smerge-mode)
+       :leader
+       ("gi" 'smerge-mode)
 
        :lazy-leader
        (:mode 'smerge-mode
         :minor t
         :prefix "g"
-        "j" 'smerge-next
-        "k" 'smerge-prev
+        "s" 'smerge-swap
+        "a" 'smerge-keep-all
+        "x" 'smerge-keep-base
         "c" 'smerge-keep-current
         "m" 'smerge-keep-mine
         "o" 'smerge-keep-other)
 
        :general
-       (:states '(normal motion)
-        :keymaps 'smerge-mode-map
+       (:keymaps 'smerge-mode-map
+        ;; Technically merge error are errors so this tracks.
+        [remap next-error] 'smerge-next
+        [remap previous-error] 'smerge-prev)
+       (:keymaps 'smerge-mode-map
+        :states '(normal motion)
         "]g" 'smerge-next
         "[g" 'smerge-prev))
    #+END_SRC
@@ -14928,7 +14932,8 @@
         "g" 'magit-dispatch
         "s" 'magit-status
         "u" 'magit-unstage-file
-        "b" 'magit-blame)
+        "b" 'magit-blame
+        "p" 'magit-pop-revision-stack)
 
        :lazy-leader
        (:mode 'magit-status-mode
@@ -14944,6 +14949,9 @@
        (:mode 'magit-log-select-mode
         "," 'magit-log-select-pick
         "q" 'magit-log-select-quit)
+       (:mode 'magit-diff-mode
+        "t" 'magit-diff-trace-definition
+        "e" 'magit-diff-edit-hunk-commit)
        (:mode 'git-commit-mode
         :minor t
         :prefix leader-major-mode-prefix
@@ -14964,6 +14972,20 @@
         "is" 'git-commit-signoff
         "it" 'git-commit-test)
 
+       :preface
+       (defvar magit-blob-mode-map (make-sparse-keymap))                            ; Suprress creation.
+       :hook (magit-blob-mode . evil-motion-state)
+
+       :leader
+       (:mode 'magit-blob-mode
+        :minor t
+        :prefix leader-major-mode-prefix
+        "b" 'magit-blame-addition
+        "f" 'magit-blame-reverse
+        "r" 'magit-blame-removal
+        "n" 'magit-blob-next
+        "p" 'magit-blob-previous)
+
        :general
        ([remap vc-revision] 'magit-find-file
         [remap vc-revision-other-window] 'magit-find-file-other-window
@@ -14972,17 +14994,6 @@
         [remap vc-print-log-all] 'magit-log-head
         [remap vc-create-tag] 'magit-tag
         [remap magit-diff-buffer-file] 'magit-diff-buffer-file)
-       (:states 'motion
-        :keymaps 'magit-section-mode-map
-        "gh" 'magit-section-up
-        "gl" 'magit-section-forward
-        "gj" 'magit-section-forward-sibling
-        "gk" 'magit-section-backward-sibling
-        "gr" 'revert-buffer
-        [remap revert-buffer] 'magit-refresh)
-       (:states 'motion
-        :keymaps 'magit-diff-mode-map
-        "gh" 'magit-section-up)
        (:keymaps 'magit-mode-map
         "M-j" 'magit-section-forward-sibling
         "M-k" 'magit-section-backward-sibling
@@ -14993,12 +15004,30 @@
         ;; "M-r" 'magit-section-hide-children ; Meta aliases
         ;; "M-e" 'magit-section-show-children ; Meta aliases
 
-        ;; visit and expand
-        "RET"   'magit-section-toggle
+        ;; Visit and expand, M-RET is used to visit in the other-window
+        ;; when applicable but most of the time it's just the same as RET.
+        "RET"   'magit-visit-thing
         "TAB"   'magit-section-toggle
-        "M-RET" 'magit-visit-thing)
-       (:keymaps 'magit-log-mode-map
-        "RET" 'magit-visit-thing))
+        "M-RET" 'magit-visit-thing
+
+        [remap revert-buffer] 'magit-refresh)
+       ;; Use M-RET to visit files in another window.
+       (:keymaps '(magit-file-section-map
+                   magit-hunk-section-map)
+        "M-RET" 'magit-diff-visit-file-other-window)
+       ;; Org like section maneuvering.
+       (:keymaps 'magit-section-mode-map
+        :states 'motion
+        "gh" 'magit-section-up
+        "gl" 'magit-section-forward
+        "gj" 'magit-section-forward-sibling
+        "gk" 'magit-section-backward-sibling)
+
+       ;; (:keymaps 'magit-diff-mode-map
+       ;;  :states 'motion
+       ;;  "gh" 'magit-section-up)
+       (:keymaps 'magit-blob-mode-map
+        [remap quit-window] 'magit-kill-this-buffer))
    #+END_SRC
 
    Now we need to enable evil-bindings in magit buffers... which is honestly a lot
@@ -21160,8 +21189,7 @@
       `org-link-minor-mode' enabled won't (eg: scratch)."
                     (add-hook 'text-mode-hook #'enable-org-link-minor-mode)
                     (add-hook 'prog-mode-hook #'enable-org-link-minor-mode)
-                    (add-hook 'conf-mode-hook #'enable-org-link-minor-mode)
-                    (add-hook 'magit-revision-mode-hook #'enable-org-link-minor-mode)))
+                    (add-hook 'conf-mode-hook #'enable-org-link-minor-mode)))
 
         :config
         (when-let ((scratch (get-buffer scratch-buffer-name)))
