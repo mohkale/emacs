@@ -20895,7 +20895,7 @@
         (org-roam-db-location (state! "org-roam.db"))
 
         :config
-        (org-roam-setup)
+        (org-roam-db-autosync-mode +1)
 
         (require 'org-roam-protocol)
 
@@ -20918,7 +20918,12 @@
         :commands (org-roam-annotate-tag+)
         :config
         (defun org-roam-annotate-tag+ (node)
-          (let ((tags (org-roam-node-read--tags-to-str (org-roam-node-tags node))))
+          (let ((tags (mapconcat
+                       (lambda (v)
+                         (concat (or (cdr (assoc "tags" org-roam-node-template-prefixes))
+                                     "")
+                                 v))
+                       (org-roam-node-tags node) " ")))
             (unless (string-empty-p tags)
               (concat
                " "
@@ -20992,8 +20997,8 @@
          :leader
          ("oG" 'org-roam-ui-mode)
 
-         :custom
-         (org-roam-ui-port 8967))
+         :preface
+         (setq org-roam-ui-port 8967))
      #+END_SRC
 
 *** org-ref
