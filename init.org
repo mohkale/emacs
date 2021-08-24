@@ -12634,6 +12634,38 @@
         ("an" #'consult-notmuch))
     #+end_src
 
+*** consult-bibtex
+    A native emacs variant for ivy-bibtex.
+
+    KLUDGE: First I need to make sure the proper version of bibtex-completion is installed.
+    #+begin_src emacs-lisp
+      (use-package bibtex-completion
+        :straight (bibtex-completion :host github :repo "mohkale/helm-bibtex"))
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (use-package consult-bibtex
+        :straight (consult-bibtex :host github :repo "mohkale/consult-bibtex")
+        :init
+        (autoload 'consult-bibtex--read-entry "consult-bibtex" nil nil)
+        (autoload 'consult-bibtex--candidates "consult-bibtex" nil nil)
+
+        (with-eval-after-load 'embark
+          (add-to-list 'embark-keymap-alist '(bibtex-completion . consult-bibtex-embark-map)))
+
+        :commands (consult-bibtex-insert-pdftools-link+)
+        :custom
+        (consult-bibtex-default-action #'consult-bibtex-insert-pdftools-link+)
+        :config
+        (consult-bibtex-embark-action consult-bibtex-insert-pdftools-link+ bibtex-insert-pdfbib-link+)
+        (define-key consult-bibtex-embark-map "p" #'consult-bibtex-insert-pdftools-link+)
+
+        :leader
+        ("ob" 'consult-bibtex)
+        (:mode 'org-mode
+         "[" 'consult-bibtex))
+    #+end_src
+
 *** consult-extensions
     :PROPERTIES:
     :header-args+: :tangle (package-str! (lisp! "+consult-custom.el") :consult)
@@ -12648,9 +12680,7 @@
                      consult-evil-marks+
                      consult-org-capture+
                      consult-yasnippet
-                     consult-company
-                     consult-bibtex+
-                     consult-bibtex-read-entry+))
+                     consult-company))
         (autoload cmd "+consult-custom.el" nil t))
 
       (with-eval-after-load 'org-ref
@@ -12663,11 +12693,7 @@
 
       (leader-set-keys
         "rj" 'consult-evil-jumps+
-        "rn" 'consult-evil-marks+
-        "ob" 'consult-bibtex+)
-
-      (leader-set-keys-for-major-mode 'org-mode
-        "[" 'consult-bibtex+)
+        "rn" 'consult-evil-marks+)
 
       (general-define-key
        :states '(insert normal)
@@ -12763,7 +12789,7 @@
                                         (org-ref-cite-hydra/body)))
 
        (defun org-ref-use-consult-bibtex+ (type &optional arg)
-         (concat type ":" (consult-bibtex-read-entry+)))
+         (concat type ":" (consult-bibtex--read-entry)))
 
        (dolist (type org-ref-cite-types)
          (advice-add (intern (format "org-%s-complete-link" type)) :override
@@ -12780,8 +12806,8 @@
            (org-ref-insert-key-at-point
             ;; TODO: Support multiple keys at once.
             (list
-             (consult-bibtex-read-entry+
-              nil (consult-bibtex-candidates+ (orhc-bibtex-candidates)))))))
+             (consult-bibtex--read-entry
+              nil (consult-bibtex--candidates (orhc-bibtex-candidates)))))))
 
        (defun org-ref-consult-insert-label-link ()
          "Insert a label with `completing-read'."
@@ -12993,150 +13019,6 @@
          ("i" consult-org-capture-insert-template+))
 
        (add-to-list 'embark-keymap-alist '(org-capture . embark-org-capture-completion-actions+))
-     #+END_SRC
-
-**** consult-bibtex
-     A native emacs variant for ivy-bibtex.
-
-     #+BEGIN_SRC emacs-lisp
-       (require 'bibtex-completion)
-
-       (defvar consult-bibtex-history+ nil
-         "History for `consult-bibtex+'.")
-
-       (defvar consult-bibtex-default-action+ 'consult-bibtex-insert-pdftools-link
-         "The default action for the `consult-bibtex+` command.")
-
-       (defvar consult-bibtex-pdf-narrow-key+ ?p
-         "Narrowing key used to narrow onto documents with PDFs.")
-
-       (defvar consult-bibtex-note-narrow-key+ ?n
-         "Narrowing key used to narrow onto documents with notes.")
-
-       (defvar consult-bibtex-narrow+
-         '((?b . "Book")
-           (?u . "Unpublished")
-           (?l . "Booklet")
-           (?a . "Article")
-           (?m . "Misc")
-           (?p . "Proceedings")
-           (?P . "Inproceedings")
-           (?B . "Inbook"))
-         "Narrowing configuration for `consult-bibtex+'.")
-
-       (defun consult-bibtex-candidates+ (&optional cands)
-         (or cands
-             (setq cands (bibtex-completion-candidates)))
-         (cl-loop
-          for cand in cands
-          with cand-str = nil
-          do (setq cand-str
-                   (concat (bibtex-completion-get-value "=type=" cand) " "
-                           (bibtex-completion-format-entry (cdr cand) (1- (frame-width)))))
-          ;; Add a `consult--type' property for narrowing support.
-          do (add-text-properties 0 1
-                                  `(consult--type
-                                    ,(or
-                                      (when-let ((type (bibtex-completion-get-value "=type=" cand)))
-                                        (car (rassoc (capitalize type) consult-bibtex-narrow+)))
-                                      (car (rassoc "Other" consult-bibtex-narrow+)))
-                                    ;; Symbols are more performant than strings for most situations.
-                                    bib-type ,(intern (capitalize (bibtex-completion-get-value "=type=" cand)))
-                                    consult--candidate ,(bibtex-completion-get-value "=key=" cand)
-                                    has-pdf ,(not (not (bibtex-completion-get-value "=has-pdf=" cand)))
-                                    has-note ,(not (not (bibtex-completion-get-value "=has-note=" cand))))
-                                  ;; The trailing type text is there for matching, it'll be removed by consult.
-                                  cand-str)
-          collect cand-str))
-
-       (defun consult-bibtex-read-entry+ (&optional arg cands)
-         (when arg
-           (bibtex-completion-clear-cache))
-         (bibtex-completion-init)
-         (let* ((candidates (or cands
-                                (consult-bibtex-candidates+)))
-                (preselect
-                 (when-let ((key (bibtex-completion-key-at-point)))
-                   (cl-find-if (lambda (cand)
-                                 (string-equal key (get-text-property 0 'consult--candidate cand)))
-                               candidates))))
-           (consult--read candidates
-                          :prompt "BibTeX entries: "
-                          :require-match t
-                          :category 'bibtex-completion
-                          :lookup 'consult--lookup-candidate
-                          :default preselect
-                          :group
-                          ;; (consult--type-title consult-bibtex-narrow+)
-                          (lambda (cand transform)
-                            (if transform
-                                (substring cand (1+ (length (symbol-name (get-text-property 0 'bib-type cand)))))
-                              (symbol-name (get-text-property 0 'bib-type cand))))
-                          :narrow
-                          ;; Allow narrowing on PDFs and notes, alongside just `consult--type'.
-                          (let ((type-narrow (plist-get (consult--type-narrow consult-bibtex-narrow+) :predicate)))
-                            (list :predicate
-                                  (lambda (cand)
-                                    (when consult--narrow
-                                      (cond
-                                       ((eq consult--narrow consult-bibtex-pdf-narrow-key+)
-                                        (get-text-property 0 'has-pdf cand))
-                                       ((eq consult--narrow consult-bibtex-note-narrow-key+)
-                                        (get-text-property 0 'has-note cand))
-                                       (t (funcall type-narrow cand)))))
-                                  :keys
-                                  `(,@(and consult-bibtex-pdf-narrow-key+
-                                           `((,consult-bibtex-pdf-narrow-key+ . "With PDFs")))
-                                    ,@(and consult-bibtex-note-narrow-key+
-                                           `((,consult-bibtex-note-narrow-key+ . "With Notes")))
-                                    ,@consult-bibtex-narrow+)))
-                          :history consult-bibtex-history+)))
-
-       (defun consult-bibtex+ (&optional arg)
-         (interactive "P")
-         (when-let ((entry (consult-bibtex-read-entry+ arg)))
-           (if consult-bibtex-default-action+
-               (funcall-interactively consult-bibtex-default-action+ entry)
-             (warn "`consult-bibtex-default-action+' is unassigned."))))
-     #+END_SRC
-
-     #+BEGIN_SRC emacs-lisp
-       (defmacro consult-bibtex-embark-action (name action)
-         `(defun ,name (key)
-            ,(format "Consult wrapper for `%s'." name)
-            (interactive (list (consult-bibtex-read-entry+)))
-            (if key
-                (,action (list key))
-              (warn "Failed to extract bibtex key from candidate: %s" key))))
-
-       (consult-bibtex-embark-action consult-bibtex-open-any           bibtex-completion-open-any)
-       (consult-bibtex-embark-action consult-bibtex-open-pdf           bibtex-completion-open-pdf)
-       (consult-bibtex-embark-action consult-bibtex-open-url-or-doi    bibtex-completion-open-url-or-doi)
-       (consult-bibtex-embark-action consult-bibtex-insert-citation    bibtex-completion-insert-citation)
-       (consult-bibtex-embark-action consult-bibtex-insert-reference   bibtex-completion-insert-reference)
-       (consult-bibtex-embark-action consult-bibtex-insert-key         bibtex-completion-insert-key)
-       (consult-bibtex-embark-action consult-bibtex-insert-bibtex      bibtex-completion-insert-bibtex)
-       (consult-bibtex-embark-action consult-bibtex-add-PDF-attachment bibtex-completion-add-PDF-attachment)
-       (consult-bibtex-embark-action consult-bibtex-edit-notes         bibtex-completion-edit-notes)
-       (consult-bibtex-embark-action consult-bibtex-show-entry         bibtex-completion-show-entry)
-       (consult-bibtex-embark-action consult-bibtex-add-pdf-to-library bibtex-completion-add-pdf-to-library)
-       (consult-bibtex-embark-action consult-bibtex-insert-pdftools-link bibtex-insert-pdfbib-link+)
-
-       (embark-define-keymap embark-bibtex-completion-actions
-         "Embark bindings for bibtex completion candidates."
-         ("o" consult-bibtex-open-pdf)
-         ("u" consult-bibtex-open-url-or-doi)
-         ("c" consult-bibtex-insert-citation)
-         ("r" consult-bibtex-insert-reference)
-         ("k" consult-bibtex-insert-key)
-         ("b" consult-bibtex-insert-bibtex)
-         ("a" consult-bibtex-add-PDF-attachment)
-         ("e" consult-bibtex-edit-notes)
-         ("j" consult-bibtex-insert-pdftools-link)
-         ("s" consult-bibtex-show-entry)
-         ("l" consult-bibtex-add-pdf-to-library))
-
-       (add-to-list 'embark-keymap-alist '(bibtex-completion . embark-bibtex-completion-actions))
      #+END_SRC
 
 **** consult-yasnippet
@@ -21274,7 +21156,7 @@
           "pdfbib:"
           (cond
            ((package! :consult)
-            (consult-bibtex-read-entry+ arg))
+            (consult-bibtex--read-entry arg))
            (t (user-error "No bibtex key reader found")))
           ;; I want to be able to omit a page number but read-number doesn't allow that :cry:.
           (let ((page (read-from-minibuffer "Page: " nil nil nil +org-pdf-complete-link-page-history)))
