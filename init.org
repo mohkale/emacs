@@ -99,8 +99,8 @@
          git-gutter                                                        ; Show version control information in the window fringe.
 
      ;;; Completion frameworks
-         selectrum                                                         ; An clean completion-framework designed to be more consistent and predictable
-         ;; vertico                                                        ; A more-minimalist selectrum alternative aiming to be completing-read compatible
+         ;; selectrum                                                      ; An clean completion-framework designed to be more consistent and predictable
+         vertico                                                           ; A more-minimalist selectrum alternative aiming to be completing-read compatible
 
      ;;; Completion Assistants
          prescient                                                         ; Sorting/Filtering based on frequency and proximity.
@@ -6165,7 +6165,8 @@
               (outline-mode                . page-break-lines-mode)
               (emacs-lisp-compilation-mode . page-break-lines-mode)
               (lisp-interaction-mode       . page-break-lines-mode)
-              (emacs-lisp-mode             . page-break-lines-mode))
+              (emacs-lisp-mode             . page-break-lines-mode)
+              (cc-mode                     . page-break-lines-mode))
        :diminish
        page-break-lines-mode)
    #+END_SRC
@@ -7246,18 +7247,7 @@
           "mod"   "\\mod"
           ;; "<<"    nil
           )
-
-        ;; Needed until [[https://github.com/tecosaur/LaTeX-auto-activating-snippets/issues/16][#16]] gets resolved.
-        (aas-set-snippets 'laas-mode
-          ". " nil)
-
-        (aas-set-snippets 'org-mode
-          :cond (lambda () (not (laas-mathp)))
-          "<<" (lambda!
-                 (yas-expand-snippet
-                  (concat "#+BEGIN_SRC $1\n"
-                          "$0\n"
-                          "#+END_SRC")))))
+        )
     #+END_SRC
 
 * Builtins
@@ -7763,8 +7753,7 @@
 
         (defun +set-compilation-bindings (mode map)
           (leader-set-keys-for-major-mode mode
-            "RET" 'recompile
-            "k" 'kill-compilation
+            "x" 'kill-compilation
             "f" 'next-error-follow-minor-mode)
 
           (general-define-key
@@ -7773,24 +7762,28 @@
             "0" nil "h" nil "g" nil "?" nil "n" nil "p" nil "<override-state>" nil)
 
           (general-define-key
-            :keymaps map
-            :states  'motion
-            [remap revert-buffer] 'recompile
-            "gj"  'compilation-next-error
-            "gk"  'compilation-previous-error
-            "gn"  'next-error-no-select
-            "gp"  'previous-error-no-select
-            "o"   'compilation-display-error
-            ;; "j"   'compilation-next-error
-            ;; "k"   'compilation-previous-error
-            "x"   'kill-compilation
-            "C-j" 'compilation-next-file
-            "C-k" 'compilation-previous-file)
+           :keymaps map
+           [remap revert-buffer] 'recompile)
 
           (general-define-key
             :keymaps map
-            :states  '(replace insert)
-            "ESC" 'evil-motion-state))
+            :states  'motion
+            "x"   'kill-compilation
+
+            ;; Flash error location in another-window without selecting it.
+            "o"     'compilation-display-error
+            "M-RET" 'compilation-display-error
+            ;; Move to the next error in compilation buffer.
+            "gj"    'compilation-next-error
+            "gk"    'compilation-previous-error
+            ;; Flash next-error location and move to it.
+            "gn"    'next-error-no-select
+            "gp"    'previous-error-no-select
+
+            "C-j"     'compilation-next-file
+            "C-k"     'compilation-previous-file
+            "C-c C-n" 'compilation-next-file
+            "C-c C-p" 'compilation-previous-file))
 
         (+set-compilation-bindings 'compilation-mode 'compilation-mode-map)
 
@@ -9022,6 +9015,7 @@
         :custom
         (flymake-rest-markdownlint-style
          (join-path (xdg-config-home) "mdlstyle.rb"))
+        (flymake-rest-hook-ignore-modes '(eglot--managed-mode))
 
         :init
         (require 'flymake-rest-hook-use-package)
@@ -9151,6 +9145,7 @@
 
         :config
         (advice-add #'wgrep-change-to-wgrep-mode :after #'evil-normal-state)
+        (advice-add #'wgrep-abort-changes :after #'evil-motion-state)
         (advice-add #'wgrep-exit :after #'evil-motion-state)
         (advice-add #'wgrep-finish-edit :after #'evil-motion-state)
 
@@ -12120,10 +12115,10 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package xref
-       :hook (xref-after-jump . recenter-top-bottom)
+       :hook ((xref-after-jump . recenter)
+              (xref-after-jump . xref-pulse-momentarily))
        :config
        (evil-set-initial-state 'xref--xref-buffer-mode 'motion)
-       (remove-hook 'xref-after-jump-hook 'recenter)
 
        :leader
        ("jb" 'xref-pop-marker-stack
@@ -12131,7 +12126,6 @@
         "js" 'xref-find-apropos
         "jg" 'xref-find-definitions
         "jo" 'xref-find-definitions-other-window
-        ;; "axw" 'xref-find-definitions-other-window
         ;; "axf" 'xref-find-definitions-other-frame
         )
 
@@ -12394,6 +12388,9 @@
         (advice-add 'embark-export           :around #'display-buffer-no-select-window-advice)
         (advice-add 'embark-collect-live     :around #'display-buffer-no-select-window-advice)
         (advice-add 'embark-collect-snapshot :around #'display-buffer-no-select-window-advice)
+
+        (push (cons xref-location #'embark-consult-export-grep)
+              embark-exporters-alist)
 
         ;; (push `(,(rx "*Embark " (or "Live" "Completions" "Collect") "*")
         ;;         nil
@@ -13795,9 +13792,8 @@
 
         :init
         (when (< (length command-line-args) 2)
-          (setq initial-buffer-choice #'goto-dashboard+)
-          (add-hook 'after-init-hook #'dashboard-insert-startupify-lists)
-          (add-hook 'emacs-startup-hook #'goto-home-buffer+))
+          (setq initial-buffer-choice #'goto-home-buffer+)
+          (add-hook 'after-init-hook #'dashboard-insert-startupify-lists))
 
         :config
         (require 'all-the-icons)
@@ -14168,6 +14164,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package eglot
        :straight t
+       :hook (eglot-connect . eglot-signal-didChangeConfiguration)
        :commands (eglot-ensure-maybe+
                   eglot-mode-server-p+
                   eglot-mode-server-all-p+
@@ -14190,8 +14187,8 @@
                        (:pylsp
                         (configurationSources . ["pycodestyle"])
                         (plugins
-                         (pydocstyle
-                          (enabled . t))))))
+                         (pydocstyle (enabled . t))
+                         (pylint (enabled . t))))))
 
        :config
        (require 'yasnippet)                                                          ; needed or else snippet expansion won't happen.
@@ -14918,10 +14915,9 @@
         :straight t
         ;; :hook (lsp-mode . lsp-ui-mode)
         :after lsp-mode
-        :config
-        ;; only really installed for flycheck support
-        (setq lsp-ui-sideline-enable nil
-              lsp-ui-doc-enable nil)
+        :custom
+        (lsp-ui-sideline-enable nil)
+        (lsp-ui-doc-enable nil)
 
         :lazy-leader
         (:mode 'lsp-mode
@@ -15067,6 +15063,8 @@
        (:keymaps '(magit-file-section-map
                    magit-hunk-section-map)
         "M-RET" 'magit-diff-visit-file-other-window)
+       (:keymaps 'magit-process-mode-map
+        "RET" 'magit-section-toggle)
        ;; Org like section maneuvering.
        (:keymaps 'magit-section-mode-map
         :states 'motion
@@ -15809,6 +15807,7 @@
         "G" 'notmuch-poll-and-refresh-this-buffer
         "z" 'notmuch-tree-from-show-current-query
         "v" 'notmuch-tree-from-show-current-query                                    ; like mu4e-conversation
+        "r" 'notmuch-show-view-raw-message
 
         "t" '(:ignore t :wk "toggle")
         "ti" 'notmuch-show-toggle-thread-indentation
