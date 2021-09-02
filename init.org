@@ -14673,13 +14673,60 @@
    #+END_SRC
 
 ** ggtags
+   Tags are the classic source-code navigation system that pre-dates LSP.
+
+   While not as reliable as LSP it's generally lighter and easier to use across
+   multiple languages/file-types and to just list semantic constructs in your
+   code base. It also scales much better to massive repositories such as Linux
+   compared to an LSP server trying to index it itself.
+
+   GNU Global is the GNU source code tagging system with support for other tag-parsers
+   through [[https://www.gnu.org/software/global/globaldoc_toc.html#Plug_002din][plugins]] such as Universal ctags. =ggtags= is the Emacs interface to global with
+   support for automatically updating the tag database on file-saves and eldoc+xref
+   integration.
+
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ggtags)
      (use-package ggtags
        :straight t
+       :custom
+       (ggtags-highlight-tag nil)
+
+       :init
+       (push 'ggtags-global-mode compilation-auto-kill-ignore-modes+)
+
+       :preface
+       (defun ggtags-enable-in-projects+ ()
+         "Enable `ggtags-mode' when opening a file in a project with a GTAGS file."
+         (unless (bound-and-true-p ggtags-mode)
+           (when-let ((root (project-current-root+)))
+             (when (file-exists-p (concat root "GTAGS"))
+               (ggtags-mode +1)))))
+       :hook (find-file . ggtags-enable-in-projects+)
+
+       :config
+       ;; Make ggtags highlight code through org-src. See [[https://github.com/leoliu/ggtags/issues/212][ggtags#212]].
+       (require 'org-src)
+
+       (defun ggtags-fontify-code-with-org+ (code &optional mode)
+         (or mode (setq mode major-mode))
+         (if (stringp code)
+             (let* ((lang (s-chop-suffix "-mode" (symbol-name mode)))
+                    ;; Fallback to default-face not org-block-face.
+                    (org-src-block-faces `((,lang . (default)))))
+               (with-temp-buffer
+                 (insert code)
+                 (org-src-font-lock-fontify-block lang (point-min) (point-max))
+                 (buffer-substring (point-min) (point-max))))
+           code))
+
+       (advice-add #'ggtags-fontify-code :override #'ggtags-fontify-code-with-org+)
+
        :leader
-       ("T"  '(:ignore t :wk "tags")
-        "TD" 'ggtags-delete-tags
-        "T/" 'ggtags-grep)
+       ("pgs" 'ggtags-grep
+        "pgx" 'ggtags-delete-tags
+        "pgr" 'ggtags-update-tags
+        "pgq" 'ggtags-query-replace
+        "pgm" 'ggtags-mode)
 
        :lazy-leader
        (:mode 'ggtags-global-mode                                                    ; NOTE ggtags-global-mode is not a global mode... global is for GNU *global* tagging system
