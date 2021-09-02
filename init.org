@@ -86,7 +86,6 @@
          ;; olivetti                                                       ; A nice writing environment for emacs
          ;; pdf-tools                                                      ; Use emacs as quick and dirty pdf viewer
          ;; piper                                                          ; Interactive shell pipelines with emacs
-         ;; realgud                                                        ; The quintessential debugger package for emacs
          rainbow-mode                                                      ; Automatically color/highlight css color names
          skeletor                                                          ; Project skeleton generator package
          undo-tree                                                         ; Undo system based on vim with tree like visualiser
@@ -9154,6 +9153,59 @@
          "," 'wgrep-finish-edit
          "s" 'wgrep-save-all-buffers))
     #+end_src
+
+** gud
+   The grand unified debugger interface.
+
+   #+begin_src emacs-lisp
+     (use-package gud
+       :straight t
+       ;; :config
+       ;; Fails because gdb parses file-paths from the cmd line and
+       ;; changes to the first one.
+       ;; (let ((conf (shell-quote-argument (join-path (xdg-config-home) "gdb" "init"))))
+       ;;   (setq gud-gdb-command-name (concat "gdb -i=mi -x " conf)
+       ;;         gud-gud-gdb-command-name (concat "gdb -x " conf " --fullname")))
+
+       :init
+       (push `(,(rx "*gud")
+               (display-buffer-reuse-window
+                display-buffer--maybe-pop-up-frame-or-window
+                display-buffer-in-side-window)
+               (side . right)
+               (window-width . 0.25)
+               (body-function . nil))
+             display-buffer-alist)
+
+       :config
+       ;; By default gud starts up in the current directory so completion
+       ;; doesn't support the path to the binary and other useful stuff.
+       (defun gud-start-in-project-root+ (func &rest args)
+         (let ((default-directory (or (project-current-root+)
+                                      default-directory)))
+           (apply func args)))
+
+       (dolist (it (list #'gdb #'gud-gdb #'perldb #'jdb #'pdb #'guiler #'dbx #'xdb #'sdb))
+         (advice-add it :around #'gud-start-in-project-root+))
+
+       :leader
+       (:prefix "v"
+        "" '(:ignore t :wk "debugger")
+        "b" 'gud-break
+        "B" 'gud-tbreak                                                              ; temporary breakpoint
+        "c" 'gud-cont
+        "f" 'gud-finish                                                              ; current function
+        "j" 'gud-jump                                                                ; to current line
+        "e" 'gud-print                                                               ; eval expression at point
+        "l" 'gud-refresh                                                             ; redraw buffers
+        "d" 'gud-remove
+        "s" 'gud-step
+        "t" 'gud-until                                                               ; continue until current line
+        "w" 'gud-watch
+        "<" 'gud-down                                                                ; stack-frames
+        ">" 'gud-up))
+   #+end_src
+
 ** help
    #+BEGIN_SRC emacs-lisp
      (use-package help
@@ -16030,12 +16082,6 @@
 
        :config
        (defalias 'rake-refresh #'rake-regenerate-cache))
-   #+END_SRC
-
-** realgud
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! realgud) :tangle no
-     (use-package realgud
-       :straight t)
    #+END_SRC
 
 ** skeletor
