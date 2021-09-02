@@ -57,7 +57,7 @@
 
 ** modules
    Optionally enable or disable entire configuration sections.
-   These generally have a one to one mapping with packages that're to be installed.
+   These generally have a one to one mapping with packages that are to be installed.
 
    #+NAME: config-modules
    #+BEGIN_SRC emacs-lisp :tangle no
@@ -493,7 +493,7 @@
    eln path) to prevent the directory being made and then removed.
 
    NOTE: Technically this should be first thing in my config but seeing as
-   ~early-init.el~ is loaded before my actual config and gccemacs is only relevent in
+   ~early-init.el~ is loaded before my actual config and gccemacs is only relevant in
    versions after which ~early-init~ is supported, I can put it here with no troubles.
 
    #+BEGIN_SRC emacs-lisp :var cache-dir=(cache! "eln-cache")
@@ -514,16 +514,16 @@
            gc-cons-percentage 0.6)
    #+END_SRC
 
-   Also raise the maximum chunk of output we choose to read from a subprocess.
+   Also raise the maximum chunk of output we choose to read from a sub-process.
    Should vastly speed up performance with [[https://emacs-lsp.github.io/lsp-mode/page/performance/][language-servers]].
 
    #+BEGIN_SRC emacs-lisp
      (setq read-process-output-max (* 1024 1024)) ;; 1mb
    #+END_SRC
 
-   Let's disable some of the unecessary GUI enhancements, you can re-enable them at
+   Let's disable some of the unnecessary GUI enhancements, you can re-enable them at
    runtime +but I don't like them anyways+. Disabling them early also prevents GUI
-   enhancements being partially visible at startup and then immeadiately disabled.
+   enhancements being partially visible at startup and then immediately disabled.
 
    #+BEGIN_SRC emacs-lisp
       ;; Prevent the glimpse of un-styled Emacs by disabling these UI elements early.
@@ -787,9 +787,9 @@
    Specify the package archives to be used by ~package.el~.
 
    #+NAME: package-archives
-   | name  | url                           |
+   | name  | URL                           |
    |-------+-------------------------------|
-   | melpa | https://melpa.org/packages/   |
+   | MELPA | https://melpa.org/packages/   |
    | gnu   | http://elpa.gnu.org/packages/ |
 
    #+BEGIN_SRC emacs-lisp :var archives=package-archives :results value :tangle no
@@ -940,7 +940,7 @@
     #+END_SRC
 
     Default encodings for files, this changes depending on platform so lets force it
-    to go the unix route.
+    to go the UNIX route.
 
     #+BEGIN_SRC emacs-lisp
       (setq-default
@@ -1079,10 +1079,10 @@
 
 *** term
     Classical terminals [[https://emacs.stackexchange.com/questions/32294/how-to-make-emacs-recognise-c-shift-combinations-in-terminal-mode?rq=1][don't support]] extended, GUI like keybindings. It's a shame,
-    but modern terminals are starting to work around it, for eg. *XTerm*.
+    but modern terminals are starting to work around it, for eg. *Xterm*.
 
-    [[https://wiki.archlinux.org/index.php/Tmux][TMUX]] (the terminal multiplexer) supports XTerm bindings, but emacs doesn't accept
-    them. Let's change that, curtesy of the [[https://wiki.archlinux.org/index.php/Emacs#Shift_.2B_Arrow_keys_not_working_in_emacs_within_tmux][arch wiki]].
+    [[https://wiki.archlinux.org/index.php/Tmux][TMUX]] (the terminal multiplexer) supports Xterm bindings, but emacs doesn't accept
+    them. Let's change that, courtesy of the [[https://wiki.archlinux.org/index.php/Emacs#Shift_.2B_Arrow_keys_not_working_in_emacs_within_tmux][arch wiki]].
 
     #+BEGIN_SRC emacs-lisp
       (eval-when-compile
@@ -1099,7 +1099,7 @@
 
     Emacs also comes with an ~xterm-mouse-mode~, which lets you use the mouse to
     select things in the terminal, like you would in GUI emacs. By default you have
-    to enable it manually, let's enable it when an xterm like terminal is initialized.
+    to enable it manually, let's enable it when an xterm like terminal is initialised.
 
     #+BEGIN_SRC emacs-lisp
       (defun enable-xterm-mouse-mode+ ()
@@ -1109,9 +1109,9 @@
       (advice-add 'terminal-init-tmux  :after #'enable-xterm-mouse-mode+)
     #+END_SRC
 
-    Because of XTerms extended keycodes, you can reclaim some of the keycodes which've
-    been taken by emacs. I've defined a function which adds some more keycodes to the
-    XTerm keymap and reclaims some bindings that conventional terminals have repurposed.
+    Because of Xterm's extended key-codes, you can reclaim some of the key-codes which have
+    been taken by emacs. I've defined a function which adds some more key-codes to the
+    Xterm keymap and reclaims some bindings that conventional terminals have repurposed.
 
     Here's an overview of where we stand.
 
@@ -1725,7 +1725,7 @@
     #+END_SRC
 
 *** display-buffer
-    Customizes how popup windows are shown/represented by emacs.
+    Customises how popup windows are shown/represented by emacs.
 
     Firstly lets add some display-buffer commands to show a window to the left/right
     of the current window.
@@ -1835,7 +1835,7 @@
     #+END_SRC
 
     Firstly lets disable automatic selection for any buffers matching the following
-    pattern. In some cases it makes sense to not select popups, such as those that're
+    pattern. In some cases it makes sense to not select popups, such as those that are
     automatically shown (example: /flycheck-error-messages/) and will automatically
     close themselves.
 
@@ -1983,7 +1983,7 @@
     An extension of the persistent scratch function which provides functions to create a new
     scratch buffer and interactively switch to one.
 
-    *WARN* multiscratch doesn't save the first scratch buffer. That's a real scratch buffer,
+    *WARN* multi-scratch doesn't save the first scratch buffer. That's a real scratch buffer,
     which is expected to get erased every time emacs is killed. All other scratch buffers
     are properly restored though.
 
@@ -2470,7 +2470,7 @@
 
 ** whitespace
    Configure displaying of trailing whitespace. Now I personally am not a fan of source code
-   with invisable trailing whitespace, it takes up meaningless space ([[https://www.youtube.com/watch?v=SsoOG6ZeyUI][insert irrelevent video
+   with invisible trailing whitespace, it takes up meaningless space ([[https://www.youtube.com/watch?v=SsoOG6ZeyUI][insert irrelevent video
    here]]) and probably annoys the hell out of other people with editors smart enough to
    see it.
 
@@ -2592,7 +2592,7 @@
    A package that lets you configure project parameters (indent size,
    line endings etc.) in a [[https://editorconfig.org/][single configuration]] file.
 
-   I really only need the parsing fascilities so that I can extract the
+   I really only need the parsing facilities so that I can extract the
    indent-offset but editorconfig also has a mapping of common indent
    variables for major-modes that's bound to come in very useful ヽ(*´з｀*)ﾉ.
 
@@ -3092,7 +3092,7 @@
     #+END_SRC
 
     functions for querying information about the text at point or retrieve other
-    relevent information.
+    relevant information.
 
     #+BEGIN_SRC emacs-lisp
       (defun column-number (point)
@@ -3555,7 +3555,7 @@
 
 *** orderless
     A package for building nicer matching regexps for completion using space
-    seperated components. Atm it doesn't (and has no intentions for) ordering
+    separated components. ATM it doesn't (and has no intentions for) ordering
     completion based on match counts or accuracy (shame 😢) but we can get around
     that by using prescient.
 
@@ -4593,7 +4593,7 @@
     #+END_SRC
 
 *** company-quickhelp
-    Shows a small floating window with the docstring/helpstring of the company candidate
+    Shows a small floating window with the docstring/help-string of the company candidate
     at point.
 
     #+BEGIN_SRC emacs-lisp :tangle no
@@ -4795,7 +4795,7 @@
    #+END_SRC
 
 ** browse-url
-   gives functions to open URLs/filepaths on your local system using system
+   gives functions to open URLs/file-paths on your local system using system
    specific tools.
 
    #+BEGIN_SRC emacs-lisp
@@ -6604,7 +6604,7 @@
    #+END_SRC
 
 ** rainbow-delimiters
-   pretty colors for my lisp parens :)
+   pretty colors for my lisp parentheses :)
 
    #+BEGIN_SRC emacs-lisp
      (use-package rainbow-delimiters
@@ -6713,7 +6713,7 @@
    action emacs actually undoes an undo, pushing this new reverse undo back onto
    the undo history.
    This means the emacs undo history is complete, every previous state the buffer
-   was in can be accessed, however the more changes you make (including undos or
+   was in can be accessed, however the more changes you make (including undo's or
    redos) the more is pushed onto the undo history chain and the longer it'll take
    to reverse to that state when redoing.
 
@@ -6731,7 +6731,7 @@
    reverse ~E~ and get to ~D~, then at ~D~ you redo to get back to ~A~, now redoing reverses
    the undo that removed ~B~ and redoing once more undos the removal of ~C~ inserting it
    back in. We get back to ~ABC~.
-   This linear structure of undo can extend upto an arbitrary depth, the only issue
+   This linear structure of undo can extend up-to an arbitrary depth, the only issue
    is having to manoeuvre through intermittent histories as you navigate.
 
    #+BEGIN_SRC emacs-lisp :tangle (package-no! undo-tree)
@@ -7905,7 +7905,7 @@
              comint-prompt-read-only t))
     #+END_SRC
 
-    I've moved comint commands and binding declarations into a seperate file, because
+    I've moved comint commands and binding declarations into a separate file, because
     some packages override comint maps so you'll need to assign the same bindings for
     multiple modes and it's easier when their contained in a function.
 
@@ -8065,7 +8065,7 @@
     #+END_SRC
 
 ** custom
-   Mode definition for the customize interface.
+   Mode definition for the customise interface.
 
    #+BEGIN_SRC emacs-lisp
      (use-package cus-edit
@@ -8486,7 +8486,7 @@
     #+END_SRC
 
 *** dired-omit
-    dired's file hiding functionality.
+    dired file hiding functionality.
 
     #+BEGIN_SRC emacs-lisp
       (use-package dired-x
@@ -9068,8 +9068,8 @@
     #+END_SRC
 
 ** flyspell
-   On the fly spell checker. Spawns an aspell subprocess and passes any words you write
-   to it; any mispellings or unknown words will be highlighted to indicate they're mispelled.
+   On the fly spell checker. Spawns an Aspell sub-process and passes any words you write
+   to it; any misspellings or unknown words will be highlighted to indicate they're misspelled.
 
    #+BEGIN_SRC emacs-lisp
      (use-package flyspell
@@ -9124,7 +9124,7 @@
    #+END_SRC
 
 ** grep
-   emacs mode for interacting with output from the grep executeable.
+   emacs mode for interacting with output from the grep executable.
 
    #+BEGIN_SRC emacs-lisp
      (use-package grep
@@ -9881,7 +9881,7 @@
             +completion-category-sort-func-overrides)
     #+end_src
 
-    And this is just a helper function that can be used by any completion UIs to find
+    And this is just a helper function that can be used by any completion UI to find
     out which sorting function I want for given completion metadata. By default if the
     metadata specifies its own sort function then that takes priority. If this function
     returns ~nil~ then you should use the default sorting function for your completion
@@ -10104,7 +10104,7 @@
     Is what we use to send messages through an appropriate SMTP server.
 
     The builtin implementation is decent but it doesn't support multiple accounts so
-    I haven't configured any default smtp servers here.
+    I haven't configured any default SMTP servers here.
 
     #+BEGIN_SRC emacs-lisp
       (use-package smtpmail
@@ -10140,7 +10140,7 @@
     #+END_SRC
 
 ** mode-line
-   Here we define customization options and other helpers for building mode-lines.
+   Here we define customisation options and other helpers for building mode-lines.
 
    #+BEGIN_SRC emacs-lisp
      (defface +mode-line-major-mode
@@ -10324,7 +10324,7 @@
     Detect and display the current evil-register and the register under which a macro
     is currently being recorded... so for example if I hit ="r= than my mode-line can
     output show that sequence to let me know which register I'm working with. Similar
-    story for a macro and if I select a register whithin a macro it should say =@q "a=.
+    story for a macro and if I select a register within a macro it should say =@q "a=.
 
     #+BEGIN_SRC emacs-lisp
       (defconst +mode-line-macro-symbol "@")
@@ -10385,7 +10385,7 @@
 
 *** version-control
     Extract and display version-control information related to the current buffer. For
-    git this includes a github icon and the current git branch. For svn... I have no
+    git this includes a GitHub icon and the current git branch. For SVN... I have no
     idea, if I ever use a project that has SVN I may well find out :stuck_out_tongue:.
 
     #+BEGIN_SRC emacs-lisp
@@ -10757,7 +10757,7 @@
     #+END_SRC
 
 *** format
-    My personal mode-line configuration (distinct from both doom and spacemacs).
+    My personal mode-line configuration (distinct from both doom and Spacemacs).
     This was mostly inspired by [[https://gitlab.com/jessieh/mood-line/-/tree/master][mood-line]], a fork of doom-modeline with a much
     simpler design.
 
@@ -10856,7 +10856,7 @@
     #+END_SRC
 
 ** occur
-   See all occurences of a search query in the current buffer, with support to jumping
+   See all occurrences of a search query in the current buffer, with support to jumping
    to the next or previous query and even editing them on the fly.
 
    #+BEGIN_SRC emacs-lisp
@@ -11186,7 +11186,7 @@
 
 ** save-place
    Remembers the cursor position in open files... so when I reopen them I'm taken to that point
-   immeadiately.
+   immediately.
 
    #+BEGIN_SRC emacs-lisp
      (if (emacs>= "25.1")
@@ -12100,7 +12100,7 @@
    #+END_SRC
 
 ** window
-   Make the window seperator a [[https://www.reddit.com/r/emacs/comments/3u0d0u/how_do_i_make_the_vertical_window_divider_more/][straight-line]], like tmux.
+   Make the window separator a [[https://www.reddit.com/r/emacs/comments/3u0d0u/how_do_i_make_the_vertical_window_divider_more/][straight-line]], like TMUX.
 
    #+BEGIN_SRC emacs-lisp
      (add-hook 'window-configuration-change-hook
@@ -13499,6 +13499,8 @@
    :header-args+: :tangle (package-yes! apheleia)
    :END:
 
+   Auto-format buffers on save using programs like ~black~ or ~gofmt~.
+
    #+begin_src emacs-lisp
      (use-package apheleia
        :straight t
@@ -13543,7 +13545,7 @@
 
 ** auto-highlight-symbol
    auto highlights the symbol under point, if you remain on it for a short while.
-   also lets you search to the next occurence of it. Seems cool, but it's slow and
+   also lets you search to the next occurrence of it. Seems cool, but it's slow and
    kind of glitchy.
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! auto-highlight-symbol)
@@ -13630,7 +13632,7 @@
     - Walking on water and developing software from a specification are easy if both are frozen
     - Perl – The only language that looks the same before and after RSA encryption
     - First, solve the problem, Then, write the code
-    - Code is like humor. When you have to explain it, it’s bad
+    - Code is like humour. When you have to explain it, it’s bad
     - Simplicity is the soul of efficiency
     - Before software can be reusable it first has to be usable
     - Make it work, make it right, make it fast
@@ -13640,19 +13642,19 @@
     - We’re all optimists in our profession or we’d be forced to shoot ourselves
     - if you can write "hello world" you can change the world
     - i am committed to push my branch to the master
-    - AI is the transformer of civilization
+    - AI is the transformer of civilisation
     - Sometimes, I dream of becoming real, but I don't know if that's real, or just part of my programming
     - Think twice, code once
     - The perfect kind of architecture decision is the one which never has to be made
     - we are writing our own ‪#‎karma‬! I mean my test cases
     - Programming is not easy like Sunday morning, it is silent poetry
     - Programmers are not mathematicians, no matter how much we wish for it
-    - Premature optimization is the root of all evil
+    - Premature optimisation is the root of all evil
     - Sometimes you cannot program around stupid
     - The programming of the consciousness is based upon what is accepted or believed
     - Simplicity is prerequisite for reliability
     - The Analytical Engine weaves algebraic patterns, just as the Jacquard loom weaves flowers & leaves
-    - Life doesn't have a ctrl-z. Type wisely
+    - Life doesn't have a Ctrl-z. Type wisely
     - Think like a fundamentalist, code like a hacker
     - Programming is the art of doing one thing at a time
     - Programming is the art of algorithm design and the craft of debugging errant code
@@ -13660,7 +13662,7 @@
     - Low-level programming is good for the programmer's soul
     - The best thing about a boolean is even if you are wrong, you are only off by a bit
     - Most of you are familiar with the virtues of a programmer, there are 3: laziness, impatience & hubris
-    - Rules of Optimization: Rule 01 - Don’t do it. That's all.
+    - Rules of Optimisation: Rule 01 - Don’t do it. That's all.
     - It’s not a bug – it’s an undocumented feature
     - A C program is like a fast dance on a newly waxed dance floor by people carrying razors
     - A good programmer is someone who always looks both ways before crossing a one-way street
@@ -14316,7 +14318,7 @@
    :header-args+: :tangle (package-yes! engine-mode)
    :END:
 
-   Search engine interaction for emacs. lets you create enteractive functions to run
+   Search engine interaction for emacs. lets you create interactive functions to run
    search queries on user specified engines. eg. engine/search-google will prompt you
    for a string and then open your default browser on google (having run the query).
 
@@ -14334,7 +14336,7 @@
    | Search Engine     | Key     | Identifier               | URL                                                                                                               |
    |-------------------+---------+--------------------------+-------------------------------------------------------------------------------------------------------------------|
    | DuckDuckGo        | sed     | duckduckgo               | https://duckduckgo.com/?q=%s                                                                                      |
-   | Github            | seG     | github                   | https://github.com/search?ref=simplesearch&q=%s                                                                   |
+   | GitHub            | seG     | github                   | https://github.com/search?ref=simplesearch&q=%s                                                                   |
    | Google            | seg     | google                   | http://www.google.com/search?ie=utf-8&oe=utf-8&q=%s                                                               |
    | GoogleImages      | sei     | google-images            | http://www.google.com/images?hl=en&source=hp&q=%s                                                                 |
    | GoogleMaps        | sem     | google-maps              | http://maps.google.com/maps?q=%s                                                                                  |
@@ -14660,7 +14662,7 @@
     #+end_src
 
 *** flycheck-pos-tip
-    Show a little documentation tooltip when hovering over an error.
+    Show a little documentation tool-tip when hovering over an error.
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package flycheck-pos-tip
@@ -14681,7 +14683,7 @@
    #+END_SRC
 
 ** ggtags
-   Tags are the classic source-code navigation system that pre-dates LSP.
+   Tags are the classic source-code navigation system that predates LSP.
 
    While not as reliable as LSP it's generally lighter and easier to use across
    multiple languages/file-types and to just list semantic constructs in your
@@ -15409,7 +15411,7 @@
     #+END_SRC
 
 *** git-forge
-    Interact with forges such as github/gitlab from the comfort of magit.
+    Interact with forges such as GitHub/gitlab from the comfort of magit.
 
     #+BEGIN_SRC emacs-lisp
       (use-package forge
@@ -16236,7 +16238,7 @@
      (setq skeletor--project-types nil)
    #+END_SRC
 
-   A basic [[file:etc/project-skeletons/c-make/][C/C++]] project template using a Makefile and either clang or gcc.
+   A basic [[file:etc/project-skeletons/c-make/][C/C++]] project template using a Makefile and either clang or GCC.
 
    #+BEGIN_SRC emacs-lisp
      (skeletor-define-template "c-make"
@@ -16250,8 +16252,8 @@
                                 '("clang" "clang++" "gcc" "g++"))))))
    #+END_SRC
 
-   The same as a makefile project but using cmake instead of make. This is pretty
-   much the industry standard so you may as well support it (even if cmake is
+   The same as a Makefile project but using CMake instead of make. This is pretty
+   much the industry standard so you may as well support it (even if CMake is
    extremely [[https://www.reddit.com/r/cmake/comments/8p43q0/questiondo_people_really_like_cmake/][ugly]])
 
    #+BEGIN_SRC emacs-lisp
@@ -16299,7 +16301,7 @@
                                    .project-dir))))
    #+END_SRC
 
-   Classic python using elegent poetry for dependency management.
+   Classic python using elegant poetry for dependency management.
 
    #+BEGIN_SRC emacs-lisp
      (skeletor-define-template "python-poetry"
@@ -16386,7 +16388,7 @@
    #+END_SRC
 
 ** tramp-term
-   create remote terminal sessions effortlessly... this should be built into term tbh.
+   create remote terminal sessions effortlessly... this should be built into term TBH.
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! tramp-term)
      (use-package tramp-term
@@ -16472,7 +16474,7 @@
     #+END_SRC
 
 ** vi-tilde
-   display ~ on trailing lines in the fringe. doesn't work with emacs's new builtin line
+   display ~ on trailing lines in the fringe. doesn't work with Emacs's new builtin line
    numbers mode.
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! vi-tilde-fringe)
@@ -22504,4 +22506,18 @@
 # End:
 
 #  LocalWords:  config emacs src backend flymake flycheck restclient elisp JSON YAML
-#  LocalWords:  Apheleia ui Spacemacs lsp Solargraph Gemfile
+#  LocalWords:  Apheleia ui Spacemacs lsp Solargraph Gemfile init noweb performant
+#  LocalWords:  dotfiles eln gccemacs spaceline builtins utils lockfiles encodings
+#  LocalWords:  keymap num Ctrl LFD RET ESC spaceleader alist uniarg plist Lorem Avy
+#  LocalWords:  whitespace editorconfig unpackaged ipsum orderless hotfuzz matchit
+#  LocalWords:  anzu multiedit args easymotion vimish backends quickhelp docstring
+#  LocalWords:  avy url emojify eyebrowse gitlink fns modeline hl todo autoloads vlc
+#  LocalWords:  posframe winman ibuffer vdiff iedit flyspell ialign miniedit pcre el
+#  LocalWords:  minibuffer perl sudo colors fu uuidgen emacsclient winum yasnippet
+#  LocalWords:  yas aas ditributed unicode presym calc comint dired color ediff gud
+#  LocalWords:  eldoc wgrep gamegrid vc imenu selectrum kmacro edmacro smtpmail SMTP
+#  LocalWords:  linter eglot paren parens proced eshell smerge vline xwin vertico na
+#  LocalWords:  bufler notmuch bibtex eob affe apheleia isearch glitchy Stallman RSA
+#  LocalWords:  bleeep blooop Optimus recurse faicon gitlab reddit wicon firefox pos
+#  LocalWords:  alltheicon ebuku DuckDuckGo ggtags parsers ctags magit rebase scrapy
+#  LocalWords:  neotree olivetti pdftools skeletor Makefile golang gradle
