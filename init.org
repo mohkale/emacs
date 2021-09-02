@@ -105,6 +105,7 @@
      ;;; Completion Assistants
          prescient                                                         ; Sorting/Filtering based on frequency and proximity.
          orderless                                                         ; Blazingly fast completion regexp generator using space seperated patterns
+         ;; hotfuzz                                                        ; Approximate string matching completion style based on fuzzy finding
 
      ;;; Buffer Menus
          ;; buffer-menu                                                    ; The (default) builtin buffer menu
@@ -3597,6 +3598,16 @@
           ;; Fixes face issues in tooltip, see [[https://github.com/oantolin/orderless/tree/d97a91f6e12ace638e65bdccefd14d1e638a2dae#company][here]].
           (advice-add 'company-capf--candidates :around #'orderless-company-fix-face+)))
     #+END_SRC
+
+*** hotfuzz
+    An emacs fuzzy finder.
+
+    #+begin_src emacs-lisp :tangle (package-yes! hotfuzz)
+      (use-package hotfuzz
+        :straight t
+        :custom
+        (completion-styles '(hotfuzz)))
+    #+end_src
 
 *** prescient
     A package for remembering and sorting completion candidates based on frequency of
