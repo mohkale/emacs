@@ -6195,7 +6195,37 @@
    #+BEGIN_SRC emacs-lisp
      (use-package project
        :custom
-       (project-list-file (state! "projects.el")))
+       (project-list-file (state! "projects.el"))
+
+       :init
+       (defun project-current-root+ (&optional dir)
+         (when-let ((project
+                     (project-current nil (or dir default-directory))))
+           (project-root project)))
+
+       :leader
+       ("fp" 'project-switch-project)
+       (:prefix "p"
+        "" '(:ignore t :wk "project")
+        ;; Unbound commands
+        ;; * project-vc-dir
+        ;; * project-eshell
+        ;; * project-shell
+        ;; * project-or-external-find-file
+        ;; * project-or-external-find-regexp
+
+        "!" 'project-shell-command
+        "&" 'project-async-shell-command
+        "b" 'project-switch-to-buffer
+        "h" 'project-dired                                                           ; Dired in project home directory
+        "f" 'project-find-file
+        "c" 'project-compile
+        "x" 'project-kill-buffers
+        "SPC" 'project-execute-extended-command                                      ; Run M-x in the root of the current project
+
+        "s" '(:ignore t :wk "search")
+        ;; "sg" 'project-find-regexp
+        "sq" 'project-query-replace-regexp))
    #+END_SRC
 
 ** projectile
@@ -6355,43 +6385,48 @@
        (:keymaps 'projectile-mode-map
         [remap org-capture]          'projectile-org-capture+
         [remap counsel-org-capture]  'projectile-org-capture+
-        [remap consult-org-capture+] 'projectile-org-capture+)
+        [remap consult-org-capture+] 'projectile-org-capture+
+
+        ;; Override project.el bindings.
+        [remap project-shell-command] 'projectile-run-shell-command-in-root
+        [remap project-async-shell-command] 'projectile-run-async-shell-command-in-root
+        [remap project-switch-project] 'projectile-switch-project
+        [remap project-switch-to-buffer] 'projectile-switch-to-buffer
+        [remap project-dired] 'projectile-dired
+        [remap project-find-file] 'projectile-find-file
+        [remap project-compile] 'projectile-compile-project
+        [remap project-kill-buffers] 'projectile-kill-buffers
+        [remap project-query-replace-regexp] 'projectile-replace-regexp)
 
        :leader
-       ("fp" 'projectile-switch-project
+       (:prefix "p"
+        "" '(:ignore t :wk "projectile")
+        "TAB" 'projectile-find-other-file
+        "RET" 'projectile-toggle-between-implementation-and-test
+        "DEL" 'projectile-invalidate-cache
 
-        "p" '(:ignore t :wk "projectile")
-        "p TAB" 'projectile-find-other-file
-        "p!" 'projectile-run-shell-command-in-root
-        "p%" 'projectile-replace-regexp
-        "p&" 'projectile-run-async-shell-command-in-root
-        "pa" 'projectile-toggle-between-implementation-and-test
-        "pb" 'projectile-switch-to-buffer
-        "pb" 'projectile-switch-to-buffer
-        "pc" 'projectile-compile-project
-        "pD" 'projectile-discover-projects-in-directory
-        "pd" 'projectile-find-dir
-        "pF" 'projectile-find-file-in-known-projects
-        "pf" 'projectile-find-file
-        "pG" 'projectile-regenerate-tags
-        "pg" 'projectile-find-tag
-        "ph" 'projectile-dired ;; dired in project home directory
-        "pI" 'projectile-invalidate-cache
-        "pi" 'projectile-install-project
-        "pk" 'projectile-kill-buffers
-        "pm" 'projectile-ibuffer
-        "po" 'projectile-org-project-file+
-        "pp" 'projectile-run-project
-        "pr" 'projectile-recentf
-        "pso" 'projectile-multi-occur
-        "pt" 'projectile-test-project
-        "p[" 'projectile-previous-project-buffer
-        "p]" 'projectile-next-project-buffer)
-       :init
-       (leader-set-keys
-         "pv" (if (package! vterm)
-                  'projectile-run-vterm
-                'projectile-run-term)))
+        "so" 'projectile-multi-occur
+
+        "t" 'projectile-test-project
+        "p" 'projectile-run-project
+        "i" 'projectile-install-project
+
+        "d" 'projectile-find-dir
+        "r" 'projectile-recentf
+        "F" 'projectile-find-file-in-known-projects                                  ; find-file across all known projects.
+        "m" 'projectile-ibuffer                                                      ; Open an ibuffer session with all open project buffers.
+
+        "o" 'projectile-org-project-file+
+        "[" 'projectile-previous-project-buffer
+        "]" 'projectile-next-project-buffer
+        "v" (if (package! vterm)
+                'projectile-run-vterm
+              'projectile-run-term)
+
+        "g" '(:ignore t :wk "tags")
+        "gr" 'projectile-regenerate-tags
+        "gg" 'projectile-find-tag
+        "st" 'projectile-find-tag))
    #+END_SRC
 
 *** project-types
@@ -6496,6 +6531,31 @@
 
     #+begin_src emacs-lisp
       (provide '+projectile-commands)
+    #+end_src
+
+*** project-integration
+    Built-in =project.el= integration courtesy of [[https://github.com/bbatsov/projectile/issues/1591#issuecomment-895111852][@wurosh]].
+
+    #+begin_src emacs-lisp
+      (use-package projectile
+        :straight t
+        :after (project)
+        :config
+        (push (defun project-projectile+ (dir)
+                (when-let ((root (projectile-project-root dir)))
+                  (cons 'projectile root)))
+              project-find-functions)
+
+        (require 'cl-lib)
+
+        (cl-defmethod project-root ((project (head projectile)))
+          (cdr project))
+
+        (cl-defmethod project-files ((project (head projectile)) &optional _dirs)
+          (let ((root (project-root project)))
+            ;; Make paths absolute and ignore the optional dirs argument, see [[https://github.com/bbatsov/projectile/issues/1591#issuecomment-896423965][here]].
+            (mapcar (apply-partially #'concat root)
+                    (projectile-project-files root)))))
     #+end_src
 
 ** real-auto-save-mode
@@ -12374,7 +12434,7 @@
                    consult--buffer-state
                    consult--lookup-cdr)
         :custom
-        (consult-project-root-function #'projectile-project-root)
+        (consult-project-root-function #'project-current-root+)
         (consult-async-split-style 'slash)
         (consult-async-split-styles-alist
          '((space :separator ?\s :type separator)
@@ -14125,7 +14185,7 @@
          (declare (indent 2))
          `(defun ,(intern (concat "eglot-local-server-" (symbol-name name) "+")) (&optional _interactive)
             (append
-             (when-let ((default-directory (projectile-project-root)))
+             (when-let ((default-directory (project-current-root+)))
                (cl-loop for (file . cmds) in ,conf
                         when (file-exists-p file)
                           return cmds))
