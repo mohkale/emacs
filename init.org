@@ -16429,13 +16429,13 @@
              tree-sitter-major-mode-language-alist))
    #+END_SRC
 
-*** evil-textobj-treesitter
+*** evil-textobj-tree-sitter
     #+begin_src emacs-lisp
-      (use-package evil-textobj-treesitter
-        :straight (evil-textobj-treesitter
+      (use-package evil-textobj-tree-sitter
+        :straight (evil-textobj-tree-sitter
                    :type git
                    :host github
-                   :repo "meain/evil-textobj-treesitter"
+                   :repo "meain/evil-textobj-tree-sitter"
                    :files (:defaults "queries"))
         :after (evil tree-sitter)
         :demand t
@@ -16443,14 +16443,14 @@
         (general-define-key
          :predicate '(bound-and-true-p tree-sitter-mode)
          :keymaps 'evil-outer-text-objects-map
-         "f" (evil-textobj-treesitter-get-textobj "function.outer")
-         "c" (evil-textobj-treesitter-get-textobj "class.outer"))
+         "f" (evil-textobj-tree-sitter-get-textobj "function.outer")
+         "c" (evil-textobj-tree-sitter-get-textobj "class.outer"))
 
         (general-define-key
          :predicate '(bound-and-true-p tree-sitter-mode)
          :keymaps 'evil-inner-text-objects-map
-         "f" (evil-textobj-treesitter-get-textobj "function.inner")
-         "c" (evil-textobj-treesitter-get-textobj "class.inner")))
+         "f" (evil-textobj-tree-sitter-get-textobj "function.inner")
+         "c" (evil-textobj-tree-sitter-get-textobj "class.inner")))
     #+end_src
 
 ** rainbow-mode
