@@ -2476,28 +2476,28 @@
 
    So I enable displaying of trailing whitespace by default in every mode. That way you can
    see and remove it. If you'd like to disable whitespace display, then you'll have to append
-   to either of the following variables or optionally attach the following hook
-   function.
+   to either of the following variables or optionally attach the following hook function.
 
    #+BEGIN_SRC emacs-lisp
-     (defun +hide-trailing-whitespace-local ()
-       (setq-local show-trailing-whitespace nil))
+     (defun +hide-trailing-whitespace ()
+       (setq show-trailing-whitespace nil))
    #+END_SRC
 
    Here we define the configuration variables used for determining whether to enable
    visible whitespace or not.
 
    #+BEGIN_SRC emacs-lisp
-     (defvar whitespace-exempt-modes '(help-mode
-                                       Buffer-menu-mode
-                                       ibuffer-mode
-                                       eshell-mode
-                                       term-mode
-                                       minibuffer-inactive-mode
-                                       eshell-mode)
+     (defvar +whitespace-exempt-modes '(help-mode
+                                        Buffer-menu-mode
+                                        ibuffer-mode
+                                        eshell-mode
+                                        term-mode
+                                        minibuffer-mode
+                                        minibuffer-inactive-mode
+                                        eshell-mode)
        "Modes under which no trailing whitespace is shown")
 
-     (defvar whitespace-exempt-buffers
+     (defvar +whitespace-exempt-buffers
        (list (rx "*Ibuffer confirmation*")
              (rx "*Org Export Dispatcher*")
              (rx "*eldoc*")
@@ -2506,54 +2506,36 @@
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
-     (defun set-trailing-whitespace--mode-based (&optional dont-set)
-       "check the mode of the current buffer, to see whether trailing
-     whitespace should be shown. with the optional parameter `dont-set'
-     trailing whitespace will not be set.
+     (defun set-trailing-whitespace--mode-p ()
+       "Check the mode of the current buffer, to see whether trailing
+     whitespace should be shown."
+       (not (and +whitespace-exempt-modes
+                 (apply 'derived-mode-p
+                        +whitespace-exempt-modes))))
 
-     This function returns what the desired value of `show-trailing-whitespace'
-     should be."
-       (let ((show (not (and whitespace-exempt-modes
-                             (apply 'derived-mode-p
-                                    whitespace-exempt-modes)))))
-         (prog1
-             show
-           (unless dont-set
-             (setq show-trailing-whitespace show)))))
-
-     (defun set-trailing-whitespace--name-based (&optional dont-set)
+     (defun set-trailing-whitespace--name-p ()
        "Check the name of the current buffer, to see whether trailing
-     whitespace should be shown. see `set-trailing-whitespace--mode-based'."
-       (let ((show (not
-                    (and whitespace-exempt-buffers
-                         (let ((it (buffer-name)))
-                           (cl-find-if (lambda (regexp)
-                                         (string-match-p regexp it))
-                                       whitespace-exempt-buffers))))))
-         (prog1
-             show
-           (unless dont-set
-             (setq show-trailing-whitespace show)))))
+     whitespace should be shown."
+       (not
+        (and +whitespace-exempt-buffers
+             (let ((it (buffer-name)))
+               (cl-find-if (lambda (regexp)
+                             (string-match-p regexp it))
+                           +whitespace-exempt-buffers)))))
 
      (defun set-trailing-whitespace (&rest _)
        (setq show-trailing-whitespace
              ;; when both name and mode decide you can show
              ;; whitespace, then show it. otherwise when at
              ;; least one says no, then hide it.
-             (and (set-trailing-whitespace--mode-based t)
-                  (set-trailing-whitespace--name-based t))))
+             (and (set-trailing-whitespace--mode-p)
+                  (set-trailing-whitespace--name-p))))
    #+END_SRC
 
    Connect the aforementioned functions to the appropriate emacs hooks.
 
    #+BEGIN_SRC emacs-lisp
-     ;; add switch-to-buffer hook because some functions, such as ibuffers confirmation
-     ;; popup use switch-to-buffer instead of display buffer and there's no easy way
-     ;; to modify it.
-     (add-hook 'switch-to-buffer-hook #'set-trailing-whitespace)
-     (add-hook 'after-change-major-mode-hook
-               (lambda (&rest _)
-                 (set-trailing-whitespace--mode-based)))
+     (add-hook 'after-change-major-mode-hook #'set-trailing-whitespace)
    #+END_SRC
 
 ** indentation
@@ -5021,6 +5003,9 @@
    #+BEGIN_SRC emacs-lisp
      (use-package hydra
        :straight t
+       :hook
+       (lv-window . +hide-trailing-whitespace)
+
        :custom
        (lv-use-separator t)
 
@@ -6628,7 +6613,7 @@
 
        :config
        (push 'undo-tree-visualizer-mode
-              whitespace-exempt-modes)
+              +whitespace-exempt-modes)
 
        (advice-add 'undo-tree-save-history :before-until
                    (defun undo-tree-save-history--respect-ignore+ (&rest _args)
@@ -7624,7 +7609,7 @@
        (diary-file (share! "diary"))
 
        :init
-       (push 'calendar-mode whitespace-exempt-modes)
+       (push 'calendar-mode +whitespace-exempt-modes)
 
        :general
        (:states  'motion
@@ -7674,7 +7659,7 @@
    #+BEGIN_SRC emacs-lisp :tangle no
      (use-package add-log
        :config
-       (push 'change-log-mode whitespace-exempt-modes)
+       (push 'change-log-mode +whitespace-exempt-modes)
        (evil-set-initial-state 'change-log-mode 'motion)
 
        :lazy-leader
@@ -7712,7 +7697,7 @@
         (evil-set-command-property 'next-error :jump t)
         (evil-set-command-property 'previous-error :jump t)
 
-        (push 'compilation-mode whitespace-exempt-modes)
+        (push 'compilation-mode +whitespace-exempt-modes)
 
         (setq compilation-read-command nil
               compilation-scroll-output 'first-error)
@@ -7898,7 +7883,7 @@
        :hook ((comint-mode . (lambda ()
                                (setq-local evil-emacs-state-cursor 'bar))))
        :config
-       (push 'comint-mode whitespace-exempt-modes)
+       (push 'comint-mode +whitespace-exempt-modes)
        (evil-set-initial-state 'comint-mode 'emacs)
 
        (setq comint-mode-map (make-sparse-keymap) ;; reset all
@@ -8070,8 +8055,8 @@
    #+BEGIN_SRC emacs-lisp
      (use-package cus-edit
        :config
-       (push 'Custom-mode whitespace-exempt-modes)
-       (push 'customize-mode whitespace-exempt-modes)
+       (push 'Custom-mode +whitespace-exempt-modes)
+       (push 'customize-mode +whitespace-exempt-modes)
 
        (evil-set-initial-state 'Custom-mode 'normal)
 
@@ -8203,7 +8188,7 @@
        (diff-advance-after-apply-hunk nil)
 
        :config
-       (push 'diff-mode whitespace-exempt-modes)
+       (push 'diff-mode +whitespace-exempt-modes)
 
        (defun diff-kill-applied-hunks--ensure-all-hunks-killed (func &rest args)
          "`diff-kill-applied-hunks' doesn't kill any applied hunks above point :("
@@ -8301,7 +8286,7 @@
 
         :config
         (push '(dired-mode . 1) +indent-config)
-        (push 'dired-mode whitespace-exempt-modes)
+        (push 'dired-mode +whitespace-exempt-modes)
 
         :commands (dired-goto-home-dir+
                    dired-evil-scroll-down+
@@ -8546,7 +8531,7 @@
        ;; (image-dired-temp-rotate-image-file . (state! "image-dired" "temp-rotate-image"))
 
        :config
-       (push 'image-dired-thumbnail-mode whitespace-exempt-modes)
+       (push 'image-dired-thumbnail-mode +whitespace-exempt-modes)
 
        :config
        ;;; Fixed weird moves line, not thumbnail, behaviour.
@@ -8700,7 +8685,7 @@
           "w" 'ediff-windows)
 
          :config
-         (push 'ediff-meta-mode whitespace-exempt-modes)
+         (push 'ediff-meta-mode +whitespace-exempt-modes)
 
          (setq-default ediff-window-setup-function       'ediff-setup-windows-plain
                        ediff-split-window-function       'split-window-horizontally
@@ -9622,7 +9607,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package info
        :config
-       (push 'Info-mode whitespace-exempt-modes)
+       (push 'Info-mode +whitespace-exempt-modes)
 
        :leader
        ("hi" 'info-apropos
@@ -9699,6 +9684,9 @@
 ** minibuffer
    #+begin_src emacs-lisp
      (use-package minibuffer
+       :hook
+       (minibuffer-setup . +hide-trailing-whitespace)
+
        :init
        (defun minibuffer-input+ ()
          "Get the input to the last minibuffer prompt."
@@ -11112,7 +11100,7 @@
      (use-package simple
        :config
        (evil-set-initial-state 'process-menu-mode 'motion)
-       (push 'process-menu-mode whitespace-exempt-modes)
+       (push 'process-menu-mode +whitespace-exempt-modes)
 
        :general
        (:states  'motion
@@ -11405,7 +11393,7 @@
         "i TAB p"   'back-to-indentation)
 
        :config
-       (push 'messages-buffer-mode whitespace-exempt-modes)
+       (push 'messages-buffer-mode +whitespace-exempt-modes)
 
        :general
        (:keymaps 'completion-list-mode-map
@@ -11884,8 +11872,8 @@
        (when (windows-p)
          (setenv "GIT_ASKPASS" "git-gui--askpass"))
 
-       (push 'vc-annotate-mode whitespace-exempt-modes)
-       (push 'vc-git-log-view-mode whitespace-exempt-modes)
+       (push 'vc-annotate-mode +whitespace-exempt-modes)
+       (push 'vc-git-log-view-mode +whitespace-exempt-modes)
 
        :config
        (require 'vc-git) ;; supported
@@ -12373,7 +12361,7 @@
       (use-package embark
         :straight t
         :init
-        (push 'embark-collect-mode whitespace-exempt-modes)
+        (push 'embark-collect-mode +whitespace-exempt-modes)
 
         :custom
         (embark-indicators
@@ -13576,7 +13564,7 @@
            display-buffer-same-window)))
 
        :init
-       (push 'bufler-list-mode whitespace-exempt-modes)
+       (push 'bufler-list-mode +whitespace-exempt-modes)
 
        :config
        ;; Force buffler to appear in the current window
@@ -13779,7 +13767,7 @@
         (dashboard-set-heading-icons nil)
 
         :preface
-        (push 'dashboard-mode whitespace-exempt-modes)
+        (push 'dashboard-mode +whitespace-exempt-modes)
 
         (defmacro dashboard-defun-shortcut-function+ (shortcut-char search-label &optional no-next-line)
           "translation of `dashboard-insert-shortcut' but less bizarre."
@@ -14006,7 +13994,7 @@
 
        :config
        (setq deft-directory +notes-home)
-       (push 'deft-mode whitespace-exempt-modes)
+       (push 'deft-mode +whitespace-exempt-modes)
 
        (advice-add 'deft-open-file :around 'display-buffer-no-select-window-advice)
 
@@ -14968,12 +14956,12 @@
                        (magit-section-goto (magit-current-section)))
                       (t (apply func args)))))
 
-       (setq whitespace-exempt-modes
+       (setq +whitespace-exempt-modes
              (append '(magit-status-mode
                        magit-process-mode
                        magit-log-mode
                        magit-diff-mode)
-                     whitespace-exempt-modes))
+                     +whitespace-exempt-modes))
 
        :leader
        (:prefix "g"
@@ -15554,7 +15542,7 @@
        (evil-set-initial-state 'notmuch-tree-mode 'motion)
        (evil-set-initial-state 'notmuch-hello-mode 'normal)
 
-       (push 'notmuch-show-mode whitespace-exempt-modes)
+       (push 'notmuch-show-mode +whitespace-exempt-modes)
 
        ;; Needs to be an absolute path when `notmuch-maildir-use-notmuch-insert' isn't
        ;; true. This won't adapt to changes in database.path while emacs is already
@@ -16651,7 +16639,7 @@
                   vterm-toggle-fullscreen
                   vterm-toggle-new-buffer+)
        :config
-       (push 'vterm-mode whitespace-exempt-modes)
+       (push 'vterm-mode +whitespace-exempt-modes)
        (evil-set-initial-state 'vterm-mode 'emacs)
 
        (setq vterm-kill-buffer-on-exit t
@@ -17043,7 +17031,7 @@
         (add-hook 'restclient-response-mode-hook
                   'evil-motion-state)
 
-        (push (rx "*HTTP Response*") whitespace-exempt-buffers)
+        (push (rx "*HTTP Response*") +whitespace-exempt-buffers)
 
         (defun restclient ()
           "create a new buffer in restclient mode"
@@ -17505,7 +17493,7 @@
         :straight t
         :init
         (defalias 'ruby-repl 'inf-ruby)
-        (push 'inf-ruby-mode whitespace-exempt-modes)
+        (push 'inf-ruby-mode +whitespace-exempt-modes)
 
         :lazy-leader
         (:mode +ruby-mode
@@ -17817,7 +17805,7 @@
        (sql-sqlite-options '("-interactive"))
 
        :init
-       (push 'sql-interactive-mode whitespace-exempt-modes)
+       (push 'sql-interactive-mode +whitespace-exempt-modes)
        (push '(sql-mode . 2) +indent-config)
 
        :config
@@ -18936,8 +18924,8 @@
       (use-package haskell-mode
         :straight t
         :init
-        (push 'haskell-interactive-mode whitespace-exempt-modes)
-        (push 'inferior-haskell-mode whitespace-exempt-modes)
+        (push 'haskell-interactive-mode +whitespace-exempt-modes)
+        (push 'inferior-haskell-mode +whitespace-exempt-modes)
 
         (defalias 'haskell-repl #'run-haskell)
 
@@ -19172,7 +19160,7 @@
        (rustic-lsp-server 'rust-analyzer)
 
        :init
-       (push 'rustic-popup-mode whitespace-exempt-modes)
+       (push 'rustic-popup-mode +whitespace-exempt-modes)
        ;; (push 'rustic-compilation-mode compilation-auto-kill-ignore-modes+)
        (push 'rustic-cargo-test-mode compilation-auto-kill-ignore-modes+)
 
@@ -19280,8 +19268,8 @@
        (push '(tex-mode   . 2) +indent-config)
        (push '(latex-mode . 2) +indent-config)
 
-       (push 'TeX-output-mode  whitespace-exempt-modes)
-       (push 'TeX-special-mode whitespace-exempt-modes)
+       (push 'TeX-output-mode  +whitespace-exempt-modes)
+       (push 'TeX-special-mode +whitespace-exempt-modes)
 
        :config
        (setq latex-standard-block-names
@@ -19730,10 +19718,10 @@
         ;; make ebib index use evil-motion-state
         (evil-set-initial-state 'ebib-index-mode 'motion)
         (evil-make-overriding-map ebib-index-mode-map 'motion)
-        (push 'ebib-index-mode whitespace-exempt-modes)
+        (push 'ebib-index-mode +whitespace-exempt-modes)
 
         ;;; ebib-log-mode
-        (push 'ebib-entry-mode whitespace-exempt-modes)
+        (push 'ebib-entry-mode +whitespace-exempt-modes)
         (evil-set-initial-state 'ebib-entry-mode 'motion)
         (evil-make-overriding-map ebib-entry-mode-map 'motion)
 
