@@ -77,6 +77,7 @@
          engine-mode                                                       ; Run a search on a given search engine and view in brower
          ;; eshell                                                         ; A nice lispy shell
          ;; expand-region                                                  ; Expand visual mode by semantic units
+         eyebrowse                                                         ; Provides switchable window configurations
          ;; flycheck                                                       ; A better buffer linter and error-checker package
          ;; frog-jump-buffer                                               ; Posframe to jump to a buffer
          ;; hide-comnt                                                     ; Minor mode to disable rendering of comments
@@ -3611,6 +3612,280 @@
         (prescient-persist-mode +1))                                                  ; persist statistics between emacs sessions
     #+END_SRC
 
+** hydra
+   #+BEGIN_SRC emacs-lisp
+     (use-package hydra
+       :straight t
+       :hook
+       (lv-window . +hide-trailing-whitespace)
+       :custom (lv-use-separator t)
+
+       :preface
+       (defvar leader-hydra-leader-prefix "H")
+
+       :leader
+       (leader-hydra-leader-prefix
+        '(:ignore t :wk ("hydras" . "Cut off one head, two more shall take it's place!"))))
+
+     (use-package use-package-hydra :straight t :demand t)
+   #+END_SRC
+
+*** pretty-hydra
+    Lets you quickly define hierarchically well structured hydras from a general
+    topological description of their commands.
+
+    #+begin_src emacs-lisp
+      (use-package pretty-hydra
+        :straight t
+        ;; Needs to be loaded or use-package-keyword fails :cry:.
+        :demand t)
+    #+end_src
+
+*** hydra-posframe
+     Changes the display of the the hydra popups from some region above the message area into a
+     posframe :) like ~frog-jump-buffer~.
+
+     #+BEGIN_SRC emacs-lisp :tangle (package-yes! hydra-posframe)
+       (use-package hydra-posframe
+         :straight (hydra-posframe :host github :repo "Ladicle/hydra-posframe")
+         :after hydra
+         :init
+         (when (display-graphic-p)
+           ;; Only use posframe when on graphical display
+           ;; my terminals always too short for it to be
+           ;; useful on there.
+           (add-hook 'after-init-hook #'hydra-posframe-mode))
+
+         :config
+         ;; Source for following section [[https://github.com/jerrypnz/.emacs.d/blob/master/config/jp-base.el][here]].
+         (defun posframe-frame-bottom-poshandler+ (info)
+           (cons (car (posframe-poshandler-frame-center info))
+                 (- (cdr (posframe-poshandler-frame-bottom-left-corner info)) 20)))
+
+         :custom
+         (hydra-posframe-poshandler 'posframe-frame-bottom-poshandler+)
+         (hydra-posframe-parameters '((alpha 100 100)
+                                      (left-fringe . 10)
+                                      (right-fringe . 10)
+                                      (x-pixel-offset 4)
+                                      (internal-border-width . 2))))
+     #+END_SRC
+
+*** hydras
+    Some hydras don't have specific packages or sections I can put them in so I place
+    them here instead.
+
+**** winman
+     Hydra for managing and interacting with windows.
+
+     #+BEGIN_SRC emacs-lisp
+       (autoload 'winman-hydra/body (lisp! "hydras" "winman-hydra.el") nil t)
+
+       (general-define-key
+        :keymaps 'emacs-window-map
+         "." '(winman-hydra/body    :wk "winman-hydra"))
+
+       (leader-set-keys
+         (concat leader-hydra-leader-prefix " h") '(winman-hydra/body :wk "winman-hydra"))
+     #+END_SRC
+
+     TODO: Support left-right to winner-undo.
+
+     #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/winman-hydra.el")
+       (require 'evil)
+       (require 'windmove)
+       (require 'winner)
+       (require 'winum)
+
+       (defhydra winman-hydra (:exit nil :foreign-keys nil :hint nil)
+         "
+       ^create^               ^move^      ^shift^          ^numbers^               ^resize^
+       ^-^------------------  ^-^-------  ^-^------------  ^-^--^-^--------------  ^-^----------------               (__)
+       _c_ create             _h_ left    _H_ move-left    _1_.._9_ window-n       _>_ increase-width                (00)
+       _d_ delete             _j_ down    _J_ move-down    _0_  ^ ^ window-by-num  _<_ decrease-width          /------\\/
+       _s_ split              _k_ up      _K_ move-up      ^ ^  ^ ^                _+_ increase-height        / |    ||
+       _v_ vsplit             _l_ right   _L_ move-right   ^ ^  ^ ^                _-_ decrease-height       *  /\\---/\\
+       _S_ split-and-focus    _n_ next    ^ ^              ^ ^  ^ ^                ^ ^                          ~~   ~~
+       _V_ vsplit-and-focus   _p_ prev
+
+       "
+         ("d" evil-window-delete)
+         ("c" evil-window-create)
+         ("s" evil-window-split)
+         ("v" evil-window-vsplit)
+         ("S" split-window-below-and-focus+)
+         ("V" split-window-right-and-focus+)
+
+         ("h" evil-window-left)
+         ("k" evil-window-up)
+         ("j" evil-window-down)
+         ("l" evil-window-right)
+         ("n" evil-window-next)
+         ("p" evil-window-prev)
+
+         ("H" windmove-left)
+         ("J" windmove-up)
+         ("K" windmove-down)
+         ("L" windmove-right)
+
+         ("0" winum-select-window-by-number)
+         ("1" winum-select-window nil)
+         ("2" winum-select-window nil)
+         ("3" winum-select-window nil)
+         ("4" winum-select-window nil)
+         ("5" winum-select-window nil)
+         ("6" winum-select-window nil)
+         ("7" winum-select-window nil)
+         ("8" winum-select-window nil)
+         ("9" winum-select-window nil)
+
+         ("C-0" digit-argument)
+         ("C-1" digit-argument)
+         ("C-2" digit-argument)
+         ("C-3" digit-argument)
+         ("C-4" digit-argument)
+         ("C-5" digit-argument)
+         ("C-6" digit-argument)
+         ("C-7" digit-argument)
+         ("C-8" digit-argument)
+         ("C-9" digit-argument)
+
+         (">" evil-window-increase-width)
+         ("<" evil-window-decrease-width)
+         ("+" evil-window-increase-height)
+         ("-" evil-window-decrease-height)
+         ("_" evil-window-decrease-height)
+
+         ("u" winner-undo "undo")
+         ("r" winner-redo "redo" :exit t)
+
+         ("w" eyebrowse-hydra/body "workgroups" :exit t)
+
+         ("m" window-zen+ "zen" :exit t)
+         ("q" nil "quit" :exit t)
+         ("<escape>" nil "quit" :exit t)) ;; prevent evil-escape
+
+       (provide 'winman-hydra)
+     #+END_SRC
+
+**** indent
+     #+BEGIN_SRC emacs-lisp
+       (autoload 'indent-hydra/body (lisp! "hydras" "indent-hydra.el") nil t)
+
+       (general-define-key
+        "C-x TAB" 'indent-hydra/body)
+
+       (leader-set-keys
+         (concat leader-hydra-leader-prefix " TAB") '(indent-hydra/body :wk "indent-hydra"))
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/indent-hydra.el")
+       (defmacro indent-hydra--keep-visual-state-active (&rest body)
+         "when body is invoked with evil-visual, restore the state after body"
+         `(let ((visual-active (evil-visual-state-p)))
+            ,@body
+            (when visual-active
+              (evil-normal-state)
+              (evil-visual-restore))))
+       (put 'indent-hydra--keep-visual-state-active 'elisp-indent-function 'defun)
+
+       (defun indent-hydra--get-region ()
+         "return the active region, or the current lines region"
+         (if (region-active-p)
+             (list (region-beginning) (region-end))
+           (list (line-beginning-position) (line-end-position))))
+
+       (defun indent-hydra--join-args-to-region (&rest args)
+         (let ((region (indent-hydra--get-region)))
+           (apply 'list
+                  (car   region)
+                  (nth 1 region)
+                  args)))
+
+       (defun indent-hydra-set-column (&optional column)
+         "set indentation of line or region such that it reaches COLUMN
+       when a region is active, function works by moving from the start of the
+       region downwards until a non-empty (whitespace does not count) line is
+       encountered, and then calculates the offset required to make that lines
+       indentation the same as the COLUMN and then applies that offset to every
+       line in the region.
+
+       Negative values for COLUMN will be coerced to be +ve and unless called
+       interactively, COLUMN will default to 1 when not specified."
+         (interactive "P")
+         (or column (setq column
+                          (if (not (called-interactively-p))
+                              +1
+                            (read-number "column: "))))
+
+         (and (< column 0) (setq column 0)) ;; ensure +ve
+
+         (save-excursion
+           (let* ((region-boundary (indent-hydra--get-region))
+                  (start           (car   region-boundary))
+                  (end             (nth 1 region-boundary))
+                  indent-diff)
+             (goto-char start) ;; start of indenting section
+
+             (while (and (<= start end)
+                         (line-empty-p)
+                         (not (eobp)))
+               ;; move forward until indent-able line encountered
+               (next-line))
+
+             (unless (or (eobp)
+                         (> start end))
+               (setq indent-diff (- column (current-indentation)))
+               (indent-rigidly start end indent-diff)))))
+
+       (defvar indent-hydra--ascii-art
+         "
+       "
+         "cool ascii art, which can't be in docstring because it has ___")
+
+       (defhydra indent-hydra (:foreign-keys run :hint nil)
+         "
+        ^ ^    ^ ^    ^ ^ |  ^ ^         |       dMP dMMMMb  dMMMMb  dMMMMMP dMMMMb dMMMMMMP .aMMMb dMMMMMMP dMP .aMMMb  dMMMMb
+        _H_    ^ ^    ^ ^ | [_q_]: quit  |      amr dMP dMP dMP VMP dMP     dMP dMP   dMP   dMP\"dMP   dMP   amr dMP\"dMP dMP dMP
+        _h_   _RET_   _l_ | [_s_]: break |     dMP dMP dMP dMP dMP dMMMP   dMP dMP   dMP   dMMMMMP   dMP   dMP dMP dMP dMP dMP
+        ^ ^    ^ ^    _L_ |  ^ ^         |    dMP dMP dMP dMP.aMP dMP     dMP dMP   dMP   dMP dMP   dMP   dMP dMP.aMP dMP dMP
+        ^ ^    ^ ^    ^ ^ |  ^ ^         |   dMP dMP dMP dMMMMP\" dMMMMMP dMP dMP   dMP   dMP dMP   dMP   dMP  VMMMP\" dMP dMP
+       "
+         ("h" (indent-hydra--keep-visual-state-active
+               (apply 'indent-rigidly
+                      (indent-hydra--join-args-to-region
+                       (or (and current-prefix-arg
+                                (- current-prefix-arg))
+                           -1)))))
+         ("l" (indent-hydra--keep-visual-state-active
+               (apply 'indent-rigidly
+                      (indent-hydra--join-args-to-region
+                       (or current-prefix-arg +1)))))
+         ("H" (indent-hydra--keep-visual-state-active
+               (apply 'evil-shift-left
+                      (indent-hydra--join-args-to-region
+                       (or current-prefix-arg +1)))))
+         ("L" (indent-hydra--keep-visual-state-active
+               (apply 'evil-shift-right
+                      (indent-hydra--join-args-to-region
+                       (or current-prefix-arg +1)))))
+         ("s"   (indent-hydra--keep-visual-state-active
+                 (call-interactively 'split-line)))
+         ("RET" (indent-hydra--keep-visual-state-active
+                 (call-interactively 'indent-hydra-set-column)))
+
+         ("q" nil :exit t))
+
+       (general-define-key
+         :keymaps 'indent-hydra/keymap
+         ;; that's scroll-up silly?
+         "C-u" nil
+         ">" 'indent-hydra/lambda-L
+         "<" 'indent-hydra/lambda-H)
+
+       (provide 'indent-hydra)
+     #+END_SRC
+
 ** evil
    The quintessential [[https://github.com/emacs-evil/evil][vi emulation]] package for emacs :speak_no_evil:.
 
@@ -3865,7 +4140,6 @@
          "g*" 'evil-multiedit-all
          "gI" 'evil-multiedit-restore)
         (:states 'multiedit
-         "g." 'hydra-evil-multiedit/body
          "g*" 'evil-multiedit-match-all
          "gh" 'evil-multiedit-prev
          "gl" 'evil-multiedit-next
@@ -3876,6 +4150,25 @@
         (:states 'multiedit
          "G"  nil "gg" nil))
     #+END_SRC
+
+**** evil-multiedit-hydra
+     #+begin_src emacs-lisp
+       (use-package evil-multiedit
+         :general
+         (:states 'multiedit
+          "g." 'evil-multiedit-hydra/body)
+
+         :hydra
+         (evil-multiedit-hydra ()
+          ("k" evil-multiedit-next "next")
+          ("j" evil-multiedit-prev "prev")
+          ("l" evil-multiedit-match-and-next "mark-next")
+          ("h" evil-multiedit-match-and-prev "mark-prev")
+          ("*" evil-multiedit-match-all "mark-all")
+
+          ("q" nil nil)
+          ("<escape>" nil nil)))
+     #+end_src
 
 *** evil-traces
     indicators for various ex commands.
@@ -4934,12 +5227,151 @@
     #+END_SRC
 
 ** eyebrowse
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! eyebrowse)
+   :END:
+
    #+BEGIN_SRC emacs-lisp
      (use-package eyebrowse
        :straight t
        :config
        (eyebrowse-mode +1))
    #+END_SRC
+
+*** eyebrowse-hydra
+    #+BEGIN_SRC emacs-lisp
+      (autoload 'eyebrowse-hydra/body (lisp! "hydras" "eyebrowse-hydra.el") nil t)
+
+      (general-define-key
+       :keymaps 'emacs-window-map
+        "w"   '(eyebrowse-hydra/body :wk "eyebrowse-hydra")
+        "C-w" '(eyebrowse-hydra/body :wk "eyebrowse-hydra"))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "hydras/eyebrowse-hydra.el") eyebrowse)
+      (require 'eyebrowse)
+
+      (defvar eyebrowse-hydra/verbose-p nil
+        "when true, hydra hint doesn't show keybindings")
+
+      (defvar eyebrowse-hydra/show-wconfig-names t
+        "when true, wconfigs in the hydra header will includes names (when applicable)")
+
+      (defhydra eyebrowse-hydra (:hint nil :foreign-keys nil)
+        ("0" eyebrowse-switch-to-window-config-0 :exit t)
+        ("1" eyebrowse-switch-to-window-config-1 :exit t)
+        ("2" eyebrowse-switch-to-window-config-2 :exit t)
+        ("3" eyebrowse-switch-to-window-config-3 :exit t)
+        ("4" eyebrowse-switch-to-window-config-4 :exit t)
+        ("5" eyebrowse-switch-to-window-config-5 :exit t)
+        ("6" eyebrowse-switch-to-window-config-6 :exit t)
+        ("7" eyebrowse-switch-to-window-config-7 :exit t)
+        ("8" eyebrowse-switch-to-window-config-8 :exit t)
+        ("9" eyebrowse-switch-to-window-config-9 :exit t)
+
+        ("M-0" eyebrowse-switch-to-window-config-0)
+        ("M-1" eyebrowse-switch-to-window-config-1)
+        ("M-2" eyebrowse-switch-to-window-config-2)
+        ("M-3" eyebrowse-switch-to-window-config-3)
+        ("M-4" eyebrowse-switch-to-window-config-4)
+        ("M-5" eyebrowse-switch-to-window-config-5)
+        ("M-6" eyebrowse-switch-to-window-config-6)
+        ("M-7" eyebrowse-switch-to-window-config-7)
+        ("M-8" eyebrowse-switch-to-window-config-8)
+        ("M-9" eyebrowse-switch-to-window-config-9)
+
+        ("c" eyebrowse-create-window-config)
+        ("d" eyebrowse-close-window-config)
+        ("r" eyebrowse-rename-window-config)
+        ("n" eyebrowse-next-window-config)
+        ("l" eyebrowse-next-window-config)
+        ("N" eyebrowse-prev-window-config)
+        ("h" eyebrowse-prev-window-config)
+        ("TAB" eyebrowse-last-window-config)
+        ("u" (progn (winner-undo) (setq this-command 'winner-undo)))
+        ("U" winner-redo :exit t)
+        ("?" (setq eyebrowse-hydra/verbose-p (not eyebrowse-hydra/verbose-p)))
+        ("t" (setq eyebrowse-hydra/show-wconfig-names (not eyebrowse-hydra/show-wconfig-names)))
+        ("w" winman-hydra/body :exit t)
+
+        ("q" nil :exit t))
+
+      (defmacro eyebrowse-hydra/generate-set-binding (kbd value)
+        ;; `(unless (eq (lookup-key eyebrowse-hydra/keymap ,kbd)
+        ;;              ,value)
+        ;;    (define-key eyebrowse-hydra/keymap ,kbd ,value))
+        `(define-key eyebrowse-hydra/keymap ,kbd ,value))
+      (put 'eyebrowse-hydra/generate-set-binding 'lisp-indent-function 'defun)
+
+      (defface eyebrowse-hydra/active-wconfig-face
+        '((t :inherit mode-line))
+        "face for inactive windows in the header string")
+
+      (defconst eyebrowse-hydra/complete-command-docstring
+            "
+      Jump                        Actions
+      ^^^^—————————————————————  —^—^———————————————————————————^—^————————————————
+      [_0_.._9_] nth wconfig     [_c_] create new wconfig      [_w_] window-manager
+      [_TAB_] previous wconfig^^ [_d_] delete current wconfig
+      ^^^^                       [_r_] rename current wconfig
+      [_h_/_N_] wconfig left
+      [_l_/_n_] wconfig right    [_u_/_U_] undo/redo wconfig
+      ")
+
+      (defmacro eyebrowse-window-list-to-title (window-list)
+        "extract window config title from list.
+      is either the title or a nil value."
+        `(let ((title (car (cdr (cdr ,window-list)))))
+           (unless (string-empty-p title)
+             title)))
+
+      (setq eyebrowse-hydra/hint
+            ;; TODO break when too long
+            '(let ((current-wconfig-num (eyebrowse--get 'current-slot))
+                   header-s wconfig-item-s)
+               (dolist (wconfig-counter (number-sequence 0 9))
+                 (let ((wconfig-item (eyebrowse--window-config-present-p wconfig-counter)))
+                   (if (not wconfig-item)
+                       ;; ;; disable binding for non existent wconfig
+                       ;; (eyebrowse-hydra/generate-set-binding
+                       ;;   (number-to-string wconfig-counter) nil)
+                       nil
+
+                     ;; ;; re-enable binding for existent wconfig
+                     ;; (let* ((wconfig-counter-s (number-to-string wconfig-counter))
+                     ;;        (invoking-function (intern (concat "eyebrowse-hydra/eyebrowse-switch-to-window-config-"
+                     ;;                                           (number-to-string wconfig-counter)))))
+                     ;;   ;; re-enable bindings for workgroups which do exist or have been created
+                     ;;   (eyebrowse-hydra/generate-set-binding wconfig-counter-s invoking-function))
+
+                     ;; include wconfig in header string
+                     (let ((win-name (eyebrowse-window-list-to-title wconfig-item)))
+                       (setq wconfig-item-s (if (and win-name
+                                                     eyebrowse-hydra/show-wconfig-names)
+                                                (format "[%d:%s]" wconfig-counter win-name)
+                                              (format "[%d]" wconfig-counter)))
+
+                       (when (eq wconfig-counter
+                                 current-wconfig-num)
+                         (setq wconfig-item-s (propertize wconfig-item-s
+                                                          'face 'eyebrowse-hydra/active-wconfig-face)))
+
+                       (setq header-s (concat header-s wconfig-item-s " "))))))
+
+               (setq header-s (format "\n%s %s (_?_ help)\n"
+                                      (propertize "Window Configs"
+                                                  'face 'font-lock-string-face)
+                                      (s-trim header-s)))
+               (eval (hydra--format nil
+                                    '(nil nil :hint nil)
+                                    (if (not eyebrowse-hydra/verbose-p)
+                                        header-s
+                                      (concat header-s
+                                              eyebrowse-hydra/complete-command-docstring))
+                                    eyebrowse-hydra/heads))))
+
+      (provide 'eyebrowse-hydra)
+    #+END_SRC
 
 ** gitlink
    #+BEGIN_SRC emacs-lisp
@@ -4995,1062 +5427,6 @@
         "it" 'hl-todo-insert
         "it" 'hl-todo-insert-keyword))
    #+END_SRC
-
-** hydra
-   Tangles ~hydras.org~ alongside this org file and then sources bindings/autoloads
-   from ~hydras.el~.
-
-   #+BEGIN_SRC emacs-lisp
-     (use-package hydra
-       :straight t
-       :hook
-       (lv-window . +hide-trailing-whitespace)
-
-       :custom
-       (lv-use-separator t)
-
-       :leader
-       ("H" '(:ignore t :wk ("hydras" . "cut off one head, two more shall take it's place"))))
-
-     (use-package pretty-hydra
-       :straight t)
-   #+END_SRC
-
-    Changes the display of the the hydra popups from some region above the message area into a
-    posframe :) like ~frog-jump-buffer~.
-
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! hydra-posframe)
-      (use-package hydra-posframe
-        :straight (hydra-posframe :host github :repo "Ladicle/hydra-posframe")
-        :after hydra
-        :init
-        (when (display-graphic-p)
-          ;; Only use posframe when on graphical display
-          ;; my terminals always too short for it to be
-          ;; useful on there.
-          (add-hook 'after-init-hook #'hydra-posframe-mode))
-
-        :config
-        ;; Source for following section [[https://github.com/jerrypnz/.emacs.d/blob/master/config/jp-base.el][here]].
-        (defun posframe-frame-bottom-poshandler+ (info)
-          (cons (car (posframe-poshandler-frame-center info))
-                (- (cdr (posframe-poshandler-frame-bottom-left-corner info)) 20)))
-
-        :custom
-        (hydra-posframe-poshandler 'posframe-frame-bottom-poshandler+)
-        (hydra-posframe-parameters '((alpha 100 100)
-                                     (left-fringe . 10)
-                                     (right-fringe . 10)
-                                     (x-pixel-offset 4)
-                                     (internal-border-width . 2))))
-    #+END_SRC
-
-*** hydra-text-zoom
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-text-zoom/body (lisp! "hydras" "hydra-text-zoom.el") nil t)
-
-      (leader-set-keys
-        "Hx" '(hydra-text-zoom :wk "hydra-text-zoom"/body)
-        "x." '(hydra-text-zoom :wk "hydra-text-zoom"/body))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-text-zoom.el")
-      (defhydra hydra-text-zoom ()
-        ("+" text-scale-increase "increase")
-        ("-" text-scale-decrease "decrease")
-        ("0" (text-scale-increase 0) "reset")
-        ("a" text-scale-increase)
-        ("x" text-scale-decrease)
-        ("z" (text-scale-increase 0))
-        ("q" nil nil :exit t)
-        ("<escape>" nil nil :exit t))
-    #+END_SRC
-
-*** hydra-winman
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-winman/body (lisp! "hydras" "hydra-winman.el") nil t)
-
-      (general-define-key
-       :keymaps 'emacs-window-map
-        "." '(hydra-winman/body    :wk "hydra-winman"))
-      (leader-set-keys
-        "Hh" '(hydra-winman/body :wk "hydra-winman"))
-    #+END_SRC
-
-    TODO: Support left-right to winner-undo.
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-winman.el")
-      (require 'evil)
-      (require 'windmove)
-      (require 'winner)
-      (require 'winum)
-
-      (defhydra hydra-winman (:exit nil :foreign-keys nil :hint nil)
-        "
-      ^create^               ^move^      ^shift^          ^numbers^               ^resize^
-      ^-^------------------  ^-^-------  ^-^------------  ^-^--^-^--------------  ^-^----------------               (__)
-      _c_ create             _h_ left    _H_ move-left    _1_.._9_ window-n       _>_ increase-width                (00)
-      _d_ delete             _j_ down    _J_ move-down    _0_  ^ ^ window-by-num  _<_ decrease-width          /------\\/
-      _s_ split              _k_ up      _K_ move-up      ^ ^  ^ ^                _+_ increase-height        / |    ||
-      _v_ vsplit             _l_ right   _L_ move-right   ^ ^  ^ ^                _-_ decrease-height       *  /\\---/\\
-      _S_ split-and-focus    _n_ next    ^ ^              ^ ^  ^ ^                ^ ^                          ~~   ~~
-      _V_ vsplit-and-focus   _p_ prev
-
-      "
-        ("d" evil-window-delete)
-        ("c" evil-window-create)
-        ("s" evil-window-split)
-        ("v" evil-window-vsplit)
-        ("S" split-window-below-and-focus+)
-        ("V" split-window-right-and-focus+)
-
-        ("h" evil-window-left)
-        ("k" evil-window-up)
-        ("j" evil-window-down)
-        ("l" evil-window-right)
-        ("n" evil-window-next)
-        ("p" evil-window-prev)
-
-        ("H" windmove-left)
-        ("J" windmove-up)
-        ("K" windmove-down)
-        ("L" windmove-right)
-
-        ("0" winum-select-window-by-number)
-        ("1" winum-select-window nil)
-        ("2" winum-select-window nil)
-        ("3" winum-select-window nil)
-        ("4" winum-select-window nil)
-        ("5" winum-select-window nil)
-        ("6" winum-select-window nil)
-        ("7" winum-select-window nil)
-        ("8" winum-select-window nil)
-        ("9" winum-select-window nil)
-
-        ("C-0" digit-argument)
-        ("C-1" digit-argument)
-        ("C-2" digit-argument)
-        ("C-3" digit-argument)
-        ("C-4" digit-argument)
-        ("C-5" digit-argument)
-        ("C-6" digit-argument)
-        ("C-7" digit-argument)
-        ("C-8" digit-argument)
-        ("C-9" digit-argument)
-
-        (">" evil-window-increase-width)
-        ("<" evil-window-decrease-width)
-        ("+" evil-window-increase-height)
-        ("-" evil-window-decrease-height)
-        ("_" evil-window-decrease-height)
-
-        ("u" winner-undo "undo")
-        ("r" winner-redo "redo" :exit t)
-
-        ("w" hydra-eyebrowse/body "workgroups" :exit t)
-
-        ("m" window-zen+ "zen" :exit t)
-        ("q" nil "quit" :exit t)
-        ("<escape>" nil "quit" :exit t)) ;; prevent evil-escape
-
-      (provide 'hydra-winman)
-    #+END_SRC
-
-*** hydra-eyebrowse
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-eyebrowse/body (lisp! "hydras" "hydra-eyebrowse.el") nil t)
-
-      (general-define-key
-       :keymaps 'emacs-window-map
-        "w"   '(hydra-eyebrowse/body :wk "hydra-windows")
-        "C-w" '(hydra-eyebrowse/body :wk "hydra-windows"))
-
-      (leader-set-keys
-        "HL" '(hydra-eyebrowse :wk "hydra-eyebrowse"/body))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-eyebrowse.el")
-      (require 'eyebrowse)
-
-      (defvar hydra-eyebrowse/verbose-p nil
-        "when true, hydra hint doesn't show keybindings")
-
-      (defvar hydra-eyebrowse/show-wconfig-names t
-        "when true, wconfigs in the hydra header will includes names (when applicable)")
-
-      (defhydra hydra-eyebrowse (:hint nil)
-        ("0" eyebrowse-switch-to-window-config-0 :exit t)
-        ("1" eyebrowse-switch-to-window-config-1 :exit t)
-        ("2" eyebrowse-switch-to-window-config-2 :exit t)
-        ("3" eyebrowse-switch-to-window-config-3 :exit t)
-        ("4" eyebrowse-switch-to-window-config-4 :exit t)
-        ("5" eyebrowse-switch-to-window-config-5 :exit t)
-        ("6" eyebrowse-switch-to-window-config-6 :exit t)
-        ("7" eyebrowse-switch-to-window-config-7 :exit t)
-        ("8" eyebrowse-switch-to-window-config-8 :exit t)
-        ("9" eyebrowse-switch-to-window-config-9 :exit t)
-
-        ("M-0" eyebrowse-switch-to-window-config-0)
-        ("M-1" eyebrowse-switch-to-window-config-1)
-        ("M-2" eyebrowse-switch-to-window-config-2)
-        ("M-3" eyebrowse-switch-to-window-config-3)
-        ("M-4" eyebrowse-switch-to-window-config-4)
-        ("M-5" eyebrowse-switch-to-window-config-5)
-        ("M-6" eyebrowse-switch-to-window-config-6)
-        ("M-7" eyebrowse-switch-to-window-config-7)
-        ("M-8" eyebrowse-switch-to-window-config-8)
-        ("M-9" eyebrowse-switch-to-window-config-9)
-
-        ("c" eyebrowse-create-window-config)
-        ("d" eyebrowse-close-window-config)
-        ("r" eyebrowse-rename-window-config)
-        ("n" eyebrowse-next-window-config)
-        ("l" eyebrowse-next-window-config)
-        ("N" eyebrowse-prev-window-config)
-        ("h" eyebrowse-prev-window-config)
-        ("TAB" eyebrowse-last-window-config)
-        ("u" (progn (winner-undo) (setq this-command 'winner-undo)))
-        ("U" winner-redo :exit t)
-        ("?" (setq hydra-eyebrowse/verbose-p (not hydra-eyebrowse/verbose-p)))
-        ("t" (setq hydra-eyebrowse/show-wconfig-names (not hydra-eyebrowse/show-wconfig-names)))
-        ("m" hydra-winman/body :exit t)
-
-        ("q" nil :exit t))
-
-      (defmacro hydra-eyebrowse/generate-set-binding (kbd value)
-        ;; `(unless (eq (lookup-key hydra-eyebrowse/keymap ,kbd)
-        ;;              ,value)
-        ;;    (define-key hydra-eyebrowse/keymap ,kbd ,value))
-        `(define-key hydra-eyebrowse/keymap ,kbd ,value))
-      (put 'hydra-eyebrowse/generate-set-binding 'lisp-indent-function 'defun)
-
-      (defface hydra-eyebrowse/active-wconfig-face
-        '((t :inherit mode-line))
-        "face for inactive windows in the header string")
-
-      (defconst hydra-eyebrowse/complete-command-docstring
-            "
-      Jump                        Actions
-      ^^^^—————————————————————  —^—^———————————————————————————^—^————————————————
-      [_0_.._9_] nth wconfig     [_c_] create new wconfig      [_m_] window-manager
-      [_TAB_] previous wconfig^^ [_d_] delete current wconfig
-      ^^^^                       [_r_] rename current wconfig
-      [_h_/_N_] wconfig left
-      [_l_/_n_] wconfig right    [_u_/_U_] undo/redo wconfig
-      ")
-
-      (defmacro eyebrowse-window-list-to-title (window-list)
-        "extract window config title from list.
-      is either the title or a nil value."
-        `(let ((title (car (cdr (cdr ,window-list)))))
-           (unless (string-empty-p title)
-             title)))
-
-      (setq hydra-eyebrowse/hint
-            ;; TODO break when too long
-            '(let ((current-wconfig-num (eyebrowse--get 'current-slot))
-                   header-s wconfig-item-s)
-               (dolist (wconfig-counter (number-sequence 0 9))
-                 (let ((wconfig-item (eyebrowse--window-config-present-p wconfig-counter)))
-                   (if (not wconfig-item)
-                       ;; ;; disable binding for non existent wconfig
-                       ;; (hydra-eyebrowse/generate-set-binding
-                       ;;   (number-to-string wconfig-counter) nil)
-                       nil
-
-                     ;; ;; re-enable binding for existent wconfig
-                     ;; (let* ((wconfig-counter-s (number-to-string wconfig-counter))
-                     ;;        (invoking-function (intern (concat "hydra-eyebrowse/eyebrowse-switch-to-window-config-"
-                     ;;                                           (number-to-string wconfig-counter)))))
-                     ;;   ;; re-enable bindings for workgroups which do exist or have been created
-                     ;;   (hydra-eyebrowse/generate-set-binding wconfig-counter-s invoking-function))
-
-                     ;; include wconfig in header string
-                     (let ((win-name (eyebrowse-window-list-to-title wconfig-item)))
-                       (setq wconfig-item-s (if (and win-name
-                                                     hydra-eyebrowse/show-wconfig-names)
-                                                (format "[%d:%s]" wconfig-counter win-name)
-                                              (format "[%d]" wconfig-counter)))
-
-                       (when (eq wconfig-counter
-                                 current-wconfig-num)
-                         (setq wconfig-item-s (propertize wconfig-item-s
-                                                          'face 'hydra-eyebrowse/active-wconfig-face)))
-
-                       (setq header-s (concat header-s wconfig-item-s " "))))))
-
-               (setq header-s (format "\n%s %s (_?_ help)\n"
-                                      (propertize "Window Configs"
-                                                  'face 'font-lock-string-face)
-                                      (s-trim header-s)))
-               (eval (hydra--format nil
-                                    '(nil nil :hint nil)
-                                    (if (not hydra-eyebrowse/verbose-p)
-                                        header-s
-                                      (concat header-s
-                                              hydra-eyebrowse/complete-command-docstring))
-                                    hydra-eyebrowse/heads))))
-
-      (provide 'hydra-eyebrowse)
-    #+END_SRC
-
-*** hydra-flycheck
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-flycheck/body (lisp! "hydras" "hydra-flycheck.el") nil t)
-      (leader-set-keys
-        "He" '(hydra-flycheck/body :wk "hydra-flycheck"))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-flycheck.el")
-      (require 'flycheck)
-
-      (defhydra hydra-flycheck
-        (:pre (let ((buffer-window (selected-window)))
-                (flycheck-list-errors)
-                (select-window buffer-window))
-         :post (quit-windows-on "*Flycheck errors*")
-         :hint nil)
-        "Errors"
-        ("f"  flycheck-error-list-set-filter "Filter")
-        ("j"  flycheck-next-error "Next")
-        ("k"  flycheck-previous-error "Previous")
-        ("gg" flycheck-first-error "First")
-        ("G"  flycheck-last-error "Last")
-        ("q"  nil :exit t))
-
-      (provide 'hydra-flycheck)
-    #+END_SRC
-
-*** hydra-flymake
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-flymake/body (lisp! "hydras" "hydra-flymake.el") nil t)
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-flymake.el")
-      (require 'flymake)
-
-      (defvar hydra-flymake--window nil
-        "Window showing hydra-flymake diagnostics.")
-
-      (defhydra hydra-flymake
-        (:pre (let ((buffer-window (selected-window)))
-                (setq hydra-flymake--window (flymake-show-diagnostics-buffer))
-                (select-window buffer-window))
-         :post (when hydra-flymake--window
-                 (quit-window nil hydra-flymake--window))
-         :hint nil)
-        "Errors"
-        ("j"  flymake-goto-next-error "Next")
-        ("k"  flymake-goto-prev-error "Previous")
-        ("gg" flymake-first-error+ "First")
-        ("G"  flymake-last-error+ "Last")
-        ("q"  nil :exit t))
-    #+END_SRC
-
-*** hydra-ibuffer
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer)
-      (autoload 'hydra-ibuffer/body (lisp! "hydras" "hydra-ibuffer.el") nil t)
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "hydras/hydra-ibuffer.el") ibuffer)
-      ;; source: https://github.com/abo-abo/hydra/wiki/Ibuffer
-      (require 'ibuffer)
-
-      (defhydra hydra-ibuffer-main (:color pink :hint nil)
-        "
-       ^ ^ ^   ^ ^ ^ | Marks [_*_] | Actions [_a_]     | View       ^^| Select      ^^|
-       _k_ ^ ↑ ^ _h_ +-^-^---------+-^-^---------------+-^-^----------+-^-^-----------+
-       ^ ^ _RET_ ^ ^ | _m_ark      | _D_: delete       | _g_: refresh | _TAB_: toggle |
-       _j_ ^ ↓ ^ _l_ | _u_nmark    | _s_: save marked  | _S_: sort    | _o_: open     |
-       ^ ^ ^   ^ ^ ^ | _t_oggle    | _._: toggle hydra | _/_: filter  | _q_: quit     |
-      "
-        ("m" ibuffer-mark-forward)
-        ("u" ibuffer-unmark-forward)
-        ("*" hydra-ibuffer-mark/body :exit t)
-        ("M" hydra-ibuffer-mark/body :exit t)
-        ("t" ibuffer-toggle-marks)
-
-        ("D" ibuffer-do-delete)
-        ("s" ibuffer-do-save)
-        ("a" hydra-ibuffer-action/body :exit t)
-
-        ("g" ibuffer-update)
-        ("S" hydra-ibuffer-sort/body :exit t)
-        ("/" hydra-ibuffer-filter/body :exit t)
-        ("H" describe-mode :exit t)
-
-        ("h" ibuffer-backward-filter-group)
-        ("k" ibuffer-backward-line)
-        ("l" ibuffer-forward-filter-group)
-        ("j" ibuffer-forward-line)
-        ("RET" ibuffer-visit-buffer :exit t)
-
-        ("TAB" ibuffer-toggle-filter-group)
-
-        ("o" ibuffer-visit-buffer-other-window :exit t)
-        ("Q" quit-window :exit t)
-        ("q" nil :exit t)
-        ("." nil :exit t))
-
-      (defalias 'hydra-ibuffer/body #'hydra-ibuffer-main/body)
-
-      (defhydra hydra-ibuffer-mark (:color teal :columns 5 :after-exit (hydra-ibuffer-main/body))
-        "Mark"
-        ("*" ibuffer-unmark-all "unmark all")
-        ("M" ibuffer-mark-by-mode "mode")
-        ("m" ibuffer-mark-modified-buffers "modified")
-        ("u" ibuffer-mark-unsaved-buffers "unsaved")
-        ("s" ibuffer-mark-special-buffers "special")
-        ("r" ibuffer-mark-read-only-buffers "read-only")
-        ("/" ibuffer-mark-dired-buffers "dired")
-        ("e" ibuffer-mark-dissociated-buffers "dissociated")
-        ("h" ibuffer-mark-help-buffers "help")
-        ("z" ibuffer-mark-compressed-file-buffers "compressed")
-        ("b" hydra-ibuffer-main/body "back" :exit t))
-
-      (defhydra hydra-ibuffer-action (:color teal :columns 4
-                                      :after-exit
-                                      (if (eq major-mode 'ibuffer-mode)
-                                          (hydra-ibuffer-main/body)))
-        "Action"
-        ("A" ibuffer-do-view "view")
-        ("E" ibuffer-do-eval "eval")
-        ("F" ibuffer-do-shell-command-file "shell-command-file")
-        ("I" ibuffer-do-query-replace-regexp "query-replace-regexp")
-        ("H" ibuffer-do-view-other-frame "view-other-frame")
-        ("N" ibuffer-do-shell-command-pipe-replace "shell-cmd-pipe-replace")
-        ("M" ibuffer-do-toggle-modified "toggle-modified")
-        ("O" ibuffer-do-occur "occur")
-        ("P" ibuffer-do-print "print")
-        ("Q" ibuffer-do-query-replace "query-replace")
-        ("R" ibuffer-do-rename-uniquely "rename-uniquely")
-        ("T" ibuffer-do-toggle-read-only "toggle-read-only")
-        ("U" ibuffer-do-replace-regexp "replace-regexp")
-        ("V" ibuffer-do-revert "revert")
-        ("W" ibuffer-do-view-and-eval "view-and-eval")
-        ("X" ibuffer-do-shell-command-pipe "shell-command-pipe")
-        ("b" nil "back"))
-
-      (defhydra hydra-ibuffer-sort (:color amaranth :columns 3)
-        "Sort"
-        ("i" ibuffer-invert-sorting "invert")
-        ("a" ibuffer-do-sort-by-alphabetic "alphabetic")
-        ("v" ibuffer-do-sort-by-recency "recently used")
-        ("s" ibuffer-do-sort-by-size "size")
-        ("f" ibuffer-do-sort-by-filename/process "filename")
-        ("m" ibuffer-do-sort-by-major-mode "mode")
-        ("b" hydra-ibuffer-main/body "back" :exit t))
-
-      (defhydra hydra-ibuffer-filter (:color amaranth :columns 4)
-        "Filter"
-        ("m" ibuffer-filter-by-used-mode "mode")
-        ("M" ibuffer-filter-by-derived-mode "derived mode")
-        ("n" ibuffer-filter-by-name "name")
-        ("c" ibuffer-filter-by-content "content")
-        ("e" ibuffer-filter-by-predicate "predicate")
-        ("f" ibuffer-filter-by-filename "filename")
-        (">" ibuffer-filter-by-size-gt "size")
-        ("<" ibuffer-filter-by-size-lt "size")
-        ("/" ibuffer-filter-disable "disable")
-        ("b" hydra-ibuffer-main/body "back" :exit t))
-
-      (provide 'hydra-ibuffer)
-    #+END_SRC
-
-*** hydra-org-agenda
-    sourced from [[https://github.com/abo-abo/hydra/wiki/Org-agenda][here]]
-
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-org-agenda/body (lisp! "hydras" "hydra-org-agenda.el") nil t)
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-org-agenda.el")
-      (require 'org-agenda)
-
-      (defhydra hydra-org-agenda (:pre  (setq which-key-inhibit t)
-                                  :post (setq which-key-inhibit nil)
-                                  :hint none
-                                  :foreign-keys run)
-        "
-      Org agenda (_q_uit)
-
-      ^Clock^      ^Visit entry^              ^Date^             ^Other^
-      ^-----^----  ^-----------^------------  ^----^-----------  ^-----^---------
-      _ci_ in      _SPC_ in other window      _ds_ schedule      _gr_ reload
-      _co_ out     _TAB_ & go to location     _dd_ set deadline  _._  go to today
-      _cq_ cancel  _RET_ & del other windows  _dt_ timestamp     _gd_ go to date
-      _cj_ jump    _o_   link                 _+_  do later
-      ^^           ^^                         _-_  do earlier
-
-      ^View^          ^Filter^                 ^Headline^         ^Toggle mode^
-      ^----^--------  ^------^---------------  ^--------^-------  ^-----------^----
-      _vd_ day        _ft_ by tag              _ht_ set status    _tf_ follow
-      _vw_ week       _fc_ by category         _hk_ kill          _tl_ log
-      _vt_ fortnight  _fh_ by top headline     _hr_ refile        _ta_ archive trees
-      _vm_ month      _fx_ by regexp           _hA_ archive       _tA_ archive files
-      _vy_ year       _fd_ delete all filters  _h:_ set tags      _tr_ clock report
-      _vn_ next span                           _hp_ set priority  _td_ diaries
-      _vp_ prev span
-      _vr_ reset
-
-      "
-        ;; Entry
-        ("hA" org-agenda-archive-default)
-        ("hk" org-agenda-kill)
-        ("hp" org-agenda-priority)
-        ("hr" org-agenda-refile)
-        ("h:" org-agenda-set-tags)
-        ("ht" org-agenda-todo)
-        ;; Visit entry
-        ("o"   link-hint-open-link :exit t)
-        ("<tab>" org-agenda-goto :exit t)
-        ("TAB" org-agenda-goto :exit t)
-        ("SPC" org-agenda-show-and-scroll-up)
-        ("RET" org-agenda-switch-to :exit t)
-        ;; Date
-        ("dt" org-agenda-date-prompt)
-        ("dd" org-agenda-deadline)
-        ("+" org-agenda-do-date-later)
-        ("-" org-agenda-do-date-earlier)
-        ("ds" org-agenda-schedule)
-        ;; View
-        ("vd" org-agenda-day-view)
-        ("vw" org-agenda-week-view)
-        ("vt" org-agenda-fortnight-view)
-        ("vm" org-agenda-month-view)
-        ("vy" org-agenda-year-view)
-        ("vn" org-agenda-later)
-        ("vp" org-agenda-earlier)
-        ("vr" org-agenda-reset-view)
-        ;; Toggle mode
-        ("ta" org-agenda-archives-mode)
-        ("tA" (org-agenda-archives-mode 'files))
-        ("tr" org-agenda-clockreport-mode)
-        ("tf" org-agenda-follow-mode)
-        ("tl" org-agenda-log-mode)
-        ("td" org-agenda-toggle-diary)
-        ;; Filter
-        ("fc" org-agenda-filter-by-category)
-        ("fx" org-agenda-filter-by-regexp)
-        ("ft" org-agenda-filter-by-tag)
-        ("fh" org-agenda-filter-by-top-headline)
-        ("fd" org-agenda-filter-remove-all)
-        ;; Clock
-        ("cq" org-agenda-clock-cancel)
-        ("cj" org-agenda-clock-goto :exit t)
-        ("ci" org-agenda-clock-in :exit t)
-        ("co" org-agenda-clock-out)
-        ;; Other
-        ("q" nil :exit t)
-        ("gd" org-agenda-goto-date)
-        ("." org-agenda-goto-today)
-        ("gr" org-agenda-redo))
-
-      (provide 'hydra-org-agenda)
-    #+END_SRC
-
-*** hydra-org-clock
-    sourced from [[https://github.com/abo-abo/hydra/wiki/Org-clock-and-timers][here]].
-
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-org-clock/body (lisp! "hydras" "hydra-org-clock.el") nil t)
-      (leader-set-keys
-        "Hc" '(hydra-org-clock/body :wk "hydra-org-clock"))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-org-clock.el")
-      (require 'org-clock)
-
-      (defhydra hydra-org-clock (:color blue :hint nil)
-        "
-      ^Clock:^ ^In/out^     ^Edit^   ^Summary^    | ^Timers:^ ^Run^           ^Insert
-      -^-^-----^-^----------^-^------^-^----------|--^-^------^-^-------------^------
-      (_?_)    _i_n         _e_dit   _g_oto entry | (_z_)     _r_elative      ti_m_e
-       ^ ^     _c_ontinue   _q_uit   _d_isplay    |  ^ ^      cou_n_tdown     i_t_em
-       ^ ^     _o_ut        ^ ^      _R_eport     |  ^ ^      _p_ause toggle
-       ^ ^     ^ ^          ^ ^      ^ ^          |  ^ ^      _s_top
-      "
-        ("i" org-clock-in)
-        ("c" org-clock-in-last)
-        ("o" org-clock-out)
-
-        ("e" org-clock-modify-effort-estimate)
-        ("q" org-clock-cancel)
-
-        ("g" org-clock-goto)
-        ("d" org-clock-display)
-        ("R" org-clock-report)
-        ("?" (org-info "Clocking commands"))
-
-        ("r" org-timer-start)
-        ("n" org-timer-set-timer)
-        ("p" org-timer-pause-or-continue)
-        ("s" org-timer-stop)
-
-        ("m" org-timer)
-        ("t" org-timer-item)
-        ("z" (org-info "Timers")))
-
-      (provide 'hydra-org-clock)
-    #+END_SRC
-
-*** hydra-org-link
-    sourced from [[https://github.com/abo-abo/hydra/wiki/Org-mode-links][here]].
-
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-org-link/body (lisp! "hydras" "hydra-org-link.el") nil t)
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-org-link.el")
-      (require 'org-link-edit)
-
-      (defun org-link-unlinkify ()
-        "Replace an org-link with the description, or if this is absent, the path."
-        (interactive)
-        (let ((eop (org-element-context)))
-          (when (eq 'link (car eop))
-            (message "%s" eop)
-            (let* ((start (org-element-property :begin eop))
-                   (end (org-element-property :end eop))
-                   (contents-begin (org-element-property :contents-begin eop))
-                   (contents-end (org-element-property :contents-end eop))
-                   (path (org-element-property :path eop))
-                   (desc (and contents-begin
-                              contents-end
-                              (buffer-substring contents-begin contents-end))))
-              (setf (buffer-substring start end)
-                    (concat (or desc path)
-                            (make-string (org-element-property :post-blank eop) ?\s)))))))
-
-      (defhydra hydra-org-link (:color red)
-        "Org Link Edit"
-        ("j" org-link-edit-forward-slurp  "forward slurp")
-        ("k" org-link-edit-forward-barf   "forward barf")
-        ("u" org-link-edit-backward-slurp "backward slurp")
-        ("i" org-link-edit-backward-barf  "backward barf")
-        ("r" org-link-unlinkify "remove link")
-        ("q" nil "cancel" :exit t))
-
-      (provide 'hydra-org-link)
-    #+END_SRC
-
-*** hydra-org-navigation
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-org-navigate/body (lisp! "hydras" "hydra-org-navigate.el") nil t)
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-org-navigate.el")
-      (eval-when-compile
-        (require 'org))
-
-      (defun hydra-org-navigate--end-of-current-branch ()
-        (interactive)
-        (let ((last-point (point))
-              current-point)
-          (while (not (eq last-point
-                          current-point))
-            (setq last-point (point))
-            (org-forward-heading-same-level nil)
-            (setq current-point (point)))))
-
-      (defun hydra-org-navigate--beginning-of-current-branch ()
-        (interactive)
-        (let ((last-point (point))
-              current-point)
-          (while (not (eq last-point
-                          current-point))
-            (setq last-point (point))
-            (org-backward-heading-same-level nil)
-            (setq current-point (point)))))
-
-      (defun hydra-org-navigate--get-pretty-outline-path ()
-        "like `org-display-outline-path' except returns
-      the propertised string instead of displaying it."
-        (interactive)
-        (let ((separator nil)
-              (path (org-get-outline-path))
-              (file (buffer-file-name (buffer-base-buffer))))
-          (ignore-errors
-            (push (save-excursion
-                    (org-back-to-heading t)
-                    (when (looking-at org-complex-heading-regexp)
-                      (let ((text (match-string 4)))
-                        (set-text-properties 0 (length text) nil text)
-                        text)))
-                  path))
-          (setq path (reverse path))
-
-          (if path
-              (org-format-outline-path
-               path
-               (1- (frame-width))
-               (and file (concat (file-name-nondirectory file) ": "))
-               separator)
-            (and file (concat (file-name-nondirectory file) ": /")))))
-
-      (defvar hydra-org-navigate/verbose-p nil
-        "display extended help message for hydra-org-navigate/body")
-
-      (defhydra hydra-org-navigate (:hint nil :foreign-keys run)
-        ;; ("h" org-previous-visible-heading)
-        ;; ("p" org-previous-visible-heading)
-        ("h" org-outline-smart-up-level)
-        ("j" org-forward-heading-same-level)
-        ("k" org-backward-heading-same-level)
-        ("l" org-next-visible-heading)
-        ("J" org-next-visible-heading)
-        ("K" org-previous-visible-heading)
-        ("?" (setq hydra-org-navigate/verbose-p (not hydra-org-navigate/verbose-p)))
-        ("g" hydra-org-navigate--beginning-of-current-branch)
-        ("G" hydra-org-navigate--end-of-current-branch)
-        ("f" counsel-org-goto)
-        ("F" counsel-org-goto-all)
-        ("n" org-next-block)
-        ("N" org-previous-block)
-        ("b" org-previous-block)
-        ("q" nil :exit t))
-
-      (defconst hydra-org-navigate/header-hint
-        "
-        %s(hydra-org-navigate--get-pretty-outline-path) (_?_ help)")
-
-      (defconst hydra-org-navigate/complete-command-docstring
-       "
-      [_h_]: parent         [_g_]: first child    [_n_]: next block
-      [_j_]: sibling down   [_G_]: last child     [_b_]: prev block
-      [_k_]: sibling up     [_f_]: find node
-      [_l_]: next           [_F_]: find any node
-      ")
-
-      (setq hydra-org-navigate/hint
-            '(eval (hydra--format
-                    nil
-                    '(nil nil :hint nil)
-                    (concat hydra-org-navigate/header-hint
-                            (when hydra-org-navigate/verbose-p
-                              hydra-org-navigate/complete-command-docstring))
-                    hydra-org-navigate/heads)))
-
-      (provide 'hydra-org-navigate)
-    #+END_SRC
-
-*** hydra-vlc-rc
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! vlc-rc)
-      (autoload 'hydra-vlc-rc/body (lisp! "hydras" "hydra-vlc-rc.el") nil t)
-      (leader-set-keys
-        "Hv" '(hydra-vlc-rc/body :wk "hydra-vlc"))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "hydras/hydra-vlc-rc.el") vlc-rc)
-      ;; NOTE: comments with @ means add current value indicator
-
-      (defhydra hydra-vlc-rc (:hint nil)
-        "
-      ^ ^             | media          ^^| general commands  ^^^^| toggle                          ^^^^^^|       *@*
-      ^-^-------------+-^-^--------------+-------------------^^^^+---------------------------------^^^^^^|       :::
-      _d_elete-socket | _f_ind-file      | _F_ull-screen       ^^| _tl_/_tr_/_ts_ loop/repeat/shuffle    |      .   .
-      _k_ill-process  | _e_nqueue-file   | _v_olume-ctrl       ^^| _oa_/_od_ ^  ^ set audio track/device |     =@@@@@=
-      _q_uit/exit     | _c_lear-playlist | stream-_p_osition   ^^| _or_ ^  ^ ^  ^ set aspect ratio       |     -*###*-
-      ^ ^             | _n_ext-item      | _=_   ^ ^ reset speed | _os_ ^  ^ ^  ^ set subtitle track     |  :*:       :*:
-      ^ ^             | _p_rev-item      | _S-+_/_+_ raise speed | _oz_ ^  ^ ^  ^ set video zoom         |  @@@/**+**\\@@@
-      ^ ^             | _._ goto-item    | _S--_/_-_ lower speed | ^  ^ ^  ^ ^  ^                        | +@@@@@@@@@@@@@+
-      "
-        ("SPC" vlc/toggle-play)
-        ("f" vlc/add-file)
-
-        ;; speed
-        ("+" vlc/increase-speed)
-        ("=" vlc/reset-speed)
-        ("-" vlc/decrease-speed)
-        ("S-+" vlc/fast-forward)
-        ("S--" vlc/rewind)
-
-        ;; exit
-        ("d" vlc/kill-connection)
-        ("k" vlc/kill-process)
-
-        ;; playlist
-        ("c" vlc/clear)
-        ("f" vlc/add-file)
-        ("e" vlc/enqueue-file)
-        ("n" vlc/next)
-        ("p" vlc/previous)
-
-        ;; commands
-        ("F" vlc/toggle-fullscreen)
-        ("v" vlc/volume-ctrl) ;; @
-        ("s" vlc/screenshot)
-        ("|" vlc/screenshot)
-        ("p" vlc/set-stream-position)
-        ("'" vlc/set-stream-position)
-        ("." vlc/goto-playlist-item)
-
-        ;; toggle/options
-        ("tl" vlc/toggle-loop)    ;; @
-        ("tr" vlc/toggle-repeat)  ;; @
-        ("ts" vlc/toggle-shuffle) ;; @
-        ("oa" vlc/set-audio-track)
-        ("oc" vlc/set-video-crop)
-        ("od" vlc/set-audio-device)
-        ("or" vlc/set-aspect-ratio)
-        ("os" vlc/set-subtitle-track)
-        ("oz" vlc/set-zoom) ;; @
-
-        ("q" nil :exit t))
-
-      (provide 'hydra-vlc-rc)
-    #+END_SRC
-
-*** hydra-visual-move
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-visual-move/body (lisp! "hydras" "hydra-visual-move.el") nil t)
-      (leader-set-keys
-        "Hm" '(hydra-visual-move/body :wk "hydra-visual-move"))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-visual-move.el")
-      (require 'evil)
-
-      (defhydra hydra-visual-move (:foreign-keys run)
-        ("gj" evil-next-line "next-line")
-        ("gk" evil-previous-line "prev-line")
-        ("j"  evil-next-visual-line "next-visual-line")
-        ("k"  evil-previous-visual-line "prev-visual-line")
-        ("q"  nil "quit" :exit t))
-
-      (provide 'hydra-visual-move)
-    #+END_SRC
-
-*** hydra-indent
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-indent/body (lisp! "hydras" "hydra-indent.el") nil t)
-      (general-define-key
-       "C-x TAB" 'hydra-indent/body)
-      (leader-set-keys
-        "H TAB" '(hydra-indent/body :wk "hydra-indent"))
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-indent.el")
-      (defmacro hydra-indent--keep-visual-state-active (&rest body)
-        "when body is invoked with evil-visual, restore the state after body"
-        `(let ((visual-active (evil-visual-state-p)))
-           ,@body
-           (when visual-active
-             (evil-normal-state)
-             (evil-visual-restore))))
-      (put 'hydra-indent--keep-visual-state-active 'elisp-indent-function 'defun)
-
-      (defun hydra-indent--get-region ()
-        "return the active region, or the current lines region"
-        (if (region-active-p)
-            (list (region-beginning) (region-end))
-          (list (line-beginning-position) (line-end-position))))
-
-      (defun hydra-indent--join-args-to-region (&rest args)
-        (let ((region (hydra-indent--get-region)))
-          (apply 'list
-                 (car   region)
-                 (nth 1 region)
-                 args)))
-
-      (defun hydra-indent-set-column (&optional column)
-        "set indentation of line or region such that it reaches COLUMN
-      when a region is active, function works by moving from the start of the
-      region downwards until a non-empty (whitespace does not count) line is
-      encountered, and then calculates the offset required to make that lines
-      indentation the same as the COLUMN and then applies that offset to every
-      line in the region.
-
-      Negative values for COLUMN will be coerced to be +ve and unless called
-      interactively, COLUMN will default to 1 when not specified."
-        (interactive "P")
-        (or column (setq column
-                         (if (not (called-interactively-p))
-                             +1
-                           (read-number "column: "))))
-
-        (and (< column 0) (setq column 0)) ;; ensure +ve
-
-        (save-excursion
-          (let* ((region-boundary (hydra-indent--get-region))
-                 (start           (car   region-boundary))
-                 (end             (nth 1 region-boundary))
-                 indent-diff)
-            (goto-char start) ;; start of indenting section
-
-            (while (and (<= start end)
-                        (line-empty-p)
-                        (not (eobp)))
-              ;; move forward until indent-able line encountered
-              (next-line))
-
-            (unless (or (eobp)
-                        (> start end))
-              (setq indent-diff (- column (current-indentation)))
-              (indent-rigidly start end indent-diff)))))
-
-      (defvar hydra-indent--ascii-art
-        "
-      "
-        "cool ascii art, which can't be in docstring because it has ___")
-
-      (defhydra hydra-indent (:foreign-keys run :hint nil)
-        "
-       ^ ^    ^ ^    ^ ^ |  ^ ^         |       dMP dMMMMb  dMMMMb  dMMMMMP dMMMMb dMMMMMMP .aMMMb dMMMMMMP dMP .aMMMb  dMMMMb
-       _H_    ^ ^    ^ ^ | [_q_]: quit  |      amr dMP dMP dMP VMP dMP     dMP dMP   dMP   dMP\"dMP   dMP   amr dMP\"dMP dMP dMP
-       _h_   _RET_   _l_ | [_s_]: break |     dMP dMP dMP dMP dMP dMMMP   dMP dMP   dMP   dMMMMMP   dMP   dMP dMP dMP dMP dMP
-       ^ ^    ^ ^    _L_ |  ^ ^         |    dMP dMP dMP dMP.aMP dMP     dMP dMP   dMP   dMP dMP   dMP   dMP dMP.aMP dMP dMP
-       ^ ^    ^ ^    ^ ^ |  ^ ^         |   dMP dMP dMP dMMMMP\" dMMMMMP dMP dMP   dMP   dMP dMP   dMP   dMP  VMMMP\" dMP dMP
-      "
-      ;;   "
-      ;;  ^ ^    ^ ^    ^ ^ |  ^ ^         |           .         .       .             . . .
-      ;;  _H_    ^ ^    ^ ^ | [_q_]: quit  |   o       |         |       |   o         | | |
-      ;;  _h_   _RET_   _l_ | [_s_]: break |   . ;-. ,-| ,-. ;-. |-  ,-: |-  . ,-. ;-. | | |
-      ;;  ^ ^    ^ ^    _L_ |  ^ ^         |   | | | | | |-' | | |   | | |   | | | | |
-      ;;  ^ ^    ^ ^    ^ ^ |  ^ ^         |   ' ' ' `-' `-' ' ' `-' `-` `-' ' `-' ' ' o o o
-      ;; "
-
-        ("h" (hydra-indent--keep-visual-state-active
-              (apply 'indent-rigidly
-                     (hydra-indent--join-args-to-region
-                      (or (and current-prefix-arg
-                               (- current-prefix-arg))
-                          -1)))))
-        ("l" (hydra-indent--keep-visual-state-active
-              (apply 'indent-rigidly
-                     (hydra-indent--join-args-to-region
-                      (or current-prefix-arg +1)))))
-        ("H" (hydra-indent--keep-visual-state-active
-              (apply 'evil-shift-left
-                     (hydra-indent--join-args-to-region
-                      (or current-prefix-arg +1)))))
-        ("L" (hydra-indent--keep-visual-state-active
-              (apply 'evil-shift-right
-                     (hydra-indent--join-args-to-region
-                      (or current-prefix-arg +1)))))
-        ("s"   (hydra-indent--keep-visual-state-active
-                (call-interactively 'split-line)))
-        ("RET" (hydra-indent--keep-visual-state-active
-                (call-interactively 'hydra-indent-set-column)))
-
-        ("q" nil :exit t))
-
-      (general-define-key
-        :keymaps 'hydra-indent/keymap
-        ;; that's scroll-up silly?
-        "C-u" nil
-        ">" 'hydra-indent/lambda-L
-        "<" 'hydra-indent/lambda-H)
-
-      (provide 'hydra-indent)
-    #+END_SRC
-
-*** hydra-vdiff
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! vdiff)
-      (autoload 'hydra-vdiff/body (lisp! "hydras" "hydra-vdiff.el") nil t)
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "hydras/hydra-vdiff.el") vdiff)
-      (defhydra vdiff-toggle-hydra (nil nil :hint nil)
-        "
-      Toggles
-       _c_ ignore case: %s(vdiff--current-case)
-       _w_ ignore whitespace: %s(vdiff--current-whitespace)
-       _q_ back to main hydra"
-        ("c" vdiff-toggle-case)
-        ("w" vdiff-toggle-whitespace)
-        ("q" vdiff-hydra/body :exit t))
-
-      (defhydra vdiff-hydra (nil nil :hint nil :foreign-keys run)
-        (concat (propertize
-                 "\
-       Navigation^^^^          Refine^^   Transmit^^^^             Folds^^^^            Other"
-                 'face 'header-line)
-                "
-       _n_/_N_ next hunk/fold  _f_ this   _s_/_S_ send (+step)     _o_/_O_ open (all)   _i_ ^ ^ toggles
-       _p_/_P_ prev hunk/fold  _F_ all    _r_/_R_ receive (+step)  _c_/_C_ close (all)  _u_ ^ ^ update diff
-       _g_^ ^  switch buffers  _x_ clear  ^ ^ ^ ^                  _t_ ^ ^ close other  _w_ ^ ^ save buffers
-       ^ ^^ ^                  ^ ^        ^ ^ ^ ^                  ^ ^ ^ ^              _q_/_Q_ quit hydra/vdiff
-       ignore case: %s(vdiff--current-case) | ignore whitespace: %s(vdiff--current-whitespace)")
-        ("j" vdiff-next-hunk)
-        ("k" vdiff-previous-hunk)
-        ("J" vdiff-next-fold)
-        ("K" vdiff-previous-fold)
-        ("g" vdiff-switch-buffer)
-        ("s" vdiff-send-changes)
-        ("S" vdiff-send-changes-and-step)
-        ("r" vdiff-receive-changes)
-        ("R" vdiff-receive-changes-and-step)
-        ("o" vdiff-open-fold)
-        ("O" vdiff-open-all-folds)
-        ("c" vdiff-close-fold)
-        ("C" vdiff-close-all-folds)
-        ("t" vdiff-close-other-folds)
-        ("u" vdiff-refresh)
-        ("w" vdiff-save-buffers)
-        ("f" vdiff-refine-this-hunk)
-        ("F" vdiff-refine-all-hunks)
-        ("x" vdiff-remove-refinements-in-hunk)
-        ("i" vdiff-toggle-hydra/body :exit t)
-        ("q" nil :exit t)
-        ("Q" vdiff-quit :exit t))
-
-      (provide 'hydra-vdiff)
-    #+END_SRC
-
-*** hydra-iedit
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-evil-multiedit/body (lisp! "hydras" "hydra-evil-multiedit.el") nil t)
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-evil-multiedit.el")
-      (defhydra hydra-evil-multiedit ()
-        ("k" evil-multiedit-next "next")
-        ("j" evil-multiedit-prev "prev")
-        ("l" evil-multiedit-match-and-next "mark-next")
-        ("h" evil-multiedit-match-and-prev "mark-prev")
-        ("*" evil-multiedit-match-all "mark-all")
-
-        ("q" nil nil)
-        ("<escape>" nil nil))
-
-      (provide 'hydra-evil-multiedit)
-    #+END_SRC
-
-*** hydra-flyspell
-    #+BEGIN_SRC emacs-lisp
-      (autoload 'hydra-flyspell/body (lisp! "hydras" "hydra-flyspell.el") nil t)
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/hydra-flyspell.el")
-      (defhydra hydra-flyspell (nil nil :hint nil :foreign-keys run)
-        "
-      | ^M^ove       | ^R^echeck   | ^C^orrect      |
-      |-^-^----------|-^-^---------|-^-^------------|
-      | _h_ fix-prev | _gr_ region | _TAB_ cycle    |
-      | _j_ next     | _gb_ buffer | _c_   correct  |
-      | _k_ prev     | _gw_ word   | _p_   at-point |
-      | _l_ fix-next | ^  ^        | ^ ^            |
-      "
-        ("h" flyspell-correct-previous "fix-prev")
-        ("j" evil-next-flyspell-error "next")
-        ("k" evil-prev-flyspell-error "prev")
-        ("l" flyspell-correct-next "fix-next")
-
-        ("TAB" flyspell-auto-correct-word "cycle-suggestion")
-
-        ("c" flyspell-correct-wrapper "correct")
-        ("p" flyspell-correct-at-point "fix-at-point")
-
-        ("gb" flyspell-buffer "check-buffer")
-        ("gr" flyspell-region "check-region")
-        ("gw" flyspell-word "check-word")
-
-        ("q" nil nil)
-        ("<escape>" nil nil))
-
-      (provide 'hydra-flyspell)
-    #+END_SRC
 
 ** ialign
    #+BEGIN_SRC emacs-lisp
@@ -8968,8 +8344,7 @@
          (evil-declare-motion 'flymake-last-error+))
 
        :leader
-       ("e." 'hydra-flymake/body
-        "ej" 'flymake-goto-next-error
+       ("ej" 'flymake-goto-next-error
         "ek" 'flymake-goto-prev-error
         "er" 'flymake-start
         "ea" 'flymake-first-error+
@@ -8990,6 +8365,30 @@
         "o" 'flymake-show-diagnostic))
    #+END_SRC
 
+*** flymake-hydra
+    #+begin_src emacs-lisp
+      (use-package flymake
+        :leader
+        ("e." 'flymake-hydra/body)
+
+        :preface
+        (defvar flymake-hydra--window nil)
+
+        :hydra
+        (flymake-hydra
+         (:pre (let ((buffer-window (selected-window)))
+                 (setq flymake-hydra--window (flymake-show-diagnostics-buffer))
+                 (select-window buffer-window))
+          :post (when (and flymake-hydra--window
+                           (window-live-p flymake-hydra--window))
+                  (quit-window nil flymake-hydra--window))
+          :hint nil)
+         ("j"  flymake-goto-next-error "Next")
+         ("k"  flymake-goto-prev-error "Previous")
+         ("gg" flymake-first-error+ "First")
+         ("G"  flymake-last-error+ "Last")
+         ("q"  nil :exit t)))
+    #+end_src
 *** flymake-rest
     #+begin_src emacs-lisp
       (use-package flymake-rest
@@ -9063,6 +8462,22 @@
        :init
        (evil-ex-define-cmd "spell" #'flyspell-buffer)
 
+       :pretty-hydra
+       ((:hint nil :foreign-keys warn :quit-key "q")
+        ("Move"
+         (("h" flyspell-correct-previous "fix-prev")
+          ("j" evil-next-flyspell-error "next")
+          ("k" evil-prev-flyspell-error "prev")
+          ("l" flyspell-correct-next "fix-next"))
+         "Recheck"
+         (("gb" flyspell-buffer "check-buffer")
+          ("gr" flyspell-region "check-region")
+          ("gw" flyspell-word "check-word"))
+         "Correct"
+         (("TAB" flyspell-auto-correct-word "cycle-suggestion")
+          ("c" flyspell-correct-wrapper "correct")
+          ("p" flyspell-correct-at-point "fix-at-point"))))
+
        :config
        (add-hook 'org-mode-hook 'flyspell-mode)
 
@@ -9070,7 +8485,7 @@
        (:mode 'flyspell-mode
         :minor t
         :prefix leader-minor-mode-leader-prefix
-        "."  'hydra-flyspell/body
+        "."  'flyspell-hydra/body
         "cb" 'flyspell-buffer
         "cr" 'flyspell-region
         "cw" 'flyspell-word))
@@ -9226,186 +8641,297 @@
    :header-args+: :tangle (package-yes! ibuffer)
    :END:
 
-*** ibuffer
-    #+BEGIN_SRC emacs-lisp
-      (defvar ibuffer-show-buffer-icons+ nil
-        "Whether to show icons alongside the buffer")
+   #+BEGIN_SRC emacs-lisp
+     (defvar ibuffer-show-buffer-icons+ nil
+       "Whether to show icons alongside the buffer")
 
+     (use-package ibuffer
+       :hook (ibuffer-mode . hl-line-mode)
+       :leader
+       ("bm" 'ibuffer)
+
+       :custom
+       (ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold)))
+       (ibuffer-title-face '(:inherit (font-lock-type-face)))
+       (ibuffer-never-show-predicates (list (rx bol " " (* any))))
+       (ibuffer-formats
+        `((mark modified read-only locked
+           " "
+           ,@(when ibuffer-show-buffer-icons+
+               (list '(icon 2 2 :left :elide)
+                     (propertize " " 'display `(space :align-to 8))))
+           (name 20 20 :left :elide)
+           " "
+           (size-h 11 -1 :right)
+           " "
+           (mode+ 16 16 :left :elide)
+           " " filename-and-process+)
+          (mark " "
+           ,@(when ibuffer-show-buffer-icons+
+               (list '(icon 2 2 :left :elide)
+                     (propertize " " 'display `(space :align-to 8))))
+           (name 30 30 :left :elide)
+           " "
+           filename)))
+
+       :init
+       (evil-set-initial-state 'ibuffer-mode 'motion)
+
+       :config
+       (advice-add #'ibuffer-visit-buffer-other-window :override
+                   (defun ibuffer-visit-buffer-other-window+ (&optional noselect)
+                     "Fixes `ibuffer-visit-buffer-other-window' doesn't always open in new window."
+                     (let ((buf (ibuffer-current-buffer t)))
+                       (bury-buffer (current-buffer))
+                       (if noselect
+                           (let ((curwin (selected-window)))
+                             (switch-to-buffer-other-window buf)
+                             (select-window curwin))
+                         (switch-to-buffer-other-window buf)))))
+
+     ;;; Adapted from [[https://emacs.stackexchange.com/a/2179][here]], this makes ibuffer support `auto-revert-mode'.
+       :hook (ibuffer-mode . ibuffer-auto-revert-setup+)
+       :commands (ibuffer-auto-revert-setup+)
+       :config
+       (defun ibuffer-stale-p+ (&optional _noconfirm)
+         ;; Let's reuse the variable that's used for 'ibuffer-auto-mode
+         (frame-or-buffer-changed-p 'ibuffer-auto-buffers-changed))
+
+       (defun ibuffer-auto-revert-setup+ ()
+         (setq-local buffer-stale-function #'ibuffer-stale-p+
+                     auto-revert-verbose nil))
+
+       :lazy-leader
+       (:mode 'ibuffer-mode
+        ;; unbound:
+        ;;  * ibuffer-do-print
+        "RET" 'ibuffer-do-view-horizontally
+        "1"   'ibuffer-visit-buffer-1-window
+        "+"   'ibuffer-add-to-tmp-show
+        "-"   'ibuffer-add-to-tmp-hide
+
+        "a"   'ibuffer-auto-mode
+        "E"   'ibuffer-do-view-and-eval
+        "e"   'ibuffer-do-eval
+        ;; "R"   'ibuffer-redisplay
+        "r"   'ibuffer-do-rename-uniquely
+        "s"   'ibuffer-do-query-replace
+        "w"   'ibuffer-do-save
+        ;; "s"   'ibuffer-do-replace-regexp
+        "t"   'ibuffer-visit-tags-table
+        "f"   'ibuffer-find-file
+        "X"   'ibuffer-kill-filter-group
+        "P"   'ibuffer-yank-filter-group
+        "x"   'ibuffer-kill-line
+        "p"   'ibuffer-yank
+        "|"   'ibuffer-do-shell-command-pipe-replace
+        "~"   'ibuffer-do-toggle-modified
+
+        "o"   'ibuffer-do-view
+        "O"   'ibuffer-do-view-other-frame
+
+        "g"   'ibuffer-jump-to-buffer
+        "b"   'ibuffer-jump-to-filter-group
+
+        "m" '(:ignore t :wk "mark")
+        "m*" 'ibuffer-mark-modified-buffers
+        "m%" 'ibuffer-mark-read-only-buffers
+        "mm" 'ibuffer-toggle-marks
+        "mf" 'ibuffer-mark-by-name-regexp
+        "mf" 'ibuffer-mark-by-file-name-regexp
+        "mo" 'ibuffer-mark-old-buffers
+        "ml" 'ibuffer-mark-by-locked
+        "mb" 'ibuffer-mark-by-content-regexp
+        "mM" 'ibuffer-mark-by-mode-regexp
+        "md" 'ibuffer-mark-dired-buffers
+        "mh" 'ibuffer-mark-help-buffers
+        "mn" 'ibuffer-mark-dissociated-buffers
+        "mN" 'ibuffer-mark-unsaved-buffers
+        "ms" 'ibuffer-mark-special-buffers
+        "mz" 'ibuffer-mark-compressed-file-buffers)
+
+       :general
+       (:keymaps 'ibuffer-mode-map
+        "+" nil "-" nil "0" nil "f" nil "SPC" nil "S-SPC" nil ">" nil "<" nil "?" nil "h" nil "X" nil "F"
+        nil "C-d" nil "C-t" nil "b" nil "n" nil "g" nil "p" nil "w" nil "s" nil "`" nil "," nil "*" nil
+        "/" nil "A" nil "C-c" nil "C-x" nil "M-s" nil "M-g" nil "M-n" nil "M-p" nil "M-{" nil "M-}" nil
+        "M-o" nil "M-DEL" nil "%" nil)
+       (:keymaps 'ibuffer-mode-map
+        :states  'motion
+        ;; ibuffer-kill-line
+        ;; ibuffer-do-kill-lines
+        ;; ibuffer-do-revert
+        ;; ibuffer-do-isearch
+        ;; ibuffer-do-isearch-regexp
+
+        ;; "D" 'ibuffer-mark-for-delete-backwards
+        "D" 'ibuffer-do-delete
+        "M" 'ibuffer-do-toggle-modified
+        "=" 'ibuffer-diff-with-file
+        "O" 'ibuffer-do-occur
+        "R" 'ibuffer-do-toggle-read-only
+
+        "RET"   'ibuffer-visit-buffer
+        "o"     'ibuffer-visit-buffer-other-window
+        "i"     'ibuffer-visit-buffer-other-window-noselect
+        "M-RET" 'ibuffer-visit-buffer-other-window-noselect
+        "S-DEL" 'ibuffer-bury-buffer
+
+        [remap ibuffer-auto-mode] 'auto-revert-mode
+        [remap revert-buffer] 'ibuffer-update
+        "gu"                  'ibuffer-do-revert
+        "gw"                  'ibuffer-do-save
+
+        "|" 'ibuffer-do-shell-command-pipe-replace
+
+     ;;; marking
+        "m" 'ibuffer-mark-forward
+        "r" 'ibuffer-change-marks
+
+     ;;; sorting
+        "S"  'ibuffer-toggle-sorting-mode
+        "sa" 'ibuffer-do-sort-by-alphabetic
+        "sf" 'ibuffer-do-sort-by-filename/process
+        "si" 'ibuffer-invert-sorting
+        "s SPC" 'ibuffer-invert-sorting
+        "sm" 'ibuffer-do-sort-by-major-mode
+        "ss" 'ibuffer-do-sort-by-size
+        "sr" 'ibuffer-do-sort-by-recency
+        "("   'ibuffer-switch-format
+
+     ;;; movement
+        "TAB"       'ibuffer-forward-filter-group
+        "gj"        'ibuffer-forward-filter-group
+        "gk"        'ibuffer-backward-filter-group
+        "<S-tab>"   'ibuffer-backward-filter-group
+        "<backtab>" 'ibuffer-backward-filter-group
+
+        [remap evil-write] 'ibuffer-do-save
+        [remap evil-write-all] 'ibuffer-do-save
+        [remap evil-next-line] 'ibuffer-forward-line
+        [remap evil-previous-line] 'ibuffer-backward-line
+        [remap imenu] 'ibuffer-jump-to-buffer
+
+        "C-j"  'ibuffer-forward-next-marked
+        "C-k"  'ibuffer-backwards-next-marked
+
+        "p"   'ibuffer-yank
+        "C-y" 'ibuffer-yank
+        "y"   'ibuffer-copy-buffername-as-kill))
+   #+END_SRC
+
+*** ibuffer-hydra
+    Sourced from [[https://github.com/abo-abo/hydra/wiki/Ibuffer][wiki/Ibuffer]].
+
+    #+begin_src emacs-lisp
       (use-package ibuffer
-        :hook (ibuffer-mode . hl-line-mode)
-        :leader
-        ("bm" 'ibuffer)
-
-        :custom
-        (ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold)))
-        (ibuffer-title-face '(:inherit (font-lock-type-face)))
-        (ibuffer-never-show-predicates (list (rx bol " " (* any))))
-        (ibuffer-formats
-         `((mark modified read-only locked
-            " "
-            ,@(when ibuffer-show-buffer-icons+
-                (list '(icon 2 2 :left :elide)
-                      (propertize " " 'display `(space :align-to 8))))
-            (name 20 20 :left :elide)
-            " "
-            (size-h 11 -1 :right)
-            " "
-            (mode+ 16 16 :left :elide)
-            " " filename-and-process+)
-           (mark " "
-            ,@(when ibuffer-show-buffer-icons+
-                (list '(icon 2 2 :left :elide)
-                      (propertize " " 'display `(space :align-to 8))))
-            (name 30 30 :left :elide)
-            " "
-            filename)))
-
-        :init
-        (evil-set-initial-state 'ibuffer-mode 'motion)
-
-        :config
-        (advice-add #'ibuffer-visit-buffer-other-window :override
-                    (defun ibuffer-visit-buffer-other-window+ (&optional noselect)
-                      "Fixes `ibuffer-visit-buffer-other-window' doesn't always open in new window."
-                      (let ((buf (ibuffer-current-buffer t)))
-                        (bury-buffer (current-buffer))
-                        (if noselect
-                            (let ((curwin (selected-window)))
-                              (switch-to-buffer-other-window buf)
-                              (select-window curwin))
-                          (switch-to-buffer-other-window buf)))))
-
-      ;;; Adapted from [[https://emacs.stackexchange.com/a/2179][here]], this makes ibuffer support `auto-revert-mode'.
-        :hook (ibuffer-mode . ibuffer-auto-revert-setup+)
-        :commands (ibuffer-auto-revert-setup+)
-        :config
-        (defun ibuffer-stale-p+ (&optional _noconfirm)
-          ;; Let's reuse the variable that's used for 'ibuffer-auto-mode
-          (frame-or-buffer-changed-p 'ibuffer-auto-buffers-changed))
-
-        (defun ibuffer-auto-revert-setup+ ()
-          (setq-local buffer-stale-function #'ibuffer-stale-p+
-                      auto-revert-verbose nil))
-
+        :straight t
         :lazy-leader
         (:mode 'ibuffer-mode
-         ;; unbound:
-         ;;  * ibuffer-do-print
-         "RET" 'ibuffer-do-view-horizontally
-         "1"   'ibuffer-visit-buffer-1-window
-         "+"   'ibuffer-add-to-tmp-show
-         "-"   'ibuffer-add-to-tmp-hide
-         "."   'hydra-ibuffer/body
+         "."   'ibuffer-hydra/body)
 
-         "a"   'ibuffer-auto-mode
-         "E"   'ibuffer-do-view-and-eval
-         "e"   'ibuffer-do-eval
-         ;; "R"   'ibuffer-redisplay
-         "r"   'ibuffer-do-rename-uniquely
-         "s"   'ibuffer-do-query-replace
-         "w"   'ibuffer-do-save
-         ;; "s"   'ibuffer-do-replace-regexp
-         "t"   'ibuffer-visit-tags-table
-         "f"   'ibuffer-find-file
-         "X"   'ibuffer-kill-filter-group
-         "P"   'ibuffer-yank-filter-group
-         "x"   'ibuffer-kill-line
-         "p"   'ibuffer-yank
-         "|"   'ibuffer-do-shell-command-pipe-replace
-         "~"   'ibuffer-do-toggle-modified
+        :hydra
+        (ibuffer-hydra
+         (:color pink :hint nil)
+         "
+       ^ ^ ^   ^ ^ ^ | Marks [_*_] | Actions [_a_]     | View       ^^| Select      ^^|
+       _k_ ^ ↑ ^ _h_ +-^-^---------+-^-^---------------+-^-^----------+-^-^-----------+
+       ^ ^ _RET_ ^ ^ | _m_ark      | _D_: delete       | _g_: refresh | _TAB_: toggle |
+       _j_ ^ ↓ ^ _l_ | _u_nmark    | _s_: save marked  | _S_: sort    | _o_: open     |
+       ^ ^ ^   ^ ^ ^ | _t_oggle    | _._: toggle hydra | _/_: filter  | _q_: quit     |
+      "
+         ("m" ibuffer-mark-forward)
+         ("u" ibuffer-unmark-forward)
+         ("*" ibuffer-mark-hydra/body :exit t)
+         ("M" ibuffer-mark-hydra/body :exit t)
+         ("t" ibuffer-toggle-marks)
 
-         "o"   'ibuffer-do-view
-         "O"   'ibuffer-do-view-other-frame
+         ("D" ibuffer-do-delete)
+         ("s" ibuffer-do-save)
+         ("a" ibuffer-action-hydra/body :exit t)
 
-         "g"   'ibuffer-jump-to-buffer
-         "b"   'ibuffer-jump-to-filter-group
+         ("g" ibuffer-update)
+         ("S" ibuffer-sort-hydra/body :exit t)
+         ("/" ibuffer-filter-hydra/body :exit t)
+         ("H" describe-mode :exit t)
 
-         "m" '(:ignore t :wk "mark")
-         "m*" 'ibuffer-mark-modified-buffers
-         "m%" 'ibuffer-mark-read-only-buffers
-         "mm" 'ibuffer-toggle-marks
-         "mf" 'ibuffer-mark-by-name-regexp
-         "mf" 'ibuffer-mark-by-file-name-regexp
-         "mo" 'ibuffer-mark-old-buffers
-         "ml" 'ibuffer-mark-by-locked
-         "mb" 'ibuffer-mark-by-content-regexp
-         "mM" 'ibuffer-mark-by-mode-regexp
-         "md" 'ibuffer-mark-dired-buffers
-         "mh" 'ibuffer-mark-help-buffers
-         "mn" 'ibuffer-mark-dissociated-buffers
-         "mN" 'ibuffer-mark-unsaved-buffers
-         "ms" 'ibuffer-mark-special-buffers
-         "mz" 'ibuffer-mark-compressed-file-buffers)
+         ("h" ibuffer-backward-filter-group)
+         ("k" ibuffer-backward-line)
+         ("l" ibuffer-forward-filter-group)
+         ("j" ibuffer-forward-line)
+         ("RET" ibuffer-visit-buffer :exit t)
 
-        :general
-        (:keymaps 'ibuffer-mode-map
-         "+" nil "-" nil "0" nil "f" nil "SPC" nil "S-SPC" nil ">" nil "<" nil "?" nil "h" nil "X" nil "F"
-         nil "C-d" nil "C-t" nil "b" nil "n" nil "g" nil "p" nil "w" nil "s" nil "`" nil "," nil "*" nil
-         "/" nil "A" nil "C-c" nil "C-x" nil "M-s" nil "M-g" nil "M-n" nil "M-p" nil "M-{" nil "M-}" nil
-         "M-o" nil "M-DEL" nil "%" nil)
-        (:keymaps 'ibuffer-mode-map
-         :states  'motion
-         ;; ibuffer-kill-line
-         ;; ibuffer-do-kill-lines
-         ;; ibuffer-do-revert
-         ;; ibuffer-do-isearch
-         ;; ibuffer-do-isearch-regexp
+         ("TAB" ibuffer-toggle-filter-group)
 
-         ;; "D" 'ibuffer-mark-for-delete-backwards
-         "D" 'ibuffer-do-delete
-         "M" 'ibuffer-do-toggle-modified
-         "=" 'ibuffer-diff-with-file
-         "O" 'ibuffer-do-occur
-         "R" 'ibuffer-do-toggle-read-only
+         ("o" ibuffer-visit-buffer-other-window :exit t)
+         ("Q" quit-window :exit t)
+         ("q" nil :exit t)
+         ("." nil :exit t))
 
-         "RET"   'ibuffer-visit-buffer
-         "o"     'ibuffer-visit-buffer-other-window
-         "i"     'ibuffer-visit-buffer-other-window-noselect
-         "M-RET" 'ibuffer-visit-buffer-other-window-noselect
-         "S-DEL" 'ibuffer-bury-buffer
+        (ibuffer-mark-hydra
+         (:color teal :columns 5 :after-exit (ibuffer-hydra/body))
+         "Mark"
+         ("*" ibuffer-unmark-all "unmark all")
+         ("M" ibuffer-mark-by-mode "mode")
+         ("m" ibuffer-mark-modified-buffers "modified")
+         ("u" ibuffer-mark-unsaved-buffers "unsaved")
+         ("s" ibuffer-mark-special-buffers "special")
+         ("r" ibuffer-mark-read-only-buffers "read-only")
+         ("/" ibuffer-mark-dired-buffers "dired")
+         ("e" ibuffer-mark-dissociated-buffers "dissociated")
+         ("h" ibuffer-mark-help-buffers "help")
+         ("z" ibuffer-mark-compressed-file-buffers "compressed")
+         ("b" ibuffer-hydra/body "back" :exit t))
 
-         [remap ibuffer-auto-mode] 'auto-revert-mode
-         [remap revert-buffer] 'ibuffer-update
-         "gu"                  'ibuffer-do-revert
-         "gw"                  'ibuffer-do-save
+        (ibuffer-action-hydra
+         (:color teal :columns 4
+          :after-exit
+          (if (eq major-mode 'ibuffer-mode)
+              (ibuffer-hydra/body)))
+         "Action"
+         ("A" ibuffer-do-view "view")
+         ("E" ibuffer-do-eval "eval")
+         ("F" ibuffer-do-shell-command-file "shell-command-file")
+         ("I" ibuffer-do-query-replace-regexp "query-replace-regexp")
+         ("H" ibuffer-do-view-other-frame "view-other-frame")
+         ("N" ibuffer-do-shell-command-pipe-replace "shell-cmd-pipe-replace")
+         ("M" ibuffer-do-toggle-modified "toggle-modified")
+         ("O" ibuffer-do-occur "occur")
+         ("P" ibuffer-do-print "print")
+         ("Q" ibuffer-do-query-replace "query-replace")
+         ("R" ibuffer-do-rename-uniquely "rename-uniquely")
+         ("T" ibuffer-do-toggle-read-only "toggle-read-only")
+         ("U" ibuffer-do-replace-regexp "replace-regexp")
+         ("V" ibuffer-do-revert "revert")
+         ("W" ibuffer-do-view-and-eval "view-and-eval")
+         ("X" ibuffer-do-shell-command-pipe "shell-command-pipe")
+         ("b" nil "back"))
 
-         "|" 'ibuffer-do-shell-command-pipe-replace
+        (ibuffer-sort-hydra
+         (:color amaranth :columns 3)
+         "Sort"
+         ("i" ibuffer-invert-sorting "invert")
+         ("a" ibuffer-do-sort-by-alphabetic "alphabetic")
+         ("v" ibuffer-do-sort-by-recency "recently used")
+         ("s" ibuffer-do-sort-by-size "size")
+         ("f" ibuffer-do-sort-by-filename/process "filename")
+         ("m" ibuffer-do-sort-by-major-mode "mode")
+         ("b" ibuffer-hydra/body "back" :exit t))
 
-      ;;; marking
-         "m" 'ibuffer-mark-forward
-         "r" 'ibuffer-change-marks
-
-      ;;; sorting
-         "S"  'ibuffer-toggle-sorting-mode
-         "sa" 'ibuffer-do-sort-by-alphabetic
-         "sf" 'ibuffer-do-sort-by-filename/process
-         "si" 'ibuffer-invert-sorting
-         "s SPC" 'ibuffer-invert-sorting
-         "sm" 'ibuffer-do-sort-by-major-mode
-         "ss" 'ibuffer-do-sort-by-size
-         "sr" 'ibuffer-do-sort-by-recency
-         "("   'ibuffer-switch-format
-
-      ;;; movement
-         "TAB"       'ibuffer-forward-filter-group
-         "gj"        'ibuffer-forward-filter-group
-         "gk"        'ibuffer-backward-filter-group
-         "<S-tab>"   'ibuffer-backward-filter-group
-         "<backtab>" 'ibuffer-backward-filter-group
-
-         [remap evil-write] 'ibuffer-do-save
-         [remap evil-write-all] 'ibuffer-do-save
-         [remap evil-next-line] 'ibuffer-forward-line
-         [remap evil-previous-line] 'ibuffer-backward-line
-         [remap imenu] 'ibuffer-jump-to-buffer
-
-         "C-j"  'ibuffer-forward-next-marked
-         "C-k"  'ibuffer-backwards-next-marked
-
-         "p"   'ibuffer-yank
-         "C-y" 'ibuffer-yank
-         "y"   'ibuffer-copy-buffername-as-kill))
-    #+END_SRC
+        (ibuffer-filter-hydra
+         (:color amaranth :columns 4)
+         "Filter"
+         ("m" ibuffer-filter-by-used-mode "mode")
+         ("M" ibuffer-filter-by-derived-mode "derived mode")
+         ("n" ibuffer-filter-by-name "name")
+         ("c" ibuffer-filter-by-content "content")
+         ("e" ibuffer-filter-by-predicate "predicate")
+         ("f" ibuffer-filter-by-filename "filename")
+         (">" ibuffer-filter-by-size-gt "size")
+         ("<" ibuffer-filter-by-size-lt "size")
+         ("/" ibuffer-filter-disable "disable")
+         ("b" ibuffer-hydra/body "back" :exit t)))
+    #+end_src
 
 *** ibuffer-all-the-icons
     Provides ~icon~, ~size-h~, ~mode+~ and ~filename-and-process+~ columns.
@@ -11388,7 +10914,7 @@
         "i TAB c"   'indent-to-column
         "i TAB r"   'indent-relative
         "i TAB 0"   'indent-relative-first-indent-point
-        "i TAB ."   'hydra-indent/body
+        "i TAB ."   'indent-hydra/body
         "i TAB n"   'forward-to-indentation
         "i TAB p"   'back-to-indentation)
 
@@ -11584,6 +11110,42 @@
         "]g" 'smerge-next
         "[g" 'smerge-prev))
    #+END_SRC
+
+*** smerge-hydra
+    #+begin_src emacs-lisp
+      (use-package smerge-mode
+        :lazy-leader
+        (:mode 'smerge-mode
+         :minor t
+         :prefix "g"
+         "." 'smerge-hydra)
+
+        :pretty-hydra
+        ;; Adapted from [[https://github.com/tecosaur/emacs-config/blob/0b39759/config.org#smerge][tecosaur/emacs-config]].
+        (smerge-hydra
+         (:foreign-keys warn :quit-key "q")
+         ("Move"
+          (("n" (smerge-next) "next")
+           ("p" (smerge-prev) "previous"))
+          "Keep"
+          (("b" (smerge-keep-base) "base")
+           ("u" (smerge-keep-upper) "upper")
+           ("l" (smerge-keep-lower) "lower")
+           ("a" (smerge-keep-all) "all")
+           ("RET" (smerge-keep-current) "current"))
+          "Diff"
+          (("<" (smerge-diff-base-upper) "upper/base")
+           ("=" (smerge-diff-upper-lower) "upper/lower")
+           (">" (smerge-diff-base-lower) "base/lower")
+           ("R" (smerge-refine) "refine")
+           ("E" (smerge-ediff) "ediff"))
+          "Other"
+          (("c" (smerge-combine-with-next) "combine")
+           ("r" (smerge-resolve) "resolve")
+           ("k" (smerge-kill-current) "kill current")
+           ;; ("q" (smerge-auto-leave) "quit")
+           ("q" nil "quit")))))
+    #+end_src
 
 ** visual-line
    auto wrap long lines at the end of words.
@@ -14516,6 +14078,23 @@
        (evil-set-command-property 'flycheck-next-error :jump t)
        (evil-set-command-property 'flycheck-previous-error :jump t)
 
+       :general
+       (:keymaps 'flycheck-mode-map
+        [remap flymake-goto-next-error] 'flycheck-next-error
+        [remap flymake-goto-prev-error] 'flycheck-previous-error
+        [remap flymake-start] 'flycheck-buffer
+        [remap flymake-first-error+] 'flycheck-first-error
+        [remap flymake-last-error+] 'flycheck-last-error
+        [remap flymake-show-diagnostics-buffer] 'flycheck-list-errors)
+
+       (:keymaps 'flycheck-error-list-mode-map
+        :states  'motion
+        "RET" 'flycheck-error-list-goto-error
+        "s" 'tabulated-list-sort
+        "gj" 'flycheck-error-list-next-error
+        "gk" 'flycheck-error-list-previous-error
+        "gs" 'flycheck-error-list-check-source)
+
        :leader
        (:mode 'flycheck-mode :minor t
         ;; "eC" 'flycheck-set-checker-executable
@@ -14524,37 +14103,36 @@
         "ec" 'flycheck-select-checker
         "ex" 'flycheck-clear)
 
-       :general
-       (:keymaps 'flycheck-mode-map
-        [remap hydra-flymake/body] 'hydra-flycheck/body
-        [remap flymake-goto-next-error] 'flycheck-next-error
-        [remap flymake-goto-prev-error] 'flycheck-previous-error
-        [remap flymake-start] 'flycheck-buffer
-        [remap flymake-first-error+] 'flycheck-first-error
-        [remap flymake-last-error+] 'flycheck-last-error
-        [remap flymake-show-diagnostics-buffer] 'flycheck-list-errors
-        ;; [remap flycheck-describe-checker] 'flycheck-describe-checker
-        )
-
        :lazy-leader
        (:mode 'flycheck-error-list-mode
         "e" 'flycheck-error-list-explain-error
         "s" 'flycheck-error-list-check-source                                        ; syntax check buffer
         "f" 'flycheck-error-list-follow-mode
         "l" 'flycheck-error-list-set-filter
-        "r" 'flycheck-error-list-reset-filter)
-
-       :general
-       (:keymaps 'flycheck-error-list-mode-map
-        :states  'motion
-        "RET" 'flycheck-error-list-goto-error
-        "s" 'tabulated-list-sort
-
-        "gj" 'flycheck-error-list-next-error
-        "gk" 'flycheck-error-list-previous-error
-
-        "gs" 'flycheck-error-list-check-source))
+        "r" 'flycheck-error-list-reset-filter))
    #+END_SRC
+
+*** flycheck-hydra
+    #+begin_src emacs-lisp
+      (use-package flycheck
+        :general
+        (:keymaps 'flycheck-mode-map
+         [remap flymake-hydra/body] 'flycheck-hydra/body)
+
+        :hydra
+        (flycheck-hydra
+         (:pre (let ((buffer-window (selected-window)))
+                 (flycheck-list-errors)
+                 (select-window buffer-window))
+          :post (quit-windows-on "*Flycheck errors*")
+          :hint nil)
+         ("f"  flycheck-error-list-set-filter "Filter")
+         ("j"  flycheck-next-error "Next")
+         ("k"  flycheck-previous-error "Previous")
+         ("gg" flycheck-first-error "First")
+         ("G"  flycheck-last-error "Last")
+         ("q"  nil :exit t)))
+    #+end_src
 
 *** flycheck-commands
     :PROPERTIES:
@@ -16528,7 +16106,6 @@
                 vdiff-3way-mode)
         :minor t
         :prefix leader-major-mode-prefix
-        "." 'vdiff-hydra/body
         "m" 'vdiff-restore-windows
         "w" 'vdiff-save-buffers
         "r" 'vdiff-receive-changes
@@ -16576,6 +16153,62 @@
         [remap revert-buffer] 'vdiff-refresh))
    #+END_SRC
 
+*** vdiff-hydra
+    #+begin_src emacs-lisp
+      (use-package vdiff
+        :lazy-leader
+        (:mode '(vdiff-mode
+                 vdiff-3way-mode)
+         :minor t
+         :prefix leader-major-mode-prefix
+         "." 'vdiff-hydra/body)
+
+        :hydra
+        (vdiff-toggle-hydra (nil nil :hint nil)
+          "
+      Toggles
+       _c_ ignore case: %s(vdiff--current-case)
+       _w_ ignore whitespace: %s(vdiff--current-whitespace)
+       _q_ back to main hydra"
+          ("c" vdiff-toggle-case)
+          ("w" vdiff-toggle-whitespace)
+          ("q" vdiff-hydra/body :exit t))
+
+        (vdiff-hydra (nil nil :hint nil :foreign-keys run)
+          (concat (propertize
+                   "\
+       Navigation^^^^          Refine^^   Transmit^^^^             Folds^^^^            Other"
+                   'face 'header-line)
+                  "
+       _j_/_J_ next hunk/fold  _f_ this   _s_/_S_ send (+step)     _o_/_O_ open (all)   _i_ ^ ^ toggles
+       _k_/_K_ prev hunk/fold  _F_ all    _r_/_R_ receive (+step)  _c_/_C_ close (all)  _u_ ^ ^ update diff
+       _g_^ ^  switch buffers  _x_ clear  ^ ^ ^ ^                  _t_ ^ ^ close other  _w_ ^ ^ save buffers
+       ^ ^^ ^                  ^ ^        ^ ^ ^ ^                  ^ ^ ^ ^              _q_/_Q_ quit hydra/vdiff
+       ignore case: %s(vdiff--current-case) | ignore whitespace: %s(vdiff--current-whitespace)")
+          ("j" vdiff-next-hunk)
+          ("k" vdiff-previous-hunk)
+          ("J" vdiff-next-fold)
+          ("K" vdiff-previous-fold)
+          ("g" vdiff-switch-buffer)
+          ("s" vdiff-send-changes)
+          ("S" vdiff-send-changes-and-step)
+          ("r" vdiff-receive-changes)
+          ("R" vdiff-receive-changes-and-step)
+          ("o" vdiff-open-fold)
+          ("O" vdiff-open-all-folds)
+          ("c" vdiff-close-fold)
+          ("C" vdiff-close-all-folds)
+          ("t" vdiff-close-other-folds)
+          ("u" vdiff-refresh)
+          ("w" vdiff-save-buffers)
+          ("f" vdiff-refine-this-hunk)
+          ("F" vdiff-refine-all-hunks)
+          ("x" vdiff-remove-refinements-in-hunk)
+          ("i" vdiff-toggle-hydra/body :exit t)
+          ("q" nil :exit t)
+          ("Q" vdiff-quit :exit t)))
+    #+end_src
+
 *** vdiff-magit
     #+begin_src emacs-lisp
       (use-package vdiff-magit
@@ -16607,6 +16240,63 @@
        :init
        (setq vlc-rc-map (make-sparse-keymap))
 
+       :hydra
+       (vlc-rc-hydra (:hint nil)
+        "
+     ^ ^             | media          ^^| general commands  ^^^^| toggle                          ^^^^^^|       *@*
+     ^-^-------------+-^-^--------------+-------------------^^^^+---------------------------------^^^^^^|       :::
+     _d_elete-socket | _f_ind-file      | _F_ull-screen       ^^| _tl_/_tr_/_ts_ loop/repeat/shuffle    |      .   .
+     _k_ill-process  | _e_nqueue-file   | _v_olume-ctrl       ^^| _oa_/_od_ ^  ^ set audio track/device |     =@@@@@=
+     _q_uit/exit     | _c_lear-playlist | stream-_p_osition   ^^| _or_ ^  ^ ^  ^ set aspect ratio       |     -*###*-
+     ^ ^             | _n_ext-item      | _=_   ^ ^ reset speed | _os_ ^  ^ ^  ^ set subtitle track     |  :*:       :*:
+     ^ ^             | _p_rev-item      | _S-+_/_+_ raise speed | _oz_ ^  ^ ^  ^ set video zoom         |  @@@/**+**\\@@@
+     ^ ^             | _._ goto-item    | _S--_/_-_ lower speed | ^  ^ ^  ^ ^  ^                        | +@@@@@@@@@@@@@+
+     "
+        ;; NOTE: comments with @ means add current value indicator
+
+        ("SPC" vlc/toggle-play)
+        ("f" vlc/add-file)
+
+        ;; speed
+        ("+" vlc/increase-speed)
+        ("=" vlc/reset-speed)
+        ("-" vlc/decrease-speed)
+        ("S-+" vlc/fast-forward)
+        ("S--" vlc/rewind)
+
+        ;; exit
+        ("d" vlc/kill-connection)
+        ("k" vlc/kill-process)
+
+        ;; playlist
+        ("c" vlc/clear)
+        ("f" vlc/add-file)
+        ("e" vlc/enqueue-file)
+        ("n" vlc/next)
+        ("p" vlc/previous)
+
+        ;; commands
+        ("F" vlc/toggle-fullscreen)
+        ("v" vlc/volume-ctrl) ;; @
+        ("s" vlc/screenshot)
+        ("|" vlc/screenshot)
+        ("p" vlc/set-stream-position)
+        ("'" vlc/set-stream-position)
+        ("." vlc/goto-playlist-item)
+
+        ;; toggle/options
+        ("tl" vlc/toggle-loop)    ;; @
+        ("tr" vlc/toggle-repeat)  ;; @
+        ("ts" vlc/toggle-shuffle) ;; @
+        ("oa" vlc/set-audio-track)
+        ("oc" vlc/set-video-crop)
+        ("od" vlc/set-audio-device)
+        ("or" vlc/set-aspect-ratio)
+        ("os" vlc/set-subtitle-track)
+        ("oz" vlc/set-zoom) ;; @
+
+        ("q" nil :exit t))
+
        :leader
        (:prefix "v"
         "" '(:ignore t :wk "VLC")
@@ -16622,7 +16312,7 @@
         "vv" 'vlc/dired-add-file
         "vq" 'vlc/dired-enqueue-file)
        (:keymaps 'vlc-rc-map
-        "C-." 'hydra-vlc-rc/body))
+        "C-." 'vlc-rc-hydra/body))
    #+END_SRC
 
 ** vterm
@@ -20176,7 +19866,6 @@
          "ci" 'org-timer-item
          "cr" 'org-clock-report
          "cs" 'org-clock-display
-         "c." 'hydra-org-clock/body
          "c C-c" 'org-clock-cancel
 
          "e"  '(:ignore t :wk "export")
@@ -20202,7 +19891,6 @@
          "ms" 'org-mark-subtree
          "me" 'org-mark-element
          "mb" 'org-babel-mark-block
-         "mm." 'hydra-org-navigate/body
 
          "n"  '(:ignore t :wk "narrow")
          "nb" 'org-narrow-to-block
@@ -20323,7 +20011,6 @@
          "gj" 'org-forward-heading-same-level
          "gk" 'org-backward-heading-same-level
          "gl" 'outline-next-visible-heading
-         "g." 'hydra-org-navigate/body
          "$" 'org-end-of-line
          "^" 'org-beginning-of-line)
         (:keymaps 'org-mode-map
@@ -20388,7 +20075,6 @@
 
         :lazy-leader
         (:mode 'org-agenda-mode
-         "." 'hydra-org-agenda/body
          "A" 'org-agenda-append-agenda
          "C" 'org-agenda-columns
 
