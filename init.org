@@ -70,6 +70,7 @@
          ;; beacon                                                         ; Highlight suddens jumps (changes in point) using a beacon
          ;; auto-highlight-symbol                                          ; Automatically highlight the symbol at point
          browser-edit                                                      ; Interface emacs with [[https://www.chromium.org/][chromium]]
+         company                                                           ; Dynamic completion previews through popup dialogs
          ;; command-log-mode                                               ; Echo commands as you enter them
          dashboard                                                         ; A feature full emacs dashboard
          ;; deft                                                           ; Note management system based on multiple org files
@@ -4665,7 +4666,11 @@
       (evil-ex-define-cmd "buffers" 'ibuffer)
     #+END_SRC
 
-** company
+** company                                                              :comp:
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! company)
+   :END:
+
    #+BEGIN_SRC emacs-lisp
      (use-package company
        :straight t
@@ -4750,6 +4755,11 @@
            (if (string-prefix-p company-prefix company-common)
                (company-complete-next-char+ count)
              (company--insert-candidate company-common))))
+
+       :preface
+       (defun company-mode-turn-off+ ()
+         (company-mode -1))
+       :hook (eshell-mode . company-mode-turn-off+)
 
        :general
        (:keymaps 'company-mode-map
@@ -4888,7 +4898,7 @@
     #+END_SRC
 
 *** company-prescient
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! prescient)
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! company prescient)
       (use-package company-prescient
         :straight t
         :after prescient
@@ -5193,7 +5203,7 @@
        (emojify-emojis-dir (cache! "emojify/"))
        ;; Make emojis work like `prettify-symbols-mode'.
        (emojify-point-entered-behaviour 'uncover)
-       (emojify-emoji-styles '(unicode) github)
+       (emojify-emoji-styles '(unicode github))
        (emojify-display-style 'unicode)
 
        :leader
@@ -5213,8 +5223,8 @@
         "Y" 'emojify-description-copy-emoji))
    #+END_SRC
 
-*** company-emojify
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! company-emoji)
+*** company-emojify                                                     :comp:
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! company company-emoji)
       (use-package company-emoji
         :straight t
         :after emojify
@@ -6625,7 +6635,7 @@
        :delight  (prettify-symbols-mode " λ")
        :custom
        (lisp-prettify-symbols-alist nil)
-       (prettify-symbols-unprettify-at-point t
+       (prettify-symbols-unprettify-at-point 'right-edge
         "Don't need to keep symbolifying it whilst I'm on it."))
    #+END_SRC
 
@@ -6826,6 +6836,9 @@
    #+BEGIN_SRC emacs-lisp
      (use-package calc
        :after evil
+       :custom
+       (calc-symbolic-mode t)
+
        :init
        (advice-add 'evil-get-register :before-until
                    (defun evil-register-*-is-calc (register &optional _)
@@ -10950,10 +10963,6 @@
    #+BEGIN_SRC emacs-lisp
      (use-package esh-mode
        :straight (esh-mode :type built-in)
-       :hook (;;; doesn't persist on window change... boo!!!
-              ;; (eshell-mode . (setq-local cursor-type 'bar))
-              ;;; disable company-mode in eshell-mode
-              (eshell-mode . (lambda () (company-mode -1))))
        :custom
        (eshell-directory-name (state! "eshell"))
        (eshell-aliases-file (state! "eshell" "aliases"))
@@ -11939,7 +11948,7 @@
         (advice-add 'embark-collect-live     :around #'display-buffer-no-select-window-advice)
         (advice-add 'embark-collect-snapshot :around #'display-buffer-no-select-window-advice)
 
-        (push (cons xref-location #'embark-consult-export-grep)
+        (push (cons 'xref-location #'embark-consult-export-grep)
               embark-exporters-alist)
 
         ;; (push `(,(rx "*Embark " (or "Live" "Completions" "Collect") "*")
@@ -12043,6 +12052,7 @@
                    consult-grep-no-project+
                    consult--buffer-state
                    consult--lookup-cdr)
+        :hook (completion-list-mode . consult-preview-at-point-mode)
         :custom
         (consult-project-root-function #'project-current-root+)
         (consult-async-split-style 'slash)
@@ -12345,38 +12355,6 @@
     myself. Most of those go into this branch and are tangled to a separate file from
     my main ~init.el~ to allow ~consult~ to be deferred.
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! "init.el" :consult)
-      (dolist (cmd '(consult-evil-jumps+
-                     consult-evil-marks+
-                     consult-org-capture+
-                     consult-yasnippet
-                     consult-company))
-        (autoload cmd "+consult-custom.el" nil t))
-
-      (with-eval-after-load 'org-ref
-        (require '+org-ref-consult-cite))
-
-      (evil-set-command-property 'consult-evil-jumps+ :jump t)
-      (evil-set-command-property 'consult-evil-marks+ :jump t)
-
-      (setq org-roam-capture-function 'consult-org-capture+)
-
-      (leader-set-keys
-        "rj" 'consult-evil-jumps+
-        "rn" 'consult-evil-marks+)
-
-      (general-define-key
-       :states '(insert normal)
-       "C-M-i" 'consult-yasnippet)
-
-      (general-define-key
-       [remap org-capture] 'consult-org-capture+)
-
-      (general-define-key
-       :keymaps 'company-mode-map
-       [remap completion-at-point] #'consult-company)
-    #+END_SRC
-
     #+BEGIN_SRC emacs-lisp
       (require 'consult)
       (require 'embark)
@@ -12385,6 +12363,14 @@
 
 **** consult-evil-jumps
      Adapted from [[*counsel-evil-jumps][counsel-evil-jumps]].
+
+     #+begin_src emacs-lisp :tangle (package-yes! :consult)
+       (autoload 'consult-evil-jumps+ "+consult-custom.el" nil t)
+       (evil-set-command-property 'consult-evil-jumps+ :jump t)
+
+       (leader-set-keys
+         "rj" 'consult-evil-jumps+)
+     #+end_src
 
      #+BEGIN_SRC emacs-lisp
        (defvar consult--evil-jumps-history+ nil)
@@ -12443,6 +12429,15 @@
      #+END_SRC
 
 **** consult-org-ref
+     #+begin_src emacs-lisp :tangle (package-yes! :consult)
+       (autoload 'org-ref-consult-insert-cite-link "+org-ref-consult-cite.el" nil t)
+       (autoload 'org-ref-consult-insert-label-link "+org-ref-consult-cite.el" nil t)
+       (autoload 'org-ref-consult-insert-ref-link "+org-ref-consult-cite.el" nil t)
+
+       (with-eval-after-load 'org-ref
+         (require '+org-ref-consult-cite))
+     #+end_src
+
      #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "+org-ref-consult-cite.el") :consult)
        (defvar org-ref-ivy-cite-keymap (make-sparse-keymap))
        (defvar org-ref-ivy-set-keywords-keymap (make-sparse-keymap))
@@ -12512,7 +12507,19 @@
        (provide '+org-ref-consult-cite)
      #+END_SRC
 
-**** consult-company
+**** consult-company                                                    :comp:
+     :PROPERTIES:
+     :header-args+: :tangle (package-str! (lisp! "+consult-custom.el") :consult company)
+     :END:
+
+     #+begin_src emacs-lisp :tangle (package-yes! :consult company)
+       (autoload 'consult-company "+consult-custom.el" nil t)
+
+       (general-define-key
+        :keymaps 'company-mode-map
+        [remap completion-at-point] #'consult-company)
+     #+end_src
+
      #+BEGIN_SRC emacs-lisp
        (require 'company)
 
@@ -12590,6 +12597,14 @@
 **** consult-evil-marks
      Taken from [[https://github.com/abo-abo/swiper/blob/25439e26a67b54d1f8aab1cbc727228427692ec8/counsel.el#L4198][counsel.el]].
 
+     #+begin_src emacs-lisp :tangle (package-yes! :consult)
+       (autoload 'consult-evil-marks+ "+consult-custom.el" nil t)
+       (evil-set-command-property 'consult-evil-marks+ :jump t)
+
+       (leader-set-keys
+         "rn" 'consult-evil-marks+)
+     #+end_src
+
      #+BEGIN_SRC emacs-lisp
        (defun consult--evil-marks-candidates+ ()
          "Convert all evil-marks in the current buffer to mark candidates.
@@ -12627,6 +12642,14 @@
 
 **** consult-org-capture
      Copied from [[https://github.com/abo-abo/swiper/blob/25439e26a67b54d1f8aab1cbc727228427692ec8/counsel.el#L3871][counsel.el]].
+
+     #+begin_src emacs-lisp :tangle (package-yes! :consult)
+       (autoload 'consult-org-capture+ "+consult-custom.el" nil t)
+       (setq org-roam-capture-function 'consult-org-capture+)
+
+       (general-define-key
+        [remap org-capture] 'consult-org-capture+)
+     #+end_src
 
      #+BEGIN_SRC emacs-lisp
        (defun consult-org-capture-candidates+ ()
@@ -12692,6 +12715,14 @@
      #+END_SRC
 
 **** consult-yasnippet
+     #+begin_src emacs-lisp :tangle (package-yes! :consult)
+       (autoload 'consult-yasnippet "+consult-custom.el" nil t)
+
+       (general-define-key
+        :states '(insert normal)
+        "C-M-i" 'consult-yasnippet)
+     #+end_src
+
      #+BEGIN_SRC emacs-lisp
        (require 'consult)
        (require 'yasnippet)
@@ -13474,7 +13505,7 @@
         (defun dashboard-read-banner+ (path)
           "Load a banner from my ~/.config/banners directory."
           (with-temp-buffer
-            (insert-file path)
+            (insert-file-contents path)
             (save-excursion
               (goto-char (point-min))
               (cons (save-match-data
@@ -16616,8 +16647,8 @@
          "gI" 'ycmd-goto-implementation))
     #+END_SRC
 
-*** company-ycmd
-    #+BEGIN_SRC emacs-lisp
+*** company-ycmd                                                        :comp:
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! company ycmd)
       (use-package company-ycmd
         :straight t
         :demand t
@@ -16747,8 +16778,8 @@
          "g TAB" 'restclient-toggle-body-visibility-or-indent))
     #+END_SRC
 
-*** company-restclient
-    #+BEGIN_SRC emacs-lisp
+*** company-restclient                                                  :comp:
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! restclient company)
       (use-package company-restclient
         :straight t
         :after  restclient
@@ -17035,8 +17066,8 @@
          [remap xref-find-references] 'anaconda-mode-find-references))
     #+END_SRC
 
-**** company-anaconda
-     #+BEGIN_SRC emacs-lisp
+**** company-anaconda                                                   :comp:
+     #+BEGIN_SRC emacs-lisp :tangle (package-yes! python anaconda company)
        (use-package company-anaconda
          :straight t
          :after  anaconda-mode
@@ -17421,8 +17452,8 @@
          "C-j" nil))
     #+END_SRC
 
-*** company-web
-    #+BEGIN_SRC emacs-lisp
+*** company-web                                                         :comp:
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! html company)
       (use-package company-web
         :straight t
         :after  web-mode
@@ -17683,8 +17714,8 @@
       (add-hook 'sh-mode-hook +lsp-command)
     #+END_SRC
 
-*** company-shell
-    #+BEGIN_SRC emacs-lisp
+*** company-shell                                                       :comp:
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! sh-script company)
       (use-package company-shell
         :straight t
         :after  sh-mode
@@ -17892,6 +17923,7 @@
       (use-package markdown-mode
         :straight t
         :hook ((markdown-mode . display-line-numbers-mode)
+               (markdown-mode . auto-fill-mode)
                (markdown-mode . +flylint))
         :custom
         (markdown-indent-on-enter 'indent-and-new-item)
@@ -18147,8 +18179,8 @@
        :mode (rx (or "CMakeLists.txt" ".cmake")))
    #+END_SRC
 
-*** company-cmake
-    #+BEGIN_SRC emacs-lisp :tangle no
+*** company-cmake                                                       :comp:
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! cmake company) :tangle no
       (use-package company-cmake
         :straight (company-cmake :host github :fork "company-cmake")
         :after cmake
@@ -18273,9 +18305,6 @@
        :config
        (require 'yasnippet)
 
-       (set-company-backend! 'java-mode
-         'company-meghanada)
-
        (setq meghanada-map+ (make-sparse-keymap))
 
        :lazy-leader
@@ -18325,6 +18354,12 @@
         "t SPC"   'meghanada-run-junit-test-case
         "t C-SPC" 'meghanada-debug-junit-test-case))
    #+END_SRC
+
+**** company-meghanada                                                  :comp:
+     #+begin_src emacs-lisp :tangle (package-yes! java company)
+       (set-company-backend! 'java-mode
+         'company-meghanada)
+     #+end_src
 
 ** javascript
    :PROPERTIES:
@@ -18551,15 +18586,20 @@
     #+BEGIN_SRC emacs-lisp
       (use-package css-mode
         :hook (css-mode . +flylint)
-        :config
-        (set-company-backend! 'css-mode
-          'company-css)
-
         :lazy-leader
         (:mode '(less-css-mode css-mode)
          "?" 'css-lookup-symbol
          "b" 'web-beautify-css))
     #+END_SRC
+
+**** company-css                                                        :comp:
+     #+begin_src emacs-lisp :tangle (package-yes! css company)
+       (set-company-backend! 'css-mode
+         'company-css)
+
+        (set-company-backend! 'less-css-mode
+          'company-css)
+     #+end_src
 
 *** vscode-css-languageserver-bin                                       :lsp:
     Requires ~npm install --global vscode-css-languageserver-bin~.
@@ -18573,10 +18613,6 @@
     #+BEGIN_SRC emacs-lisp
       (use-package less-css-mode
         :hook (scss-mode . +flylint)
-        :config
-        (set-company-backend! 'less-css-mode
-          'company-css)
-
         :lazy-leader
         (:mode 'less-css-mode
          "c" 'less-css-compile))
@@ -18594,8 +18630,8 @@
         :hook (haskell-mode . hindent-mode))
     #+END_SRC
 
-*** company-cabal
-    #+BEGIN_SRC emacs-lisp
+*** company-cabal                                                       :comp:
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! haskell company)
       (use-package company-cabal
         :straight t
         :after haskell-mode
@@ -19312,8 +19348,8 @@
         "gl" 'bibtex-end-of-entry))
    #+END_SRC
 
-*** company-bibtex
-    #+BEGIN_SRC emacs-lisp
+*** company-bibtex                                                      :comp:
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! bibtex company)
       (use-package company-bibtex
         :straight t
         :after (company bibtex)
@@ -19730,6 +19766,7 @@
            (haskell    . t)
            (latex      . t)
            (java       . t)
+           (gnuplot    . t)
            (js         . t)
            (ditaa      . t)
            (plantuml   . t)
@@ -20698,10 +20735,10 @@
         :straight t)
     #+END_SRC
 
-*** company-org-block
+*** company-org-block                                                   :comp:
     A better solution for inserting code-blocks or block-groups in org-mode.
 
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! org company)
       (use-package company-org-block
         :straight (company-org-block :host github :repo "xenodium/company-org-block")
         :after org
@@ -21227,8 +21264,6 @@
        :init
        (push '(nxml-mode . 2) +indent-config)
 
-       (set-company-backend! 'nxml-mode #'company-nxml)
-
        :config
        ;; Technically its builtin so its better, but it doesn't cooperate with
        ;; with flymake/flycheck and I'm not interested in re-learning how to
@@ -21244,9 +21279,14 @@
         "/" 'nxml-electric-slash))
    #+end_src
 
+*** company-xml                                                        :comp:
+    #+begin_src emacs-lisp :tangle (package-yes! xml company)
+      (set-company-backend! 'nxml-mode #'company-nxml)
+    #+end_src
+
 ** lua
    :PROPERTIES:
-   :header-args+: :tangle (package-yes! org lua)
+   :header-args+: :tangle (package-yes! lua)
    :END:
 
    #+begin_src emacs-lisp
@@ -21269,8 +21309,8 @@
         "'"  'lua-show-process-buffer))
    #+end_src
 
-*** company-lua
-    #+begin_src emacs-lisp
+*** company-lua                                                         :comp:
+    #+begin_src emacs-lisp :tangle (package-yes! lua company)
       (use-package company-lua
         :straight t
         :init
@@ -22137,6 +22177,9 @@
        `(diff-hl-change ((,cls (:foreground ,purple-int :inherit bold))))
        `(diff-hl-insert ((,cls (:foreground ,green-int :inherit bold))))
        `(diff-hl-delete ((,cls (:foreground ,red-int :inherit bold))))
+
+      ;;; sh-mode
+       `(sh-heredoc ((,cls (:inherit font-lock-string-face))))
 
       ;;; diffs
        ;; These were taken directly from `magit'.
