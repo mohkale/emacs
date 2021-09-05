@@ -14558,7 +14558,7 @@
         "u" 'magit-jump-to-unstaged
         "s" 'magit-jump-to-staged
         "f" 'magit-jump-to-untracked
-        "r" 'magit-show-refs
+        "r" 'magit-diff-toggle-refine-hunk
         "y" '(:ignore t :wk "copy")
         "ys" 'magit-copy-section-value
         "yr" 'magit-copy-buffer-revision)
@@ -14566,6 +14566,7 @@
         "," 'magit-log-select-pick
         "q" 'magit-log-select-quit)
        (:mode 'magit-diff-mode
+        "r" 'magit-diff-toggle-refine-hunk
         "t" 'magit-diff-trace-definition
         "e" 'magit-diff-edit-hunk-commit)
        (:mode 'git-commit-mode
@@ -14863,10 +14864,10 @@
         :states 'visual
         "y" 'magit-copy-section-value)
        ;; evil-collection-magit-minor-mode-map-bindings
-       (:keymaps 'magit-blob-mode-map
-        :states '(motion visual)
-        "gj" 'magit-blob-mode-map "n" 'magit-blob-next
-        "gk" 'magit-blob-mode-map "p" 'magit-blob-previous)
+       ;; (:keymaps 'magit-blob-mode-map
+       ;;  :states '(motion visual)
+       ;;  "gj" 'magit-blob-next     "n" 'magit-blob-next
+       ;;  "gk" 'magit-blob-previous "p" 'magit-blob-previous)
        (:keymaps 'git-commit-mode-map
         :states '(motion visual)
         "gk" 'git-commit-prev-message "M-p" nil
@@ -16063,21 +16064,19 @@
    #+BEGIN_SRC emacs-lisp
      (use-package vdiff
        :straight t
-       :custom
-       (vdiff-subtraction-style 'single)
+       :preface
+       (defvar vdiff-use-relative-line-numbers+ nil
+         "When true, line numbers in vdiff sessions are relative")
 
        :config
-       (defvar vdiff-use-relative-line-numbers nil
-         "when true, line numbers in vdiff sessions are relative")
-
        (defun vdiff-setup+ (&rest _)
          (let ((inhibit-message t))
            (toggle-truncate-lines +1)
            (evil-normalize-keymaps))
 
-         (when vdiff-use-relative-line-numbers
+         (when vdiff-use-relative-line-numbers+
            (setq-local display-line-numbers
-                       (if vdiff-mode t 'relative))))
+                       (if vdiff-mode t 'visual))))
 
        (defun vdiff-prepare+ ()
          (cond
@@ -16085,8 +16084,8 @@
            (when vdiff-mode
              (outline-show-all)))))
 
-       (dolist (handler '(vdiff-setup+
-                          vdiff-prepare+))
+       (dolist (handler `(,#'vdiff-setup+
+                          ,#'vdiff-prepare+))
          (add-hook 'vdiff-mode-hook      handler)
          (add-hook 'vdiff-3way-mode-hook handler))
 
@@ -16106,7 +16105,7 @@
                 vdiff-3way-mode)
         :minor t
         :prefix leader-major-mode-prefix
-        "m" 'vdiff-restore-windows
+        ;; "m" 'vdiff-restore-windows
         "w" 'vdiff-save-buffers
         "r" 'vdiff-receive-changes
         "s" 'vdiff-send-changes
@@ -16127,10 +16126,13 @@
         "tw" 'vdiff-toggle-whitespace)
 
        :general
-       (:states 'normal
+       (:keymaps '(vdiff-mode-map
+                   vdiff-3way-mode-map)
+        [remap quit-window] 'vdiff-quit)
+       (:states '(normal motion)
         :keymaps '(vdiff-mode-map
                    vdiff-3way-mode-map)
-        "q"  'vdiff-quit
+        "q" 'vdiff-quit
         "TAB" 'vdiff-switch-buffer
         "gj" 'vdiff-next-hunk
         "gk" 'vdiff-previous-hunk
@@ -22135,6 +22137,15 @@
        `(diff-hl-change ((,cls (:foreground ,purple-int :inherit bold))))
        `(diff-hl-insert ((,cls (:foreground ,green-int :inherit bold))))
        `(diff-hl-delete ((,cls (:foreground ,red-int :inherit bold))))
+
+      ;;; diffs
+       ;; These were taken directly from `magit'.
+       `(diff-added   ((,cls (:foreground "#ddffdd" :background "#335533" :extend t)))) ;; `magit-diff-added'
+       `(diff-removed ((,cls (:foreground "#ffdddd" :background "#553333" :extend t)))) ;; `magit-diff-removed'
+       `(diff-changed ((,cls (:foreground "#ffddff" :background "#553355" :extend t)))) ;; Adapted from `magit-diff-base'
+
+       `(magit-diff-base ((,cls (:inherit diff-changed))))
+       `(diff-refine-changed ((,cls (:background "#aa22aa"))))
        )
 
       (custom-theme-set-variables 'an-old-hope
