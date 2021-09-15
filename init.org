@@ -866,7 +866,6 @@
 
 *** aliases
     #+BEGIN_SRC emacs-lisp
-      (defalias 'yes-or-no-p 'y-or-n-p)
       (defalias 'regexp-string-match #'string-match)
 
       (defalias 'path-basename                   #'file-name-nondirectory)
@@ -902,6 +901,8 @@
              find-file-suppress-same-file-warnings t                                ; don't warn when finding a file that's already open.
              recentf-max-saved-items 2048                                           ; keep this many files in the recentf history.
              completion-ignore-case t                                               ; make completion case insensitive, holding down shift is annoying.
+             use-short-answers t                                                    ; never use `yes-or-no-p', prefer `y-or-n-p'.
+             remote-file-name-inhibit-locks t
              read-file-name-completion-ignore-case t
              read-buffer-completion-ignore-case t
              completions-detailed t                                                 ; show annotations for certain completion candidates
@@ -1315,10 +1316,11 @@
      #+begin_src emacs-lisp
        (leader-set-keys
          "TAB" '(switch-to-last-buffer+ :wk "last-buffer")
-         "SPC" '(execute-extended-command :wk "M-x")
+         "SPC" '(execute-extended-command-for-buffer :wk "M-x")
          "<escape>" 'abort-recursive-edit
          "DEL"      'exit-recursive-edit
 
+         ":" 'repeat-complex-command
          "!" 'shell-command
          "&" 'async-shell-command
          "." 'repeat
@@ -1396,15 +1398,17 @@
          "h RET" 'view-order-manuals
 
          "hd" '(:ignore t :wk "help-describe")
+         "hdd" 'shortdoc-display-group
+         "hdx" 'describe-command
          "hdo" 'describe-symbol
          "hdi" 'describe-input-method
          "hdL" 'describe-language-environment
          "hdb" 'describe-bindings
          "hdc" 'describe-char
          "hdu" 'describe-coding-system
-         "hdF" 'describe-face
          "hdk" 'describe-key
-         "hdK" 'describe-key-briefly
+         "hdK" 'describe-keymap
+         "hdm" 'describe-mode
          "hdp" 'describe-package
          "hdP" 'finder-by-keyword
          "hds" 'describe-syntax
@@ -1671,8 +1675,6 @@
        :states '(normal motion emacs)
        "C-q" (general-simulate-key "C-w"))
     #+END_SRC
-
-    A command that inserts a character without moving point.
 
 *** hooks
     Run a hook on buffer change
@@ -5397,20 +5399,6 @@
         "gyh" 'git-link-homepage))
    #+END_SRC
 
-** help-fns+
-   #+BEGIN_SRC emacs-lisp
-     (use-package help-fns+
-       :straight (help-fns+ :host github :repo "emacsmirror/help-fns-plus")
-       :commands (describe-buffer
-                  describe-keymap
-                  describe-mode
-                  describe-function)
-       :leader
-       ("hdm" '(describe-buffer :wk "describe-mode")
-        "hdf" 'describe-function
-        "hdK" 'describe-keymap))
-   #+END_SRC
-
 ** hide-modeline
    Makes the mode-line blank in the current buffer. this doesn't let the buffer contents expand
    into the mode-line region, it simply makes it appear as if nothings there.
@@ -7081,6 +7069,7 @@
         (next-error-verbose nil)
         (compilation-ask-about-save nil)
         (compilation-message-face 'default)
+        (next-error-message-highlight nil)
 
         :config
         (evil-set-command-property 'next-error :jump t)
@@ -8628,6 +8617,8 @@
 ** help
    #+BEGIN_SRC emacs-lisp
      (use-package help
+       :custom
+       (describe-bindings-outline t)
        :config
        ;; once was enough, stop repeating the same message please :P
        (advice-add 'help-window-display-message :around #'ignore))
@@ -9150,7 +9141,8 @@
 
        :leader
        ("hi" 'info-apropos
-        "ai" 'info)
+        ;; "ai" 'info
+        "ai" 'info-display-manual)
 
        :lazy-leader
        (:mode 'Info-mode
@@ -10759,7 +10751,6 @@
        :commands (find-client-buffer+
                   next-client-buffer+
                   prev-client-buffer+
-                  server-abort
                   server-edit-mode+)
        :custom
        (server-client-instructions nil)
@@ -10883,16 +10874,6 @@
                    (server-edit-mode+ -1)))
 
        :config
-       ;; see [[https://superuser.com/questions/295156/how-to-set-the-exit-status-for-emacsclienti][here]].
-       (defun server-abort (&optional prefix)
-         "Sends error exit command to every client for the current buffer."
-         (interactive "P")
-         (if (not server-buffer-clients)
-             (error "current buffer has no server clients")
-           (dolist (proc server-buffer-clients)
-             (server-send-string proc "-error die"))
-           (unless prefix (kill-buffer))))
-
        ;; add ,, and ,q like bindings in server edit sessions, like org-edit-src-code
        (define-minor-mode server-edit-mode+
          "A dummy minor mode for files being edited by `server'.
@@ -10900,7 +10881,7 @@
          :lighter " ServerEdit"
          '(;; ([remap evil-write] . server-edit)
            ([remap evil-save-and-close] . server-edit)
-           ([remap evil-quit-all-with-error-code] . server-abort)))
+           ([remap evil-quit-all-with-error-code] . server-edit-abort)))
 
        :leader
        ("f SPC" 'server-start
@@ -10913,7 +10894,7 @@
         :minor t
         :prefix leader-major-mode-prefix
         "," 'server-edit
-        "q" 'server-abort))
+        "q" 'server-edit-abort))
    #+END_SRC
 
 ** simple
@@ -11904,7 +11885,7 @@
 *** marginalia
     #+BEGIN_SRC emacs-lisp
       (use-package marginalia
-        :straight t
+        :straight (marginalia :build (:not autoloads))                                ; TODO: Re-support autoloads after [[https://github.com/minad/marginalia/issues/105][marginalia#105]].
         :hook ((selectrum-mode . marginalia-mode)
                (vertico-mode . marginalia-mode))
         :general
@@ -12180,7 +12161,6 @@
         (:mode '(selectrum-mode
                  vertico-mode)
          :minor t
-         "SPC" 'consult-mode-command
          "aa" 'consult-minor-mode-menu
          "ee" 'consult-compile-error
          "jc" 'consult-compile-error "jx" 'goto-char                                  ; Replaces `goto-char'
@@ -12216,7 +12196,8 @@
         (:keymaps 'org-mode-map
          [remap consult-imenu] 'consult-org-heading
          [remap imenu] 'consult-org-heading)
-        ([remap imenu] 'consult-imenu
+        ([remap execute-extended-command-for-buffer] 'consult-mode-command
+         [remap imenu] 'consult-imenu
          [remap imenu-anywhere] 'consult-imenu-multi
          [remap switch-to-buffer] 'consult-buffer
          [remap multi-occur] 'consult-multi-occur
@@ -13704,7 +13685,7 @@
         (:keymaps 'edit-server-edit-mode-map
          [remap evil-write] 'server-edit
          [remap evil-save-and-close] 'server-edit
-         [remap evil-quit-all-with-error-code] 'server-abort))
+         [remap evil-quit-all-with-error-code] 'server-edit-abort))
 
       ;; fixes issues with non conventional input components likes gmails compose box
       (use-package edit-server-htmlize
