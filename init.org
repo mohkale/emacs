@@ -155,6 +155,7 @@
          elisp
          git-langs
          ;; haskell
+         ;; ledger
          html
          ;; haml
          ;; java
@@ -8446,6 +8447,7 @@
          flymake-rest-sql-lint
          (flymake-rest-sqlint :disabled t))
         (ruby-mode flymake-rest-rubocop)
+        ;; (hledger-mode flymake-rest-hledger)
         (sh-mode flymake-rest-shellcheck)
         (yaml-mode flymake-rest-yamllint)
         (web-mode flymake-rest-html-tidy)
@@ -17322,6 +17324,84 @@
      (use-package powershell
        :straight t)
    #+END_SRC
+
+** ledger
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! ledger)
+   :END:
+
+   #+begin_src emacs-lisp :tangle no
+     (use-package ledger-mode
+       :straight t
+       :mode ("\.journal$" . ledger-mode)
+       :custom
+       ;; Required to use hledger instead of ledger itself.
+       (ledger-mode-should-check-version nil)
+       (ledger-report-links-in-register nil)
+       (ledger-binary-path "hledger")
+       (ledger-highlight-xact-under-point nil)
+       (ledger-source-directory (join-path (xdg-documents-dir) "ledger"))
+       (ledger-reconcile-default-commodity "")
+
+       :init
+       (evil-set-initial-state 'ledger-mode 'normal)
+
+       :config
+       (modify-syntax! '((?- . "w")) ledger-mode-syntax-table))
+   #+end_src
+
+   #+begin_src emacs-lisp
+     (use-package hledger-mode
+       :straight t
+       :mode ("\.journal$" . hledger-mode)
+       :custom
+       (hledger-jfile (or (getenv "LEDGER_FILE")
+                          (join-path (xdg-documents-dir) "ledger" "main.journal")))
+       (hledger-comments-column 0)
+       (hledger-currency-string ""
+        "Default to no currency (the file specifies D).")
+       (hledger-enable-current-overlay nil)
+       (hledger-amount-face 'font-lock-type-face)
+
+       :init
+       (evil-set-initial-state 'hledger-mode 'normal)
+
+       :config
+       (modify-syntax! '((?- . "w")) hledger-mode-syntax-table)
+       (set-company-backend! 'hledger-mode 'hledger-company)
+
+       (defun hledger-pulse-momentary-current-entry-no-args+ (&rest _)
+         (hledger-pulse-momentary-current-entry))
+
+       (advice-add 'hledger-next-or-new-entry :after 'hledger-pulse-momentary-current-entry-no-args+)
+       (advice-add 'hledger-backward-entry    :after 'hledger-pulse-momentary-current-entry-no-args+)
+
+       :lazy-leader
+       (:mode 'hledger-input-mode
+        :minor t
+        :prefix leader-major-mode-prefix
+        "," 'hledger-commit-input
+        "q" 'hledger-discard-input
+        "Q" 'hledger-discard-input-jentry)
+
+       (:mode 'hledger-mode
+        "s" 'hledger-reschedule
+        "a" 'hledger-edit-amount)
+
+       :general
+       (:keymaps 'hledger-mode-map
+        :states 'motion
+        "gj" 'hledger-next-or-new-entry
+        "gk" 'hledger-backward-entry))
+   #+end_src
+
+*** flycheck-hledger
+    #+begin_src emacs-lisp :tangle (package-yes! ledger flycheck)
+      (use-package flycheck-hledger
+        :straight t
+        :after (flycheck ledger-mode)
+        :demand t)
+    #+end_src
 
 ** HTML
    :PROPERTIES:
