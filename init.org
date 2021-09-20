@@ -13191,6 +13191,212 @@
        :straight t)
    #+END_SRC
 
+** compile-multi
+   :PROPERTIES:
+   :header-args+: :tangle (lisp! "+multi-compile")
+   :END:
+
+   Adapted from [[https://github.com/ReanGD/emacs-multi-compile][emacs-multi-compile]] this is my attempt at a multi-target interface to
+   compile.
+   Some of the core changes are that this approach supports a more flexible
+   configuration format and can support dynamic compilation targets (such as make
+   rules or gradle tasks etc.). It also doesn't rely on ~%substitution~ or other forms
+   for building commands, instead using strings, or lists of strings, including lisp
+   constructs that will be evaluated and concatenated together into strings.
+
+   This package also works as a usable alternative for [[https://github.com/abo-abo/helm-make][helm-make]], using a smaller
+   more general core interface that can easily be repurposed for other similar tools.
+
+   #+begin_src emacs-lisp :tangle yes
+     (use-package +compile-multi
+       :commands (compile-multi)
+       :custom
+       (compile-multi-default-directory #'project-current-root+)
+
+       :preface
+       (setq compile-multi-config
+             `(((file-exists-p "go.sum")
+                ("go:build" . "go build -v")
+                ("go:test" . "go test"))
+               ((file-exists-p "CMakeLists.txt")
+                ("cmake:build" . "cmake build"))))
+
+       :init
+       ;; Dynamically fetch the list of makefile targets for the current project.
+       (defvar helm-make-cache-targets+ t)
+       (defvar helm-make-targets-cache+ (make-hash-table))
+
+       (defun compile-multi-makefile-targets+ (makefile)
+         (let (make-targets
+               (modtime (and helm-make-cache-targets+
+                             (file-attribute-modification-time (file-attributes makefile 'integer)))))
+           (setq make-targets
+                 (or (and helm-make-cache-targets+
+                          (when-let ((entry (gethash default-directory helm-make-targets-cache+)))
+                            (when (time-less-p modtime (car entry))
+                              (cdr entry))))
+                     ;; Taken from [[https://github.com/abo-abo/helm-make/blob/ebd71e85046d59b37f6a96535e01993b6962c559/helm-make.el#L284][helm-make/helm--make-target-list-default]].
+                     (let (targets)
+                       (with-temp-buffer
+                         (insert-file-contents makefile)
+                         (goto-char (point-min))
+                         (while (re-search-forward "^\\([^: \n]+\\) *:\\(?: \\|$\\)" nil t)
+                           (let ((str (match-string 1)))
+                             (unless (string-match "^\\." str)
+                               (push str targets)))))
+                       (nreverse targets))))
+           (when helm-make-cache-targets+
+             (puthash default-directory (cons modtime make-targets) helm-make-targets-cache+))
+           make-targets))
+
+       (defun compile-multi-make-targets+ ()
+         "Retun a list of `compile-multi' targets for the current Makefile project.
+     Compile task for the current buffer (may not be supported by the Makefile."
+         ;; (when-let ((name (buffer-file-name)))
+         ;;   `(("make:buffer" .
+         ;;      ,(concat "make " (shell-quote-argument (file-relative-name name))))))
+         (cl-loop for it in (compile-multi-makefile-targets+ "Makefile")
+                  collect (cons (concat "make:" it)
+                                (concat "make " (shell-quote-argument it)))))
+
+       (push `((file-exists-p "Makefile")
+               ,#'compile-multi-make-targets+)
+             compile-multi-config)
+
+       :init
+       (defun byte-compile-this-file+ ()
+         (byte-compile-file (buffer-file-name)))
+
+       (push `(emacs-lisp-mode
+               ("emacs:bytecompile" . ,#'byte-compile-this-file+))
+             compile-multi-config)
+
+       :leader ("cm" 'compile-multi))
+   #+end_src
+
+   #+begin_src emacs-lisp
+     (require 's)
+     (require 'seq)
+
+     (defvar compile-multi-default-directory #'ignore
+       "Function called to set the `default-directory' of a compilation in `+compile-multi'.")
+
+     (defvar compile-multi-forms
+       '((file-name . (buffer-file-name))
+         (file-dir . (file-name-directory (buffer-file-name)))
+         (file-base . (file-name-nondirectory (buffer-file-name)))
+         (file-base-no-ext . (file-name-sans-extension (file-name-nondirectory (buffer-file-name))))
+         (file-ext . (file-name-extension (file-name-nondirectory (buffer-file-name)))))
+       "Alist of special let-forms that'll be substituted in `compile-multi-config'.")
+
+     (defvar compile-multi-config
+       `((emacs-lisp-mode . (("rust-debug" . ("cargo run" (buffer-file-name)))))))
+
+     (defun compile-multi--tasks ()
+       "Select the tasks from `compile-multi-config' whose triggers are fired."
+       (apply #'append
+              (mapcar #'cdr
+                      (seq-filter
+                       (lambda (it)
+                         (let ((trigger (car it)))
+                           (cond
+                            ((eq trigger t) t)
+                            ((symbolp trigger)
+                             (derived-mode-p trigger))
+                            ((listp trigger)
+                             (eval trigger))
+                            ((stringp trigger)
+                             (string-match-p trigger (buffer-name)))
+                            ((functionp trigger)
+                             (funcall trigger))
+                            (t (error "Unknown trigger type: %s" trigger)))))
+                       compile-multi-config))))
+
+     (defun compile-multi--fill-tasks (tasks)
+       (let (res task-name)
+         (dolist (task tasks)
+           (cond
+            ;; Generate one-or more tasks to replace this task.
+            ((functionp task)
+             (setq res (append (seq-reverse
+                                (compile-multi--fill-tasks (funcall task)))
+                               res)))
+            ;; A full command to be called as a standalone task.
+            ((stringp (cdr task))
+             (push task res))
+            ;; Defer to a lisp-command to compile, not a shell command.
+            ;; KLUDGE: I'm not sure about this, it might be a little too hacky.
+            ((functionp (cdr task))
+             (push task res))
+            ;; It's a list that we need to format into a shell-command to run.
+            ((listp (cdr task))
+             (push (cons task-name
+                         (s-join " "
+                          (mapcar (lambda (it)
+                                    (cond
+                                     ((stringp it) it)
+                                     ((symbolp it)
+                                      (let* ((val (or (alist-get task compile-multi-forms)
+                                                      task))
+                                             (evaluated-value (eval val)))
+                                        (unless (stringp val)
+                                          (error "Failed to stringify task argument %s" val))
+                                        evaluated-value))
+                                     (t
+                                      (let ((evaluated-value (eval it)))
+                                        (unless (stringp evaluated-value)
+                                          (error "Failed to stringify task argument %s" it))
+                                        evaluated-value))))
+                                  task)))
+                   res))
+            (t (error "Unknown task type: %s" task))))
+         (seq-reverse res)))
+
+     (defvar compile-multi-history nil)
+
+     (defvar compile-multi-annotate-cmds t)
+
+     (defun compile-multi--annotation-function (tasks)
+       (lambda (it)
+         (when compile-multi-annotate-cmds
+           (when-let ((cmd (cdr (assoc it tasks))))
+             (setq cmd (format "%s" cmd))
+             (concat " "
+                     (propertize " " 'display `(space :align-to (- right ,(+ 1 (length cmd)))))
+                     cmd)))))
+
+     (defun compile-multi ()
+       (interactive)
+       (let* ((default-directory (or (and compile-multi-default-directory
+                                          (funcall compile-multi-default-directory))
+                                     default-directory))
+              (tasks (compile-multi--tasks))
+              (tasks (compile-multi--fill-tasks tasks))
+              (compile-cmd (if tasks
+                               (cdr
+                                (assoc (completing-read
+                                        "Compile: "
+                                        (lambda (string predicate action)
+                                          (if (eq action 'metadata)
+                                              `(metadata
+                                                (annotation-function . ,(compile-multi--annotation-function tasks))
+                                                (category . compile))
+                                            (complete-with-action action tasks string predicate)))
+                                        nil t nil 'compile-multi-history)
+                                       tasks))
+                             (read-shell-command "Compile command: "))))
+         (cond
+          ((stringp compile-cmd)
+           (compile compile-cmd))
+          ((functionp compile-cmd)
+           (funcall compile-cmd))
+          (t (error "Don't know how to run the command cmd.")))))
+   #+end_src
+
+   #+begin_src emacs-lisp
+     (provide '+compile-multi)
+   #+end_src
+
 ** dashboard
 *** footer
     A random quote and icon from the following lists will be chosen at startup and
@@ -18985,6 +19191,13 @@
                                          :compile #'rustic-compile
                                          :test    #'rustic-cargo-test
                                          :run     #'rustic-cargo-run))
+
+       ;; Support `compile-multi'.
+       (push `((file-exists-p "Cargo.toml")
+               ("rust:build" . ,#'rustic-compile)
+               ("rust:test" . ,#'rustic-cargo-test)
+               ("rust:run" . ,#'rustic-cargo-run))
+             compile-multi-config)
 
        :custom
        (rustic-lsp-server 'rust-analyzer)
