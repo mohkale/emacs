@@ -86,6 +86,7 @@
          ;; neotree                                                        ; Tree like directory viewer for emacs
          ;; notmuch                                                        ; Mail client and manager
          imenu                                                             ; Interactively jump to points of interest in this buffer
+         ;; indent-guide                                                   ; Show guides for leading indents
          ;; olivetti                                                       ; A nice writing environment for emacs
          ;; pdf-tools                                                      ; Use emacs as quick and dirty pdf viewer
          ;; piper                                                          ; Interactive shell pipelines with emacs
@@ -14390,6 +14391,26 @@
        :leader
        ("t/" 'hide/show-comments-toggle))
    #+END_SRC
+
+** indent-guide
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! indent-guides)
+   :END:
+
+   #+begin_src emacs-lisp :tangle no
+     (use-package indent-guide
+       :straight t
+       :custom
+       (indent-guide-char "│")
+       (indent-guide-threshold -1))
+   #+end_src
+
+   #+begin_src emacs-lisp
+     (use-package highlight-indent-guides
+       :straight t
+       :custom
+       (highlight-indent-guides-auto-enabled nil))
+   #+end_src
 
 ** link-hint
    Jump to links through an avy interface.
