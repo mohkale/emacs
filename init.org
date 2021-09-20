@@ -16776,9 +16776,7 @@
         :straight t
         :after (org restclient)
         :init
-        (org-babel-do-load-languages
-         'org-babel-load-languages
-         '((restclient . t))))
+        (org-babel-lazy-load-languages+ 'restclient))
     #+END_SRC
 
 ** elisp
@@ -19582,25 +19580,26 @@
    :header-args+: :tangle (package-yes! org)
    :END:
 
-*** org-mode
-    #+BEGIN_SRC emacs-lisp
-      ;; See [[https://emacs.stackexchange.com/questions/58994/symbol-s-value-as-variable-is-void-org-priority-highest-using-org-agenda][here]].
-      (defvaralias 'org-highest-priority 'org-priority-highest)
-      (defvaralias 'org-lowest-priority 'org-priority-lowest)
-      (defvaralias 'org-default-priority 'org-priority-default)
+   The quintessential plain-text editing and writing package for emacs. It ranges
+   from a basic writing utility to a spread-sheet engine or even a time-sheet
+   manager.
 
+   First we need to define some aliases due to some migration errors. See [[https://emacs.stackexchange.com/questions/58994/symbol-s-value-as-variable-is-void-org-priority-highest-using-org-agenda][here]].
+
+   #+begin_src emacs-lisp
+     (defvaralias 'org-highest-priority 'org-priority-highest)
+     (defvaralias 'org-lowest-priority 'org-priority-lowest)
+     (defvaralias 'org-default-priority 'org-priority-default)
+   #+end_src
+
+   #+BEGIN_SRC emacs-lisp
       (use-package org
         :straight t
         :hook ((org-mode . display-line-numbers-mode)
-               (org-mode . auto-fill-mode)
-               (org-follow-link . recenter))
-        :commands (org-completing-goto+
-                   org-toggle-async-export+)
+               (org-mode . auto-fill-mode))
         :custom
         (org-clock-idle-time 15)
-        (org-src-tab-acts-natively nil)                                               ; native tabs are slow and unreliable... :sad:
         (org-fontify-done-headline nil)
-        (org-src-window-setup 'current-window)
         (org-archive-file-header-format "\
       # -*- mode: org; coding: utf-8-unix -*-
       ,#+TITLE: Archive
@@ -19614,43 +19613,16 @@
                             '(sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED")))
         (org-refile-use-outline-path t)                                               ; Show full paths for refiling
         (org-archive-location (concat (join-path +notes-home "archive.org") "::* %s"))                 ; Archive to the same file from everywhere
-        (org-confirm-babel-evaluate nil)
         (org-refile-targets (list
                              (cons (join-path user-emacs-directory "init.org") '(:maxlevel . 1))
                              (cons nil '(:maxlevel . 9))
                              (cons 'org-agenda-files '(:maxlevel . 2))))
-        (org-latex-default-class "article")
-        (org-export-with-toc nil)
-        (org-latex-classes
-         '(("article" "\\documentclass[11pt]{article} \\setlength{\\parindent}{0in} \\setlength{\\parskip}{\\baselineskip}"
-            ("\\section{%s}" . "\\section*{%s}")
-            ("\\subsection{%s}" . "\\subsection*{%s}")
-            ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
-            ("\\paragraph{%s}" . "\\paragraph*{%s}")
-            ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))
-           ("report" "\\documentclass[11pt]{report}"
-            ("\\part{%s}" . "\\part*{%s}")
-            ("\\chapter{%s}" . "\\chapter*{%s}")
-            ("\\section{%s}" . "\\section*{%s}")
-            ("\\subsection{%s}" . "\\subsection*{%s}")
-            ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))
-           ("book" "\\documentclass[11pt]{book}"
-            ("\\part{%s}" . "\\part*{%s}")
-            ("\\chapter{%s}" . "\\chapter*{%s}")
-            ("\\section{%s}" . "\\section*{%s}")
-            ("\\subsection{%s}" . "\\subsection*{%s}")
-            ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
         (org-highlight-latex-and-related '(latex script entities))
-        (org-src-ask-before-returning-to-edit-buffer nil)
-        (org-edit-src-turn-on-auto-save nil) ;; WARN: Doesn't let you configure save path.
-        (org-edit-src-auto-save-idle-delay 0)
         (org-adapt-indentation t)
 
-        :config
-        (setq org-babel-default-header-args:emacs-lisp '((:lexical . "yes")))
-        (setq org-cite-global-bibliography (directory-files +bib-home t ".bib"))
-
         :init
+        (push '(org-mode . 2) +indent-config)
+
         (modify-syntax-hook! 'org-mode
           '((?< . "_")
             (?> . "_")
@@ -19660,6 +19632,9 @@
         (add-hook 'org-mode-hook
                   (defun org-disable-electric-balance+ ()
                     (setq electric-pair-preserve-balance t)))
+
+        :config
+        (setq org-cite-global-bibliography (directory-files +bib-home t ".bib"))
 
         :config
         (setq org-agenda-files
@@ -19677,8 +19652,6 @@
                                 (xopen-url+ path))))))
 
         :init
-        (push '(org-mode . 2) +indent-config)
-
         (advice-add 'evil-ret-gen :before-until
                     (defun evil-ret-open-org-links+ (&rest _)
                       "hitting return in evil-normal-state on an org-link
@@ -19709,54 +19682,6 @@
         (setq org-read-date-minibuffer-local-map (make-sparse-keymap))
         (set-keymap-parent org-read-date-minibuffer-local-map minibuffer-local-map)
 
-        ;; switch to insert state when capturing org templates
-        (add-hook 'org-capture-mode-hook (lambda () (evil-insert nil)) t)
-
-        (advice-add 'org-edit-src-code :after
-                    (lambda (&rest args)
-                      "Prevents org mode from restoring the window config before
-      source code edit. when you run `org-edit-src-code' the window configuration
-      from before the edit is saved, and when you exit the session it's restored.
-      Any windows/buffers you open while in an edit get erased. This prevents that
-      happening."
-                      (setq org-src--saved-temp-window-config nil)))
-
-        (let ((lob-file (etc! "babel-lib.org")))
-          (when (file-exists-p lob-file)
-            (org-babel-lob-ingest lob-file)))
-
-        (advice-add 'org-edit-src-code :before (lambda (&rest args)
-                                                 (unless (eq evil-state 'normal)
-                                                   (evil-normal-state))))
-
-        (defun org-completing-goto+ ()
-          (interactive)
-          (org-refile '(4)))
-
-        ;;  _
-        ;; | | __ _ _ __   __ _ _   _  __ _  __ _  ___  ___
-        ;; | |/ _` | '_ \ / _` | | | |/ _` |/ _` |/ _ \/ __|
-        ;; | | (_| | | | | (_| | |_| | (_| | (_| |  __/\__ \
-        ;; |_|\__,_|_| |_|\__, |\__,_|\__,_|\__, |\___||___/
-        ;;                |___/             |___/
-
-        (org-babel-do-load-languages 'org-babel-load-languages
-         '((emacs-lisp . t)
-           (awk        . t)
-           (C          . t)
-           (haskell    . t)
-           (latex      . t)
-           (java       . t)
-           (gnuplot    . t)
-           (js         . t)
-           (ditaa      . t)
-           (plantuml   . t)
-           (python     . t)
-           (ruby       . t)
-           (sed        . t)
-           (shell      . t)
-           (R          . t)))
-
         ;;             _ _       _     _           _ _
         ;;   _____   _(_) |     | |__ (_)_ __   __| (_)_ __   __ _ ___
         ;;  / _ \ \ / / | |_____| '_ \| | '_ \ / _` | | '_ \ / _` / __|
@@ -19770,45 +19695,6 @@
 
         :config
         (add-to-list 'org-latex-default-packages-alist '("" "babel" t nil) t)
-
-        :config
-        ;; Inspired by [[https://stackoverflow.com/a/25335933/6247387][this]] stack-overflow answer, the following advice tries to make
-        ;; `org-capture's window popup mechanism a lot less *forceful*.
-        (advice-add 'org-capture-place-template :around
-                    (defun org-capture-place-template-keep-windows+ (func &rest args)
-                      "Prevent `org-capture' from forcefully deleting my current window-config."
-                      (cl-letf (((symbol-function #'delete-other-windows)
-                                 (symbol-function #'ignore)))
-                        (apply func args))))
-
-        (advice-add 'org-capture :around
-                    (defun org-capture-open-in-current-window+ (func &rest args)
-                      "Make `org-capture' popups always open in the current window.
-      I find this a lot more predictable then randomly popping up here and there."
-                      (cl-letf (((symbol-function #'org-switch-to-buffer-other-window)
-                                 (symbol-function #'switch-to-buffer)))
-                        (apply func args))))
-
-        (advice-add 'org-capture-finalize :around
-                    (defun org-capture-keep-wconfig+ (func &rest args)
-                      "Prevent `org-capture-finalize' from resetting my window-configs"
-                      (cl-letf (((symbol-function #'set-window-configuration)
-                                 (symbol-function #'ignore)))
-                        (apply func args))))
-
-        (defun org-toggle-async-export+ ()
-          (interactive)
-          (when (called-interactively-p 'interactive)
-            (message "org-export-in-background: %s"
-                     (if (setq org-export-in-background (not org-export-in-background))
-                         (propertize "enabled" 'face 'compilation-info)
-                       (propertize "disabled" 'face 'compilation-error)))))
-
-        :config
-        (advice-add #'org-src--contents-for-write-back :after
-                    (defun org-edit-src-write-back-clean-whitespace+ (buf)
-                      (with-current-buffer buf
-                        (delete-trailing-whitespace (point-min) (point-max)))))
 
         :leader
         ("o"  '(:ignore t :wk "org")
@@ -20085,7 +19971,62 @@
                                      (line-beginning-position)))
                      (org-eval-in-calendar '(calendar-goto-today))
                    (insert ".")))))
-    #+END_SRC
+   #+END_SRC
+
+*** org-babel
+    Deals with evaluating and substituting code-blocks in ~org-mode~.
+
+    #+begin_src emacs-lisp
+      (use-package ob
+        :custom
+        (org-confirm-babel-evaluate nil)
+        (org-babel-load-languages nil)
+
+        :init
+        (defun org-babel-lazy-load-languages+ (&rest langs)
+          "Proxy for `org-babel-do-load-languages' that can defer loading."
+          (let ((loaded (and (boundp 'org-babel-load-languages)
+                             (default-value 'org-babel-load-languages)))
+                (new-langs (cl-loop for it in langs collect (cons it t))))
+            ;; `org-babel-do-load-languages' has this weird signature where
+            ;; once you call it, it overrides the existing value of
+            ;; `org-babel-load-languages', so even if you have some languages
+            ;; already setup they can't be evaluated. This fixes that.
+            (condition-case err
+                (org-babel-do-load-languages 'org-babel-load-languages new-langs)
+              (error (set-default 'org-babel-load-languages loaded)
+                     (signal (car err) (cdr err))))
+            (set-default 'org-babel-load-languages (append new-langs loaded))))
+
+        :config
+        ;; Some langs don't need any further deferring.
+        (org-babel-do-load-languages 'org-babel-load-languages
+         ;; Note: We haven't setup gnuplot, ditaa, plantuml and R.
+         '((emacs-lisp . t)
+           (latex . t)))
+
+        ;; Add load hooks for the rest of the available languages I may use.
+        (with-eval-after-load 'python (org-babel-lazy-load-languages+ 'python))
+        (with-eval-after-load 'cc-mode (org-babel-lazy-load-languages+ 'C 'java 'haskell))
+        (with-eval-after-load 'js       (org-babel-lazy-load-languages+ 'js))
+        (with-eval-after-load 'js2-mode (org-babel-lazy-load-languages+ 'js))
+        (with-eval-after-load 'shell (org-babel-lazy-load-languages+ 'shell))
+        (with-eval-after-load 'cc-awk (org-babel-lazy-load-languages+ 'awk))
+        (with-eval-after-load 'sed-mode (org-babel-lazy-load-languages+ 'sed))
+        ;; Deferring these doesn't do anything for load-time, it's just because
+        ;; I use them so rarely. If you want them loaded just insert a src-code
+        ;; block with their format and it'll be available from then onwards.
+        (with-eval-after-load 'sql (org-babel-lazy-load-languages+ 'sql))
+        (with-eval-after-load 'ruby-mode (org-babel-lazy-load-languages+ 'ruby))
+        (with-eval-after-load 'haskell-mode (org-babel-lazy-load-languages+ 'haskell))
+
+        :config
+        (setq org-babel-default-header-args:emacs-lisp '((:lexical . "yes")))
+
+        (let ((lob-file (etc! "babel-lib.org")))
+          (when (file-exists-p lob-file)
+            (org-babel-lob-ingest lob-file))))
+    #+end_src
 
 *** org-agenda
     #+BEGIN_SRC emacs-lisp
@@ -20196,22 +20137,6 @@
          "M-f" 'org-agenda-recenterstates))
     #+END_SRC
 
-*** org-bullets
-    Better heading indicators in org buffers.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package org-superstar
-        :straight (org-superstar-mode :host github :repo "integral-dw/org-superstar-mode")
-        :hook (org-mode . org-superstar-mode)
-        :custom
-        (org-superstar-todo-bullet-alist
-         '(("TODO" . 9744)
-           ("DONE" . 9745)))
-        (org-superstar-cycle-headline-bullets t)
-        (org-hide-leading-stars t)
-        (org-superstar-special-todo-items t))
-    #+END_SRC
-
 *** org-contrib
     #+BEGIN_SRC emacs-lisp
       (use-package org-contrib
@@ -20245,30 +20170,6 @@
           (require 'ol-notmuch)))
     #+END_SRC
 
-*** orgit
-    Link to magit buffers directly from org-mode.
-    Autoloads have been disabled because otherwise magit is immeadiately loaded.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package orgit
-        :straight (orgit :build (:not autoloads))
-        :demand t
-        :after (org magit)
-        :hook (git-commit-post-finish . orgit-store-after-commit)
-        :custom
-        (orgit-store-repository-id t)
-
-        :config
-        (defun orgit-store-after-commit ()
-          "Store orgit-link for latest commit after commit message editor is finished."
-          (let* ((repo (orgit--current-repository))
-                 (rev (magit-git-string "rev-parse" "HEAD"))
-                 (link (format "orgit-rev:%s::%s" repo rev))
-                 (summary (substring-no-properties (magit-format-rev-summary rev)))
-                 (desc (format "%s (%s)" summary repo)))
-            (push (list link desc) org-stored-links))))
-    #+END_SRC
-
 *** org-capture
     :PROPERTIES:
     :header-args+: :tangle (lisp! "+org-capture.el")
@@ -20286,11 +20187,45 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! org)
       (use-package org-capture
+        :hook (org-capture-mode . evil-insert-state)
         :custom
         (org-capture-bookmark nil)
 
         :config
         (require '+org-capture)
+
+        (advice-add 'org-edit-src-code :after
+                    (lambda (&rest args)
+                      "Prevents org mode from restoring the window config before
+      source code edit. when you run `org-edit-src-code' the window configuration
+      from before the edit is saved, and when you exit the session it's restored.
+      Any windows/buffers you open while in an edit get erased. This prevents that
+      happening."
+                      (setq org-src--saved-temp-window-config nil)))
+
+        ;; Inspired by [[https://stackoverflow.com/a/25335933/6247387][this]] stack-overflow answer, the following advice tries to make
+        ;; `org-capture's window popup mechanism a lot less *forceful*.
+        (advice-add 'org-capture-place-template :around
+                    (defun org-capture-place-template-keep-windows+ (func &rest args)
+                      "Prevent `org-capture' from forcefully deleting my current window-config."
+                      (cl-letf (((symbol-function #'delete-other-windows)
+                                 (symbol-function #'ignore)))
+                        (apply func args))))
+
+        (advice-add 'org-capture :around
+                    (defun org-capture-open-in-current-window+ (func &rest args)
+                      "Make `org-capture' popups always open in the current window.
+      I find this a lot more predictable then randomly popping up here and there."
+                      (cl-letf (((symbol-function #'org-switch-to-buffer-other-window)
+                                 (symbol-function #'switch-to-buffer)))
+                        (apply func args))))
+
+        (advice-add 'org-capture-finalize :around
+                    (defun org-capture-keep-wconfig+ (func &rest args)
+                      "Prevent `org-capture-finalize' from resetting my window-configs"
+                      (cl-letf (((symbol-function #'set-window-configuration)
+                                 (symbol-function #'ignore)))
+                        (apply func args))))
 
         :lazy-leader
         (:mode 'org-capture-mode
@@ -20456,6 +20391,8 @@
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! org)
       (use-package +org-commands
         :commands (org-outline-smart-up-level
+                   org-toggle-async-export+
+                   org-completing-goto+
                    org-openable-p
                    org-find-file
                    org-clever-return
@@ -20482,6 +20419,12 @@
     #+begin_src emacs-lisp
       (require 'org)
       (require 'evil)
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (defun org-completing-goto+ ()
+        (interactive)
+        (org-refile '(4)))
     #+end_src
 
     A jump command which moves you to the current branches heading when you're not at
@@ -20676,12 +20619,42 @@
     #+END_SRC
 
     #+begin_src emacs-lisp
+      (defun org-toggle-async-export+ ()
+        (interactive)
+        (when (called-interactively-p 'interactive)
+          (message "org-export-in-background: %s"
+                   (if (setq org-export-in-background (not org-export-in-background))
+                       (propertize "enabled" 'face 'compilation-info)
+                     (propertize "disabled" 'face 'compilation-error)))))
+    #+end_src
+
+    #+begin_src emacs-lisp
       (provide '+org-commands)
     #+end_src
 
 *** org-src
     #+BEGIN_SRC emacs-lisp
       (use-package org-src
+        :custom
+        (org-src-tab-acts-natively nil)                                               ; native tabs are slow and unreliable... :sad:
+        (org-src-window-setup 'current-window)
+        (org-src-ask-before-returning-to-edit-buffer nil)
+        (org-edit-src-turn-on-auto-save nil)                                          ; WARN: Doesn't let you configure save path.
+        (org-edit-src-auto-save-idle-delay 0)
+
+        :init
+        (advice-add 'org-edit-src-code :before
+                    (defun org-edit-src-pre-exit-normal-state+ (&rest args)
+                      (unless (eq evil-state 'normal)
+                        (evil-normal-state))))
+
+        :config
+        ;; Trailing white-space is a pest that org-mode tacitly accepts.
+        (advice-add #'org-src--contents-for-write-back :after
+                    (defun org-edit-src-write-back-clean-whitespace+ (buf)
+                      (with-current-buffer buf
+                        (delete-trailing-whitespace (point-min) (point-max)))))
+
         :leader
         (:mode 'org-src-mode
          :minor t
@@ -20699,219 +20672,6 @@
          [remap evil-save-modified-and-close] 'org-edit-src-exit))
     #+END_SRC
 
-*** org-fragtog
-    Automatically render latex fragments in org mode.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package org-fragtog
-        :straight t
-        :after org)
-    #+END_SRC
-
-*** org-ql
-    Lisp like query language for org mode.
-
-    #+BEGIN_SRC emacs-lisp :tangle no
-      (use-package org-ql
-        :straight t)
-    #+END_SRC
-
-*** company-org-block                                                   :comp:
-    A better solution for inserting code-blocks or block-groups in org-mode.
-
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! org company)
-      (use-package company-org-block
-        :straight (company-org-block :host github :repo "xenodium/company-org-block")
-        :after org
-        :demand t
-        :custom
-        (company-org-block-edit-style 'auto)
-        (company-org-block-explicit-lang-defaults nil)
-
-        :config
-        (set-company-backend! 'org-mode
-          'company-org-block))
-    #+END_SRC
-
-*** org-roam
-    note taking system centred around org-mode. you can tag notes using the
-    ~roam_tags~ keyword and you can reference sources using ~roam_key~.
-
-    *Note*: protocol installation requires some manual setup, see [[https://www.orgroam.com/manual/Installation-_00281_0029.html#Installation-_00281_0029][here]].
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package org-roam
-        :straight t
-        :hook ((org-roam-file-setup . flyspell-mode))
-        :commands org-roam-rg
-        :preface
-        (setq org-roam-v2-ack t)
-
-        :custom
-        (org-roam-prefer-id-links t)
-        (org-roam-completion-system 'default)
-        (org-id-link-to-org-use-id 'use-existing)
-        (org-roam-db-location (state! "org-roam.db"))
-
-        :config
-        (org-roam-db-autosync-mode +1)
-
-        (require 'org-roam-protocol)
-
-        (defun org-roam-rg ()
-          "Run a rg session in your org roam directory."
-          (interactive)
-          (cond ((package! :consult)
-                 (require 'consult)
-                 (consult-ripgrep org-roam-directory))
-                (t (message "No rg package found"))))
-
-        :config
-        ;; Fix compatability with v1 when moving to v2... eventually this won't be
-        ;; needed :-).
-        (setq org-id-extra-files (directory-files org-roam-directory nil "\\.org$"))
-
-        :custom
-        (org-roam-node-display-template "${title} ${tags:0}")
-        (org-roam-node-annotation-function #'org-roam-annotate-tag+)
-        :commands (org-roam-annotate-tag+)
-        :config
-        (defun org-roam-annotate-tag+ (node)
-          (let ((tags (mapconcat
-                       (lambda (v)
-                         (concat (or (cdr (assoc "tags" org-roam-node-template-prefixes))
-                                     "")
-                                 v))
-                       (org-roam-node-tags node) " ")))
-            (unless (string-empty-p tags)
-              (concat
-               " "
-               (propertize " " 'display `(space :align-to (- right ,(+ 1 (length tags)))))
-               tags))))
-
-        :commands (org-roam-create-new-img+)
-        :leader (:mode 'org-mode "f" 'org-roam-create-new-img+)
-        :config
-        (defun org-roam-create-new-img+ ()
-          (interactive)
-          (let* ((root (join-path default-directory "images"))
-                 (template (join-path root "template.svg"))
-                 (stamp (format-time-string "%Y%m%d%H%M%S"))
-                 (copy (join-path root (concat stamp ".svg"))))
-            (unless (file-exists-p template)
-              (user-error "Template not found at path: %s" template))
-            (copy-file template copy nil nil t t)
-
-            (let ((company-org-block-edit-style 'inline))
-              (company-org-block--wrap-point "src latex" "src"))
-            (let ((space (make-string (- (line-end-position) (line-beginning-position)) ? )))
-              (indent-region
-               (point)
-               (save-excursion
-                 (insert (format (s-join "\n"
-                                         `("\\begin{figure}[ht]"
-                                           ,(concat space "  \\centering")
-                                           ,(concat space "  \\incfig{%s}")
-                                           ,(concat space "\\end{figure}")))
-                                 stamp))
-                 (point)))
-              (next-line 2)
-              (forward-char 2))
-
-            (message "Opening new figure in inkscape.")
-            (start-process "inkscape" nil "inkscape" copy)))
-
-        :leader
-        ("ox" 'org-roam-capture
-         "oF" 'org-roam-ref-find
-         "of" 'org-roam-node-find
-         "op" 'org-roam-node-insert
-         "oz" 'org-roam-alias-add
-         "oZ" 'org-roam-alias-delete
-         "ot" 'org-roam-tag-add
-         "oT" 'org-roam-tag-remove
-         "or" 'org-roam-buffer-toggle
-         "oR" 'org-roam-buffer-render
-         "os" 'org-roam-rg)
-
-        :general
-        (:keymaps '(org-roam-node-map
-                    org-roam-preview-map)
-         "SPC" nil)
-        (:keymaps 'org-roam-node-map
-         :states 'motion
-         "RET" 'org-roam-visit-thing))
-    #+END_SRC
-
-**** org-roam-ui
-     #+BEGIN_SRC emacs-lisp
-       (use-package simple-httpd :straight t)
-       (use-package websocket :straight t)
-
-       (use-package org-roam-ui
-         :straight (org-roam-ui :host github :repo "org-roam/org-roam-ui" :files ("*.el" "out"))
-         :config
-         (require 'org-roam)
-
-         :leader
-         ("oG" 'org-roam-ui-mode)
-
-         :preface
-         (setq org-roam-ui-port 8967))
-     #+END_SRC
-
-*** org-ref
-    :PROPERTIES:
-    :header-args+: :tangle (package-yes! org bibtex)
-    :END:
-    Support citations, references and links in org mode documents.
-
-    WARN for bibliographies to show up you have to specify a biliographystyle (use
-    unsrt when unsure).
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package org-ref
-        :straight t
-        :after org
-        :demand t
-        :leader
-        (:mode 'org-mode
-         "]" 'org-ref-insert-link)
-        ("ov" 'doi-utils-add-bibtex-entry-from-doi)
-
-        :init
-        (defvaralias 'reftex-default-bibliography 'org-cite-global-bibliography)
-        (defvaralias 'org-ref-default-bibliography 'org-cite-global-bibliography)
-        (defvaralias 'org-ref-bibliography-notes 'bibtex-completion-notes-path)
-
-        :custom
-        (org-ref-bibtex-completion-add-keywords-field nil)
-        (org-ref-show-citation-on-enter nil)
-        (helm-minibuffer-history-key nil)
-
-        :config
-        (setq org-ref-latex-bibliography-absolute-p t
-              org-ref-pdf-directory (let ((path bibtex-completion-library-path))
-                                      (if (listp path) (car path) path))
-              org-ref-latex-bib-resolve-func #'expand-file-name))
-    #+END_SRC
-
-*** citeproc-org
-    :PROPERTIES:
-    :header-args+: :tangle (package-yes! org bibtex citeproc)
-    :END:
-
-    #+begin_src emacs-lisp
-      (use-package citeproc-org
-        :straight t
-        :demand t
-        :after org-ref
-        :custom
-        (citeproc-org-ignore-backends '(beamer))
-        :config
-        (citeproc-org-setup))
-    #+end_src
-
 *** org-links
     View org links in non-org buffers as you would in org buffers.
 
@@ -20919,31 +20679,39 @@
       (use-package ol :commands (org-insert-link-global))
 
       (use-package org-link-minor-mode
-        :straight (org-link-minor-mode :host github :repo "seanohalpin/org-link-minor-mode")
+        :straight (org-link-minor-mode :host github
+                                       :repo "seanohalpin/org-link-minor-mode")
+        :hook (org-follow-link . recenter)
         :diminish org-link-minor-mode
+        :after org
+        :demand t
+        :preface
+        (defvar org-link-enable-modes+ '(hledger-mode text-mode prog-mode conf-mode)
+          "List of major modes in which `org-link-minor-mode' should be enabled.")
+
         :init
+        (defvaralias 'org-any-re 'org-link-any-re)                                    ; deprecated in org 9.3, not yet updated upstream.
+
         (defun enable-org-link-minor-mode (&rest _)
-          (unless (derived-mode-p 'major-mode 'org-mode)
+          (unless (derived-mode-p 'org-mode)
             (org-link-minor-mode +1)))
 
-        (add-hook 'window-setup-hook
-                  (defun org-link-minor-mode-setup-hooks+ ()
-                    "Setup `org-link-minor-mode' in a bunch of different mode hooks.
-      We defer these hook setups until after emacs has started to avoid loading
-      all of `org-mode' at startup. A mild but definite performance boost. The
-      downside is any buffers begun before this hook is called that would have
-      `org-link-minor-mode' enabled won't (eg: scratch)."
-                    (add-hook 'text-mode-hook #'enable-org-link-minor-mode)
-                    (add-hook 'prog-mode-hook #'enable-org-link-minor-mode)
-                    (add-hook 'conf-mode-hook #'enable-org-link-minor-mode)))
-
         :config
-        (when-let ((scratch (get-buffer scratch-buffer-name)))
-          (with-current-buffer scratch
-            (org-link-minor-mode)))
+        ;; We defer these hook setups and enabling `org-link-minor-mode' until
+        ;; after `org-mode' has been loaded because `org-link-minor-mode' forces
+        ;; all of `org-mode' to be loaded, and that's a large overhead for both
+        ;; startup and regular editing.
+        ;;
+        ;; This provides a mild but definite performance and startup boost.
+        (dolist (mode org-link-enable-modes+)
+          (add-hook (intern (concat (symbol-name mode) "-hook"))
+                    #'enable-org-link-minor-mode))
 
-        ;; deprecated in org 9.3, not yet updated upstream.
-        (defvaralias 'org-any-re 'org-link-any-re))
+        (dolist (buf (buffer-list))
+          (with-current-buffer buf
+            (when (and (not (bound-and-true-p org-link-minor-mode))
+                       (apply #'derived-mode-p org-link-enable-modes+))
+              (enable-org-link-minor-mode)))))
     #+END_SRC
 
 **** pdftools
@@ -21185,12 +20953,34 @@
 
     #+NAME: org-export-options
     #+BEGIN_SRC emacs-lisp
-      (setq
-       org-latex-pdf-process (list "latexmk -shell-escape -bibtex -f -pdf %f")
-       org-babel-python-command "python3"
-       org-ditaa-jar-path (cache! "org/bin/ditaa.jar")
-       org-ditaa-eps-jar-path (cache! "org/bin/ditaaEps.jar")
-       org-plantuml-jar-path (cache! "org/bin/plantuml.jar"))
+      (use-package org
+        :custom
+        (org-latex-pdf-process (list "latexmk -shell-escape -bibtex -f -pdf %f"))
+        (org-babel-python-command "python3")
+        (org-ditaa-jar-path (cache! "org/bin/ditaa.jar"))
+        (org-ditaa-eps-jar-path (cache! "org/bin/ditaaEps.jar"))
+        (org-plantuml-jar-path (cache! "org/bin/plantuml.jar"))
+        (org-export-with-toc nil)
+        (org-latex-default-class "article")
+        (org-latex-classes
+         '(("article" "\\documentclass[11pt]{article} \\setlength{\\parindent}{0in} \\setlength{\\parskip}{\\baselineskip}"
+            ("\\section{%s}" . "\\section*{%s}")
+            ("\\subsection{%s}" . "\\subsection*{%s}")
+            ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+            ("\\paragraph{%s}" . "\\paragraph*{%s}")
+            ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))
+           ("report" "\\documentclass[11pt]{report}"
+            ("\\part{%s}" . "\\part*{%s}")
+            ("\\chapter{%s}" . "\\chapter*{%s}")
+            ("\\section{%s}" . "\\section*{%s}")
+            ("\\subsection{%s}" . "\\subsection*{%s}")
+            ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))
+           ("book" "\\documentclass[11pt]{book}"
+            ("\\part{%s}" . "\\part*{%s}")
+            ("\\chapter{%s}" . "\\chapter*{%s}")
+            ("\\section{%s}" . "\\section*{%s}")
+            ("\\subsection{%s}" . "\\subsection*{%s}")
+            ("\\subsubsection{%s}" . "\\subsubsection*{%s}")))))
     #+END_SRC
 
 **** org-async-init
@@ -21223,16 +21013,275 @@
        (require 'org-ref)
      #+END_SRC
 
-*** org-appear
-    #+BEGIN_SRC emacs-lisp
-      (use-package org-appear
-        :straight t
-        :defer t
-        :hook (org-mode . org-appear-mode)
-        :custom
-        (org-hide-emphasis-markers t)
-        (org-appear-autolinks nil))
-    #+END_SRC
+*** extensions
+    org-mode is a relatively massive project with a bunch of built-in features. To
+    simplify determining what's built in and what's external I've placed any external
+    packages to org-mode itself into this sub-branch.
+
+**** org-bullets
+     Better heading indicators in org buffers.
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-superstar
+         :straight (org-superstar-mode :host github :repo "integral-dw/org-superstar-mode")
+         :hook (org-mode . org-superstar-mode)
+         :custom
+         (org-superstar-todo-bullet-alist
+          '(("TODO" . 9744)
+            ("DONE" . 9745)))
+         (org-superstar-cycle-headline-bullets t)
+         (org-hide-leading-stars t)
+         (org-superstar-special-todo-items t))
+     #+END_SRC
+
+**** orgit
+     Link to magit buffers directly from org-mode.
+     Autoloads have been disabled because otherwise magit is immeadiately loaded.
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package orgit
+         :straight (orgit :build (:not autoloads))
+         :demand t
+         :after (ol magit)
+         :custom
+         (orgit-store-repository-id t)
+
+         ;; :hook (git-commit-post-finish . orgit-store-after-commit)
+         ;; :config
+         ;; (defun orgit-store-after-commit ()
+         ;;   "Store orgit-link for latest commit after commit message editor is finished."
+         ;;   (let* ((repo (orgit--current-repository))
+         ;;          (rev (magit-git-string "rev-parse" "HEAD"))
+         ;;          (link (format "orgit-rev:%s::%s" repo rev))
+         ;;          (summary (substring-no-properties (magit-format-rev-summary rev)))
+         ;;          (desc (format "%s (%s)" summary repo)))
+         ;;     (push (list link desc) org-stored-links)))
+         )
+     #+END_SRC
+
+**** org-fragtog
+     Automatically render latex fragments in org mode.
+
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (use-package org-fragtog
+         :straight t
+         :after org)
+     #+END_SRC
+
+**** org-ql
+     Lisp like query language for org mode.
+
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (use-package org-ql
+         :straight t)
+     #+END_SRC
+
+**** company-org-block                                                  :comp:
+     A better solution for inserting code-blocks or block-groups in org-mode.
+
+     #+BEGIN_SRC emacs-lisp :tangle (package-yes! org company)
+       (use-package company-org-block
+         :straight (company-org-block :host github :repo "xenodium/company-org-block")
+         :after org
+         :demand t
+         :custom
+         (company-org-block-edit-style 'auto)
+         (company-org-block-explicit-lang-defaults nil)
+
+         :config
+         (set-company-backend! 'org-mode
+           'company-org-block))
+     #+END_SRC
+
+**** org-roam
+     note taking system centred around org-mode. you can tag notes using the
+     ~roam_tags~ keyword and you can reference sources using ~roam_key~.
+
+     *Note*: protocol installation requires some manual setup, see [[https://www.orgroam.com/manual/Installation-_00281_0029.html#Installation-_00281_0029][here]].
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-roam
+         :straight t
+         :hook ((org-roam-file-setup . flyspell-mode))
+         :commands org-roam-rg
+         :preface
+         (setq org-roam-v2-ack t)
+
+         :custom
+         (org-roam-prefer-id-links t)
+         (org-roam-completion-system 'default)
+         (org-id-link-to-org-use-id 'use-existing)
+         (org-roam-db-location (state! "org-roam.db"))
+
+         :config
+         (org-roam-db-autosync-mode +1)
+
+         (require 'org-roam-protocol)
+
+         (defun org-roam-rg ()
+           "Run a rg session in your org roam directory."
+           (interactive)
+           (cond ((package! :consult)
+                  (require 'consult)
+                  (consult-ripgrep org-roam-directory))
+                 (t (message "No rg package found"))))
+
+         :config
+         ;; Fix compatability with v1 when moving to v2... eventually this won't be
+         ;; needed :-).
+         (setq org-id-extra-files (directory-files org-roam-directory nil "\\.org$"))
+
+         :custom
+         (org-roam-node-display-template "${title} ${tags:0}")
+         (org-roam-node-annotation-function #'org-roam-annotate-tag+)
+         :commands (org-roam-annotate-tag+)
+         :config
+         (defun org-roam-annotate-tag+ (node)
+           (let ((tags (mapconcat
+                        (lambda (v)
+                          (concat (or (cdr (assoc "tags" org-roam-node-template-prefixes))
+                                      "")
+                                  v))
+                        (org-roam-node-tags node) " ")))
+             (unless (string-empty-p tags)
+               (concat
+                " "
+                (propertize " " 'display `(space :align-to (- right ,(+ 1 (length tags)))))
+                tags))))
+
+         :commands (org-roam-create-new-img+)
+         :leader (:mode 'org-mode "f" 'org-roam-create-new-img+)
+         :config
+         (defun org-roam-create-new-img+ ()
+           (interactive)
+           (let* ((root (join-path default-directory "images"))
+                  (template (join-path root "template.svg"))
+                  (stamp (format-time-string "%Y%m%d%H%M%S"))
+                  (copy (join-path root (concat stamp ".svg"))))
+             (unless (file-exists-p template)
+               (user-error "Template not found at path: %s" template))
+             (copy-file template copy nil nil t t)
+
+             (let ((company-org-block-edit-style 'inline))
+               (company-org-block--wrap-point "src latex" "src"))
+             (let ((space (make-string (- (line-end-position) (line-beginning-position)) ? )))
+               (indent-region
+                (point)
+                (save-excursion
+                  (insert (format (s-join "\n"
+                                          `("\\begin{figure}[ht]"
+                                            ,(concat space "  \\centering")
+                                            ,(concat space "  \\incfig{%s}")
+                                            ,(concat space "\\end{figure}")))
+                                  stamp))
+                  (point)))
+               (next-line 2)
+               (forward-char 2))
+
+             (message "Opening new figure in inkscape.")
+             (start-process "inkscape" nil "inkscape" copy)))
+
+         :leader
+         ("ox" 'org-roam-capture
+          "oF" 'org-roam-ref-find
+          "of" 'org-roam-node-find
+          "op" 'org-roam-node-insert
+          "oz" 'org-roam-alias-add
+          "oZ" 'org-roam-alias-delete
+          "ot" 'org-roam-tag-add
+          "oT" 'org-roam-tag-remove
+          "or" 'org-roam-buffer-toggle
+          "oR" 'org-roam-buffer-render
+          "os" 'org-roam-rg)
+
+         :general
+         (:keymaps '(org-roam-node-map
+                     org-roam-preview-map)
+          "SPC" nil)
+         (:keymaps 'org-roam-node-map
+          :states 'motion
+          "RET" 'org-roam-visit-thing))
+     #+END_SRC
+
+***** org-roam-ui
+      #+BEGIN_SRC emacs-lisp
+        (use-package simple-httpd :straight t)
+        (use-package websocket :straight t)
+
+        (use-package org-roam-ui
+          :straight (org-roam-ui :host github :repo "org-roam/org-roam-ui" :files ("*.el" "out"))
+          :config
+          (require 'org-roam)
+
+          :leader
+          ("oG" 'org-roam-ui-mode)
+
+          :preface
+          (setq org-roam-ui-port 8967))
+      #+END_SRC
+
+**** org-ref
+     :PROPERTIES:
+     :header-args+: :tangle (package-yes! org bibtex)
+     :END:
+     Support citations, references and links in org mode documents.
+
+     WARN for bibliographies to show up you have to specify a biliographystyle (use
+     unsrt when unsure).
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-ref
+         :straight t
+         :after org
+         :demand t
+         :leader
+         (:mode 'org-mode
+          "]" 'org-ref-insert-link)
+         ("ov" 'doi-utils-add-bibtex-entry-from-doi)
+
+         :init
+         (defvaralias 'reftex-default-bibliography 'org-cite-global-bibliography)
+         (defvaralias 'org-ref-default-bibliography 'org-cite-global-bibliography)
+         (defvaralias 'org-ref-bibliography-notes 'bibtex-completion-notes-path)
+
+         :custom
+         (org-ref-bibtex-completion-add-keywords-field nil)
+         (org-ref-show-citation-on-enter nil)
+         (helm-minibuffer-history-key nil)
+
+         :config
+         (setq org-ref-latex-bibliography-absolute-p t
+               org-ref-pdf-directory (let ((path bibtex-completion-library-path))
+                                       (if (listp path) (car path) path))
+               org-ref-latex-bib-resolve-func #'expand-file-name))
+     #+END_SRC
+
+**** citeproc-org
+     :PROPERTIES:
+     :header-args+: :tangle (package-yes! org bibtex citeproc)
+     :END:
+
+     #+begin_src emacs-lisp
+       (use-package citeproc-org
+         :straight t
+         :demand t
+         :after org-ref
+         :custom
+         (citeproc-org-ignore-backends '(beamer))
+         :config
+         (citeproc-org-setup))
+     #+end_src
+
+**** org-appear
+     #+BEGIN_SRC emacs-lisp
+       (use-package org-appear
+         :straight t
+         :defer t
+         :hook (org-mode . org-appear-mode)
+         :custom
+         (org-hide-emphasis-markers t)
+         (org-appear-autolinks nil))
+     #+END_SRC
 
 ** xml
    :PROPERTIES:
