@@ -275,6 +275,11 @@
      the overhead of an LSP server starting unintentionally whenever you switch to a
      file. It gives you the flexibility to continue existing LSP sessions, but avoid
      spawning new ones unless you actively want them.")
+
+     (defvar +indirect-edit-save-buffers t
+       "When true saving changes from an `edit-indirect' buffer saves the buffer file.
+     This applies both to the `edit-indirect' package and `org-edit-src-save', and
+     makes commiting consistent between the two packages.")
    #+END_SRC
 
 ** require
@@ -13638,7 +13643,7 @@
    #+END_SRC
 
 ** edit-indirect
-   Open regions of code in their own dedicated buffers, like org modes org-edit-special.
+   Open regions of code in their own dedicated buffers, like org modes ~org-edit-special~.
 
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! edit-indirect)
      (use-package edit-indirect
@@ -13648,6 +13653,12 @@
                 (display-buffer-reuse-window
                  display-buffer-same-window))
              display-buffer-alist)
+
+       (advice-add 'edit-indirect-save :after
+                   (defun edit-indirect-commit-save-buffer+ ()
+                     (when +indirect-edit-save-buffers
+                       (with-current-buffer (overlay-buffer edit-indirect--overlay)
+                         (save-buffer)))))
 
        :general
        (:keymaps 'edit-indirect-mode-map
@@ -20686,6 +20697,14 @@
                     (defun org-edit-src-write-back-clean-whitespace+ (buf)
                       (with-current-buffer buf
                         (delete-trailing-whitespace (point-min) (point-max)))))
+
+        (advice-add #'org-edit-src-save :around
+                    (defun org-edit-src-save-buffer+ (func &rest args)
+                      (if +indirect-edit-save-buffers
+                          (apply func args)
+                        (cl-letf (((symbol-function 'save-buffer)
+                                   (symbol-function 'ignore)))
+                          (apply func args)))))
 
         :leader
         (:mode 'org-src-mode
