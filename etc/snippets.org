@@ -2238,6 +2238,55 @@
    #+END_SRC
 
 * emacs-lisp-mode
+  #+begin_src emacs-lisp :tangle snippets/emacs-lisp-mode/.yas-setup.el :shebang ";; -*- lexical-binding: t -*-"
+    (autoinsert-register-yas+ (rx ".el" eol) 'emacs-lisp-mode "autoinsert")
+  #+end_src
+
+** autoinsert
+   #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/autoinsert
+     # name: autoinsert
+     # --
+     ;;; ${1:`(file-name-base (or (buffer-file-name) (buffer-name)))`}.el --- ${2:Short description} -*- lexical-binding: t; -*-
+
+     ;; Copyright (C) `(format-time-string "%Y")`  `(user-full-name)`
+
+     ;; Author: `(user-full-name)` <`(cadadr smtpmail-multi-accounts)`@`(caddar smtpmail-multi-accounts)`>
+     ;; Keywords: ${3:`(and
+                         (require 'finder)
+                         (s-join ", "
+                          (let ((minibuffer-help-form (mapconcat
+                                                       (lambda (x) (format "%12s:  %s" (car x) (cdr x)))
+                                                       finder-known-keywords "\n")))
+                            (completing-read-multiple
+                             "Keyword, C-h: " (mapcar (lambda (x) (symbol-name (car x)))
+                                                      finder-known-keywords)
+                             nil t))))`}
+
+     ;; This program is free software; you can redistribute it and/or modify
+     ;; it under the terms of the GNU General Public License as published by
+     ;; the Free Software Foundation, either version 3 of the License, or
+     ;; (at your option) any later version.
+
+     ;; This program is distributed in the hope that it will be useful,
+     ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+     ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+     ;; GNU General Public License for more details.
+
+     ;; You should have received a copy of the GNU General Public License
+     ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+     ;;; Commentary:
+
+     ;; $4
+
+     ;;; Code:
+
+     $0
+
+     (provide '$1)
+     ;;; $1.el ends here
+   #+END_SRC
+
 ** require
    #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/require
      # name: require

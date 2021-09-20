@@ -6798,15 +6798,29 @@
    #+END_SRC
 
 ** auto-insert
+   Automatically insert some text into newly made files and buffers.
    Can use skeletons, see [[info:autotype#Skeleton Language][Skeleton Language]].
 
    #+BEGIN_SRC emacs-lisp
      (use-package autoinsert
+       :leader ("ia" 'auto-insert)
        :custom
        (auto-insert-directory (etc! "auto-insert"))
 
-       :leader
-       ("ia" 'auto-insert))
+       :init
+       ;; Adapted from [[https://gist.github.com/jrnold/675584][here]].
+       (defmacro autoinsert-register-yas+ (regex mode uuid)
+         `(with-eval-after-load 'autoinsert
+            (define-auto-insert ,regex
+              '(lambda () (autoinsert-expand-yas+ ,mode ,uuid)))))
+
+       :config
+       (require 'yasnippet)
+
+       (defun autoinsert-expand-yas+ (mode uuid)
+         (if-let ((snippet (yas--get-template-by-uuid mode uuid)))
+             (yas-expand-snippet (yas--template-content snippet))
+           (user-error "Failed to find snippet %s/%s" mode uuid))))
    #+END_SRC
 
 ** auto-revert-mode
