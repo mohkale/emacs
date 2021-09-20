@@ -17173,77 +17173,94 @@
    :header-args+: :tangle (package-yes! python)
    :END:
 
-*** python-mode
-    #+BEGIN_SRC emacs-lisp
-      (use-package python
-        :straight (python :type built-in)
-        :hook (python-mode . +flylint)
-        :custom
-        (python-indent-guess-indent-offset-verbose nil
-         "Disable annoying notification when indent guess fails")
+   #+BEGIN_SRC emacs-lisp
+     (use-package python
+       :straight (python :type built-in)
+       :hook (python-mode . +flylint)
+       :custom
+       (python-indent-guess-indent-offset-verbose nil
+        "Disable annoying notification when indent guess fails")
 
-        :init
-        (setq python-prettify-symbols-alist nil)
-        (defalias 'python-repl 'run-python)
+       :init
+       (setq python-prettify-symbols-alist nil)
+       (defalias 'python-repl 'run-python)
 
-        :config
-        (modify-syntax! '((?_ . "w")) python-mode-syntax-table)
+       :config
+       (modify-syntax! '((?_ . "w")) python-mode-syntax-table)
 
-        (evil-set-initial-state 'inferior-python-mode 'emacs)
-        (add-to-list 'python-shell-completion-native-disabled-interpreters "python3")
+       (evil-set-initial-state 'inferior-python-mode 'emacs)
+       (add-to-list 'python-shell-completion-native-disabled-interpreters "python3")
 
-        (configure-presym! 'python-mode
-          "lambda" ?λ)
+       (configure-presym! 'python-mode
+         "lambda" ?λ)
 
-        (defun python-shell-calculate-command ()
-          "python3 -i")
+       (defun python-shell-calculate-command ()
+         "python3 -i")
 
-        :lazy-leader
-        (:mode 'python-mode
-         "r" 'run-python ;; REPL
-         "R" 'python-shell-switch-to-shell
-         "m" 'python-mark-defun
-         "v" 'python-check
-         "s" 'python-describe-at-point
-         ;; unbound: python-nav-forward-sexp[-safe]
-         ;;          python-nav-backward-sexp[-safe]
+       :config
+       ;; So pythons tab command behaves kind of weirdly. The first time you
+       ;; call it it indents the current line to the maximum possible indent
+       ;; level, and then cycles between indents. It does this by checking
+       ;; the current and last-command are the same and then cycling, this
+       ;; fails because I remap TAB to [tab] and `last-command' is [tab]
+       ;; while `this-command' is `indent-for-tab-command'.
+       ;;
+       ;; There's 2 ways to fix this. Either prevent this special case for
+       ;; the first call and always cycle, or map TAB to the same command
+       ;; as [tab] instead of relying on a macro. I opt for the latter.
 
-         "n"  '(:ignore t :wk "navigate")
-         "nh" 'python-nav-forward-statement
-         "nj" 'python-nav-forward-block
-         "nk" 'python-nav-backward-block
-         "nl" 'python-nav-backward-statement
-         "n(" 'python-nav-backward-up-list
-         "n)" 'python-nav-up-list
-         "n0" 'python-nav-beginning-of-block
-         "n$" 'python-nav-end-of-block
-         "nm" 'python-nav-if-name-main
+       ;; (advice-add 'python-indent-line-function :override
+       ;;             (defun python-indent-line-function+ ()
+       ;;               (python-indent-line
+       ;;                (memq this-command python-indent-trigger-commands))))
 
-         "n C-0" 'python-nav-beginning-of-statement
-         "n C-$" 'python-nav-end-of-statement
-         "n M-j" 'python-nav-forward-defun
-         "n M-k" 'python-nav-backward-defun
-         ;; "n M-0" 'python-nav-beginning-of-defun
-         "n M-$" 'python-nav-end-of-defun
+       (general-define-key
+        :keymaps 'python-mode-map
+        :states 'insert
+        "TAB" 'indent-for-tab-command)
 
-         "h"  '(:ignore t :wk "help")
-         "hp" 'python-eldoc-at-point
+       :lazy-leader
+       (:mode 'python-mode
+        "r" 'run-python ;; REPL
+        "R" 'python-shell-switch-to-shell
+        "m" 'python-mark-defun
+        "v" 'python-check
+        "s" 'python-describe-at-point
+        ;; unbound: python-nav-forward-sexp[-safe]
+        ;;          python-nav-backward-sexp[-safe]
 
-         "e"  '(:ignore t :wk "eval/exec")
-         "ed" 'python-shell-send-defun
-         "eb" 'python-shell-send-buffer
-         "ef" 'python-shell-send-file
-         "er" 'python-shell-send-region
-         "ec" 'python-shell-send-string)
+        "n"  '(:ignore t :wk "navigate")
+        "nh" 'python-nav-forward-statement
+        "nj" 'python-nav-forward-block
+        "nk" 'python-nav-backward-block
+        "nl" 'python-nav-backward-statement
+        "n(" 'python-nav-backward-up-list
+        "n)" 'python-nav-up-list
+        "n0" 'python-nav-beginning-of-block
+        "n$" 'python-nav-end-of-block
+        "nm" 'python-nav-if-name-main
 
-        :general
-        (:keymaps 'python-mode-map
-         "<C-backspace>" nil)
-        (:states 'insert
-         :keymaps 'python-mode-map
-         "TAB"   'tab-to-tab-stop
-         "<tab>" 'tab-to-tab-stop))
-    #+END_SRC
+        "n C-0" 'python-nav-beginning-of-statement
+        "n C-$" 'python-nav-end-of-statement
+        "n M-j" 'python-nav-forward-defun
+        "n M-k" 'python-nav-backward-defun
+        ;; "n M-0" 'python-nav-beginning-of-defun
+        "n M-$" 'python-nav-end-of-defun
+
+        "h"  '(:ignore t :wk "help")
+        "hp" 'python-eldoc-at-point
+
+        "e"  '(:ignore t :wk "eval/exec")
+        "ed" 'python-shell-send-defun
+        "eb" 'python-shell-send-buffer
+        "ef" 'python-shell-send-file
+        "er" 'python-shell-send-region
+        "ec" 'python-shell-send-string)
+
+       :general
+       (:keymaps 'python-mode-map
+        "<C-backspace>" nil))
+   #+END_SRC
 
 *** python-lsp-server                                                   :lsp:
     Your going to need a python language server, I recommend [[https://github.com/python-lsp/python-lsp-server][this]] one that's based on
