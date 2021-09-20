@@ -137,6 +137,7 @@
          ibuffer-projectile                                                ; Filter ibuffer buffers by active projects
          ;; company-emoji                                                  ; Show emojis in company-completion candidates
          ;; citeproc                                                       ; Standard for citation links used with org-ref
+         ;; hindent                                                        ; Intelligent indentation control for haskell
 
      ;;; language-support
          ;; ggtags                                                         ; GNU Global source code tagging system
@@ -18931,8 +18932,67 @@
    :header-args+: :tangle (package-yes! haskell)
    :END:
 
+   #+BEGIN_SRC emacs-lisp
+     (use-package haskell-mode
+       :straight t
+       :init
+       (push 'haskell-interactive-mode +whitespace-exempt-modes)
+       (push 'inferior-haskell-mode +whitespace-exempt-modes)
+
+       (defalias 'haskell-repl #'run-haskell)
+
+       :config
+       (setq haskell-process-type 'cabal-repl)
+       (evil-set-initial-state 'haskell-interactive-mode 'emacs)
+
+       ;; haskell-mode seems to be configuring the wrong value for eldoc.
+       (defun haskell-doc-function+ (callback)
+         (funcall callback (haskell-doc-current-info)))
+
+       (add-hook 'haskell-mode-hook
+                 (defun haskell-mode-fix-eldoc+ ()
+                   (kill-local-variable 'eldoc-documentation-function)
+                   (add-hook 'eldoc-documentation-functions #'haskell-doc-function+ nil t)))
+
+       :lazy-leader
+       (:mode 'haskell-mode
+        "r"  '(:ignore t :wk "refactor")
+        "ri" 'haskell-mode-format-imports
+        "rI" 'haskell-sort-imports
+
+        "i"  '(:ignore t :wk "insert")
+        "is" 'haskell-mode-toggle-scc-at-point
+
+        "s"  '(:ignore t :wk "session")
+        "sc" 'haskell-session-change
+        "sC" 'haskell-session-change-target
+        "sk" 'haskell-session-kill
+        "sK" 'haskell-kill-session-process)
+
+       :general
+       (:keymaps 'haskell-mode-map "C-M-i" nil))
+   #+END_SRC
+
+*** haskell-indent
+    #+begin_src emacs-lisp
+      (use-package haskell-indent
+        :commands (haskell-indent-cycle)
+        :general
+        (:keymaps 'haskell-mode-map
+         :states 'insert
+         "<tab>" 'haskell-indent-cycle
+         "S-TAB" 'haskell-delete-indentation)
+
+        :leader
+        (:mode 'haskell-mode
+         "i|" 'haskell-indent-insert-guard
+         "iw" 'haskell-indent-insert-where
+         "io" 'haskell-indent-insert-other
+         "i=" 'haskell-indent-insert-equal))
+    #+end_src
+
 *** hindent
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! haskell hindent)
       (use-package hindent
         :straight t
         :hook (haskell-mode . hindent-mode))
@@ -18952,58 +19012,7 @@
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! haskell flycheck)
       (use-package flycheck-haskell
         :straight t
-        :after  haskell-mode)
-    #+END_SRC
-
-*** haskell-mode
-    #+BEGIN_SRC emacs-lisp
-      (use-package haskell-mode
-        :straight t
-        :init
-        (push 'haskell-interactive-mode +whitespace-exempt-modes)
-        (push 'inferior-haskell-mode +whitespace-exempt-modes)
-
-        (defalias 'haskell-repl #'run-haskell)
-
-        :config
-        (use-package haskell-indent
-          :commands (haskell-indent-cycle))
-
-        (setq haskell-process-type 'cabal-repl)
-        (evil-set-initial-state 'haskell-interactive-mode 'emacs)
-
-        (defun haskell-enable-indent-control+ ()
-          (interactive)
-          (haskell-indent-mode +1)
-          (general-define-key
-            :states  '(insert replace)
-            :keymaps 'haskell-mode-map
-            "<tab>" 'haskell-indent-cycle))
-
-        :lazy-leader
-        (:mode 'haskell-mode
-         "TAB"   'haskell-indent-cycle
-         "S-TAB" 'haskell-delete-indentation
-
-         "r"  '(:ignore t :wk "refactor")
-         "ri" 'haskell-mode-format-imports
-         "rI" 'haskell-sort-imports
-
-         "i"  '(:ignore t :wk "insert")
-         "is" 'haskell-mode-toggle-scc-at-point
-         "i|" 'haskell-indent-insert-guard
-         "iw" 'haskell-indent-insert-where
-         "io" 'haskell-indent-insert-other
-         "i=" 'haskell-indent-insert-equal
-
-         "s"  '(:ignore t :wk "session")
-         "sc" 'haskell-session-change
-         "sC" 'haskell-session-change-target
-         "sk" 'haskell-session-kill
-         "sK" 'haskell-kill-session-process)
-
-        :general
-        (:keymaps 'haskell-mode-map "C-M-i" nil))
+        :after haskell-mode)
     #+END_SRC
 
 *** haskell-language-server                                             :lsp:
