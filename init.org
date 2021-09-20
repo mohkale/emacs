@@ -9,7 +9,8 @@
 # On the planet emacs in the holy control tower and among the stars aboard
 # the evil flagship. -- Spacemacs
 
-#+PROPERTY: header-args :tangle init.el :comments link :mkdirp yes :noweb yes :hlines no :shebang ";; -*- lexical-binding: t -*-"
+#+PROPERTY: header-args  :tangle init.el :shebang ";; -*- lexical-binding: t -*-"
+#+PROPERTY: header-args+ :comments link :mkdirp yes :noweb yes :hlines no
 
 * Config
   This is the root configuration branch for my emacs config.
@@ -63,6 +64,7 @@
    #+BEGIN_SRC emacs-lisp :tangle no
      (defvar +modules
        '(;; apheleia                                                       ; Automatic buffer formatting after save.
+         abbrev                                                            ; Enable automatic in text substitutions
          magit                                                             ; It's git... but magical  ,
          link-hint                                                         ; Jump to links in the current buffer through an avy interface
          ;; adaptive-wrap                                                  ; Visually wrap long lines. doesn't alter what you write.
@@ -129,7 +131,7 @@
          ;; image-dired                                                    ; View images in dired like sessions
          ;; edit-indirect                                                  ; Edit regions of a buffer in another mode.
          ;; hydra-posframe                                                 ; Show hydras in a posframe
-         ebib                                                              ; Nice emacs based interface for editing bibtex files
+         ;; ebib                                                           ; Nice emacs based interface for editing bibtex files
                                                                            ; NOTE: This package requires bibtex to be enabled
          ;; tramp-term                                                     ; Make term work seamlessly in tramp sessions
          ibuffer-vc                                                        ; Filter ibuffer buffers by version-control repos
@@ -137,6 +139,7 @@
          ibuffer-projectile                                                ; Filter ibuffer buffers by active projects
          ;; company-emoji                                                  ; Show emojis in company-completion candidates
          ;; citeproc                                                       ; Standard for citation links used with org-ref
+         evil-tty-cursor                                                   ; Make emacs change terminal cursors based on evil-state.
          ;; hindent                                                        ; Intelligent indentation control for haskell
 
      ;;; language-support
@@ -167,7 +170,7 @@
          ;; jupyter
          ;; kotlin
          ;; glsl
-         log
+         ;; log
          latex
          ;; lua
          makefile
@@ -178,12 +181,12 @@
          ;; php
          ;; powershell
          ;; restclient
-         ruby
+         ;; ruby
          ;; rust
          sh-script
          sql
          ssh-config
-         vimlang
+         ;; vimlang
          xml
          yaml
          ;; yarn
@@ -1343,6 +1346,7 @@
          "af" 'describe-face
          "aX" 'customize
          "al" 'find-library
+         "aL" 'load-library
          "at" 'load-theme
          "am" +man-command
          "ae" 'list-processes
@@ -1659,6 +1663,14 @@
        "M-DEL"           'delete-forward-char
        "<C-S-backspace>" 'kill-word)
     #+END_SRC
+
+    Root level remaps.
+
+    #+begin_src emacs-lisp
+      (general-define-key
+       [remap revert-buffer] 'revert-buffer-quick                                     ; Why ever be prompted if nothings been modified?
+       )
+    #+end_src
 
     My window map, like ~C-w~ in vim.
 
@@ -3562,6 +3574,8 @@
         (completion-styles '(orderless))
         (completion-category-overrides
          '((file (styles partial-completion))))
+        (orderless-component-separator #'orderless-escapable-split-on-space
+         "Allows escaping space with a backslash.")
 
         :preface
         (defun flex-if-twiddle (pattern _index _total)
@@ -3569,20 +3583,28 @@
           (when (string-suffix-p "~" pattern)
             `(orderless-flex . ,(substring pattern 0 -1))))
 
-        (defun literal-if-equals (pattern _index _totle)
+        (defun literal-if-equals (pattern _index _total)
           (when (string-prefix-p "=" pattern)
             `(orderless-literal . ,(substring pattern 1))))
 
         (defun without-if-bang (pattern _index _total)
           "Exclude literal when leading punctuation-mark."
           (when (string-prefix-p "!" pattern)
-            `(orderless-without-literal . ,(substring pattern 1))))
+            (if (not (eq pattern "!"))
+                `(orderless-literal . "")                                             ; Ignore single ! by default.
+              `(orderless-without-literal . ,(substring pattern 1)))))
+
+        (defun fold-if-percent (pattern _index _total)
+          (when (string-prefix-p "%" pattern)
+            ;; Allows you to [[http://endlessparentheses.com/new-in-emacs-25-1-easily-search-non-ascii-characters.html][search]] unicode characters with ascii queries.
+            `(char-fold-to-regexp . ,(substring pattern 1))))
 
         :custom
         (orderless-matching-styles '(orderless-regexp))
         (orderless-style-dispatchers '(flex-if-twiddle
                                        literal-if-equals
-                                       without-if-bang))
+                                       without-if-bang
+                                       fold-if-percent))
 
         :config
         (defun orderless-company-fix-face+ (fn &rest args)
@@ -3591,7 +3613,15 @@
 
         (with-eval-after-load 'company
           ;; Fixes face issues in tooltip, see [[https://github.com/oantolin/orderless/tree/d97a91f6e12ace638e65bdccefd14d1e638a2dae#company][here]].
-          (advice-add 'company-capf--candidates :around #'orderless-company-fix-face+)))
+          (advice-add 'company-capf--candidates :around #'orderless-company-fix-face+))
+
+        :init
+        (defun consult--orderless-regexp-compiler (input type)
+          (setq input (orderless-pattern-compiler input))
+          (cons
+           (mapcar (lambda (r) (consult--convert-regexp r type)) input)
+           (apply-partially #'orderless--highlight input)))
+        :custom (consult--regexp-compiler #'consult--orderless-regexp-compiler))
     #+END_SRC
 
 *** hotfuzz
@@ -3989,7 +4019,7 @@
     #+END_SRC
 
 *** evil-cursor
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! evil-tty-cursor)
       (use-package evil-terminal-cursor-changer
         :straight t
         :hook (tty-setup . evil-terminal-cursor-changer-activate))
@@ -4188,10 +4218,8 @@
     #+BEGIN_SRC emacs-lisp
        (use-package evil-traces
          :straight t
-         :hook (evil-mode . evil-traces-mode)
          :diminish
-         :config
-         (evil-traces-use-diff-faces))
+         :hook (evil-mode . evil-traces-mode))
     #+END_SRC
 
 *** evil-args
@@ -4755,6 +4783,7 @@
                (company--insert-candidate
                 (concat company-prefix
                         (substring remaining-input 0 count)))))))
+       (put 'company-complete-next-char+ 'company-keep t)
 
        (defun company-complete-common-or-next-char+ (&optional count)
          "complete the common part of the current selection or insert
@@ -4812,8 +4841,10 @@
         "C-l"    'company-complete-selection
         "C-h"    'company-show-doc-buffer
         "C-p"    'company-show-location
-        "<tab>"  'company-complete-common-or-cycle
+        [tab]    'company-complete-common-or-cycle
+        "TAB"    'company-complete-common-or-cycle
         "RET"    'company-complete-selection
+        [C-i]    'company-complete-selection
         "C-:"    'completion-at-point
         "C-/"    'company-filter-candidates
         "C-s"    'company-filter-candidates
@@ -4829,12 +4860,12 @@
       (setq-default company-backends '(company-capf))
 
       (defvar company-backend-alist+
-        '((text-mode (:separate company-files company-dabbrev company-yasnippet ;; company-ispell
+        '((text-mode (:separate company-files company-abbrev company-yasnippet ;; company-ispell
                       ))
           (lisp-interaction-mode (:separate company-capf company-files company-yasnippet company-abbrev ;; company-ispell
                                   ))
           (prog-mode (company-capf company-files company-yasnippet))
-          (conf-mode company-capf company-files company-dabbrev-code company-yasnippet))
+          (conf-mode company-capf company-files company-abbrev-code company-yasnippet))
         "An alist matching modes to company backends. The backends for any mode is
       built from this.")
 
@@ -7485,6 +7516,10 @@
    #+END_SRC
 
 ** abbrev
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! abbrev)
+   :END:
+
    #+BEGIN_SRC emacs-lisp
      (use-package abbrev
        :hook ((org-mode . abbrev-mode)
@@ -7495,6 +7530,7 @@
        :custom
        (abbrev-file-name (etc! "abbrev.el"))
        (save-abbrevs 'silently)
+       (evil-want-abbrev-expand-on-insert-exit nil)
 
        ;; TODO: edit-abbrevs-mode
 
@@ -8383,21 +8419,42 @@
         ("e." 'flymake-hydra/body)
 
         :preface
-        (defvar flymake-hydra--window nil)
+        (defvar flymake-hydra--window-config+ nil)
+
+        :init
+        (defun flymake-hydra--setup-window-config+ (diag-buffer)
+          (setq flymake-hydra--window-config+ (current-window-configuration))
+          (delete-other-windows)
+          (with-selected-window (split-window-right)
+            (switch-to-buffer diag-buffer)
+
+            (when (and (bound-and-true-p compilation-last-buffer)
+                       (buffer-live-p compilation-last-buffer))
+              (with-selected-window (split-window-below)
+                (switch-to-buffer compilation-last-buffer)))))
+
+        (defun flymake-hydra--restore-window-config+ ()
+          (when flymake-hydra--window-config+
+            (unwind-protect
+                (save-current-buffer
+                  (save-selected-window
+                    (save-excursion
+                      (set-window-configuration flymake-hydra--window-config+))))
+              (setq flymake-hydra--window-config+ nil))))
 
         :hydra
         (flymake-hydra
-         (:pre (let ((buffer-window (selected-window)))
-                 (setq flymake-hydra--window (flymake-show-diagnostics-buffer))
-                 (select-window buffer-window))
-          :post (when (and flymake-hydra--window
-                           (window-live-p flymake-hydra--window))
-                  (quit-window nil flymake-hydra--window))
+         (:body-pre (flymake-hydra--setup-window-config+
+                     (save-window-excursion
+                       (window-buffer (flymake-show-diagnostics-buffer))))
+          :post (flymake-hydra--restore-window-config+)
           :hint nil)
          ("j"  flymake-goto-next-error "Next")
          ("k"  flymake-goto-prev-error "Previous")
          ("gg" flymake-first-error+ "First")
          ("G"  flymake-last-error+ "Last")
+         ("n"  next-error "Next-Compile")
+         ("p"  previous-error "Last-Compile")
          ("q"  nil :exit t)))
     #+end_src
 *** flymake-rest
@@ -12222,7 +12279,13 @@
          ;; [remap man] 'consult-man
          ;; [remap woman] 'consult-man
          "C-M-y" 'consult-yank-pop
-         "C-s" 'consult-line))
+         "C-s" 'consult-line)
+        (:keymaps 'evil-ex-completion-map
+         "C-s" 'consult-history)
+        (:keymaps 'minibuffer-local-map
+         ;; TODO: Pick one, leave other for something else.
+         "C-s" 'consult-history
+         "C-r" 'consult-history))
     #+END_SRC
 
 *** consult-bufler
@@ -12292,6 +12355,9 @@
         :init
         (evil-set-command-property 'consult-eglot :jump t)
 
+        :custom
+        (consult-eglot-show-kind-name nil)
+
         :general
         (:keymaps 'eglot-mode-map
          [remap xref-find-apropos] 'consult-eglot-symbols))
@@ -12302,7 +12368,13 @@
       (use-package consult-notmuch
         :straight t
         :leader
-        ("an" #'consult-notmuch))
+        ("an" #'consult-notmuch)
+
+        :init
+        (advice-add #'notmuch-read-tag-changes :filter-return
+                    ;; See [[https://github.com/minad/vertico/issues/119][vertico#119]].
+                    (defun notmuch-fix-notmuch-read-tag-changes+ (x)
+                      (mapcar #'string-trim x))))
     #+end_src
 
 *** consult-bibtex
@@ -14365,16 +14437,19 @@
 
         :hydra
         (flycheck-hydra
-         (:pre (let ((buffer-window (selected-window)))
-                 (flycheck-list-errors)
-                 (select-window buffer-window))
-          :post (quit-windows-on "*Flycheck errors*")
+         (:body-pre (flymake-hydra--setup-window-config+
+                     (save-window-excursion
+                       (flycheck-list-errors)
+                       (get-buffer "*Flycheck errors*")))
+          :post (flymake-hydra--restore-window-config+)
           :hint nil)
          ("f"  flycheck-error-list-set-filter "Filter")
          ("j"  flycheck-next-error "Next")
          ("k"  flycheck-previous-error "Previous")
          ("gg" flycheck-first-error "First")
          ("G"  flycheck-last-error "Last")
+         ("n"  next-error "Next-Compile")
+         ("p"  previous-error "Last-Compile")
          ("q"  nil :exit t)))
     #+end_src
 
@@ -14722,10 +14797,10 @@
         "wr" 'lsp-workspace-folders-remove
         "ws" 'lsp-workspace-folders-switch
 
-        "l"  '(:ignore t :wk "lens")
-        "ll" 'lsp-lens-mode
-        "ls" 'lsp-lens-show
-        "lh" 'lsp-lens-hide
+        "L"  '(:ignore t :wk "lens")
+        "Ll" 'lsp-lens-mode
+        "Ls" 'lsp-lens-show
+        "Lh" 'lsp-lens-hide
 
         "r"  '(:ignore t :wk "refactor")
         "rr" 'lsp-format-buffer
@@ -15216,14 +15291,17 @@
       (use-package magit-todos
         :straight t
         :after magit
-        :hook (magit-mode . magit-todos-mode)
         :lazy-leader
         (:mode 'magit-status-mode
          "T" 'magit-todos-list
          "t" 'magit-todos-jump-to-todos)
 
+        :config
+        (magit-todos-mode +1)
+
         :general
-        (:keymaps '(magit-todos-item-section-map magit-todos-section-map)
+        (:keymaps '(magit-todos-item-section-map
+                    magit-todos-section-map)
          "j" nil "B" nil "b" nil))
     #+END_SRC
 
@@ -17036,75 +17114,74 @@
    :header-args+: :tangle (package-yes! elisp)
    :END:
 
-*** elisp-mode
-    #+BEGIN_SRC emacs-lisp
-      (use-package elisp-mode
-        :commands (eval-replace-last-sexp)
-        :config
-        (modify-syntax!
-          '((?_ . "w")
-            (?- . "w")
-            (?! . "w"))
-          emacs-lisp-mode-syntax-table)
+   #+BEGIN_SRC emacs-lisp
+     (use-package elisp-mode
+       :commands (eval-replace-last-sexp)
+       :config
+       (modify-syntax!
+         '((?_ . "w")
+           (?- . "w")
+           (?! . "w"))
+         emacs-lisp-mode-syntax-table)
 
-        ;; show lambda as an actual lambda symbol... pretty cool, if I do say
-        ;; so myself.
-        (configure-presym! '(lisp-interaction-mode emacs-lisp-mode org-mode)
-          "lambda"  ?λ
-          "lambda!" "λ!")
+       ;; show lambda as an actual lambda symbol... pretty cool, if I do say
+       ;; so myself.
+       (configure-presym! '(lisp-interaction-mode emacs-lisp-mode org-mode)
+         "lambda"  ?λ
+         "lambda!" "λ!")
 
-        (defun eval-replace-last-sexp (&optional prefix)
-          "evaluate then replace the preceding sexp"
-          (interactive "p")
-          (let* ((sexp (elisp--preceding-sexp))
-                 (value (eval sexp)))
-            (kill-sexp -1)
-            (insert (format (if prefix "%s" "%S") value))))
+       (defun eval-replace-last-sexp (&optional prefix)
+         "evaluate then replace the preceding sexp"
+         (interactive "p")
+         (let* ((sexp (elisp--preceding-sexp))
+                (value (eval sexp)))
+           (kill-sexp -1)
+           (insert (format (if prefix "%s" "%S") value))))
 
-        (evil-set-initial-state 'inferior-emacs-lisp-mode 'emacs) ;; ielm
+       (evil-set-initial-state 'inferior-emacs-lisp-mode 'emacs) ;; ielm
 
-        ;; Allows for smarter indentation based on the lisp syntax.
-        (push '(emacs-lisp-mode . nil) +indent-config)
-        (push '(lisp-interaction-mode . nil) +indent-config)
+       ;; Allows for smarter indentation based on the lisp syntax.
+       (push '(emacs-lisp-mode . nil) +indent-config)
+       (push '(lisp-interaction-mode . nil) +indent-config)
 
-        :leader
-        ("fk" 'emacs-lisp-byte-compile)
-        (:prefix "k"
-         "e" 'eval-last-sexp
-         "k" 'eval-last-sexp
-         "(" 'eval-print-last-sexp
-         ")" 'eval-replace-last-sexp)
+       :leader
+       ("fk" 'emacs-lisp-byte-compile)
+       (:prefix "k"
+        "e" 'eval-last-sexp
+        "k" 'eval-last-sexp
+        "(" 'eval-print-last-sexp
+        ")" 'eval-replace-last-sexp)
 
-        :lazy-leader
-        (:mode '(emacs-lisp-mode lisp-interaction-mode)
-          "'" 'ielm
-          "c" 'emacs-lisp-byte-compile
-          "i" 'indent-sexp
-          "p" 'pp-buffer
+       :lazy-leader
+       (:mode '(emacs-lisp-mode lisp-interaction-mode)
+         "'" 'ielm
+         "c" 'emacs-lisp-byte-compile
+         "i" 'indent-sexp
+         "p" 'pp-buffer
 
-          ;; eval
-          "e"  '(:ignore t :wk "eval")
-          "eb" 'eval-buffer
-          "ee" 'eval-last-sexp
-          "eE" 'eval-replace-last-sexp
-          "ef" 'eval-defun
-          "er" 'eval-region
-          ;; "et" 'elisp-transcript
+         ;; eval
+         "e"  '(:ignore t :wk "eval")
+         "eb" 'eval-buffer
+         "ee" 'eval-last-sexp
+         "eE" 'eval-replace-last-sexp
+         "ef" 'eval-defun
+         "er" 'eval-region
+         ;; "et" 'elisp-transcript
 
-          ;; jump
-          "g" '(xref-find-definitions :wk "goto-definition")
-          "G" '(xref-find-definitions-other-window :wk "goto-definition-other-window")
+         ;; jump
+         "g" '(xref-find-definitions :wk "goto-definition")
+         "G" '(xref-find-definitions-other-window :wk "goto-definition-other-window")
 
-          ;; tests
-          "t" 'ert
-          "T" 'ert-run-tests-interactively)
+         ;; tests
+         "t" 'ert
+         "T" 'ert-run-tests-interactively)
 
-        :general
-        (:keymaps '(emacs-lisp-mode-map lisp-interaction-mode-map)
-         "C-j" nil
-         "C-(" 'eval-print-last-sexp
-         "C-)" 'eval-replace-last-sexp))
-    #+END_SRC
+       :general
+       (:keymaps '(emacs-lisp-mode-map lisp-interaction-mode-map)
+        "C-j" nil
+        "C-(" 'eval-print-last-sexp
+        "C-)" 'eval-replace-last-sexp))
+   #+END_SRC
 
 *** paredit
     #+BEGIN_SRC emacs-lisp
@@ -17379,22 +17456,21 @@
      (leader-set-keys "tmr" +ruby-mode)
    #+END_SRC
 
-*** ruby-mode
-    #+BEGIN_SRC emacs-lisp :tangle (if (eq +ruby-package 'ruby) "yes" "no")
-      (use-package ruby-mode
-        :mode ("\\.rb$" . ruby-mode)
-        :hook (ruby-mode . +flylint)
-        :interpreter "ruby"
-        :config
-        (modify-syntax! '((?_ . "w")
-                          (?: . "w"))
-          ruby-mode-syntax-table)
+   #+BEGIN_SRC emacs-lisp :tangle (if (eq +ruby-package 'ruby) "yes" "no")
+     (use-package ruby-mode
+       :mode ("\\.rb$" . ruby-mode)
+       :hook (ruby-mode . +flylint)
+       :interpreter "ruby"
+       :config
+       (modify-syntax! '((?_ . "w")
+                         (?: . "w"))
+         ruby-mode-syntax-table)
 
-        :lazy-leader
-        (:mode 'ruby-mode
+       :lazy-leader
+       (:mode 'ruby-mode
          "'" 'ruby-toggle-string-quotes
          "{" 'ruby-toggle-block))
-    #+END_SRC
+   #+END_SRC
 
 *** enhanced-ruby-mode
     #+BEGIN_SRC emacs-lisp :tangle (if (eq +ruby-package 'enh-ruby) "yes" "no")
@@ -18217,10 +18293,6 @@
 
        :general
        (:keymaps 'makefile-mode-map
-        :states 'insert
-        "TAB" 'indent-for-tab-command
-        "<tab>" 'indent-for-tab-command)
-       (:keymaps 'makefile-mode-map
         :states 'motion
         "gj" 'makefile-next-dependency
         "gk" 'makefile-previous-dependency)
@@ -18908,24 +18980,23 @@
    :header-args+: :tangle (package-yes! css)
    :END:
 
-*** css-mode
-    #+BEGIN_SRC emacs-lisp
-      (use-package css-mode
-        :hook (css-mode . +flylint)
-        :lazy-leader
-        (:mode '(less-css-mode css-mode)
-         "?" 'css-lookup-symbol
-         "b" 'web-beautify-css))
-    #+END_SRC
+   #+BEGIN_SRC emacs-lisp
+     (use-package css-mode
+       :hook (css-mode . +flylint)
+       :lazy-leader
+       (:mode '(less-css-mode css-mode)
+        "?" 'css-lookup-symbol
+        "b" 'web-beautify-css))
+   #+END_SRC
 
-**** company-css                                                        :comp:
-     #+begin_src emacs-lisp :tangle (package-yes! css company)
-       (set-company-backend! 'css-mode
+*** company-css                                                        :comp:
+    #+begin_src emacs-lisp :tangle (package-yes! css company)
+      (set-company-backend! 'css-mode
+        'company-css)
+
+       (set-company-backend! 'less-css-mode
          'company-css)
-
-        (set-company-backend! 'less-css-mode
-          'company-css)
-     #+end_src
+    #+end_src
 
 *** vscode-css-languageserver-bin                                       :lsp:
     Requires ~npm install --global vscode-css-languageserver-bin~.
@@ -20298,7 +20369,6 @@
          :predicate '(or (org-table-p t)
                          (org-at-heading-p)
                          (org-at-item-p))
-         "<tab>"   'org-cycle
          "TAB"     'org-cycle
          "<S-tab>" 'org-shifttab)
         (:keymaps 'org-mode-map
@@ -21679,7 +21749,7 @@
         "/" 'nxml-electric-slash))
    #+end_src
 
-*** company-xml                                                        :comp:
+*** company-xml                                                         :comp:
     #+begin_src emacs-lisp :tangle (package-yes! xml company)
       (set-company-backend! 'nxml-mode #'company-nxml)
     #+end_src
@@ -22589,6 +22659,28 @@
 
        `(magit-diff-base ((,cls (:inherit diff-changed))))
        `(diff-refine-changed ((,cls (:background "#aa22aa"))))
+
+      ;;; evil-traces
+       ;; Taken almost directly from `evil-traces-use-diff-faces'.
+       ;; Except diff-changed has been converted to the default-face.
+       `(evil-traces-change           ((t (:inherit diff-removed))))
+       `(evil-traces-copy-preview     ((t (:inherit diff-added))))
+       `(evil-traces-copy-range       ((t (:inherit default))))
+       `(evil-traces-delete           ((t (:inherit diff-removed))))
+       `(evil-traces-global-match     ((t (:inherit diff-added))))
+       `(evil-traces-global-range     ((t (:inherit default))))
+       `(evil-traces-join-indicator   ((t (:inherit diff-added))))
+       `(evil-traces-join-range       ((t (:inherit default))))
+       `(evil-traces-move-preview     ((t (:inherit diff-added))))
+       `(evil-traces-move-range       ((t (:inherit diff-removed))))
+       `(evil-traces-normal           ((t (:inherit default))))
+       `(evil-traces-shell-command    ((t (:inherit default))))
+       `(evil-traces-substitute-range ((t (:inherit default))))
+       `(evil-traces-yank             ((t (:inherit default))))
+       `(evil-ex-substitute-matches
+         ((t (:inherit diff-removed :foreground unspecified :background unspecified))))
+       `(evil-ex-substitute-replacement
+         ((t (:inherit diff-added :foreground unspecified :background unspecified))))
        )
 
       (custom-theme-set-variables 'an-old-hope
@@ -22648,4 +22740,6 @@
 #  LocalWords:  bufler notmuch bibtex eob affe apheleia isearch glitchy Stallman RSA
 #  LocalWords:  bleeep blooop Optimus recurse faicon gitlab reddit wicon firefox pos
 #  LocalWords:  alltheicon ebuku DuckDuckGo ggtags parsers ctags magit rebase scrapy
-#  LocalWords:  neotree olivetti pdftools skeletor Makefile golang gradle
+#  LocalWords:  neotree olivetti pdftools skeletor Makefile golang gradle lua xml ql
+#  LocalWords:  hindent powershell contrib orgit fragtog vscode css haskell nimlsp
+#  LocalWords:  gitattributes gitconfig
