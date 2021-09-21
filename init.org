@@ -145,7 +145,6 @@
      ;;; language-support
          ;; ggtags                                                         ; GNU Global source code tagging system
          ;; ycmd                                                           ; A language-server for most languages. written in python.
-         ;; anaconda                                                       ; A no-longer mainatained, but still powerful language-server for python
          ;; tree-sitter                                                    ; Incremental parsing of your source code asynchronously.
 
      ;;; Languages
@@ -17342,62 +17341,9 @@
     [[https://github.com/davidhalter/jedi][jedi]]. There's also a Microsoft based [[https://github.com/microsoft/python-language-server][server]], and the newer/faster [[https://github.com/microsoft/pyright][pyright]] (but be
     forewarned, there be [[https://github.com/microsoft/pylance-release/issues/4][dragons]] there).
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! python :lsp (not anaconda))
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! python :lsp)
       (add-hook 'python-mode-hook +lsp-command)
     #+END_SRC
-
-*** anaconda
-    :PROPERTIES:
-    :header-args+: :tangle (package-yes! python anaconda)
-    :END:
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package anaconda-mode
-        :diminish anaconda-mode
-        :straight t
-        :hook ((python-mode . enable-anaconda-mode+)
-               (anaconda-mode . anaconda-eldoc-mode))
-        :commands enable-anaconda-mode+
-        :config
-        (setq anaconda-mode-installation-directory (cache! "anaconda/"))
-
-        (defun enable-anaconda-mode+ ()
-          "run anaconda-mode unless you're in a remote file."
-          (when (and (buffer-file-name)
-                     (not (file-remote-p (buffer-file-name))))
-            (anaconda-mode +1)))
-
-        :lazy-leader
-        (:mode 'python-mode
-         "TAB" 'anaconda-mode-complete
-         "hh" 'anaconda-mode-show-doc
-
-         "ga" 'anaconda-mode-find-assignments
-         "gr" 'anaconda-mode-find-references
-         "gg" 'anaconda-mode-find-definitions
-         "gA" 'anaconda-mode-find-assignments-other-window
-         "gR" 'anaconda-mode-find-references-other-window
-         "gG" 'anaconda-mode-find-definitions-other-window
-         "g M-a" 'anaconda-mode-find-assignments-other-frame
-         "g M-r" 'anaconda-mode-find-references-other-frame
-         "g M-g" 'anaconda-mode-find-definitions-other-frame)
-
-        :general
-        (:keymaps 'anaconda-mode-map
-         [remap display-local-help] 'anaconda-mode-show-doc
-         [remap xref-find-definitions] 'anaconda-mode-find-definitions
-         [remap xref-find-references] 'anaconda-mode-find-references))
-    #+END_SRC
-
-**** company-anaconda                                                   :comp:
-     #+BEGIN_SRC emacs-lisp :tangle (package-yes! python anaconda company)
-       (use-package company-anaconda
-         :straight t
-         :after  anaconda-mode
-         :init
-         (set-company-backend! 'anaconda-mode
-           'company-anaconda))
-     #+END_SRC
 
 *** pyimport
     #+BEGIN_SRC emacs-lisp
