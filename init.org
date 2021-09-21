@@ -1289,6 +1289,7 @@
         :config
         (require 'spaceleader-use-package)
         (leader-declare-prefix leader-server-leader-prefix "lang-server")
+        (leader-declare-prefix leader-minor-mode-leader-prefix "minor-modes")
 
         :general
         ("C-@" (general-simulate-key "C-SPC")) ;; C-SPC in terminal
@@ -1324,7 +1325,6 @@
        (leader-set-keys
          "a" '(:ignore t :wk "applications")
          "a:" 'eshell
-         "a*" 'calc-dispatch
          "ad" 'calendar
          "af" 'describe-face
          "aX" 'customize
@@ -1357,12 +1357,11 @@
          "bR" 'rename-uniquely
          "bo" 'occur
          "b DEL" 'bury-buffer
-         "bE" 'safe-erase-buffer+
+         "bE" '(safe-erase-buffer+ :wk "safe-erase-buffer")
          "bH" 'htmlfontify-buffer
          "bk" 'kill-this-buffer
          "bK" 'kill-this-buffer-and-window-maybe+
-         "bM" 'switch-to-messages-buffer+
-         "by" 'yank-whole-buffer-as-kill+)
+         "bM" '(switch-to-messages-buffer+ :wk "switch-to-messages"))
 
        (leader-set-keys
          "c" '(:ignore t :wk "compile/comments")
@@ -1380,6 +1379,9 @@
          "e1" 'first-error
          "en" 'next-error
          "ep" 'previous-error)
+
+       (leader-set-keys
+         "g" '(:ignore t :wk "git/vc"))
 
        (leader-set-keys
          "h" '(:ignore t :wk "help")
@@ -1445,7 +1447,10 @@
          "nw" 'widen)
 
        (leader-set-keys
-         "x" '(:ignore t :wk "text")
+         "r" '(:ignore t :wk "registers"))
+
+       (leader-set-keys
+         "x" '(:ignore t :wk "edit-text")
          "xa" 'describe-text-properties
          "xf" 'list-faces
          "xt" 'delete-trailing-whitespace)
@@ -1458,10 +1463,10 @@
          "ss" 'isearch-forward)
 
        (leader-set-keys
-         "*" '(:ignore t :wk "calculator")
-         "*." 'calc-dispatch
-         "**" 'calc
-         "*y" 'calc-copy-to-buffer)
+         "8" '(:ignore t :wk "calculator")
+         "8." 'calc-dispatch
+         "88" 'calc
+         "8p" '(calc-copy-to-buffer :wk "calc-paste"))
 
        (leader-set-keys
          "t" '(:ignore t :wk "toggles")
@@ -1492,23 +1497,20 @@
        (leader-set-keys
          "f" '(:ignore t :wk "files/frames")
          "ff" 'find-file
-         "f\"" 'recover-this-file
-         "f'" 'recover-file
          "fc" 'copy-file
-         "ff" 'find-file
          "fo" 'find-file-other-window
          "fh" 'find-file-at-point
-         "sF" 'find-dired
-         "fL" 'find-file-literally
+         "f\"" 'recover-this-file
+         "f'" 'recover-file
+         "fl" 'find-file-literally
          ;; frame
          "fx" 'delete-frame
          "fX" 'delete-other-frames
-         "f RET" '(toggle-frame-maximized :wk "maximize")
-         "fn" 'make-frame-command
-         "fm" 'set-frame-name
-         "fg" 'select-frame-by-name
+         "f RET" '(make-frame-command :wk "new-frame")
          "f TAB" 'other-frame
          "f DEL" 'save-buffers-kill-emacs
+         "fn" 'set-frame-name
+         "fg" 'select-frame-by-name
 
          "fe" '(:ignore t :wk "emacs")
          "fev" 'emacs-version
@@ -1531,10 +1533,9 @@
 
        (leader-set-keys
          "j" '(:ignore t :wk "jump")
-         "jc" 'goto-char
-         "jn" 'next-error
-         "jp" 'previous-error
-         "j TAB" 'move-to-column
+         "jx" 'goto-char
+         "jl" 'goto-line
+         "j TAB" '(move-to-column :wk "goto-column")
          "jd" '(dired-jump :wk "jump-to-directory")
          "jD" '(dired-jump-other-window :wk "jump-to-directory-other-window"))
      #+end_src
@@ -1544,7 +1545,7 @@
          "My keymap to interact with emacs windows.")
 
        (leader-set-keys
-         "w" "windows"
+         "w" '(:ignore t :wk "windows")
          "w" emacs-window-map)
 
        (general-define-key
@@ -2471,7 +2472,7 @@
        "fy" 'show-and-copy-buffer-file-name
        "fu" 'show-and-copy-directory
        "f%" 'show-and-copy-buffer-file-basename
-       "bh" 'goto-home-buffer+
+       "bh" '(goto-home-buffer+ :wk "switch-to-home")
        ;; "fo" 'open-file-or-directory-in-external-app ;; TODO implement
        )
    #+END_SRC
@@ -3159,7 +3160,6 @@
                     async-shell-command-on-region+
                     set-window-dedication+
                     safe-erase-buffer+
-                    yank-whole-buffer-as-kill+
                     split-window-right-and-focus+
                     split-window-below-and-focus+)
          :general
@@ -3318,13 +3318,6 @@
         (split-window-vertically)
         (other-window 1))
 
-    #+END_SRC
-
-    #+BEGIN_SRC emacs-lisp
-      (defun yank-whole-buffer-as-kill+ (buffer)
-        (interactive (list (current-buffer)))
-        (with-current-buffer buffer
-          (copy-region-as-kill (point-min) (point-max))))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
@@ -4027,6 +4020,7 @@
       (use-package evil-snipe
         :straight t
         :hook ((magit-status-mode . turn-off-evil-snipe-mode)
+               (calc-mode . turn-off-evil-snipe-mode)
                (evil-mode . evil-snipe-mode))
         :diminish
         evil-snipe-mode
@@ -4247,7 +4241,7 @@
         :straight t
         :leader
         (:prefix "jh"
-         ""   '(:ignore t :wk "motion")
+         ""   '(:ignore t :wk "avy-motion")
          "w"  'evilem-motion-forward-word-begin
          "W"  'evilem-motion-forward-WORD-begin
          "e"  'evilem-motion-forward-word-end
@@ -4939,9 +4933,6 @@
        :straight t
        :commands (all-the-icons--insert-all-icons
                   all-the-icons-family+)
-       :leader
-       ("xi" 'all-the-icons-insert
-        "xI" 'all-the-icons-insert-all)
 
        :custom
        (inhibit-compacting-font-caches t)
@@ -5233,7 +5224,7 @@
 
        :leader
        ("tme" 'emojify-mode
-        "xe" 'emojify-insert-emoji
+        "ie" 'emojify-insert-emoji
         "hE" 'emojify-apropos-emoji
         "he" 'emojify-describe-emoji)
 
@@ -6867,7 +6858,7 @@
        :init
        (advice-add 'evil-get-register :before-until
                    (defun evil-register-*-is-calc (register &optional _)
-                     "make evils * register paste from head of calculator stack."
+                     "Make evils * register paste from head of calculator stack."
                      (when (eq register ?*)
                        (condition-case err
                            (with-temp-buffer
@@ -6878,32 +6869,6 @@
 
        :config
        (evil-set-initial-state 'calc-mode 'motion)
-
-       (add-hook 'calc-mode-hook
-                 (defun calc--disable-evil-snipe (&rest _)
-                   "overrides f, so disable it :P."
-                   (when (bound-and-true-p evil-snipe-local-mode)
-                     (evil-snipe-local-mode -1))))
-
-       (evil-define-command evil-calc-call-kbd-macro (count macro)
-         (interactive
-          (let (count macro register)
-            (setq count (prefix-numeric-value current-prefix-arg)
-                  register (or evil-this-register (read-char)))
-            (cond
-             ((eq register ?@)
-              (unless evil-last-register
-                (user-error "No previously executed keyboard macro."))
-              (setq macro (evil-get-register evil-last-register t)))
-             (t
-              (setq macro (evil-get-register register t)
-                    evil-last-register register)))
-            (list count macro)))
-
-         (evil-with-single-undo
-           (let ((last-kbd-macro macro))
-             (dotimes (_ (or count 1))
-               (calc-call-last-kbd-macro)))))
 
        (evil-define-motion evil-calc-next-line (count)
          (interactive "<c>")
@@ -6935,7 +6900,7 @@
 
        (advice-add 'calc-scroll-down :around
                    (defun calc-scroll-down--make-goto-point-min (func &rest args)
-                     "for some reason, scrolling before `point-min' doesn't change point."
+                     "For some reason, scrolling before `point-min' doesn't change point."
                      (let ((current-point (point)))
                        (apply func args)
 
@@ -6950,8 +6915,31 @@
                                 (line-beginning-position)
                                 (line-end-position)))
            (funcall-interactively 'evil-calc-prev-line 1))
-
          (evil-visual-line))
+
+       :preface
+       (defvar evil-calc-support-macro+ nil
+         "When true `calc-mode' uses q for macros instead of quit.")
+
+       :config
+       (evil-define-command evil-calc-call-kbd-macro (count macro)
+         (interactive
+          (let (count macro register)
+            (setq count (prefix-numeric-value current-prefix-arg)
+                  register (or evil-this-register (read-char)))
+            (cond
+             ((eq register ?@)
+              (unless evil-last-register
+                (user-error "No previously executed keyboard macro."))
+              (setq macro (evil-get-register evil-last-register t)))
+             (t
+              (setq macro (evil-get-register register t)
+                    evil-last-register register)))
+            (list count macro)))
+
+         (evil-with-single-undo
+           (let ((last-kbd-macro macro))
+             (calc-call-last-kbd-macro (or count 1)))))
 
        :lazy-leader
        (:mode 'calc-mode
@@ -10965,16 +10953,10 @@
    #+BEGIN_SRC emacs-lisp
      (use-package simple
        :leader
-       ("i TAB"     '(:ignore t :wk "indent")
-        "i TAB TAB" 'indent-region
-        "i TAB RET" 'split-line
-        "i TAB SPC" 'just-one-space
-        "i TAB c"   'indent-to-column
-        "i TAB r"   'indent-relative
-        "i TAB 0"   'indent-relative-first-indent-point
-        "i TAB ."   'indent-hydra/body
-        "i TAB n"   'forward-to-indentation
-        "i TAB p"   'back-to-indentation)
+       ("i TAB" 'indent-hydra/body
+        "i |"   'indent-to-column
+        "i RET" 'split-line
+        "i SPC" 'just-one-space)
 
        :config
        (push 'messages-buffer-mode +whitespace-exempt-modes)
@@ -11172,7 +11154,7 @@
         (:mode 'smerge-mode
          :minor t
          :prefix "g"
-         "." 'smerge-hydra)
+         "." 'smerge-hydra/body)
 
         :pretty-hydra
         ;; Adapted from [[https://github.com/tecosaur/emacs-config/blob/0b39759/config.org#smerge][tecosaur/emacs-config]].
@@ -12227,7 +12209,7 @@
          :minor t
          "aa" 'consult-minor-mode-menu
          "ee" 'consult-compile-error
-         "jc" 'consult-compile-error "jx" 'goto-char                                  ; Replaces `goto-char'
+         "jc" 'consult-compile-error
          "je" 'consult-compile-error                                                  ; Overriden by flycheck/flymake
          "ju" 'consult-outline
          "hx" 'consult-complex-command
@@ -13231,9 +13213,9 @@
 
        :config
        ;; Force buffler to appear in the current window
-       (push (cons (rx "*Bufler*")
-                   '(display-buffer-reuse-window
-                     display-buffer-same-window))
+       (push `(,(rx "*Bufler*")
+               (display-buffer-reuse-window
+                display-buffer-same-window))
              display-buffer-alist)
 
        :leader
@@ -14141,7 +14123,6 @@
 
        :leader
        (:prefix leader-server-leader-prefix
-        "" '(:ignore t :wk "server")
         "l" 'eglot
         "e" 'eglot-events-buffer
         "x" 'eglot-shutdown)
@@ -14780,7 +14761,6 @@
        (:mode 'lsp-mode
         :minor t
         :prefix leader-server-leader-prefix
-        "" '(:ignore t :wk "server")
 
         "?" 'lsp-describe-session
         "a" 'lsp-execute-code-action
@@ -17043,55 +17023,53 @@
    :header-args+: :tangle (package-yes! restclient)
    :END:
 
-*** restclient-mode
-    #+BEGIN_SRC emacs-lisp
-      (use-package restclient
-        :straight t
-        :commands (restclient)
-        :config
-        (let ((leader leader-major-mode-key))
-          (leader-set-keys-for-major-mode 'restclient-mode
-            "RET"   '(restclient-http-send-current :wk "execute-current")
-            "M-RET" '(restclient-http-send-current-raw :wk "execute-current-raw")
-            ;; leader  '(restclient-http-send-current-stay-in-window :wk "execute-current-same-window")
-            "y"     '(restclient-copy-curl-command :wk "yank-curl-command")
-            "m"     'restclient-mark-current
-            "n"     'restclient-narrow-to-current
-            "w"     'widen))
+   #+BEGIN_SRC emacs-lisp
+     (use-package restclient
+       :straight t
+       :leader ("ar" 'restclient)
+       :init
+       (push (rx "*HTTP Response*") +whitespace-exempt-buffers)
+       (evil-set-initial-state 'restclient-mode 'normal)
 
-        (add-hook 'restclient-response-mode-hook
-                  'evil-motion-state)
+       (push `(,(rx "*restclient*")
+               (display-buffer-reuse-window
+                display-buffer-same-window))
+             display-buffer-alist)
 
-        (push (rx "*HTTP Response*") +whitespace-exempt-buffers)
+       (defun restclient ()
+         "Create a new buffer in restclient mode"
+         (interactive)
+         (let ((buffer (create-new-empty-buffer "*restclient*")))
+           (with-current-buffer buffer
+             (restclient-mode))
+           (display-buffer buffer)))
 
-        (defun restclient ()
-          "create a new buffer in restclient mode"
-          (interactive)
-          (let ((buffer (create-new-empty-buffer "restclient")))
-            (with-current-buffer buffer
-              (restclient-mode))
-            (display-buffer buffer)))
+       :general
+       (:states 'motion
+        :keymaps 'restclient-mode-map
+        "gj" 'restclient-jump-next
+        "gk" 'restclient-jump-prev)
+       (:states  'normal
+        :keymaps 'restclient-outline-mode-map
+        "TAB"   'restclient-toggle-body-visibility-or-indent
+        "g TAB" 'restclient-toggle-body-visibility-or-indent)
 
-        :leader
-        ("ar" 'restclient)
-
-        :general
-        (:states 'motion
-         :keymaps 'restclient-mode-map
-         "gj" 'restclient-jump-next
-         "gk" 'restclient-jump-prev)
-        (:states  'normal
-         :keymaps 'restclient-outline-mode-map
-         "TAB"   'restclient-toggle-body-visibility-or-indent
-         "g TAB" 'restclient-toggle-body-visibility-or-indent))
-    #+END_SRC
+       :leader
+       (:mode 'restclient-mode
+        leader-major-mode-key '(restclient-http-send-current-stay-in-window :wk "execute-current-same-window")
+        "RET" '(restclient-http-send-current :wk "execute-current")
+        "r" '(restclient-http-send-current-raw :wk "execute-current-raw")
+        "y" '(restclient-copy-curl-command :wk "yank-curl-command")
+        "m" 'restclient-mark-current
+        "n" 'restclient-narrow-to-current
+        "w" 'widen))
+   #+END_SRC
 
 *** company-restclient                                                  :comp:
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! restclient company)
       (use-package company-restclient
         :straight t
-        :after  restclient
-        :commands (company-restclient)
+        :after restclient
         :init
         (set-company-backend! 'restclient-mode
           'company-restclient))
@@ -17114,6 +17092,13 @@
    #+BEGIN_SRC emacs-lisp
      (use-package elisp-mode
        :commands (eval-replace-last-sexp)
+       :init
+       (evil-set-initial-state 'inferior-emacs-lisp-mode 'emacs) ;; ielm
+
+       ;; Allows for smarter indentation based on the lisp syntax.
+       (push '(emacs-lisp-mode . nil) +indent-config)
+       (push '(lisp-interaction-mode . nil) +indent-config)
+
        :config
        (modify-syntax!
          '((?_ . "w")
@@ -17121,7 +17106,7 @@
            (?! . "w"))
          emacs-lisp-mode-syntax-table)
 
-       ;; show lambda as an actual lambda symbol... pretty cool, if I do say
+       ;; Show lambda as an actual lambda symbol... pretty cool, if I do say
        ;; so myself.
        (configure-presym! '(lisp-interaction-mode emacs-lisp-mode org-mode)
          "lambda"  ?λ
@@ -17135,12 +17120,6 @@
            (kill-sexp -1)
            (insert (format (if prefix "%s" "%S") value))))
 
-       (evil-set-initial-state 'inferior-emacs-lisp-mode 'emacs) ;; ielm
-
-       ;; Allows for smarter indentation based on the lisp syntax.
-       (push '(emacs-lisp-mode . nil) +indent-config)
-       (push '(lisp-interaction-mode . nil) +indent-config)
-
        :leader
        ("fk" 'emacs-lisp-byte-compile)
        (:prefix "k"
@@ -17151,30 +17130,26 @@
 
        :lazy-leader
        (:mode '(emacs-lisp-mode lisp-interaction-mode)
-         "'" 'ielm
-         "c" 'emacs-lisp-byte-compile
-         "i" 'indent-sexp
-         "p" 'pp-buffer
+        "c" 'emacs-lisp-byte-compile
+        "i" 'indent-sexp
+        "p" 'pp-buffer
 
-         ;; eval
-         "e"  '(:ignore t :wk "eval")
-         "eb" 'eval-buffer
-         "ee" 'eval-last-sexp
-         "eE" 'eval-replace-last-sexp
-         "ef" 'eval-defun
-         "er" 'eval-region
-         ;; "et" 'elisp-transcript
+        ;; eval
+        "e"  '(:ignore t :wk "eval/REPL")
+        "es" 'ielm
+        "ee" 'eval-last-sexp
+        "eb" 'eval-buffer
+        "eE" 'eval-replace-last-sexp
+        "ef" 'eval-defun
+        "er" 'eval-region
 
-         ;; jump
-         "g" '(xref-find-definitions :wk "goto-definition")
-         "G" '(xref-find-definitions-other-window :wk "goto-definition-other-window")
-
-         ;; tests
-         "t" 'ert
-         "T" 'ert-run-tests-interactively)
+        ;; tests
+        "t" 'ert
+        "T" 'ert-run-tests-interactively)
 
        :general
-       (:keymaps '(emacs-lisp-mode-map lisp-interaction-mode-map)
+       (:keymaps '(emacs-lisp-mode-map
+                   lisp-interaction-mode-map)
         "C-j" nil
         "C-(" 'eval-print-last-sexp
         "C-)" 'eval-replace-last-sexp))
@@ -17197,15 +17172,15 @@
         ;; M-" same as " but then trims whitespace and inserts a newline
         (:keymaps 'paredit-mode-map
          :states 'insert
-         "<delete>" 'paredit-backward-delete
-         "M-<delete>" 'paredit-forward-delete
-         "C-<delete>" 'paredit-backward-kill-word
+         "DEL"           'paredit-backward-delete
+         "M-DEL"         'paredit-forward-delete
+         "C-<backspace>" 'paredit-backward-kill-word
          ;; "C-M-<delete>" 'paredit-forward-kill-word
 
          ;; damn you windows
          ;; just use paredit forward, then kill backward
          "C-M-k" 'paredit-kill ;; forward body
-         "<return>" 'paredit-newline)
+         "RET" 'paredit-newline)
         (:keymaps 'paredit-mode-map
          :states 'normal
          "gSh" '(paredit-splice-sexp-killing-backward :wk "splice-sexp-forward")
@@ -17257,7 +17232,6 @@
 
        :init
        (setq python-prettify-symbols-alist nil)
-       (defalias 'python-repl 'run-python)
 
        :config
        (modify-syntax! '((?_ . "w")) python-mode-syntax-table)
@@ -17295,7 +17269,6 @@
 
        :lazy-leader
        (:mode 'python-mode
-        "r" 'run-python ;; REPL
         "R" 'python-shell-switch-to-shell
         "m" 'python-mark-defun
         "v" 'python-check
@@ -17304,32 +17277,34 @@
         ;;          python-nav-backward-sexp[-safe]
 
         "n"  '(:ignore t :wk "navigate")
-        "nh" 'python-nav-forward-statement
+        "nh" 'python-nav-backward-statement
         "nj" 'python-nav-forward-block
         "nk" 'python-nav-backward-block
-        "nl" 'python-nav-backward-statement
-        "n(" 'python-nav-backward-up-list
-        "n)" 'python-nav-up-list
-        "n0" 'python-nav-beginning-of-block
-        "n$" 'python-nav-end-of-block
+        "nl" 'python-nav-forward-statement
+        "n[" 'python-nav-backward-up-list
+        "n]" 'python-nav-up-list
+        "na" 'python-nav-beginning-of-block
+        "ne" 'python-nav-end-of-block
         "nm" 'python-nav-if-name-main
 
-        "n C-0" 'python-nav-beginning-of-statement
-        "n C-$" 'python-nav-end-of-statement
-        "n M-j" 'python-nav-forward-defun
-        "n M-k" 'python-nav-backward-defun
+        ;; "n C-0" 'python-nav-beginning-of-statement
+        ;; "n C-$" 'python-nav-end-of-statement
+        ;; "n M-j" 'python-nav-forward-defun
+        ;; "n M-k" 'python-nav-backward-defun
         ;; "n M-0" 'python-nav-beginning-of-defun
-        "n M-$" 'python-nav-end-of-defun
+        ;; "n M-$" 'python-nav-end-of-defun
 
         "h"  '(:ignore t :wk "help")
         "hp" 'python-eldoc-at-point
 
         "e"  '(:ignore t :wk "eval/exec")
+        "es" '(run-python :wk "python-repl")
+        "ee" '(python-shell-send-region :wk "python-shell-send-line")
         "ed" 'python-shell-send-defun
         "eb" 'python-shell-send-buffer
         "ef" 'python-shell-send-file
         "er" 'python-shell-send-region
-        "ec" 'python-shell-send-string)
+        "ep" 'python-shell-send-string)
 
        :general
        (:keymaps 'python-mode-map
@@ -17634,17 +17609,16 @@
          ;;   * web-mode-block-select
          ;;   * web-mode-block-transpose
          ;;   * web-mode-navigate
+         ;;   * web-mode-snippet-insert
+         ;;   * web-mode-element-children-fold-or-unfold
+         ;;   * web-mode-dom-errors-show
          ;;
          ;; WARN the block commands don't seem to do anything
 
-         ";"     'web-mode-comment-or-uncomment
-         "f"     'web-mode-fold-or-unfold
-         "l"     'web-mode-file-link
-         "b"     'web-mode-element-close ; insert matching tag for body at point
-         "M-r"   'web-mode-reload
-         "<tab>" 'web-mode-buffer-indent
-         "C-M-i" 'web-mode-snippet-insert
-         ;; "tw" 'web-mode-whitespace-show
+         "TAB"   'web-mode-fold-or-unfold
+         "c"     'web-mode-comment-or-uncomment
+         "c"     'web-mode-element-close ; insert matching tag for body at point
+         "-"     'web-mode-buffer-indent
 
          ;; insert
          "i"  '(:ignore t :wk "insert")
@@ -17653,6 +17627,7 @@
          "ic" 'web-mode-element-clone
          "ie" 'web-mode-element-insert
          "ie" 'web-mode-element-insert-at-point ; converts word before point to tag
+         "il" 'web-mode-file-link
 
          ;; refactor/insert
          "r"  '(:ignore t :wk "refactor")
@@ -17663,25 +17638,19 @@
          "ra" 'web-mode-attribute-transpose
          "re" 'web-mode-element-transpose
          "rr" 'web-mode-element-rename
-         "rf" 'web-mode-fold-or-unfold
-         "rF" 'web-mode-element-children-fold-or-unfold ; collapse the children of current tags body, not body itself
 
          ;; delete
-         "d"  '(:ignore t :wk "delete")
-         "da" 'web-mode-attribute-kill
-         "de" 'web-mode-element-kill
-         "dp" 'web-mode-element-vanish ; delete element, but move body up a level instead of erasing it
+         "x"  '(:ignore t :wk "delete")
+         "xa" 'web-mode-attribute-kill
+         "xe" 'web-mode-element-kill
+         "xp" 'web-mode-element-vanish ; delete element, but move body up a level instead of erasing it
 
          ;; DOM
-         "D"  '(:ignore t :wk "DOM")
-         "Da" 'web-mode-dom-apostrophes-replace
-         "Ds" 'web-mode-dom-entities-replace
-         "Dq" 'web-mode-dom-quotes-replace
-         "D/" 'web-mode-dom-xpath
-                                              ; shows the xpath of the current element
-
-         "hd" 'web-mode-dom-errors-show
-         "hj" 'web-mode-jshint
+         "t"  '(:ignore t :wk "DOM")
+         "ta" 'web-mode-dom-apostrophes-replace
+         "ts" 'web-mode-dom-entities-replace
+         "tq" 'web-mode-dom-quotes-replace
+         "tx" 'web-mode-dom-xpath                                                     ; shows the xpath of the current element
 
          ;; mark
          "m"  '(:ignore t :wk "mark")
@@ -17694,8 +17663,8 @@
 
          ;; navigation
          "n"  '(:ignore t :wk "navigate")
-         "n0" 'web-mode-element-beginning
-         "n$" 'web-mode-element-end
+         "na" 'web-mode-element-beginning
+         "ne" 'web-mode-element-end
          "nn" 'web-mode-tag-match
          "nh" 'web-mode-element-next
          "nj" 'web-mode-element-child
@@ -17703,19 +17672,22 @@
          "nh" 'web-mode-element-parent
          ;; "nt" 'web-mode-dom-traverse
 
-         "na"  '(:ignore t :wk "attributes")
-         "na0" 'web-mode-attribute-beginning
-         "na$" 'web-mode-attribute-end
-         "nah" 'web-mode-attribute-previous
-         "nal" 'web-mode-attribute-next
+         "np"  '(:ignore t :wk "attributes")
+         "npa" 'web-mode-attribute-beginning
+         "npe" 'web-mode-attribute-end
+         "nph" 'web-mode-attribute-previous
+         "npl" 'web-mode-attribute-next
 
          "nt"  '(:ignore t :wk "tags")
-         "nt0" 'web-mode-tag-beginning
-         "nt$" 'web-mode-tag-end
+         "nta" 'web-mode-tag-beginning
+         "nte" 'web-mode-tag-end
          "nth" 'web-mode-tag-previous
          "ntl" 'web-mode-tag-next)
 
         :general
+        (:keymaps 'web-mode-map
+         ;; [remap whitespace-mode] 'web-mode-whitespace-show
+         [remap revert-buffer] 'web-mode-reload)
         (:keymaps 'web-mode-map
          :states 'normal
          "<tab>" 'web-mode-fold-or-unfold))
@@ -17767,10 +17739,10 @@
         :after  web-mode
         :leader
         (:mode 'web-mode
-         "rb"  '(:ignore t :wk "beautify")
-         "rbh" 'web-beautify-htlm
-         "rbj" 'web-beautify-js
-         "rbc" 'web-beautify-css))
+         "p"  '(:ignore t :wk "beautify")
+         "ph" 'web-beautify-htlm
+         "pj" 'web-beautify-js
+         "pc" 'web-beautify-css))
     #+END_SRC
 
 ** HAML
@@ -17794,8 +17766,8 @@
 
        :lazy-leader
        (:mode 'json-mode
-        "b" 'json-mode-beautify
-        "/" 'json-mode-kill-path
+        "p" 'json-mode-beautify
+        "x" 'json-mode-kill-path
         "t" 'json-toggle-boolean
         "DEL" 'json-nullify-sexp))
    #+END_SRC
@@ -17824,35 +17796,42 @@
        :hook (sql-mode . +flylint)
        :custom
        (sql-sqlite-options '("-interactive"))
+       (sql-pop-to-buffer-after-send-region nil)
 
        :init
        (push 'sql-interactive-mode +whitespace-exempt-modes)
        (push '(sql-mode . 2) +indent-config)
 
-       :config
+       (evil-set-initial-state 'sql-mode 'normal)
        (evil-set-initial-state 'sql-interactive-mode 'emacs)
 
        :lazy-leader
-       ;; see [here](https://truongtx.me/2014/08/23/setup-emacs-as-an-sql-database-client)
-       ;; for a guide on how to make quick database access easier. or if you've already got
-       ;; an interactive session running, use sql-save-connection to append it to a local
-       ;; variable from which you can just paste it in here.
+       ;; see [[https://truongtx.me/2014/08/23/setup-emacs-as-an-sql-database-client][here]] for a guide on how to make quick database access easier. or if you've
+       ;; already got an interactive session running, use sql-save-connection to append
+       ;; it to a local variable from which you can just paste it in here.
        (:mode 'sql-mode
-        "0" 'sql-beginning-of-statement
-        "$" 'sql-end-of-statement
+        ;; "a" 'sql-beginning-of-statement
+        ;; "e" 'sql-end-of-statement
         "i" 'sql-show-sqli-buffer
         "t" 'sql-toggle-pop-to-buffer-after-send-region
 
-        "e"  '(:ignore t :wk "eval")
+        "e"  '(:ignore t :wk "eval/REPL")
+        "ee" 'sql-send-line-and-next
         "eb" 'sql-send-buffer
         "ep" 'sql-send-paragraph
         "er" 'sql-send-region
-        "es" 'sql-send-string
+        "ep" 'sql-send-string
+
+        "es" '(:ignore t :wk "REPL")
+        "esp" 'sql-postgres
+        "ess" 'sql-sqlite
+        "esm" 'sql-mysqlite
 
         "l"  '(:ignore t :wk "list")
         "ll" 'sql-list-all
         "lt" 'sql-list-table)
        (:mode 'sql-interactive-mode
+        "m" 'sql-set-sqli-buffer
         "t" 'sql-list-table
         "a" 'sql-list-all))
    #+END_SRC
@@ -17886,8 +17865,10 @@
        :straight t
        :mode (rx "." (or "yaml" "yml"))
        :hook (yaml-mode . +flylint)
-       :config
+       :init
        (push '(yaml-mode . 2) +indent-config)
+
+       :config
        (modify-syntax! '((?_ . "w")
                          (?- . "w"))
          yaml-mode-syntax-table)
@@ -17976,12 +17957,13 @@
         :lazy-leader
         (:mode 'sh-mode
          ":" 'sh-set-shell
-         "0" 'sh-beginning-of-command
-         "$" 'sh-end-of-command
+         ;; "0" 'sh-beginning-of-command
+         ;; "$" 'sh-end-of-command
          "!" 'executable-interpret
          "b" 'sh-show-shell
          "\\" 'sh-backslash-region
 
+         "e" '(:ignore t :wk "eval/REPL")
          "er" 'sh-execute-region
          "ej" 'sh-send-line-or-region-and-step
 
@@ -18180,9 +18162,7 @@
         "o" 'makefile-create-up-to-date-overview
         "p" 'makefile-pickup-everything
         "f" 'makefile-pickup-filenames-as-targets
-
-        ":"   'makefile-insert-target-ref
-        "C-:" 'makefile-insert-target-ref
+        "i" 'makefile-insert-target-ref
 
         "\\"  'makefile-backslash-region
         "TAB" 'makefile-insert-gmake-function)
@@ -18516,7 +18496,6 @@
         "D" 'c-display-defun-name
         "m" 'c-mark-function
         "r" 'c-indent-defun
-        "g" 'imenu
         "/" 'c-backslash-region
         "\\" 'c-toggle-comment-style
         "DEL" 'c-hungry-delete-forward
@@ -18554,7 +18533,7 @@
        (:mode 'kotlin-mode
         "r" 'kotlin-repl
 
-        "e"     '(:ignore t :wk "eval")
+        "e"     '(:ignore t :wk "eval/REPL")
         "e-"    'kotlin-send-line
         "e|"    'kotlin-send-block
         "er"    'kotlin-send-region
@@ -18940,6 +18919,8 @@
 
        :lazy-leader
        (:mode 'haskell-mode
+        "e" '(run-haskell :wk "haskell-repl")
+
         "r"  '(:ignore t :wk "refactor")
         "ri" 'haskell-mode-format-imports
         "rI" 'haskell-sort-imports
@@ -20026,7 +20007,7 @@
         (add-to-list 'org-latex-default-packages-alist '("" "babel" t nil) t)
 
         :leader
-        ("o"  '(:ignore t :wk "org")
+        ("o"  '(:ignore t :wk "org-notes")
          "oc" 'org-capture
          "og" 'org-capture-goto-last-stored
          "oa" 'org-agenda
@@ -22638,4 +22619,4 @@
 #  LocalWords:  alltheicon ebuku DuckDuckGo ggtags parsers ctags magit rebase scrapy
 #  LocalWords:  neotree olivetti pdftools skeletor Makefile golang gradle lua xml ql
 #  LocalWords:  hindent powershell contrib orgit fragtog vscode css haskell nimlsp
-#  LocalWords:  gitattributes gitconfig
+#  LocalWords:  gitattributes gitconfig yapfify makefile
