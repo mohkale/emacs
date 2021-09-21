@@ -254,13 +254,6 @@
          ("^gitlab.com/" . ,#'markdown-mode))
        "Association list of url regexps against mode-functions.")
 
-     (defvar +ruby-package 'ruby
-       "Determine which mode to use for ruby from `ruby' or `enh-ruby'.
-
-     enh-ruby is really slowing everything down on windows also, for some reason, creating
-     a symlink to ruby on cygwin makes the process unrunnable from emacs, it just spits
-     out exec error... my loathing towards windows grows :P.")
-
      (defvar +lsp-maybe-connect `((python-mode . :global)
                                   (sh-mode . nil)
                                   (t . :local))
@@ -444,15 +437,6 @@
                                path (substring path 0 -2)))
                 unless (string-empty-p path)
                 collect (cons (string-remove-suffix "/" path) depth)))
-   #+end_src
-
-   Emacs has two modes for ruby, one built-in and the other external. Here I just
-   declare some variables to streamline access to which-ever mode I'm using in my
-   configuration.
-
-   #+begin_src emacs-lisp
-     (defvar +ruby-mode      (intern (concat (symbol-name +ruby-package) "-mode")))
-     (defvar +ruby-mode-hook (intern (concat (symbol-name +ruby-mode)    "-hook")))
    #+end_src
 
    This is the command I use to kick-start on the fly linting. In general when
@@ -17466,68 +17450,24 @@
    :END:
 
    #+BEGIN_SRC emacs-lisp
-     (push (cons +ruby-mode 2) +indent-config)
-     (leader-set-keys "tmr" +ruby-mode)
-   #+END_SRC
-
-   #+BEGIN_SRC emacs-lisp :tangle (if (eq +ruby-package 'ruby) "yes" "no")
      (use-package ruby-mode
        :mode ("\\.rb$" . ruby-mode)
        :hook (ruby-mode . +flylint)
        :interpreter "ruby"
+       :init
+       (push '(ruby-mode . 2) +indent-config)
+
        :config
        (modify-syntax! '((?_ . "w")
                          (?: . "w"))
          ruby-mode-syntax-table)
 
+       :leader ("tmr" 'ruby-mode)
        :lazy-leader
        (:mode 'ruby-mode
          "'" 'ruby-toggle-string-quotes
          "{" 'ruby-toggle-block))
    #+END_SRC
-
-*** enhanced-ruby-mode
-    #+BEGIN_SRC emacs-lisp :tangle (if (eq +ruby-package 'enh-ruby) "yes" "no")
-      (use-package enh-ruby-mode
-        :straight t
-        :mode ("\\.rb$" . enh-ruby-mode)
-        :interpreter "ruby"
-        :hook (ruby-mode . +flylint)
-        :config
-        (setq enh-ruby-deep-indent-paren nil
-              enh-ruby-hanging-paren-deep-indent-level 2)
-
-        :lazy-leader
-        (:mode 'enh-ruby-mode
-         "m" 'enh-ruby-mark-defun
-         "f" 'enh-ruby-find-file
-         "e" 'enh-ruby-find-error
-
-         "i"  '(:ignore t :wk "insert")
-         "ie" 'enh-ruby-insert-end
-         "it" 'enh-ruby-indent-exp
-         "i TAB" 'enh-ruby-indent-exp
-
-         "n"  '(:ignore t :wk "navigate")
-         "nh" 'enh-ruby-backward-sexp
-         "nl" 'enh-ruby-forward-sexp
-         "nk" 'enh-ruby-up-sexp
-         "n0" 'enh-ruby-beginning-of-block
-         "n$" 'enh-ruby-end-of-block
-         "n M-0" 'enh-ruby-beginning-of-defun
-         "n M-$" 'enh-ruby-end-of-defun)
-
-        :general
-        (:keymaps 'enh-ruby-mode-map
-         "{" nil "}" nil)
-        (:keymaps 'enh-ruby-mode-map
-         :states 'insert
-         "{" 'enh-ruby-electric-brace
-         "}" 'enh-ruby-electric-brace)
-        (:keymaps 'enh-ruby-mode-map
-         :states '(normal insert)
-         "C-{" 'enh-ruby-toggle-block))
-    #+END_SRC
 
 *** solargraph                                                          :lsp:
     Language server implementation for ruby.
@@ -17539,34 +17479,33 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ruby :lsp)
       (push
-       (cons +ruby-mode
+       (cons 'ruby-mode
              (defun ruby-enable-lsp-in-projects+ ()
                (when (project-has-file-p "Gemfile")
                  :local)))
        +lsp-maybe-connect)
 
-      (add-hook +ruby-mode-hook +lsp-command)
+      (add-hook 'ruby-mode-hook +lsp-command)
     #+END_SRC
 
-*** inferiror-ruby
+*** inferior-ruby
     #+BEGIN_SRC emacs-lisp
       (use-package inf-ruby
         :straight t
         :init
-        (defalias 'ruby-repl 'inf-ruby)
         (push 'inf-ruby-mode +whitespace-exempt-modes)
 
-        :lazy-leader
-        (:mode +ruby-mode
-         "r"  '(:ignore t :wk "REPL")
-         "rr" 'inf-ruby
-         "rg" 'inf-ruby-console-gem
-         "rz" 'inf-ruby-console-zues
-         "ra" 'inf-ruby-console-auto
-         "rR" 'inf-ruby-console-rails
-         "rk" 'inf-ruby-console-racksh
-         "rc" 'inf-ruby-console-script
-         "rh" 'inf-ruby-console-hanami))
+        :leader
+        (:mode 'ruby-mode
+         "e"  '(:ignore t :wk "eval/REPL")
+         "es" '(inf-ruby :wk "ruby-repl")
+         "eg" 'inf-ruby-console-gem
+         "ez" 'inf-ruby-console-zues
+         "ea" 'inf-ruby-console-auto
+         "eR" 'inf-ruby-console-rails
+         "ek" 'inf-ruby-console-racksh
+         "ec" 'inf-ruby-console-script
+         "eh" 'inf-ruby-console-hanami))
     #+END_SRC
 
 *** ruby-tools
@@ -17574,11 +17513,10 @@
       (use-package ruby-tools
         :straight t
         :diminish ruby-tools-mode
-        :init
-        (add-hook +ruby-mode-hook #'ruby-tools-mode)
+        :hook (ruby-mode . ruby-tools-mode)
 
         :lazy-leader
-        (:mode +ruby-mode
+        (:mode 'ruby-mode
          "i"  '(:ignore t :wk "insert")
          "i:" 'ruby-tools-to-symbol
          "i{" 'ruby-tools-interpolate
@@ -17592,7 +17530,7 @@
       (use-package bundler
         :straight t
         :leader
-        (:mode +ruby-mode
+        (:mode 'ruby-mode
          "b"  '(:ignore t :wk "bundler")
          "rb" 'bundle-console
          "bf" 'bundle-open
@@ -17606,11 +17544,9 @@
       (use-package ruby-electric
         :straight t
         :diminish ruby-electric-mode
-        :init
-        (add-hook +ruby-mode-hook #'ruby-electric-mode)
-
+        :hook (ruby-mode . ruby-electric-mode)
         :config
-          ;;; why poison the standard ruby map instead of using ruby-electric-mode-map?
+        ;;; Why poison the standard ruby map instead of using `ruby-electric-mode-map'?
         (defun ruby-electric-setup-keymap ()
           (general-define-key
            :keymaps 'ruby-mode-map
