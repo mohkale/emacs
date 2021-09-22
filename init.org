@@ -2820,7 +2820,8 @@
         :commands (toggle-lexical-binding
                    keymaps-at-point
                    toggle-relative-linum
-                   toggle-buffer-header))
+                   toggle-buffer-header
+                   cycle-hook+))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
@@ -2895,6 +2896,52 @@
                   "Text-property local-map: %s")
                  map-list)))
     #+END_SRC
+
+    #+begin_src emacs-lisp
+      (defun cycle-hook+ (hook-var &optional global)
+        "Interactively cycle the order of functions in HOOK-VAR.
+      When GLOBAL is true then the global value of the hook is modified
+      even if there's a buffer-local value."
+        (interactive
+         (list (intern (completing-read
+                        "Hook variable: "
+                        obarray #'boundp t nil nil nil))
+               current-prefix-arg))
+        (unless (boundp hook-var)
+          (error "Hook variable %s not bound" hook-var))
+
+        (let* ((hook-value (if global
+                               (default-value hook-var)
+                             (eval hook-var)))
+               (hook-value (if (or (not hook-value)
+                                   (not (listp hook-value)))
+                               (error "The hook variable %s is not a hook" hook-var)
+                             hook-value))
+               (contains-t (member t hook-value))
+               (hook-value (remove t hook-value))
+               (cycle-to
+                (cl-position (intern
+                              (completing-read "Cycle hook: "
+                                               (lambda (str pred action)
+                                                 (if (eq action 'metadata)
+                                                     ;; Don't resort the order of the hook.
+                                                     ;; It makes cycling confusing.
+                                                     '(metadata
+                                                       (category . function)
+                                                       (cycle-sort-function . identity)
+                                                       (display-sort-function . identity))
+                                                   (complete-with-action action hook-value str pred)))
+                                               nil t nil 'foo-history))
+                             hook-value))
+               (new-hook-value hook-value))
+          (unless (zerop cycle-to)
+            (setq new-hook-value (append (nthcdr cycle-to hook-value)
+                                         (cl-subseq hook-value 0 cycle-to)
+                                         (when contains-t
+                                           (list t)))))
+          (message "%s" new-hook-value)
+          (funcall (if global #'set-default 'set) hook-var new-hook-value)))
+    #+end_src
 
     #+begin_src emacs-lisp
       (provide '+lib-misc)
@@ -8213,22 +8260,14 @@
          (with-display-buffer-no-select-window
            (eldoc-doc-buffer)))
 
-       (defun eldoc-cycle-doc-functions+ (&optional count)
-         (interactive "p")
-         (or count (setq count 1)) ;; TODO: count
-         (let* ((head (pop eldoc-documentation-functions)))
-           (add-to-list 'eldoc-documentation-functions head t))
-         (message "cycled: %s" eldoc-documentation-functions))
-
-       (defun eldoc-cycle-doc-functions-back+ (&optional count)
-         (interactive "p")
-         (eldoc-cycle-doc-functions+ (- count)))
+       (defun eldoc-cycle-display-function+ (&optional global)
+         (interactive "P")
+         (cycle-hook+ 'eldoc-documentation-functions global))
 
        :leader
-       ("hb" 'eldoc-doc-buffer
-        "ho" 'eldoc-doc-buffer-no-select+
-        "tj" '(eldoc-cycle-doc-functions+ :wk "cycle-eldoc")
-        "tk" '(eldoc-cycle-doc-functions-back+ :wk "cycle-eldoc-back")))
+       ("ev" 'eldoc-cycle-display-function+
+        "hb" 'eldoc-doc-buffer
+        "ho" 'eldoc-doc-buffer-no-select+))
    #+END_SRC
 
 ** electric-pair
