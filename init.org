@@ -12427,6 +12427,40 @@
          "[" 'consult-bibtex))
     #+end_src
 
+*** consult-company                                                    :comp:
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! :consult company)
+    :END:
+
+    #+begin_src emacs-lisp
+      (use-package consult-company
+        :straight (consult-company :host 'github
+                                   :repo "mohkale/consult-company")
+        :general
+        (:keymaps 'company-mode-map
+         [remap completion-at-point] #'consult-company))
+    #+end_src
+
+*** consult-yasnippet
+    #+begin_src emacs-lisp :tangle (package-yes! :consult)
+      (use-package consult-yasnippet
+        :straight (consult-yasnippet :host github
+                                     :repo "mohkale/consult-yasnippet")
+        :config
+        (with-eval-after-load 'embark
+          (embark-define-keymap embark-yasnippet-completion-actions
+            "Embark actions for `consult-yasnippet' and derivatives."
+            ("d" consult-yasnippet-visit-snippet-file)                                  ; NOTE: Binding differs from `ivy-yasnippet' which uses "v".
+            )
+
+          (push '(yasnippet . embark-yasnippet-completion-actions)
+                embark-keymap-alist))
+
+        :general
+        (:states '(insert normal)
+         "C-M-i" 'consult-yasnippet))
+    #+end_src
+
 *** consult-extensions
     :PROPERTIES:
     :header-args+: :tangle (package-str! (lisp! "+consult-custom.el") :consult)
@@ -12588,93 +12622,6 @@
        (provide '+org-ref-consult-cite)
      #+END_SRC
 
-**** consult-company                                                    :comp:
-     :PROPERTIES:
-     :header-args+: :tangle (package-str! (lisp! "+consult-custom.el") :consult company)
-     :END:
-
-     #+begin_src emacs-lisp :tangle (package-yes! :consult company)
-       (autoload 'consult-company "+consult-custom.el" nil t)
-
-       (general-define-key
-        :keymaps 'company-mode-map
-        [remap completion-at-point] #'consult-company)
-     #+end_src
-
-     #+BEGIN_SRC emacs-lisp
-       (require 'company)
-
-       (defvar consult-company--narrow
-         `((color ?# "Color")
-           ((file folder) ?f . "Files")
-           (text ?w . "Word")
-           (snippet ?s . "Snippet")
-           (t ?c . "Completion"))
-         "Takes the same keys as `company-text-icons-mapping'.")
-
-       (defun consult-company--candidates ()
-         (cl-loop for cand in company-candidates
-                  ;; We need to keep the original candidate separate from the one passed
-                  ;; to completing-read to prevent the useful text-properties from being
-                  ;; stripped.
-                  with ix = 0 do (setq ix (1+ ix))
-                  with cand-str = nil
-                  do (setq cand-str (consult--tofu-append (substring-no-properties cand) ix))
-                  ;; Assign the backend for candidate, defaults to capf for unknown backends.
-                  with backend = nil
-                  do (setq backend
-                           (or (get-text-property 0 'company-backend cand)
-                               (if (consp company-backend)
-                                   (car (cl-remove-if #'symbolp company-backend))
-                                 company-backend)))
-                  ;; Apply completions-common face to non-capf candidates.
-                  when (and (not (eq backend 'company-capf))
-                            (string-prefix-p company-prefix cand))
-                    ;; Copy candidate and prefix with completions-common-part
-                    do (add-face-text-property 0 (length company-prefix)
-                                                 'completions-common-part nil cand-str)
-                  ;; Assign the consult--type property for title and narrowing.
-                  do (when-let ((narrow (or (when-let ((company-backend backend)
-                                                       (kind (company-call-backend 'kind cand)))
-                                              (cl-assoc kind consult-company--narrow
-                                                        :test (lambda (it x)
-                                                                (or (eq x it)
-                                                                    (and (listp x)
-                                                                         (member it x))))))
-                                          (assoc t consult-company--narrow))))
-                     (add-text-properties 0 1 (list 'consult--type (cadr narrow)) cand-str))
-                  collect (cons cand-str cand)))
-
-       (defun consult-company ()
-         (interactive)
-         (unless (bound-and-true-p company-mode)
-           (user-error "`company-completion-in-point' only works in `company-mode'."))
-         (unless company-candidates
-           (company-complete))
-         (let ((cands (consult--with-increased-gc
-                       (consult-company--candidates)))
-               (narrow-assoc (mapcar #'cdr consult-company--narrow)))
-           (unless cands
-             (user-error "No completion candidates available."))
-           (company-finish
-            (consult--read
-             cands
-             :prompt "Candidate: "
-             :lookup #'consult--lookup-cdr
-             :sort nil
-             :group (consult--type-group narrow-assoc)
-             :narrow
-             ;; (consult--type-narrow narrow-assoc)
-             (let* ((narrow (consult--type-narrow narrow-assoc))
-                    (pred (plist-pop! narrow :predicate)))
-               `(:predicate
-                 ,(lambda (cand)
-                    (funcall pred (car cand)))
-                 ,@narrow))))))
-
-       (provide 'consult-company)
-     #+END_SRC
-
 **** consult-evil-marks
      Taken from [[https://github.com/abo-abo/swiper/blob/25439e26a67b54d1f8aab1cbc727228427692ec8/counsel.el#L4198][counsel.el]].
 
@@ -12793,146 +12740,6 @@
          ("i" consult-org-capture-insert-template+))
 
        (add-to-list 'embark-keymap-alist '(org-capture . embark-org-capture-completion-actions+))
-     #+END_SRC
-
-**** consult-yasnippet
-     #+begin_src emacs-lisp :tangle (package-yes! :consult)
-       (autoload 'consult-yasnippet "+consult-custom.el" nil t)
-
-       (general-define-key
-        :states '(insert normal)
-        "C-M-i" 'consult-yasnippet)
-     #+end_src
-
-     #+BEGIN_SRC emacs-lisp
-       (require 'consult)
-       (require 'yasnippet)
-
-       (defun consult-yasnippet--expand-template (template region region-contents)
-         "Expand the yasnippet template TEMPLATE at point."
-         (deactivate-mark)
-         (goto-char (car region))
-
-         ;; Restore marked region (when it existed) so that `yas-expand-snippet'
-         ;; overwrites it.
-         (when (not (string-equal "" region-contents))
-           (push-mark (point))
-           (push-mark (cdr region) nil t))
-
-         (cl-letf (((symbol-function 'yas-completing-read)
-                    (lambda (&rest _args) "")))
-           (yas-expand-snippet (yas--template-content template)
-                               nil nil
-                               (yas--template-expand-env template))))
-
-       (defun consult-yasnippet--preview ()
-         "Previewer for `consult--read'.
-       This function expands TEMPLATE at point in the buffer
-       `consult-yasnippet--read-template' was started in. This includes
-       overwriting any region that was active and removing any previous
-       previews that're already active.
-
-       When TEMPLATE is not given, this function essentially just resets
-       the state of the current buffer to before any snippets were previewed."
-         (let* ((buf (current-buffer))
-                (region (if (region-active-p)
-                            (cons (region-beginning) (region-end))
-                          (cons (point) (point))))
-                (region-contents (buffer-substring (car region) (cdr region))))
-           (lambda (template restore)
-             (with-current-buffer buf
-               (let ((yas-verbosity 0)
-                     (inhibit-redisplay t)
-                     (inhibit-read-only t)
-                     (orig-offset (- (point-max) (cdr region)))
-                     (yas-prompt-functions '(yas-no-prompt)))
-
-                 ;; We always undo any snippet previews before maybe setting up
-                 ;; some new previews.
-                 (delete-region (car region) (cdr region))
-                 (goto-char (car region))
-                 (setcar region (point))
-                 (insert region-contents)
-                 (setcdr region (point))
-
-                 (when (and template (not restore))
-                   (unwind-protect
-                       (consult-yasnippet--expand-template template region region-contents)
-                     (unwind-protect
-                         (mapc #'yas--commit-snippet
-                               (yas-active-snippets (point-min) (point-max)))
-                       (setcdr region (- (point-max) orig-offset))))
-                   (redisplay)))))))
-
-       (defun consult-yasnippet--candidates (&rest body)
-         "Retrieve the list of available snippets in the current buffer."
-         (unless (bound-and-true-p yas-minor-mode)
-           (error "`yas-minor-mode' not enabled in current buffer"))
-
-         (mapcar
-          (lambda (template)
-            (cons (concat (yas--template-name template)
-                          (propertize " "
-                                      'display (concat
-                                                " ["
-                                                (propertize (or (yas--template-key template)
-                                                                (and (functionp 'yas--template-regexp-key)
-                                                                     (yas--template-regexp-key template)))
-                                                            'face 'consult-key)
-                                                "]")))
-                  template))
-          (yas--all-templates (yas--get-snippet-tables))))
-
-       (defun consult-yasnippet--read-template ()
-         "Backend implementation of `consult-yasnippet'.
-
-       This starts a `completing-read' session with all the snippets in the current
-       snippet table with support for previewing the snippet to be expanded and
-       replacing the active region with the snippet expansion.
-
-       This function doesn't actually expand the snippet, it only reads and then
-       returns a snippet template from the user."
-         (barf-if-buffer-read-only)
-
-         (let* ((buffer-undo-list t))                                                  ; Prevent querying user (and showing previews) from updating the undo-history
-           (consult--read
-            (consult-yasnippet--candidates)
-            :prompt "Choose a snippet: "
-            :lookup 'consult--lookup-cdr
-            :require-match t
-            :state (consult-yasnippet--preview)
-            :category 'yasnippet)))
-
-       (defun consult-yasnippet-visit-snippet-file (template)
-         "Visit the snippet file associated with TEMPLATE.
-       When called interactively this command previews snippet completions in
-       the current buffer, and then opens the selected snippets template file
-       using `yas--visit-snippet-file-1'."
-         (interactive (list (consult-yasnippet--read-template)))
-         (yas--visit-snippet-file-1 template))
-
-       (defun consult-yasnippet (template)
-         "Interactively select and expand the yasnippet template TEMPLATE.
-       When called interactively this command presents a completing read interface
-       containing all currently available snippet expansions, with live previews for
-       each snippet. Once selected a chosen snippet will be expanded at point using
-       `yas-expand-snippet'."
-         (interactive (list (consult-yasnippet--read-template)))
-         (barf-if-buffer-read-only)
-         (let* ((region (if (region-active-p)
-                            (cons (region-beginning) (region-end))
-                          (cons (point) (point))))
-                (region-contents (buffer-substring (car region) (cdr region))))
-           (consult-yasnippet--expand-template template region region-contents)))
-     #+END_SRC
-
-     #+BEGIN_SRC emacs-lisp
-       (embark-define-keymap embark-yasnippet-completion-actions
-         "Embark actions for `consult-yasnippet' and derivatives"
-         ;; NOTE: Binding differs from `ivy-yasnippet' which uses "v".
-         ("d" consult-yasnippet-visit-snippet-file))
-
-       (add-to-list 'embark-keymap-alist '(yasnippet . embark-yasnippet-completion-actions))
      #+END_SRC
 
 **** consult-extensions-eob
@@ -13283,28 +13090,15 @@
    #+END_SRC
 
 ** compile-multi
-   :PROPERTIES:
-   :header-args+: :tangle (lisp! "+multi-compile")
-   :END:
-
-   Adapted from [[https://github.com/ReanGD/emacs-multi-compile][emacs-multi-compile]] this is my attempt at a multi-target interface to
-   compile.
-   Some of the core changes are that this approach supports a more flexible
-   configuration format and can support dynamic compilation targets (such as make
-   rules or gradle tasks etc.). It also doesn't rely on ~%substitution~ or other forms
-   for building commands, instead using strings, or lists of strings, including lisp
-   constructs that will be evaluated and concatenated together into strings.
-
-   This package also works as a usable alternative for [[https://github.com/abo-abo/helm-make][helm-make]], using a smaller
-   more general core interface that can easily be repurposed for other similar tools.
-
-   #+begin_src emacs-lisp :tangle yes
-     (use-package +compile-multi
-       :commands (compile-multi)
+   #+begin_src emacs-lisp
+     (use-package compile-multi
+       :straight '(compile-multi :host github
+                                 :repo "mohkale/compile-multi")
+       :leader ("cm" 'compile-multi)
        :custom
        (compile-multi-default-directory #'project-current-root+)
 
-       :preface
+       :init
        (setq compile-multi-config
              `(((file-exists-p "go.sum")
                 ("go:build" . "go build -v")
@@ -13312,46 +13106,8 @@
                ((file-exists-p "CMakeLists.txt")
                 ("cmake:build" . "cmake build"))))
 
-       :init
-       ;; Dynamically fetch the list of makefile targets for the current project.
-       (defvar helm-make-cache-targets+ t)
-       (defvar helm-make-targets-cache+ (make-hash-table))
-
-       (defun compile-multi-makefile-targets+ (makefile)
-         (let (make-targets
-               (modtime (and helm-make-cache-targets+
-                             (file-attribute-modification-time (file-attributes makefile 'integer)))))
-           (setq make-targets
-                 (or (and helm-make-cache-targets+
-                          (when-let ((entry (gethash default-directory helm-make-targets-cache+)))
-                            (when (time-less-p modtime (car entry))
-                              (cdr entry))))
-                     ;; Taken from [[https://github.com/abo-abo/helm-make/blob/ebd71e85046d59b37f6a96535e01993b6962c559/helm-make.el#L284][helm-make/helm--make-target-list-default]].
-                     (let (targets)
-                       (with-temp-buffer
-                         (insert-file-contents makefile)
-                         (goto-char (point-min))
-                         (while (re-search-forward "^\\([^: \n]+\\) *:\\(?: \\|$\\)" nil t)
-                           (let ((str (match-string 1)))
-                             (unless (string-match "^\\." str)
-                               (push str targets)))))
-                       (nreverse targets))))
-           (when helm-make-cache-targets+
-             (puthash default-directory (cons modtime make-targets) helm-make-targets-cache+))
-           make-targets))
-
-       (defun compile-multi-make-targets+ ()
-         "Retun a list of `compile-multi' targets for the current Makefile project.
-     Compile task for the current buffer (may not be supported by the Makefile."
-         ;; (when-let ((name (buffer-file-name)))
-         ;;   `(("make:buffer" .
-         ;;      ,(concat "make " (shell-quote-argument (file-relative-name name))))))
-         (cl-loop for it in (compile-multi-makefile-targets+ "Makefile")
-                  collect (cons (concat "make:" it)
-                                (concat "make " (shell-quote-argument it)))))
-
        (push `((file-exists-p "Makefile")
-               ,#'compile-multi-make-targets+)
+               ,#'compile-multi-make-targets)
              compile-multi-config)
 
        :init
@@ -13360,132 +13116,7 @@
 
        (push `(emacs-lisp-mode
                ("emacs:bytecompile" . ,#'byte-compile-this-file+))
-             compile-multi-config)
-
-       :leader ("cm" 'compile-multi))
-   #+end_src
-
-   #+begin_src emacs-lisp
-     (require 's)
-     (require 'seq)
-
-     (defvar compile-multi-default-directory #'ignore
-       "Function called to set the `default-directory' of a compilation in `+compile-multi'.")
-
-     (defvar compile-multi-forms
-       '((file-name . (buffer-file-name))
-         (file-dir . (file-name-directory (buffer-file-name)))
-         (file-base . (file-name-nondirectory (buffer-file-name)))
-         (file-base-no-ext . (file-name-sans-extension (file-name-nondirectory (buffer-file-name))))
-         (file-ext . (file-name-extension (file-name-nondirectory (buffer-file-name)))))
-       "Alist of special let-forms that'll be substituted in `compile-multi-config'.")
-
-     (defvar compile-multi-config
-       `((emacs-lisp-mode . (("rust-debug" . ("cargo run" (buffer-file-name)))))))
-
-     (defun compile-multi--tasks ()
-       "Select the tasks from `compile-multi-config' whose triggers are fired."
-       (apply #'append
-              (mapcar #'cdr
-                      (seq-filter
-                       (lambda (it)
-                         (let ((trigger (car it)))
-                           (cond
-                            ((eq trigger t) t)
-                            ((symbolp trigger)
-                             (derived-mode-p trigger))
-                            ((listp trigger)
-                             (eval trigger))
-                            ((stringp trigger)
-                             (string-match-p trigger (buffer-name)))
-                            ((functionp trigger)
-                             (funcall trigger))
-                            (t (error "Unknown trigger type: %s" trigger)))))
-                       compile-multi-config))))
-
-     (defun compile-multi--fill-tasks (tasks)
-       (let (res task-name)
-         (dolist (task tasks)
-           (cond
-            ;; Generate one-or more tasks to replace this task.
-            ((functionp task)
-             (setq res (append (seq-reverse
-                                (compile-multi--fill-tasks (funcall task)))
-                               res)))
-            ;; A full command to be called as a standalone task.
-            ((stringp (cdr task))
-             (push task res))
-            ;; Defer to a lisp-command to compile, not a shell command.
-            ;; KLUDGE: I'm not sure about this, it might be a little too hacky.
-            ((functionp (cdr task))
-             (push task res))
-            ;; It's a list that we need to format into a shell-command to run.
-            ((listp (cdr task))
-             (push (cons task-name
-                         (s-join " "
-                          (mapcar (lambda (it)
-                                    (cond
-                                     ((stringp it) it)
-                                     ((symbolp it)
-                                      (let* ((val (or (alist-get task compile-multi-forms)
-                                                      task))
-                                             (evaluated-value (eval val)))
-                                        (unless (stringp val)
-                                          (error "Failed to stringify task argument %s" val))
-                                        evaluated-value))
-                                     (t
-                                      (let ((evaluated-value (eval it)))
-                                        (unless (stringp evaluated-value)
-                                          (error "Failed to stringify task argument %s" it))
-                                        evaluated-value))))
-                                  task)))
-                   res))
-            (t (error "Unknown task type: %s" task))))
-         (seq-reverse res)))
-
-     (defvar compile-multi-history nil)
-
-     (defvar compile-multi-annotate-cmds t)
-
-     (defun compile-multi--annotation-function (tasks)
-       (lambda (it)
-         (when compile-multi-annotate-cmds
-           (when-let ((cmd (cdr (assoc it tasks))))
-             (setq cmd (format "%s" cmd))
-             (concat " "
-                     (propertize " " 'display `(space :align-to (- right ,(+ 1 (length cmd)))))
-                     cmd)))))
-
-     (defun compile-multi ()
-       (interactive)
-       (let* ((default-directory (or (and compile-multi-default-directory
-                                          (funcall compile-multi-default-directory))
-                                     default-directory))
-              (tasks (compile-multi--tasks))
-              (tasks (compile-multi--fill-tasks tasks))
-              (compile-cmd (if tasks
-                               (cdr
-                                (assoc (completing-read
-                                        "Compile: "
-                                        (lambda (string predicate action)
-                                          (if (eq action 'metadata)
-                                              `(metadata
-                                                (annotation-function . ,(compile-multi--annotation-function tasks))
-                                                (category . compile))
-                                            (complete-with-action action tasks string predicate)))
-                                        nil t nil 'compile-multi-history)
-                                       tasks))
-                             (read-shell-command "Compile command: "))))
-         (cond
-          ((stringp compile-cmd)
-           (compile compile-cmd))
-          ((functionp compile-cmd)
-           (funcall compile-cmd))
-          (t (error "Don't know how to run the command cmd.")))))
-   #+end_src
-
-   #+begin_src emacs-lisp
-     (provide '+compile-multi)
+             compile-multi-config))
    #+end_src
 
 ** dashboard
