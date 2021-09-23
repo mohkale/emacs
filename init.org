@@ -15727,11 +15727,38 @@
                              display-buffer--maybe-pop-up-frame-or-window
                              display-buffer-use-some-window
                              display-buffer-pop-up-frame)))))
-       :init
-       (with-eval-after-load 'skeletor
-         (require '+skeletor-templates))
 
        :config
+       ;; Remove all the builtin skeletor project types because they're like a
+       ;; decade old and some just don't work for some reason :/.
+       (setq skeletor--project-types nil)
+
+       ;; You can include dotfiles with __DOT__ so let me use actual dotfiles
+       ;; for configuring stuff.
+       (require 'cl-lib)
+       (advice-add 'skeletor--dir->SkeletorTemplate :filter-return
+                   (defun skeletor-dir-template-exclude-dotfiles (template)
+                     ;; (setf (SkeletorTemplate-files template)
+                     ;;       (seq-filter (lambda (it) (not
+                     ;;                            (string-prefix-p "." (file-name-base it))))
+                     ;;                   (SkeletorTemplate-files template)))
+
+                     ;; KLUDGE: Hard-coded expansion of setf because its failing for some reason.
+                     (aset template
+                           (cl-position 'files (mapcar #'car (cl-struct-slot-info 'SkeletorTemplate)))
+                           (seq-filter
+                            (lambda
+                              (it)
+                              (not
+                               (string-prefix-p "."
+                                                (file-name-base it))))
+                            (SkeletorTemplate-files template)))
+                     template))
+
+       ;; I keep definitions for skeletor templates alongside the skeleton directory.
+       (dolist (it (file-expand-wildcards (join-path skeletor-user-directory "*" ".skeletor.el")))
+         (load it nil t))
+
        (advice-add 'skeletor--initialize-git-repo :override
                    (defun skeletor--initialize-git-repo+  (dir)
                      "Override of `skeletor--initialize-git-repo' which produces only one initial commit."
@@ -15775,172 +15802,46 @@
                       ((symbol-function 'skeletor--read-project-name)
                        (lambda () (if is-empty basename
                                (skeletor--actual-read-project-name)))))
-             (skeletor-create-project-at dir skeleton)))))
-   #+END_SRC
+             (skeletor-create-project-at dir skeleton))))
 
-*** skeletor-templates
-   :PROPERTIES:
-   :header-args+: :tangle (package-str! (lisp! "+skeletor-templates.el") skeletor)
-   :END:
+       :config
+       ;; A template to bootstrap a [[https://www.rust-lang.org/][rust]] project with cargo.
+       (skeletor-define-constructor "rust-cargo"
+         :title "Rust [cargo]"
+         :requires-executables '(("rustc" . "https://www.rust-lang.org/")
+                                 ("cargo" . "https://doc.rust-lang.org/book/ch01-03-hello-cargo.html"))
+         :initialise
+         (lambda (spec)
+           (let-alist spec
+             (skeletor-shell-command (concat "cargo init --color never --vcs none "
+                                             (if (yes-or-no-p "Create a binary template instead of a library?")
+                                                 "--bin "
+                                               "--lib ")
+                                             (let ((name (read-string "Package name: ")))
+                                               (unless (string-empty-p name)
+                                                 (concat "--name " (shell-quote-argument name) " ")))
+                                             .project-name)
+                                     .project-dir))))
 
-   #+begin_src emacs-lisp
-     (require 'skeletor)
-   #+end_src
+       ;; Generator for a scrapy project using poetry for dependency management.
+       (skeletor-define-constructor "python-scrapy"
+         :title "Python [scrapy]"
+         :requires-executables '(("python3" . "https://www.python.org/")
+                                 ("poetry" . "https://python-poetry.org/"))
+         :initialise
+         (lambda (spec)
+           (let-alist spec
+             (mkdir .dest t)
+             (skeletor--log-info "Initialising project using poetry and installing scrapy")
+             (skeletor-shell-command
+              "poetry init --no-interaction --no-ansi --dependency scrapy --dev-dependency pytest" .dest)
+             (skeletor-shell-command "poetry install" .dest)
 
-   Firstly lets remove all the builtin skeletor project types because they're like a
-   decade old and some just don't work for some reason :/.
-
-   #+BEGIN_SRC emacs-lisp
-     (setq skeletor--project-types nil)
-   #+END_SRC
-
-   A basic [[file:etc/project-skeletons/c-make/][C/C++]] project template using a Makefile and either clang or GCC.
-
-   #+BEGIN_SRC emacs-lisp
-     (skeletor-define-template "c-make"
-       :title "C/C++ [make]"
-       :requires-executables '(("make" . "https://www.gnu.org/software/make/"))
-       :substitutions
-       '(("__MAIN__" . (lambda ()
-                         (read-string "Entry point [main]: " nil nil "main")))
-         ("__CCLD__" . (lambda ()
-                       (funcall skeletor-completing-read-function "Compiler: "
-                                '("clang" "clang++" "gcc" "g++"))))))
-   #+END_SRC
-
-   The same as a Makefile project but using CMake instead of make. This is pretty
-   much the industry standard so you may as well support it (even if CMake is
-   extremely [[https://www.reddit.com/r/cmake/comments/8p43q0/questiondo_people_really_like_cmake/][ugly]])
-
-   #+BEGIN_SRC emacs-lisp
-     (skeletor-define-template "c-cmake"
-       :title "C/C++ [cmake]"
-       :requires-executables '(("cmake" . "https://cmake.org/"))
-       :substitutions
-       '(("__MAIN__" . (lambda ()
-                         (read-string "Entry point [main]: " nil nil "main")))
-         ("__TOOLCHAIN__" . (lambda ()
-                              (completing-read "Toolchain: " '("clang" "gcc") nil t))))
-       :after-creation
-       (lambda (dir)
-         (cl-destructuring-bind (c . cxx)
-             (assoc (alist-get "__TOOLCHAIN__" (assoc 'repls skeletor-project-spec) nil nil #'string-equal)
-                    '(("clang" . "clang++") ("gcc" . "g++")) #'string-equal)
-           (skeletor--log-info "Initialising project using cmake with %s" c)
-           (skeletor-shell-command (format "CC=%s CXX=%s cmake -B build"
-                                           (shell-quote-argument c)
-                                           (shell-quote-argument cxx))
-                                         dir))
-         (let ((default-directory dir))
-           (skeletor--log-note "Creating link to compile_commands.json")
-           (make-symbolic-link "./build/compile_commands.json" "compile_commands.json" t))))
-   #+END_SRC
-
-   A template to bootstrap a [[https://www.rust-lang.org/][rust]] project with cargo.
-
-   #+BEGIN_SRC emacs-lisp
-     (skeletor-define-constructor "rust-cargo"
-       :title "Rust [cargo]"
-       :requires-executables '(("rustc" . "https://www.rust-lang.org/")
-                               ("cargo" . "https://doc.rust-lang.org/book/ch01-03-hello-cargo.html"))
-       :initialise
-       (lambda (spec)
-         (let-alist spec
-           (skeletor-shell-command (concat "cargo init --color never --vcs none "
-                                           (if (yes-or-no-p "Create a binary template instead of a library?")
-                                               "--bin "
-                                             "--lib ")
-                                           (let ((name (read-string "Package name: ")))
-                                             (unless (string-empty-p name)
-                                               (concat "--name " (shell-quote-argument name) " ")))
-                                           .project-name)
-                                   .project-dir))))
-   #+END_SRC
-
-   Classic python using elegant poetry for dependency management.
-
-   #+BEGIN_SRC emacs-lisp
-     (skeletor-define-template "python-poetry"
-       :title "Python [poetry]"
-       :requires-executables '(("python3" . "https://www.python.org/")
-                               ("poetry" . "https://python-poetry.org/"))
-       :after-creation
-       (lambda (dir)
-         (skeletor-shell-command "poetry init --no-interaction --no-ansi --dev-dependency pytest" dir)))
-   #+END_SRC
-
-   Generator for a scrapy project using poetry for dependency management.
-
-   #+BEGIN_SRC emacs-lisp
-     (skeletor-define-constructor "python-scrapy"
-       :title "Python [scrapy]"
-       :requires-executables '(("python3" . "https://www.python.org/")
-                               ("poetry" . "https://python-poetry.org/"))
-       :initialise
-       (lambda (spec)
-         (let-alist spec
-           (mkdir .dest t)
-           (skeletor--log-info "Initialising project using poetry and installing scrapy")
-           (skeletor-shell-command
-            "poetry init --no-interaction --no-ansi --dependency scrapy --dev-dependency pytest" .dest)
-
-           (skeletor--log-info "Bootstrapping new scrapy project")
-           (skeletor-shell-command (concat "poetry run scrapy startproject "
-                                           (shell-quote-argument .project-name)
-                                           " .")
-                                   .dest))))
-   #+END_SRC
-
-   The recommended golang package structure with sub-packages for commands.
-
-   #+BEGIN_SRC emacs-lisp
-     (skeletor-define-template "golang"
-       :title "Golang [go]"
-       :requires-executables '(("go" . "https://golang.org/"))
-       :substitutions
-       '(("__URL__" . (lambda ()
-                        (read-string "Module url: " (concat "github.com/mohkale/project")))))
-       :after-creation
-       (lambda (dir)
-         (skeletor-shell-command (concat "go mod init "
-                                         (shell-quote-argument
-                                          (alist-get "__URL__" (assoc 'repls skeletor-project-spec)
-                                                     nil nil #'string-equal)))
-                                 dir)))
-   #+END_SRC
-
-   Java with gradle... the current standard build tool /but my god I hate anything java/.
-
-   #+BEGIN_SRC emacs-lisp
-     (skeletor-define-template "java-gradle"
-       :title "Java [gradle]"
-       :requires-executables '(("javac" . "https://openjdk.java.net/")
-                               ("java" . "https://openjdk.java.net/")
-                               ("gradle" . "https://gradle.org/"))
-       :substitutions
-       '(("__MAIN-CLASS__" . (lambda ()
-                               (read-string "Main class: " "Main"))))
-       :after-creation
-       (lambda (dir)
-         ;; why /dev/null... gradle isn't very scriptable, go figure.
-         (skeletor-shell-command "gradle wrapper" dir)))
-   #+END_SRC
-
-   A basic Makefile variant for java.
-
-   #+begin_src emacs-lisp
-     (skeletor-define-template "java-make"
-       :title "Java [make]"
-       :requires-executables '(("javac" . "https://openjdk.java.net/")
-                               ("java" . "https://openjdk.java.net/")
-                               ("make" . "https://www.gnu.org/software/make/"))
-       :substitutions
-       '(("__MAIN-CLASS__" . (lambda ()
-                               (read-string "Main class: " "Main")))))
-   #+end_src
-
-   #+BEGIN_SRC emacs-lisp
-   (provide '+skeletor-templates)
+             (skeletor--log-info "Bootstrapping new scrapy project")
+             (skeletor-shell-command (concat "poetry run scrapy startproject "
+                                             (shell-quote-argument .project-name)
+                                             " .")
+                                     .dest)))))
    #+END_SRC
 
 ** tramp-term
