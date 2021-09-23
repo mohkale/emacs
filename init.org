@@ -7142,6 +7142,9 @@
         (compilation-ask-about-save nil)
         (compilation-message-face 'default)
         (next-error-message-highlight nil)
+        (compilation-always-kill t)
+        (compilation-read-command nil)
+        (compilation-scroll-output 'first-error)
 
         :config
         (evil-set-command-property 'next-error :jump t)
@@ -7149,20 +7152,10 @@
 
         (push 'compilation-mode +whitespace-exempt-modes)
 
-        (setq compilation-read-command nil
-              compilation-scroll-output 'first-error)
-
-        (defvar compilation-last-buffer nil
-          "the last open compilation buffer.")
-
-        (add-hook 'compilation-finish-functions
-                  (lambda (buf &rest _)
-                    (setq compilation-last-buffer buf)))
-
         (defun kill-compilation-windows+ ()
           (interactive)
-          (when compilation-last-buffer
-            (delete-windows-on compilation-last-buffer)))
+          (when-let ((buf (next-error-find-buffer)))
+            (delete-windows-on buf)))
 
         (defun compilation-colorize+ ()
           "Colorize from `compilation-filter-start' to `point'.
@@ -7175,16 +7168,12 @@
 
         (defun display-compilation-buffer ()
           (interactive)
-          (let* ((buffer
-                  (or compilation-last-buffer
-                      (get-buffer
-                       (if compilation-buffer-name-function
-                           (funcall compilation-buffer-name-function "compilation")
-                         "*compilation*")))))
-            (if (not buffer)
-                (user-error "Compilation buffer doesn't exist")
-              (when-let ((window (display-buffer buffer '(nil (reusable-frames . nil)))))
-                (select-window window)))))
+          (if-let ((buffer (next-error-find-buffer)))
+              (display-buffer buffer
+                              '(nil
+                                (body-function . select-window)
+                                (reusable-frames . nil)))
+            (user-error "Could not determine compilation-buffer.")))
 
         (defun +set-compilation-bindings (mode map)
           (leader-set-keys-for-major-mode mode
@@ -7224,6 +7213,7 @@
 
         :leader
         ("cv" 'kill-compilation-windows+)
+
         :general
         (:states  'motion
          :keymaps 'compilation-mode-map
@@ -7252,24 +7242,21 @@
       the compilation window was already open when the compilation was
       started.")
 
-      ;; WARN: Making buffer-local prevents persistance after compilation.
-      ;; WARN: Not thread-safe, will only work for the last set compilation buffer.
-      (defvar compilation-was-open-p+ nil
+      (defvar-local compilation-was-open-p+ nil
         "True whether the compilation window was visible when compilation began.")
 
-      (advice-add 'compilation-start :before
-                  (defun compilation-check-window-was-open+ (_command &optional mode name-function _highlight-regexp)
+      (advice-add 'compilation-start :around
+                  (defun compilation-check-window-was-open+ (func _command &optional mode name-function _highlight-regexp)
                     ;; name-of-mode and buf-name sourced from compile.el
                     (let* ((mode (or mode 'compilation-mode))
                            (name-of-mode (if (eq mode t)
                                              "compilation"
                                            (replace-regexp-in-string "-mode\\'" "" (symbol-name mode))))
-                           (buf-name (compilation-buffer-name name-of-mode mode name-function)))
-                      (when-let* ((buf (get-buffer buf-name)))
-                        (with-current-buffer buf
-                          (setq compilation-was-open-p+
-                                (when (get-buffer-window buf t)
-                                  t)))))))
+                           (buf-name (compilation-buffer-name name-of-mode mode name-function))
+                           (compilation-was-visible (when (get-buffer-window buf-name t) t)))
+                      ;; Start compilation and then assign `compilation-was-open-p+'.
+                      (with-current-buffer (funcall func _command mode name-function _highlight-regexp)
+                        (setq-local compilation-was-open-p+ compilation-was-visible)))))
 
       (defun compilation-safely-close-window+ (buffer)
         (when (and buffer
@@ -7280,28 +7267,26 @@
 
       (defun compilation-cancel-auto-kill-p+ ()
         "whether to cancel compilation window auto-kill due to `compilation-dont-auto-kill-window-when+'."
-        (let ((associations '((errors   . compilation-num-errors-found)
-                              (warnings . compilation-num-warnings-found)
-                              (infos    . compilation-num-infos-found))))
-          (cl-loop for (name . var) in associations
-                   when (and (member name compilation-dont-auto-kill-window-when+)
-                             (not (zerop (eval var))))
-                   collect (symbol-name name))))
+        (cl-loop for (name . var) in '((errors   . compilation-num-errors-found)
+                                       (warnings . compilation-num-warnings-found)
+                                       (infos    . compilation-num-infos-found))
+                 when (and (member name compilation-dont-auto-kill-window-when+)
+                           (not (zerop (eval var))))
+                   collect (symbol-name name)))
 
       (defun compilation-finish-function+ (buf str)
         "hook to automatically hide compilation output."
         (when (and compilation-auto-kill-window+
-                   (and (member 'focus compilation-dont-auto-kill-window-when+)
-                        (not (with-current-buffer buf
-                               compilation-was-open-p+)))
-                   ;; an abnormal exit automatically cancels window kill
+                   (or (not (member 'focus compilation-dont-auto-kill-window-when+))
+                       (with-current-buffer buf
+                         (not compilation-was-open-p+)))
+                   ;; An abnormal exit automatically cancels window kill.
                    (not (string-match-p (rx (zero-or-more any)
                                             "exited abnormally"
                                             (zero-or-more any))
                                         str))
-                   (not (apply 'derived-mode-p
-                               compilation-auto-kill-ignore-modes+)))
-          (let* ((terminate-window t))
+                   (not (apply 'derived-mode-p compilation-auto-kill-ignore-modes+)))
+          (let ((terminate-window t))
             (when-let ((notifications (compilation-cancel-auto-kill-p+)))
               (when debug-on-error
                 (message "Window kill suspended due to encountering: %s"
@@ -7318,7 +7303,7 @@
       (with-eval-after-load 'compile
         (add-hook 'compilation-finish-functions 'compilation-finish-function+)
         (add-hook 'compilation-finish-functions
-                  (lambda (&rest _)
+                  (defun compilation-exit-comint+ (&rest _)
                     (when (eq major-mode 'comint-mode)
                       (compilation-mode)))))
     #+END_SRC
@@ -18756,6 +18741,14 @@
        (evil-set-initial-state 'rustic-popup-mode 'emacs)
        (advice-add 'rustic-popup :around #'display-buffer-no-select-window-advice)
 
+       (advice-add 'rustic-compilation :around
+                   (defun rustic-compilation-check-window-was-open-p+ (func cmd args)
+                     (let* ((buf (or (plist-get args :buffer)
+                                     rustic-compilation-buffer-name))
+                            (compilation-was-visible (when (get-buffer-window buf t) t)))
+                       (with-current-buffer (process-buffer (funcall func cmd args))
+                         (setq-local compilation-was-open-p+ compilation-was-visible)))))
+
        :lazy-leader
        (:mode 'rustic-mode
         "," 'rustic-popup
@@ -18781,21 +18774,6 @@
         "rf" 'rustic-cargo-fmt
         "rc" 'rustic-cargo-clippy))
    #+END_SRC
-
-*** rust-compile
-    Fix ~compilation-was-open-p+~ isn't assigned when rustic compilation is begun.
-
-    #+BEGIN_SRC emacs-lisp
-      (advice-add 'rustic-compilation :before
-                  (defun rustic-compilation-check-window-was-open-p+ (_command &rest args)
-                    ;; copied from `rustic-compilation'.
-                    (when-let ((buf (get-buffer
-                                     (or (plist-get args :buffer)
-                                         rustic-compilation-buffer-name))))
-                      (with-current-buffer buf
-                        (setq compilation-was-open-p+ (when (get-buffer-window buf t)
-                                                        t))))))
-    #+END_SRC
 
 *** rust-analyzer                                                       :lsp:
     #+begin_src emacs-lisp :tangle (package-yes! rust :lsp)
