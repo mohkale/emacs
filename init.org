@@ -278,6 +278,9 @@
        "When true saving changes from an `edit-indirect' buffer saves the buffer file.
      This applies both to the `edit-indirect' package and `org-edit-src-save', and
      makes commiting consistent between the two packages.")
+
+     (defvar +org-capture-function 'org-capture
+       "Function to call to start an `org-capture' session.")
    #+END_SRC
 
 ** require
@@ -5635,8 +5638,30 @@
                      (project-current nil (or dir default-directory))))
            (project-root project)))
 
+       (defun project-has-file-p (&rest files)
+         (when-let ((default-directory (project-current-root+)))
+           (cl-find-if #'file-exists-p files)))
+
+       :commands project-show-and-copy-project-dir+
+       :leader ("py" 'project-show-and-copy-project-dir+)
+       :config
+       (defun project-show-and-copy-project-dir+ (&optional arg)
+         (interactive "P")
+         (if-let ((path (project-current-root+)))
+             (progn
+               (when arg
+                 (if (and (consp arg)
+                          (eq (car arg) 4))
+                     (insert path)
+                   (save-excursion
+                     (insert path))))
+               (message (abbreviate-file-name path))
+               (kill-new path))
+           (message "You're not currently in a project.")))
+
        :leader
        ("fp" 'project-switch-project)
+
        (:prefix "p"
         "" '(:ignore t :wk "project")
         ;; Unbound commands
@@ -5659,6 +5684,87 @@
         ;; "sg" 'project-find-regexp
         "sq" 'project-query-replace-regexp))
    #+END_SRC
+
+*** project-org-capture
+    #+begin_src emacs-lisp
+      (use-package org
+        :commands (org-contextualize-keys
+                   project-org-capture+
+                   project-org-project-file+)
+        :preface
+        (defvar project-org-capture-templates+ nil)
+        (defvar project-org-capture-templates-contexts+ nil)
+
+        :config
+        (defun project-org-capture-templates+ (name root)
+          "Adapted from `counsel-projectile-org-capture'."
+          (cl-loop
+           with replace-fun = `(lambda (string)
+                                 (replace-regexp-in-string
+                                  "\\${[^}]+}"
+                                  (lambda (s)
+                                    (pcase s
+                                      ("${root}" ,root)
+                                      ("${name}" ,name)))
+                                  string))
+           for template in project-org-capture-templates+
+           collect (cl-loop
+                    for item in template
+                    if (= (cl-position item template) 1) ;; template's name
+                      collect (funcall replace-fun item)
+                    else if (= (cl-position item template) 3) ;; template's target
+                      collect (cl-loop
+                               for x in item
+                               if (stringp x)
+                                 collect (funcall replace-fun x)
+                               else
+                                 collect x)
+                    else
+                      collect item)))
+
+        (defun project-org-capture+ ()
+          "`org-capture' wrapper which includes project specific capture templates."
+          (interactive)
+          (require 'org-capture)
+          (let* ((root (ignore-errors (project-current-root+)))
+                 (org-capture-templates-contexts
+                  (append (or (and root
+                                   project-org-capture-templates-contexts+)
+                              org-capture-templates-contexts)))
+                 (org-capture-templates
+                  (append org-capture-templates
+                          (when root
+                            (project-org-capture-templates+
+                             (file-name-base (s-chop-suffix "/" root)) root)))))
+            (call-interactively +org-capture-function)))
+
+        (defun project-org-project-file+ (&optional arg)
+          (interactive "P")
+          (find-file
+           (if-let ((cands (let ((default-directory project-org-projects-directory+))
+                             (cl-loop for file in (cl-remove-if
+                                                   (apply-partially #'string-match-p +find-file-ignore-regexp)
+                                                   (append (file-expand-wildcards "*.org")))
+                                      collect (cons file (concat default-directory "/" file))))))
+               (or (and (not arg)
+                        (when-let* ((current-project (project-project-name))
+                                    (current-project (unless (string-equal current-project "-")
+                                                       current-project)))
+                          (alist-get (concat current-project ".org") cands nil nil #'string-equal)))
+                   (alist-get
+                    (completing-read
+                     "Find file: " (lambda (string predicate action)
+                                     (if (eq action 'metadata)
+                                         '(metadata (category . file))
+                                       (complete-with-action action cands string predicate)))
+                     nil t)
+                    cands nil nil #'string-equal))
+             (user-error "No project org files have been found at %s" project-org-projects-directory+))))
+
+        :general
+        ([remap org-capture]          'project-org-capture+
+         [remap consult-org-capture+] 'project-org-capture+))
+    #+end_src
 
 ** projectile
    Project management in style.
@@ -5699,14 +5805,12 @@
              (mkdir dir t))))
 
        :config
-       (require '+projectile-project-types)
-
        (defun projectile-ensure-no-trailing-slash-in-root (func &rest args)
          (cl-letf* (((symbol-function 'true-projectile-project-root)
                      (symbol-function 'projectile-project-root))
                     ((symbol-function 'projectile-project-root)
                      (lambda (&rest args)
-                       ;; TODO maybe don't hardcode file name seperator
+                       ;; TODO maybe don't hardcode file name seperator.
                        (string-remove-suffix "/"
                                              (apply 'true-projectile-project-root args)))))
            (apply func args)))
@@ -5742,84 +5846,9 @@
        (advice-add 'projectile-compile-project :around #'projectile-compile--double-prefix-means-run-comint)
        (advice-add 'projectile-test-project    :around #'projectile-compile--double-prefix-means-run-comint)
 
-       (defvar projectile-org-capture-templates+ nil)
-       (defvar projectile-org-capture-templates-contexts+ nil)
-
-       (defun projectile-org-capture-templates+ (name root)
-         "Adapted from `counsel-projectile-org-capture'."
-         (cl-loop
-          with replace-fun = `(lambda (string)
-                                (replace-regexp-in-string
-                                 "\\${[^}]+}"
-                                 (lambda (s)
-                                   (pcase s
-                                     ("${root}" ,root)
-                                     ("${name}" ,name)))
-                                 string))
-          for template in projectile-org-capture-templates+
-          collect (cl-loop
-                   for item in template
-                   if (= (cl-position item template) 1) ;; template's name
-                   collect (funcall replace-fun item)
-                   else if (= (cl-position item template) 3) ;; template's target
-                   collect (cl-loop
-                            for x in item
-                            if (stringp x)
-                            collect (funcall replace-fun x)
-                            else
-                            collect x)
-                   else
-                   collect item)))
-
-       (defun projectile-org-capture+ ()
-         "`org-capture' wrapper which includes project specific capture templates."
-         (interactive)
-         (require 'org-capture)
-         (let* ((root (ignore-errors (projectile-project-root)))
-                (name (projectile-project-name))
-                (org-capture-templates-contexts
-                 (append (when root
-                           projectile-org-capture-templates-contexts+)
-                         org-capture-templates-contexts))
-                (org-capture-templates
-                 (append org-capture-templates
-                         (when root
-                           (projectile-org-capture-templates+ name root)))))
-           (call-interactively
-            (cond ((package! :consult)
-                   'consult-org-capture+)
-                  (t 'org-capture)))))
-
-       (defun projectile-org-project-file+ (&optional arg)
-         (interactive "P")
-         (find-file
-          (if-let ((cands (let ((default-directory projectile-org-projects-directory+))
-                            (cl-loop for file in (cl-remove-if
-                                                  (apply-partially #'string-match-p +find-file-ignore-regexp)
-                                                  (append (file-expand-wildcards "*.org")))
-                                     collect (cons file (concat default-directory "/" file))))))
-              (or (and (not arg)
-                       (when-let* ((current-project (projectile-project-name))
-                                   (current-project (unless (string-equal current-project "-")
-                                                      current-project)))
-                         (alist-get (concat current-project ".org") cands nil nil #'string-equal)))
-                  (alist-get
-                   (completing-read
-                    "Find file: " (lambda (string predicate action)
-                                    (if (eq action 'metadata)
-                                        '(metadata (category . file))
-                                      (complete-with-action action cands string predicate)))
-                    nil t)
-                   cands nil nil #'string-equal))
-            (user-error "No project org files have been found at %s" projectile-org-projects-directory+))))
-
        :general
        (:keymaps 'projectile-mode-map
-        [remap org-capture]          'projectile-org-capture+
-        [remap counsel-org-capture]  'projectile-org-capture+
-        [remap consult-org-capture+] 'projectile-org-capture+
-
-        ;; Override project.el bindings.
+        ;; Override `project' bindings.
         [remap project-shell-command] 'projectile-run-shell-command-in-root
         [remap project-async-shell-command] 'projectile-run-async-shell-command-in-root
         [remap project-switch-project] 'projectile-switch-project
@@ -5832,7 +5861,6 @@
 
        :leader
        (:prefix "p"
-        "" '(:ignore t :wk "projectile")
         "TAB" 'projectile-find-other-file
         "RET" 'projectile-toggle-between-implementation-and-test
         "DEL" 'projectile-invalidate-cache
@@ -5862,108 +5890,28 @@
    #+END_SRC
 
 *** project-types
-    :PROPERTIES:
-    :header-args+: :tangle (lisp! "+projectile-project-types.el")
-    :END:
-
-    #+begin_src emacs-lisp
-      (require 'projectile)
-    #+end_src
-
     #+BEGIN_SRC emacs-lisp
-      (projectile-register-project-type 'rake '("rakefile")
-                                        :compile "rake build"
-                                        :test    "rake test"
-                                        :run     "rake run"
-                                        :test-suffix ".spec")
+      (use-package projectile
+        :config
+        (projectile-register-project-type 'rake '("rakefile")
+         :compile "rake build"
+         :test    "rake test"
+         :run     "rake run"
+         :test-suffix ".spec")
 
-      (projectile-register-project-type 'pipenv '("Pipfile")
-                                        :test "pipenv py -m pytest")
+        (projectile-update-project-type 'gradle
+         :marker-files '("build.gradle" "build.gradle.kts")
+         :run "gradle run")
 
-      (projectile-register-project-type 'make '("Makefile")
-                                        :compile "make"
-                                        :install "make install"
-                                        :run     "make run"
-                                        :test    "make test")
+        (projectile-update-project-type 'make :run "make run")
+        (projectile-update-project-type 'gradlew :run "./gradlew run")
+        (projectile-update-project-type 'go :run "go run")
+        (projectile-update-project-type 'haskell-stack :run "stack run")
 
-      ;; see: https://github.com/bbatsov/projectile/blob/master/projectile.el#L2636
-      (projectile-register-project-type 'gradle '("build.gradle.kts")
-                                        :run     "gradle run"
-                                        :compile "gradle build"
-                                        :test    "gradle test"
-                                        :test-suffix "Spec")
-
-      (projectile-register-project-type 'gradlew '("gradlew")
-                                        :run     "./gradlew run"
-                                        :compile "./gradlew build"
-                                        :test    "./gradlew test"
-                                        :test-suffix "Spec")
-
-      (projectile-register-project-type 'golang '("go.mod")
-                                        :run     "go run"
-                                        :compile "go build"
-                                        :test    "go test"
-                                        :test-suffix "_test")
-
-      (projectile-register-project-type 'cmake '("CMakeLists.txt")
-                                        :project-file "CMakeLists.txt"
-                                        :compilation-dir "build"
-                                        :test "ctest"
-                                        :configure "cmake %s -B %s"
-                                        :run     "cmake --build . --target run"
-                                        :compile "cmake --build ."
-                                        :install "cmake --build . --target install"
-                                        :package "cmake --build . --target package")
+        (projectile-update-project-type 'cmake
+         :compilation-dir "build"
+         :run "cmake --build . --target run"))
     #+END_SRC
-
-    #+begin_src emacs-lisp
-      (provide '+projectile-project-types)
-    #+end_src
-
-*** projectile-commands
-    :PROPERTIES:
-    :header-args+: :tangle (lisp! "+projectile-commands.el")
-    :END:
-
-    #+BEGIN_SRC emacs-lisp :tangle yes
-      (use-package +projectile-commands
-        :commands (projectile-show-and-copy-project-dir
-                   project-has-file-p
-                   when-project-has-file-p)
-        :leader
-        ("py" 'projectile-show-and-copy-project-dir))
-    #+END_SRC
-
-    #+begin_src emacs-lisp
-      (require 'projectile)
-    #+end_src
-
-    #+BEGIN_SRC emacs-lisp :tangle (lisp! "+projectile-commands.el")
-      (defun projectile-show-and-copy-project-dir (&optional prefix)
-        (interactive "P")
-        (if (not (projectile-project-p))
-            (message "you're not currently in a project")
-          (let ((path (projectile-project-root)))
-            (when prefix
-              (if (and (consp prefix) (eq (car prefix) 4))
-                  (insert path)
-                (save-excursion
-                  (insert path))))
-            (message (abbreviate-file-name path))
-            (kill-new path))))
-
-      (defun project-has-file-p (&rest files)
-        (let ((project-dir (projectile-project-p)))
-          (and project-dir
-               (cl-loop
-                for file in files
-                when (file-exists-p (concat project-dir file))
-                return t))))
-    #+END_SRC
-
-    #+begin_src emacs-lisp
-      (provide '+projectile-commands)
-    #+end_src
 
 *** project-integration
     Built-in =project.el= integration courtesy of [[https://github.com/bbatsov/projectile/issues/1591#issuecomment-895111852][@wurosh]].
@@ -12656,10 +12604,8 @@
 
      #+begin_src emacs-lisp :tangle (package-yes! :consult)
        (autoload 'consult-org-capture+ "+consult-custom.el" nil t)
-       (setq org-roam-capture-function 'consult-org-capture+)
-
-       (general-define-key
-        [remap org-capture] 'consult-org-capture+)
+       (setq +org-capture-function 'consult-org-capture+)
+       ;; (general-define-key [remap org-capture] 'consult-org-capture+)
      #+end_src
 
      #+BEGIN_SRC emacs-lisp
@@ -20361,7 +20307,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (setq
-       projectile-org-capture-templates+
+       project-org-capture-templates+
        (doct `(("[${name}] Task"
                 :keys "p"
                 :template ("* TODO %?"
@@ -21182,6 +21128,7 @@
          :commands org-roam-rg
          :preface
          (setq org-roam-v2-ack t)
+         (defvaralias 'org-roam-capture-function '+org-capture-function)
 
          :custom
          (org-roam-prefer-id-links t)
