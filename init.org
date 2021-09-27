@@ -77,6 +77,7 @@
          ;; command-log-mode                                               ; Echo commands as you enter them
          dashboard                                                         ; A feature full emacs dashboard
          ;; deft                                                           ; Note management system based on multiple org files
+         ;; ebdb                                                           ; A contact management database for emacs
          ;; ebuku                                                          ; Interface to the, ebuku, bookmark manager
          engine-mode                                                       ; Run a search on a given search engine and view in brower
          ;; eshell                                                         ; A nice lispy shell
@@ -12724,6 +12725,66 @@
        (add-to-list 'embark-keymap-alist '(org-capture . embark-org-capture-completion-actions+))
      #+END_SRC
 
+**** consult-ebdb
+     #+begin_src emacs-lisp :tangle (package-yes! :consult ebdb)
+       (autoload 'consult-ebdb-display-records+ "+consult-custom.el" nil t)
+       (autoload 'consult-ebdb-mail+ "+consult-custom.el" nil t)
+       (autoload 'consult-ebdb-cite-records-mail+ "+consult-custom.el" nil t)
+       (autoload 'embark-ebdb-completion-actions+ "+consult-custom.el")
+
+       (leader-set-keys "ak" '(consult-ebdb-display-records+ :wk "consult-ebdb"))
+     #+end_src
+
+     #+begin_src emacs-lisp
+       (defun consult-ebdb-cands+ ()
+         (require 'ebdb)
+         (mapcar
+          ;; This same lambda is used in `ebdb-counsel'.
+          (lambda (rec)
+            (let* ((rec-string (ebdb-string rec))
+                   (mails (ebdb-record-mail-canon rec))
+                   (mail-list (when mails
+                                (mapconcat #'identity mails " "))))
+              (cons (if mail-list
+                        (concat rec-string " => " mail-list)
+                      rec-string)
+                    rec)))
+          (ebdb-records)))
+
+       (defun consult-ebdb-read+ ()
+         (if-let ((cands (consult-ebdb-cands+)))
+             (cdr
+              (assoc
+               (completing-read "Records: "
+                                (lambda (str pred action)
+                                  (if (eq action 'metadata)
+                                      '(metadata (category . ebdb))
+                                    (complete-with-action action cands str pred))))
+               cands))
+           (user-error "No ebdb candidates found.")))
+
+       (defmacro consult-ebdb-define-cmd+ (cmd)
+         `(defun ,(intern (concat "consult-" (symbol-name cmd) "+")) (rec)
+            (interactive (list (consult-ebdb-read+)))
+            (,cmd rec)))
+
+       (defun consult-ebdb-display-records+ (rec)
+         (interactive (list (consult-ebdb-read+)))
+         (ebdb-display-records (list rec) nil t))
+       (consult-ebdb-define-cmd+ ebdb-mail)
+       (consult-ebdb-define-cmd+ ebdb-cite-records)
+     #+end_src
+
+     #+begin_src emacs-lisp
+       (embark-define-keymap embark-ebdb-completion-actions+
+         "Embark bindings for ebdb."
+         ("g" consult-org-capture-goto-target+)
+         ("c" consult-ebdb-mail+)
+         ("i" consult-ebdb-cite-records+))
+
+       (add-to-list 'embark-keymap-alist '(ebdb . embark-ebdb-completion-actions+))
+     #+end_src
+
 **** consult-extensions-eob
      #+BEGIN_SRC emacs-lisp
        (provide '+consult-custom)
@@ -15086,6 +15147,9 @@
        (defface notmuch-search-H-face+ '((t (:foreground "#FF6EB4")))
          "Face for lines tagged H in the `notmuch-search-mode' buffer.")
 
+       :init
+       (set-company-backend! 'notmuch-message-mode 'notmuch-company)
+
        :config
        (evil-set-initial-state 'notmuch-show-mode 'motion)
        (evil-set-initial-state 'notmuch-search-mode 'motion)
@@ -15178,6 +15242,10 @@
        (:keymaps '(notmuch-hello-mode-map
                    notmuch-show-mode-map)
         [remap quit-buffer] 'notmuch-bury-or-kill-this-buffer)
+       (:keymaps 'notmuch-hello-mode-map
+        :states 'normal
+        ;; Don't need macros in notmuch-hello mode.
+        "q" 'quit-window)
 
        (:keymaps 'notmuch-show-mode-map
         :states 'motion
@@ -15364,6 +15432,151 @@
         "t" '(:ignore t :wk "toggle")
         "to" 'notmuch-search-toggle-order))
    #+END_SRC
+
+** ebdb
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! ebdb)
+   :END:
+   A rewrite of [[https://www.jwz.org/bbdb/#:~:text=The%20Insidious%20Big%20Brother%20Database&text=BBDB%20is%20a%20rolodex%2Dlike,%2DE%2C%20and%20RMAIL.)&text=It%20also%20does%20a%20good,someone's%20email%20address%20has%20changed.][the insidious big brother database]] aiming at better performance and
+   reliability.
+
+   #+begin_src emacs-lisp
+     (use-package ebdb
+       :straight t
+       :custom
+       (ebdb-mua-auto-update-p 'existing
+        "Disable to prevent EBDB from interfering with mail dispatch.")
+       (ebdb-complete-mail nil
+        "I prefer `company-edbd' over replacing capf or rebinding TAB.")
+       (ebdb-save-on-exit t)
+
+       :config
+       ;; I have a main contacts database and may have several other databases as well.
+       (let ((default-directory (join-path (xdg-documents-dir) "contacts" "database")))
+         (mkdir default-directory t)
+
+         (setq ebdb-sources (seq-uniq
+                             (append (list (join-path default-directory "main.el"))
+                                     (file-expand-wildcards "*.el" t))
+                             #'string-equal)))
+
+       :init
+       (with-eval-after-load 'notmuch
+         (require 'ebdb-notmuch)
+         (remove-hook 'notmuch-show-mode-hook #'ebdb-insinuate-notmuch)
+         (leader-set-keys-for-major-mode 'notmuch-show-mode
+           ";" ebdb-mua-keymap))
+
+       ;; Override the default keymap for ebdb-mua.
+       (defvar ebdb-mua-keymap (make-sparse-keymap))
+
+       :config
+       ;; Erase the default ebdb mode map.
+       (setq ebdb-mode-map (make-sparse-keymap))
+
+       :leader
+       ("aK" '(ebdb-display-all-records :wk "ebdb"))
+       (:mode 'ebdb-mode
+        "m" 'ebdb-toggle-record-mark
+        "u" 'ebdb-unmark-all-records
+        "e" 'ebdb-edit-foo
+        "F" 'ebdb-toggle-all-records-format
+        "f" 'ebdb-format-these-records
+        "l" 'ebdb-cite-records-ebdb                                                  ; Generate a link to the list of records in different formats
+        "C" 'ebdb-mail-each
+        "c" 'ebdb-mail
+        "o" 'ebdb-omit-records
+        "." 'ebdb-reformat-records
+        "w" 'ebdb-save-ebdb
+        "," 'ebdb-toggle-records-format
+        "d" 'ebdb-clone-buffer
+        "r" 'ebdb-move-records
+        "R" 'ebdb-reload-database
+        "p" 'ebdb-display-current-record
+        "P" 'ebdb-display-all-records
+
+        "y" '(:ignore t :wk "clone")
+        "yf" 'ebdb-copy-fields-as-kill
+        "ym" 'ebdb-copy-mail-as-kill
+        "yy" 'ebdb-copy-records-as-kill
+
+        "s" '(:ignore t :wk "search")
+        "si" 'ebdb-search-invert
+        "sx" 'ebdb-search-pop
+        "sc" 'ebdb-search-record-class
+        "sD" 'ebdb-search-database
+        "sa" 'ebdb-search-address
+        "se" 'ebdb-search-modified
+        "sd" 'ebdb-search-duplicates
+        "sm" 'ebdb-search-mail
+        "sn" 'ebdb-search-name
+        "so" 'ebdb-search-organization
+        "sp" 'ebdb-search-phone
+        "st" 'ebdb-search-tags
+        "sf" 'ebdb-search-user-fields
+        "ss" 'ebdb                                                                   ; Search regexp
+        "s1" 'ebdb-search-single-record)
+
+       :general
+       (:keymaps 'ebdb-mode-map
+        [remap evil-save] 'ebdb-save
+        "SPC" nil)
+       (:keymaps 'ebdb-mua-keymap
+        ";" 'ebdb-mua-display-all-records
+        "n" 'ebdb-mua-edit-sender-notes
+        "f" 'ebdb-mua-toggle-records-format
+        "c" 'ebdb-mua-update-records
+        "s" 'ebdb-mua-snarf-article
+        "o" 'ebdb-mua-in-ebdb-buffer)
+       (:keymaps 'ebdb-mode-map
+        :states 'motion
+        "TAB" 'ebdb-next-field
+        "<backtab>" 'ebdb-prev-field
+        "RET" 'ebdb-record-action
+
+        ;; Unbound:
+        ;;   ebdb-edit-field-customize
+        ;;   ebdb-create-record-and-role
+        ;;   ebdb-format-to-tmp-buffer
+        ;;   ebdb-info
+        ;;   ebdb-dial
+        ;;   ebdb-copy-records
+        ;;   ebdb-disable-database
+        ;;   ebdb-customize-database
+        "a" 'ebdb-mail-aliases
+        "c" 'ebdb-create-record
+        "C" 'ebdb-create-record-extended
+        "e" 'ebdb-edit-field
+        "i" 'ebdb-insert-field
+        "x" 'ebdb-delete-field-or-record
+
+        "gj" 'ebdb-next-record
+        "gk" 'ebdb-prev-record))
+   #+end_src
+
+*** company-ebdb                                                       :comp:
+    #+begin_src emacs-lisp
+      (use-package company-ebdb
+        :straight t
+        :init
+        (set-company-backend! 'notmuch-message-mode
+          '(company-ebdb notmuch-company))
+
+        :config
+        (setq company-backends (remove 'company-ebdb company-backends))
+
+        :custom (company-ebdb-pop-up nil "Prefer `company-doc-buffer'.")
+        :config
+        (advice-add 'company-ebdb :before-until
+                    (defun company-ebdb-doc-buffer+ (command &optional arg &rest args)
+                      (when (eq command 'doc-buffer)
+                        (let* ((bits (ebdb-decompose-ebdb-address arg))
+                               (recs (ebdb-message-search (car bits) (nth 1 bits))))
+                          (when recs
+                            (save-window-excursion
+                              (ebdb-display-records recs)
+                              (window-buffer))))))))
+    #+end_src
 
 ** olivetti
    A nice writing environment for emacs :)
@@ -22165,4 +22378,4 @@
 #  LocalWords:  alltheicon ebuku DuckDuckGo ggtags parsers ctags magit rebase scrapy
 #  LocalWords:  neotree olivetti pdftools skeletor Makefile golang gradle lua xml ql
 #  LocalWords:  hindent powershell contrib orgit fragtog vscode css haskell nimlsp
-#  LocalWords:  gitattributes gitconfig yapfify makefile
+#  LocalWords:  gitattributes gitconfig yapfify makefile citeproc ebdb
