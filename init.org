@@ -18971,7 +18971,7 @@
        :hook ((latex-mode . display-line-numbers-mode)
               (latex-mode . +flylint))
        :custom
-       (TeX-electric-math '("$" . "$"))
+       (TeX-electric-math '("\\( " . " \\)"))
        (TeX-auto-save  t)
        (TeX-parse-self t)
        (TeX-source-correlate-start-server t)
@@ -19001,16 +19001,22 @@
        (unless (file-exists-p TeX-auto-local)
          (mkdir TeX-auto-local t))
 
-     ;; Show process output buffer on error.
+       ;; Show process output buffer on error.
        (advice-add 'TeX-command-sentinel :after
                    (defun TeX-process-error-handler+ (p _msg)
                      (unless (zerop (process-exit-status p))
-                       (TeX-recenter-output-buffer nil))))
+                       (let* ((buf (TeX-active-buffer))
+                              (visible (get-buffer-window buf nil)))
+                         (TeX-recenter-output-buffer nil)
+                         (unless visible
+                           (TeX-pop-to-buffer (TeX-active-buffer)))))))
 
        ;; for some reason, focus switches back to tex buffer.
-       (advice-add 'TeX-recenter-output-buffer :after
-                   (defun TeX-recenter-focus (&rest _)
-                     (TeX-pop-to-buffer (TeX-active-buffer))))
+       (advice-add 'TeX-recenter-output-buffer :around
+                   (defun TeX-recenter-focus (func &rest args)
+                     (apply func args)
+                     (when (called-interactively-p 'interactive)
+                       (TeX-pop-to-buffer (TeX-active-buffer)))))
 
      ;;; Extend prettify-symbol symbols from `tex--prettify-symbols-alist'.
        (eval
@@ -19033,27 +19039,23 @@
       (use-package tex-site
         :straight auctex
         :hook ((latex-mode . TeX-fold-mode)
-               (latex-mode . TeX-PDF-mode)
-               (latex-mode . TeX-source-correlate-mode))
+               (latex-mode . TeX-source-correlate-mode)                               ; Lets your PDF-viewer open lines in emacs and the TeX-view command jump to lines in your viewer.
+               (latex-mode . TeX-PDF-mode))
         :config
       ;;; Command to insert a math symbol at point
-        (defvar LaTeX-math-menu)
-        (defun latex-insert-math-candidates+ ()
-          "Adapted from `helm-insert-latex-math'."
-          (cl-labels ((latex--math-collect (L)
-                        (cond ((vectorp L)
-                               (list (cons (aref L 0) (aref L 1))))
-                              ((listp L)
-                               (cl-loop for a in L nconc
-                                        (latex--math-collect a))))))
-            (latex--math-collect LaTeX-math-menu)))
-
         (defun latex-insert-math+ ()
           (interactive)
-          (let* ((cands (latex-insert-math-candidates+))
+          (let* ((cands (cl-labels ((latex--math-collect (L)
+                                      (cond ((vectorp L)
+                                             (list (cons (aref L 0) (aref L 1))))
+                                            ((listp L)
+                                             (cl-loop for a in L nconc
+                                                      (latex--math-collect a))))))
+                          (latex--math-collect LaTeX-math-menu)))
                  (cand (assoc (completing-read "Math symbol: " cands nil t) cands)))
             (call-interactively (cdr cand))))
 
+        :config
       ;;; Make latex automatically repeat the last run command
         (defvar-local TeX-command-last+ nil
           "The last command invoked by TeX in this buffer.")
@@ -19083,10 +19085,12 @@
                                      (yes-or-no-p (format "Save file %s?" buffer-file-name))))
                         (save-buffer))))
 
-      ;;; Setup the view command for latex
+        :config
         (when +TeX-view-in-emacs
-          (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer))
+          (add-hook 'TeX-after-compilation-finished-functions
+                    #'TeX-revert-document-buffer))
 
+        :config
         (with-eval-after-load 'tex
           (setq TeX-view-program-selection
                 (append (delq nil (list (when +TeX-view-in-emacs
@@ -19096,6 +19100,7 @@
                                         '(output-html "xopen")))                      ; prefer over xdg-open
                         TeX-view-program-selection)))
 
+        :config
       ;;; Fix annoying emacsclient issues with synctex
         ;; emacs isn't using the path for my server file and there's no way to specify
         ;; both the server TCP file and socket file, so let's just hack it into the editor
@@ -19103,6 +19108,7 @@
         (with-eval-after-load 'tex
           (push
            `("Zathura"
+             ;; Hit C-click in zathura to jump to a point in emacs.
              ("zathura %o"
               (mode-io-correlate
                ,(concat " --synctex-forward %n:0:\"%b\" -x \""
@@ -19119,11 +19125,17 @@
              "zathura")
            TeX-view-program-list))
 
-        (add-hook 'org-src-mode-hook
-                  (defun org-src-setup-auctex+ ()
-                    (when (eq major-mode 'latex-mode)
-                      (apply #'TeX-run-style-hooks
-                             (mapcar #'cadr org-latex-packages-alist)))))
+        :config
+        (defun org-src-setup-auctex+ ()
+          (when (eq major-mode 'latex-mode)
+            (apply #'TeX-run-style-hooks
+                   (mapcar #'cadr org-latex-packages-alist))))
+        (add-hook 'org-src-mode-hook #'org-src-setup-auctex+)
+
+        :hook (latex-mode . TeX-setup-next-error-function+)
+        :preface
+        (defun TeX-setup-next-error-function+ ()
+          (setq-local next-error-function 'TeX-next-error))
 
         :leader
         (:mode `(,@latex-modes+ org-mode)
