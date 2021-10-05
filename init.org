@@ -281,6 +281,35 @@
 
      (defvar +org-capture-function 'org-capture
        "Function to call to start an `org-capture' session.")
+
+     (defvar +mail-default-conf
+       `((user . "mohkale")
+         (host . "gmail.com")
+         (sent-dir . "local/Sent")
+         (signature-file . ,(etc! "signatures" "mohkale@kisara.moe"))
+         ;; SMTP configuration should match `smtpmail-multi-accounts'.
+         (smtp-host . "smtp.gmail.com")
+         (smtp-args . (587 header starttls nil nil nil)))
+       "Default configuration options for `+mail-conf'.")
+
+     (defvar +mail-conf
+       `((main
+          (user . "mohkale")
+          (host . "kisara.moe")
+          (sent-dir . "kisara/Sent")
+          (smtp-host . "kisara.moe"))
+         (work
+          (user . "mohkalex")
+          (sent-dir . "mohkalex/[Gmail]/Sent Mail")
+          (signature-file . ,(etc! "signatures" "mohkalex@gmail.com")))
+         (personal
+          (user . "mohkalsin")
+          (sent-dir . "mohkalsin/[Gmail]/Sent Mail")
+          (signature-file . ,(etc! "signatures" "mohkalex@gmail.com"))))
+       "The comprehensive mail configuration reference.
+     There's a bunch of different mail extensions I have setup and each
+     seem to redefine or re-reference the same core variables so I define
+     and reference them from this variable to minimise the duplication.")
    #+END_SRC
 
 ** require
@@ -457,6 +486,23 @@
               (t
                'flymake-mode))
         'toggle))
+   #+end_src
+
+   I manage mail configurations from the ~+mail-conf~ variable. Here I define some
+   helper methods to make accessing the configuration data in it much simpler.
+
+   #+begin_src emacs-lisp
+     (defun +mail-conf-get (key &optional conf)
+       (or (alist-get key conf)
+           (alist-get key +mail-default-conf)))
+
+     (defun +mail-conf-email (&optional conf)
+       (concat (+mail-conf-get 'user conf)
+               "@"
+               (+mail-conf-get 'host conf)))
+
+     (defun +mail-conf-from-header (&optional conf)
+       (concat user-full-name " <" (+mail-conf-email conf) ">"))
    #+end_src
 
    Lastly here's a little helper sourced from [[https://emacs.stackexchange.com/questions/16890/how-to-find-out-where-a-file-is-being-required][here]] which gives you a tree like
@@ -9609,7 +9655,9 @@
      (use-package message
        :custom
        (message-auto-save-directory (share! "messages/"))
-       (message-signature "Mohsin")
+       ;; (message-signature "Mohsin")
+       (message-signature-file (+mail-conf-get 'signature-file))
+       (message-kill-buffer-on-exit t)
 
        :leader
        ("ac" 'message-mail)
@@ -9662,19 +9710,21 @@
       (use-package smtpmail-multi
         :straight t
         :custom
-        (smtpmail-multi-default-account 'kisara)
         (send-mail-function 'smtpmail-multi-send-it)
         (message-send-mail-function 'smtpmail-multi-send-it)
-        (smtpmail-multi-associations
-         `((,(rx "mohkale@kisara.moe") kisara)
-           (,(rx "mohkalsin@gmail.com") mohkalsin)
-           (,(rx "mohkalex@gmail.com") mohkalex)))
 
-        :init
-        (setq smtpmail-multi-accounts
-              `((kisara . ("mohkale" "kisara.moe" 587 header starttls nil nil nil))
-                (mohkalsin . ("mohkalsin" "smtp.gmail.com" 587 header starttls nil nil nil))
-                (mohkalex . ("mohkalex" "smtp.gmail.com" 587 header starttls nil nil nil))))
+        (smtpmail-multi-default-account (caar +mail-conf))
+        (smtpmail-multi-associations
+         (cl-loop
+          for (it . conf) in +mail-conf
+          collect (list (regexp-quote (+mail-conf-email conf)) it)))
+        (smtpmail-multi-accounts
+         (cl-loop
+          for (it . conf) in +mail-conf
+          collect (cons it
+                        `(,(+mail-conf-get 'user conf)
+                          ,(+mail-conf-get 'smtp-host conf)
+                          ,@(+mail-conf-get 'smtp-args conf)))))
 
         (with-eval-after-load 'smtpmail
           (require 'smtpmail-multi)))
@@ -15109,10 +15159,13 @@
        ;; open.
        (setq notmuch-fcc-dirs
              (let ((default-directory (notmuch-database-path)))
-               `((,(rx "mohkalsin@gmail.com") . ,(expand-file-name "mohkalsin/[Gmail]/Sent Mail"))
-                 (,(rx "mohkalex@gmail.com") . ,(expand-file-name "mohkalex/[Gmail]/Sent Mail"))
-                 (,(rx "mohkale@kisara.moe") . ,(expand-file-name "kisara/Sent"))
-                 (,(rx any) . ,(expand-file-name "local/Sent")))))
+               (append
+                (cl-loop for (it . conf) in +mail-conf
+                         collect (cons
+                                  (regexp-quote (concat (+mail-conf-email conf)))
+                                  (expand-file-name
+                                   (+mail-conf-get 'sent-dir conf))))
+                `((,(rx any) . ,(expand-file-name (+mail-conf-get 'sent-dir)))))))
 
        (cl-defun notmuch-tag+ (tag-changes
                                &optional (next
@@ -15378,6 +15431,78 @@
         "t" '(:ignore t :wk "toggle")
         "to" 'notmuch-search-toggle-order))
    #+END_SRC
+
+*** gnus-alias
+    The [[https://notmuchmail.org/emacstips/#index16h2][recommended]] way to manage and interact with multiple accounts from notmuch.
+
+    #+begin_src emacs-lisp
+      (use-package gnus-alias
+        :straight t
+        :hook (message-setup . gnus-alias-determine-identity)
+        :custom
+        (gnus-alias-default-identity (symbol-name (caar +mail-conf)))
+        (gnus-alias-identity-alist
+         (cl-loop for (it . conf) in +mail-conf
+                  collect (list (symbol-name it)
+                                nil ; Does not refer to any other identity.
+                                (+mail-conf-from-header conf)
+                                nil ; No organization header
+                                nil ; No extra headers
+                                nil ; No extra body text
+                                (+mail-conf-get 'signature-file conf))))
+
+        (gnus-alias-allow-forward-as-reply t)
+
+        :leader
+        (:mode '(message-mode notmuch-message-mode)
+         "c" 'gnus-alias-select-identity)
+
+        :config
+        ;; Update the FCC header after an identity change (pretty much essential IMO).
+        (require 'notmuch-maildir-fcc)                                                ; Needed for fcc->identity association.
+
+        (advice-add 'gnus-alias-use-identity-1 :after
+                    (defun gnus-alias-use-identity-update-fcc+ (&rest _ignore)
+                      (save-excursion
+                        (gnus-alias-remove-header "FCC")
+                        (notmuch-fcc-header-setup))))
+
+        :config
+        (advice-add 'gnus-alias-identity-prompt :override
+                    (defun gnus-alias-identity-prompt+ ()
+                      (gnus-alias-ensure-message-mode)
+                      (let* ((identities (cl-loop for it in gnus-alias-identity-alist
+                                                  collect (cons (gnus-alias-get-from it)
+                                                                it)))
+                             (cands (mapcar #'car identities))
+                             (affixate
+                              (lambda (cands)
+                                (cl-loop for cand in cands
+                                         with signature = nil
+                                         do (setq signature (cadr (assoc cand identities)))
+                                         collect
+                                         (list cand ""
+                                               (concat (propertize " " 'display `(space :align-to (- right 1 ,(length signature))))
+                                                       (propertize signature 'face 'completions-annotations)))))))
+                        (cadr
+                         (assoc
+                          (completing-read "Identity: "
+                                           (lambda (str pred action)
+                                             (if (eq action 'metadata)
+                                                 `(metadata
+                                                   (affixation-function . ,affixate))
+                                               (complete-with-action action cands str pred))))
+                          identities)))))
+
+        :config
+        ;; Fix signature is read-only and can't be removed.
+        (advice-add 'gnus-alias-remove-sig :override
+                  (defun gnus-alias-remove-sig+ ()
+                    (gnus-alias-goto-sig)
+                    ;; Needed because delete-region can't delete signature, why?
+                    (delete-backward-char (current-column))
+                    (delete-region (point) (point-max)))))
+    #+end_src
 
 ** ebdb
    :PROPERTIES:
