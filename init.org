@@ -149,6 +149,7 @@
          ;; tree-sitter                                                    ; Incremental parsing of your source code asynchronously.
 
      ;;; Languages
+         ;; assembly
          bibtex
          c
          clojure
@@ -16854,6 +16855,39 @@
 
 * Languages
   [[*Extensions][Extensions]] providing tailored support for specific programming languages or tools.
+
+** assembly
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! assembly)
+   :END:
+   #+begin_src emacs-lisp
+     (use-package asm-mode
+       :hook (asm-mode . indent-tabs-mode)
+       :mode (rx "." (or "asl" "S" "s") eol)
+       :init
+       (push '(asm-mode . 8) +indent-config)
+
+       :preface
+       (defun asm-setup-imenu+ ()
+         (setq imenu-generic-expression
+               `(("label"
+                  ,(rx bol
+                       (group (one-or-more alnum))
+                       (zero-or-more space) ":")
+                  1))))
+       :hook (asm-mode . asm-setup-imenu+)
+
+       :config
+       (advice-add 'asm-colon :around
+                   (defun asm-colon-indent-space+ (func &rest args)
+                     (let ((indent-tabs-mode nil))
+                       (apply func args))))
+
+       :general
+       (:keymaps 'asm-mode-map
+        "<override-state>" 'all
+        "C-c ;" nil))
+   #+end_src
 
 ** awk
    #+BEGIN_SRC emacs-lisp
