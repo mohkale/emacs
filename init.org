@@ -13612,11 +13612,15 @@
    #+END_SRC
 
 ** edit-indirect
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! edit-indirect)
+   :END:
    Open regions of code in their own dedicated buffers, like org modes ~org-edit-special~.
 
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! edit-indirect)
+   #+BEGIN_SRC emacs-lisp
      (use-package edit-indirect
        :straight t
+       :leader ("bE" 'edit-indirect-region)
        :init
        (push `(,(rx bol "*edit-indirect ")
                 (display-buffer-reuse-window
@@ -13635,8 +13639,6 @@
         [remap evil-save-and-close] 'edit-indirect-commit
         [remap evil-quit-all-with-error-code] 'edit-indirect-abort)
 
-       :leader
-       ("be" 'edit-indirect-region)
        :lazy-leader
        (:mode 'edit-indirect--overlay
         :minor t
@@ -13645,6 +13647,36 @@
         "s" 'edit-indirect-save
         "q" 'edit-indirect-abort))
    #+END_SRC
+
+*** separedit
+    #+begin_src emacs-lisp
+      (use-package separedit
+        :straight t
+        :leader ("be" 'separedit)
+        :custom
+        (separedit-default-mode 'text-mode)
+        (separedit-code-block-default-mode 'text-mode)
+        (separedit-inhibit-edit-window-p nil)
+
+        :config
+        (push 'tree-sitter-hl-face:comment separedit-comment-faces)
+
+        :hook (separedit-buffer-creation . separedit-clear-header-line-format+)
+        :preface
+        (defun separedit-clear-header-line-format+ ()
+          (setq header-line-format nil))
+
+        :preface
+        (defvaralias 'separedit-write-file-when-execute-save '+indirect-edit-save-buffers)
+
+        :general
+        ;; I can't seem to bind for separedit-mode exclusively so I
+        ;; remap edit-indirect commands globally, should still work
+        ;; even when called through `edit-indirect-region'.
+        (;; :keymaps 'separedit-mode-map
+         [remap edit-indirect-commit] 'separedit-commit
+         [remap edit-indirect-save] 'separedit-save))
+    #+end_src
 
 ** browser-edit
    Invoke emacs-client from a browser... EPIC!!!
