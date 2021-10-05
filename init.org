@@ -8249,15 +8249,30 @@
    #+END_SRC
 
 ** electric-pair
-   Electric pair is a built in module which lets auto insert matching pairs. For example,
-   inserting a ( will lead to emacs auto inserting ).
+   Electric pair is a built in module which lets auto insert matching pairs.
+   For example, inserting a ~(~ will lead to emacs auto inserting ~)~.
 
    #+BEGIN_SRC emacs-lisp
      (use-package elec-pair
        :hook (emacs-startup . electric-pair-mode)
-       :config
-       (setq electric-pair-preserve-balance nil
-             electric-pair-skip-whitespace  nil))
+       :custom
+       (electric-pair-skip-whitespace nil)
+       (electric-pair-preserve-balance nil)
+
+       :custom (electric-pair-inhibit-predicate #'electric-pair-inhibit-p+)
+       :preface
+       (defvar electric-pair-skip-completion-categories+
+         '(environment-variable file)
+         "Completion categories under which electric-pair doesn't work.")
+
+       (defun electric-pair-inhibit-p+ (ch)
+         ;; Any of the following can prevent pairing.
+         (or
+          (when (minibufferp)
+            (member (alist-get 'category (+completion-metadata))
+                    electric-pair-skip-completion-categories+))
+          ;; Respect the default inhibition predicate.
+          (electric-pair-default-inhibit ch))))
    #+END_SRC
 
 ** electric-indent
