@@ -850,8 +850,10 @@
 
    #+BEGIN_SRC emacs-lisp
      (setq straight-use-package-by-default nil
-           use-package-always-ensure       nil
-           use-package-always-defer        t
+           use-package-always-ensure nil
+           use-package-always-defer t
+           ; straight-recipes-gnu-elpa-use-mirror nil
+           ; straight-recipes-emacsmirror-use-mirror nil
            straight-allow-recipe-inheritance t
            straight-disable-native-compile nil
            straight-process-buffer " *straight*"
@@ -938,7 +940,6 @@
              delete-by-moving-to-trash t                                            ; don't rm, trash my garbage please :)
              search-whitespace-regexp nil                                           ; SPC means SPC, not any amount of spaces
              enable-local-variables t                                               ; allow safe variables, even alongside unsafe ones
-             hl-line-sticky-flag nil                                                ; only highlight line in active window
              auto-save-interval 50                                                  ; auto-save as frequently as possible
              backup-by-copying t                                                    ; don't clobber symlinks
              kill-whole-line t                                                      ; kill-line includes eol
@@ -1389,7 +1390,8 @@
          "api" 'straight-use-package
          "apU" 'straight-pull-all
          "apu" 'straight-pull-package-and-deps
-         "apf" 'straight-fetch-all
+         "apf" 'straight-fetch-package-and-deps
+         "apF" 'straight-fetch-all
          "apx" 'straight-prune-build
          "apR" 'straight-rebuild-all
          "apr" 'straight-rebuild-package
@@ -1549,7 +1551,6 @@
          "f" '(:ignore t :wk "files/frames")
          "ff" 'find-file
          "fc" 'copy-file
-         "fo" 'find-file-other-window
          "fh" 'find-file-at-point
          "f\"" 'recover-this-file
          "f'" 'recover-file
@@ -2433,7 +2434,9 @@
              (and (boundp 'org-capture-mode)
                   (buffer-file-name (org-capture-get :buffer t)))
              (and (boundp 'org-src-mode)
-                  (bound-and-true-p org-src-source-file-name)))))
+                  (bound-and-true-p org-src-source-file-name))
+             (and (derived-mode-p 'notmuch-show-mode)
+                  (notmuch-show-get-filename)))))
 
      (defmacro defun-show-and-copy-command (name &rest body)
        "Define a function which uses BODY to generate a string which is then shown and copied.
@@ -2461,6 +2464,9 @@
 
      (defun-show-and-copy-command buffer-file-name
        (smart-buffer-file-name))
+
+     (defun-show-and-copy-command buffer-name
+       (buffer-name))
 
      (defun-show-and-copy-command directory
        (file-name-directory (or (smart-buffer-file-name) default-directory)))
@@ -2520,12 +2526,11 @@
        "fa" 'write-autosave
        "fD" 'delete-buffer-file
        "fR" 'rename-buffer-file
+       "by" 'show-and-copy-buffer-name
        "fy" 'show-and-copy-buffer-file-name
        "fu" 'show-and-copy-directory
        "f%" 'show-and-copy-buffer-file-basename
-       "bh" '(goto-home-buffer+ :wk "switch-to-home")
-       ;; "fo" 'open-file-or-directory-in-external-app ;; TODO implement
-       )
+       "bh" '(goto-home-buffer+ :wk "switch-to-home"))
    #+END_SRC
 
 ** whitespace
@@ -3263,12 +3268,11 @@
          :general
          (:keymaps 'emacs-window-map
           "T"   'force-set-all-visible-windows-dedication+
-          "O"   'display-last-buffer+
+          "o"   'other-window
           "M-o" 'display-last-buffer+
+          "C-o" 'vertical-display-last-buffer+
           "SPC" 'set-window-dedication+
-          "M-d" 'set-window-dedication+
-          "o"   'vertical-display-last-buffer+
-          "C-o" 'vertical-display-last-buffer+)
+          "M-d" 'set-window-dedication+)
          :leader
          ("ft" 'find-temp-file+))
     #+END_SRC
@@ -4012,6 +4016,7 @@
        :straight t
        :custom
        (evil-cross-lines t)
+       (evil-start-of-line nil)
        (evil-default-state 'motion)
        (evil-want-C-i-jump nil)
        (evil-want-C-u-scroll t)
@@ -4504,9 +4509,7 @@
          "gd" 'evil-downcase
          "g@" 'what-cursor-position
          "ga" 'evil-fill-and-move
-         "g-" 'evil-indent
-         "<C-return>" 'xref-find-definitions
-         "M-RET" 'xref-find-definitions-other-window)
+         "g-" 'evil-indent)
         (:states '(normal motion)
          ;; Y = yy is easy   to press
          ;; Y = y$ is harder to press
@@ -4518,6 +4521,7 @@
          "M-k" nil
          "C-d" nil
          "C-t" nil
+         "C-@" nil
 
          "<tab>"           'indent-for-tab-command
          "TAB"             "<tab>"
@@ -5031,6 +5035,7 @@
        :straight t
        :commands (all-the-icons--insert-all-icons
                   all-the-icons-family+)
+       :leader ("ii" 'all-the-icons-insert)
 
        :custom
        (inhibit-compacting-font-caches t)
@@ -5112,9 +5117,8 @@
                             collect (cons (substring name ,(1+ (length family)))
                                           icon))))
 
-               (all-the-icons-define-icon ,name ,font-alist ,nerd-family
-                 ;; The font on my linux machine, maybe needs updating depending on platform
-                 "Symbols-2048-em Nerd Font Complete.ttf"))))
+               ;; The font on my linux machine, maybe needs updating depending on platform
+               (all-the-icons-define-icon ,name ,font-alist ,nerd-family "Symbols Nerd Font"))))
 
         (dolist (it nerd-fonts-families+)
           (eval
@@ -5200,21 +5204,24 @@
    #+BEGIN_SRC emacs-lisp
      (use-package browse-url
        :straight t
-       :commands (xopen-url+
-                  xopen-pdf+)
        :init
-       (advice-add #'browse-url-xdg-open :override #'xopen-url+)
+       (advice-add #'browse-url-xdg-open :override #'+xopen-url)
        (advice-add #'browse-url-can-use-xdg-open :override
                    (defun browse-url-prefer-xopen+ ()
-                     (and (or (getenv "DISPLAY") (getenv "WAYLAND_DISPLAY"))
+                     (and (or (getenv "DISPLAY")
+                              (getenv "WAYLAND_DISPLAY"))
                           (executable-find "xopen"))))
+       (advice-add #'consult-file-externally :override #'+xopen-url)
 
+       :leader ("fo" '+xopen-url)
        :config
-       (defun xopen-url+ (url &optional arg)
+       (defun +xopen-url (url &optional arg)
          "Open visited file in default external program.
      When in dired mode, open file under the cursor.
      With a prefix ARG always prompt for command to use."
-         (interactive "fOpen file: \nP")
+         (interactive (list (or (smart-buffer-file-name)
+                                (user-error "Cannot determine file name for buffer."))
+                            current-prefix-arg))
          (unless url
            (setq url (if (eq major-mode 'dired-mode)
                          (dired-get-file-for-visit)
@@ -5227,12 +5234,15 @@
                             (read-shell-command "Open current file with: ")
                           "xopen")))
            (call-process program nil 0 nil url)))
+       :commands +xopen-url
 
-       (defun xopen-pdf+ (path page)
+       :config
+       (defun +xopen-pdf (path page)
          (if (and (not (string-empty-p page))
                   (executable-find "zathura"))
              (call-process "zathura" nil 0 nil path "--page" page)
-           (xopen-url+ path))))
+           (+xopen-url path)))
+       :commands +xopen-pdf)
    #+END_SRC
 
 ** buffer-move
@@ -5982,7 +5992,10 @@
           (let ((root (project-root project)))
             ;; Make paths absolute and ignore the optional dirs argument, see [[https://github.com/bbatsov/projectile/issues/1591#issuecomment-896423965][here]].
             (mapcar (apply-partially #'concat root)
-                    (projectile-project-files root)))))
+                    (projectile-project-files root))))
+
+        (cl-defmethod project-buffers ((project (head projectile)))
+          (projectile-project-buffers (project-root project))))
     #+end_src
 
 ** real-auto-save-mode
@@ -6273,11 +6286,16 @@
    package used by ~magit~ for controlling emacsclient.
 
    #+BEGIN_SRC emacs-lisp
-     (with-eval-after-load 'with-editor
-       (leader-with-prefix leader-major-mode-prefix
-         (leader-set-keys-for-mode 'with-editor-mode
-           ","  'with-editor-finish
-           "q"  'with-editor-cancel)))
+     (use-package with-editor
+       :config
+       (add-hook 'vterm-mode-hook 'with-editor-export-editor)
+
+       :lazy-leader
+       (:mode 'with-editor-mode
+        :minor t
+        :prefix leader-major-mode-prefix
+        ","  'with-editor-finish
+        "q"  'with-editor-cancel))
     #+END_SRC
 
 ** winum
@@ -6378,7 +6396,8 @@
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package +yas-license
-        :commands +insert-license
+        :commands (+insert-license
+                   +project-license)
         :leader
         ("ih" '+insert-license))
     #+END_SRC
@@ -6413,26 +6432,23 @@
                               "*.license"))
          collect (cons (file-name-base file) file)))
 
-      (defun +license-read-license ()
-        (let ((licenses (+license-licenses +license-dir))
-              license)
+      (defun +license-read-license (&optional prompt)
+        (let ((licenses (+license-licenses +license-dir)))
           (when (zerop (length licenses))
             (error "No licenses found in dir: %s" default-directory))
 
-          (setq license
-                (if (eq 1 (length licenses))
-                    (car licenses)
-                  (assoc (completing-read "License: " licenses nil t) licenses)))
+          (if-let ((license (if (eq 1 (length licenses))
+                                (car licenses)
+                              (assoc (yas-completing-read
+                                      (or prompt "License: ")
+                                      licenses nil t)
+                                     licenses))))
+              (with-temp-buffer
+                (insert-file-contents-literally (cdr license))
+                (cons (car license)
+                      (buffer-substring (point-min) (point-max))))
+            (cons "" ""))))
 
-          (with-temp-buffer
-            (insert-file-contents (cdr license))
-            (cons (car license)
-                  (buffer-substring (point-min) (point-max))))))
-    #+end_src
-
-    Expand and insert a chosen license into the current buffer at point.
-
-    #+BEGIN_SRC emacs-lisp
       (defun +license-comment-template (template &optional prefix)
         (save-vars-with-temp-buffer!
             (comment-start comment-end comment-style
@@ -6440,14 +6456,30 @@
           (insert template)
           (comment-region (point-min) (point-max) prefix)
           (buffer-substring (point-min) (point-max))))
+    #+end_src
 
+        Fetch the license for the current project, used for auto-insert snippets.
+
+    #+begin_src emacs-lisp
+      (defun +license-project-license ()
+        (if-let* ((default-directory (project-current-root+))
+                  (license (cl-find-if #'file-exists-p '("LICENSE"))))
+            (with-temp-buffer
+              (insert-file-contents-literally license)
+              (buffer-substring (point-min) (point-max)))
+          (cdr (+license-read-license "No project license found, pick one: "))))
+    #+end_src
+
+    Expand and insert a chosen license into the current buffer at point.
+
+    #+BEGIN_SRC emacs-lisp
       (defun +insert-license (license)
         "Insert a license from the known license list.
       with PREFIX, repeats insertion of the last inserted license."
         (interactive
-         (list (or (and current-prefix-arg +license-last-inserted)
-                   (+license-read-license)))
-         "P")
+         (list (or (and current-prefix-arg
+                        +license-last-inserted)
+                   (+license-read-license))))
         (let ((comment-multi-line t))
           (yas-expand-snippet
            (+license-comment-template (cdr license))
@@ -6826,7 +6858,7 @@
        (defmacro autoinsert-register-yas+ (regex mode uuid)
          `(with-eval-after-load 'autoinsert
             (define-auto-insert ,regex
-              '(lambda () (autoinsert-expand-yas+ ,mode ,uuid)))))
+              (lambda () (autoinsert-expand-yas+ ,mode ,uuid)))))
 
        :config
        (require 'yasnippet)
@@ -7162,10 +7194,10 @@
         (defun display-compilation-buffer ()
           (interactive)
           (if-let ((buffer (next-error-find-buffer)))
-              (display-buffer buffer
-                              '(nil
-                                (body-function . select-window)
-                                (reusable-frames . nil)))
+              (select-window
+               (display-buffer buffer
+                               '(nil
+                                 (reusable-frames . nil))))
             (user-error "Could not determine compilation-buffer.")))
 
         (defun +set-compilation-bindings (mode map)
@@ -7532,11 +7564,12 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package abbrev
-       :hook ((org-mode . abbrev-mode)
-              (TeX-mode . abbrev-mode)
-              (LaTeX-mode . abbrev-mode)
-              (git-commit-mode . abbrev-mode)
-              (lisp-interaction-mode . abbrev-mode))
+       :hook ((org-mode
+               git-commit-mode
+               lisp-interaction-mode
+               TeX-mode LaTeX-mode
+               c-mode c++-mode)
+               . abbrev-mode)
        :custom
        (abbrev-file-name (etc! "abbrev.el"))
        (save-abbrevs 'silently)
@@ -7546,6 +7579,28 @@
 
        :config
        (quietly-read-abbrev-file)
+
+       :config
+       ;; Define abbrev table inheritance.
+       (define-abbrev-table 'lisp-interaction-mode-abbrev-table '())
+       (define-abbrev-table 'git-commit-mode-abbrev-table '())
+
+       (let ((text-parents (list text-mode-abbrev-table)))
+         (dolist (it (list lisp-interaction-mode-abbrev-table
+                           git-commit-mode-abbrev-table))
+           (abbrev-table-put it :parents text-parents))
+
+         (with-eval-after-load 'tex-mode
+           (abbrev-table-put tex-mode-abbrev-table :parents text-parents))
+
+         (with-eval-after-load 'auctex
+           (abbrev-table-put latex-mode-abbrev-table :parents text-parents)))
+
+       (with-eval-after-load 'cc-mode
+         (abbrev-table-put c++-mode-abbrev-table :parents (list c-mode-abbrev-table)))
+
+       :config
+       (push `(git-commit-mode . ,git-commit-mode-abbrev-table) abbrev-minor-mode-table-alist)
 
        :leader
        (:prefix "ip"
@@ -8419,7 +8474,6 @@
         ;; (flymake-unsupported-command+ toggle-flycheck-messages)
         "ex" (flymake-unsupported-command+ flycheck-clear)
         "ed" (flymake-unsupported-command+ flycheck-explain-error-at-point)
-        "ec" (flymake-unsupported-command+ flycheck-select-checker)
         "hde" (flymake-unsupported-command+ flycheck-describe-checker))
 
        :general
@@ -8474,6 +8528,7 @@
          ("p"  previous-error "Last-Compile")
          ("q"  nil :exit t)))
     #+end_src
+
 *** flymake-rest
     #+begin_src emacs-lisp
       (use-package flymake-rest
@@ -8490,7 +8545,7 @@
         (require 'flymake-rest-hook-use-package)
 
         :leader
-        ("tF" 'flymake-rest-change-checker))
+        ("ec" 'flymake-rest-change-checker))
 
       (use-package flymake-rest
         :flymake-hook
@@ -8527,6 +8582,7 @@
         (yaml-mode flymake-rest-yamllint)
         (web-mode flymake-rest-html-tidy)
         (org-mode flymake-rest-proselint)
+        (notmuch-message-mode flymake-rest-proselint)
         (nxml-mode flymake-rest-xmllint))
     #+end_src
 
@@ -8683,6 +8739,7 @@
        :leader
        (:prefix "v"
         "" '(:ignore t :wk "debugger")
+        "SPC" 'gud-run
         "b" 'gud-break
         "B" 'gud-tbreak                                                              ; temporary breakpoint
         "c" 'gud-cont
@@ -8721,7 +8778,10 @@
    #+BEGIN_SRC emacs-lisp
      (use-package hl-line
        :hook ((prog-mode . hl-line-mode)
-              (text-mode . hl-line-mode)))
+              (text-mode . hl-line-mode))
+       :custom
+       (hl-line-sticky-flag nil
+        "Only highlight line in active window."))
    #+END_SRC
 
 ** ibuffer
@@ -8894,8 +8954,8 @@
         "<S-tab>"   'ibuffer-backward-filter-group
         "<backtab>" 'ibuffer-backward-filter-group
 
-        [remap evil-write] 'ibuffer-do-save
-        [remap evil-write-all] 'ibuffer-do-save
+        ;; [remap evil-write] 'ibuffer-do-save
+        ;; [remap evil-write-all] 'ibuffer-do-save
         [remap evil-next-line] 'ibuffer-forward-line
         [remap evil-previous-line] 'ibuffer-backward-line
         [remap imenu] 'ibuffer-jump-to-buffer
@@ -9876,17 +9936,22 @@
     When available we should try to show an icon for the current file.
 
     #+BEGIN_SRC emacs-lisp
-      (defvar-local +mode-line--buffer-file-icon nil)
+      (defun +mode-line-buffer-file-icon (&rest props)
+        ;; Adapted from `all-the-icons-icon-for-buffer' because it doesn't let you supply
+        ;; any face properties for the buffer icon face :cry:.
+        (if (and (buffer-file-name)
+                 (all-the-icons-auto-mode-match?))
+            (apply #'all-the-icons-icon-for-file (file-name-nondirectory (buffer-file-name)) props)
+          (apply #'all-the-icons-icon-for-mode major-mode props)))
+
+      (defvar-local +mode-line-buffer-file-icon nil)
       (defun +mode-line-update-buffer-file-icon (&rest _)
         "Update file icon in `mode-line'."
-        (setq +mode-line--buffer-file-icon
+        (setq +mode-line-buffer-file-icon
               (when (and +icons-available (featurep 'all-the-icons))
-                (let ((icon (or (all-the-icons-icon-for-buffer))))
+                (let ((icon (or (+mode-line-buffer-file-icon :face nil))))
                   (propertize (if (or (null icon) (symbolp icon))
-                                  (all-the-icons-faicon "file-o" nil nil :face 'all-the-icons-dsilver)
-                                (when (stringp icon)
-                                  (remove-text-properties 0 (length icon) '(font-lock-face) icon)
-                                  (remove-text-properties 0 (length icon) '(face) icon))
+                                  (all-the-icons-faicon "file-o" :face nil)
                                 icon)
                               'help-echo (format "Major-mode: %s" (format-mode-line mode-name))
                               'display '(raise -0.135))))))
@@ -10003,8 +10068,8 @@
       (defun +mode-line--update-vc-status ()
         (setq +mode-line-vc-text
               (when (and vc-mode buffer-file-name)
-                (let ((backend (vc-backend buffer-file-name))
-                      (state (vc-state buffer-file-name (vc-backend buffer-file-name))))
+                (let* ((backend (vc-backend buffer-file-name))
+                       (state (vc-state buffer-file-name backend)))
                   (cl-destructuring-bind (icon . face)
                       (cond ((memq state '(edited added))
                              (cons "+" 'compilation-mode-line-exit))
@@ -10014,15 +10079,17 @@
                              (cons "↑" 'compilation-mode-line-run))
                             ((memq state '(removed conflict unregistered))
                              (cons "✖" 'compilation-mode-line-fail))
-                            ;; (t (propertize "✔ " 'face face))
-                            (t (cons nil nil))
-                            )
-                      (when icon
-                        (apply #'propertize
-                               (concat " " icon " "
-                                       (substring vc-mode (+ (if (eq backend 'Hg) 2 3) 2)))
-                               `(,@(when face (list 'face face))
-                                 'mouse-face face))))))))
+                            ;; (t (propertize "✔" 'face face))
+                            (t (cons nil nil)))
+                    ;; Hide when there's nothing out of the ordinary to show.
+                    (when icon
+                      (apply #'propertize
+                             (concat (when icon
+                                       (apply #'propertize (concat icon " ")
+                                              (text-properties-at 0 vc-mode)))
+                                     (substring vc-mode (+ (if (eq backend 'Hg) 2 3) 2)))
+                             `(,@(when face (list 'face face))
+                               mouse-face mode-line-highlight))))))))
 
       ;; Hooks to auto-update vc status alongside the buffer.
       (add-hook 'find-file-hook #'+mode-line--update-vc-status)
@@ -10313,14 +10380,19 @@
           (or (and (not (string-empty-p meta)) meta)
               (+mode-line-buffer-size))))
 
-      (defun +mode-line-buffer-icon ()
-        (when-let ((icon +mode-line--buffer-file-icon))
-          (concat (all-the-icons-pad+ +mode-line--buffer-file-icon) " ")))
-
       (defun +mode-line-misc-info ()
         (let ((misc-info (s-trim (format-mode-line mode-line-misc-info 'file-name-shadow))))
           (unless (string-empty-p misc-info)
             (concat " " misc-info))))
+
+      (defun +mode-line-status-icons ()
+        (let ((msg (concat (and (buffer-narrowed-p)
+                                (featurep 'all-the-icons)
+                                (all-the-icons-pad+ (all-the-icons-nerd-mdi "eye")))
+                           +mode-line-eglot-text
+                           +mode-line-lsp-text)))
+          (unless (string-empty-p msg)
+            (concat " " msg))))
     #+END_SRC
 
 *** visual-selection
@@ -10363,6 +10435,36 @@
              'face 'mode-line-emphasis))))
     #+END_SRC
 
+*** window-width
+    Support hiding some sections of the mode-line when the window isn't wide enough.
+    Adapted from ~doom-modeline-window-size-change-function~.
+
+    #+begin_src emacs-lisp
+      (defvar +mode-line-window-width-limit fill-column
+        "The limit of the window width.
+      If `window-width' is smaller than the limit, some information won't be
+      displayed.")
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (defvar-local +mode-line-wide-p t)
+      (defun +mode-line-window-size-change-function (&rest _)
+        "Function for `window-size-change-functions'."
+        (setq +mode-line-wide-p
+              (not
+               (and (numberp +mode-line-window-width-limit)
+                    (<= (+ (window-total-width)
+                           (or scroll-bar-width 0)
+                           (or left-fringe-width 0)
+                           (or right-fringe-width 0)
+                           (or left-margin-width 0)
+                           (or right-margin-width 0))
+                        +mode-line-window-width-limit)))))
+
+      (add-hook 'window-size-change-functions #'+mode-line-window-size-change-function)
+      (add-hook 'buffer-list-update-hook #'+mode-line-window-size-change-function)
+    #+end_src
+
 *** format
     My personal mode-line configuration (distinct from both doom and Spacemacs).
     This was mostly inspired by [[https://gitlab.com/jessieh/mood-line/-/tree/master][mood-line]], a fork of doom-modeline with a much
@@ -10383,15 +10485,18 @@
         '((:eval (+mode-line-winum))
           (:eval (+mode-line-matches))
           " [%*] "
-          (:eval (+mode-line-buffer-icon))
+          (+mode-line-buffer-file-icon
+           ((:eval (all-the-icons-pad-on-tty-advice+
+                    +mode-line-buffer-file-icon))
+            " "))
           (:eval (+mode-line-buffer-name))
+          (default-directory
+           (:propertize (:eval (when-let ((host (file-remote-p default-directory 'host)))
+                                 (concat "@" host)))
+            face +mode-line-host-face))
           (mode-line-process
            (:propertize (" " mode-line-process)
             face +mode-line-buffer-minor-mode))
-          (:propertize (:eval (when default-directory
-                                (when-let ((host (file-remote-p default-directory 'host)))
-                                   (concat "@" host))))
-           face +mode-line-host-face)
           (:eval (+mode-line-selection-info))
           (:eval (or +mode-line-flymake-text
                      +mode-line-flycheck-text))
@@ -10400,13 +10505,7 @@
 
       (defvar mode-line-right+
         '((:eval +mode-line-vc-text)
-          (:eval (let ((msg (concat (and (buffer-narrowed-p)
-                                         (featurep 'all-the-icons)
-                                         (all-the-icons-pad+ (all-the-icons-nerd-mdi "eye")))
-                                    +mode-line-eglot-text
-                                    +mode-line-lsp-text)))
-                   (unless (string-empty-p msg)
-                     (concat " " msg))))
+          (:eval (+mode-line-status-icons))
           (:propertize ("" minor-mode-alist)
            face +mode-line-buffer-minor-mode
            mouse-face mode-line-highlight
@@ -10416,11 +10515,14 @@
         mouse-3: Toggle minor modes"
            local-map ,mode-line-minor-mode-keymap)
           (:eval (+mode-line-misc-info))
-          (:eval (+mode-line-buffer-eol))
-          (:eval (+mode-line-buffer-encoding))
-          (line-number-mode
-           (column-number-mode " %l:%c" " %l")
-           (column-number-mode " :%c"))
+          (+mode-line-wide-p
+           (:eval (+mode-line-buffer-eol)))
+          (+mode-line-wide-p
+           (:eval (+mode-line-buffer-encoding)))
+          (+mode-line-wide-p
+           (line-number-mode
+            (column-number-mode " %l:%c" " %l")
+            (column-number-mode " :%c")))
           (" " mode-line-percent-position)
           " "
           (:propertize mode-name
@@ -10861,7 +10963,7 @@
        (defun server-client-buffers+ (&optional all-frames)
          "List buffers being visited by emacs-client in the current frame.
      With ALL-FRAMES use all frames known to the current emacs session."
-         (remove-duplicates
+         (cl-remove-duplicates
           (cl-loop for frame in (if all-frames (frame-list) (list (selected-frame)))
                    append (when-let ((proc (frame-parameter frame 'client)))
                             (process-get proc 'buffers)))))
@@ -10936,7 +11038,7 @@
                   (completing-read "Client buffer: "
                                    (lambda (str pred action)
                                      (if (eq action 'metadata)
-                                         `((category . buffer))
+                                         `(metadata (category . buffer))
                                        (complete-with-action action cands str pred)))
                                    nil t nil nil (car cands))
                   client-buffers))))
@@ -11169,8 +11271,11 @@
         "a" 'smerge-keep-all
         "x" 'smerge-keep-base
         "c" 'smerge-keep-current
+        "RET" 'smerge-keep-current
         "m" 'smerge-keep-mine
-        "o" 'smerge-keep-other)
+        "o" 'smerge-keep-other
+        "j" 'smerge-next
+        "k" 'smerge-prev)
 
        :general
        (:keymaps 'smerge-mode-map
@@ -11195,7 +11300,7 @@
         :pretty-hydra
         ;; Adapted from [[https://github.com/tecosaur/emacs-config/blob/0b39759/config.org#smerge][tecosaur/emacs-config]].
         (smerge-hydra
-         (:foreign-keys warn :quit-key "q")
+         (:foreign-keys run :quit-key "q")
          ("Move"
           (("n" (smerge-next) "next")
            ("p" (smerge-prev) "previous"))
@@ -11214,7 +11319,7 @@
           "Other"
           (("c" (smerge-combine-with-next) "combine")
            ("r" (smerge-resolve) "resolve")
-           ("k" (smerge-kill-current) "kill current")
+           ("x" (smerge-kill-current) "kill current")
            ;; ("q" (smerge-auto-leave) "quit")
            ("q" nil "quit")))))
     #+end_src
@@ -11903,7 +12008,7 @@
         '(read-only t cursor-intangible t face minibuffer-prompt))
 
        :hook (vertico-mode . vertico-enable-consult-completion-in-region+)
-       :init
+       :preface
        (defun vertico-enable-consult-completion-in-region+ ()
          (setq completion-in-region-function
                (if vertico-mode
@@ -11931,6 +12036,7 @@
 
        :general
        (:keymaps 'vertico-map
+        "<C-i>" 'vertico-insert
         "C-c C-n" 'vertico-next-group
         "C-c C-p" 'vertico-previous-group
         "<S-return>" 'vertico-exit-input
@@ -12006,11 +12112,12 @@
                   (which-key--hide-popup-ignore-command)
                 (which-key--show-keymap "Embark" map nil nil 'no-paging))))))
 
-        :config
+        :init
         (advice-add 'embark-export           :around #'display-buffer-no-select-window-advice)
         (advice-add 'embark-collect-live     :around #'display-buffer-no-select-window-advice)
         (advice-add 'embark-collect-snapshot :around #'display-buffer-no-select-window-advice)
 
+        :config
         (push (cons 'xref-location #'embark-consult-export-grep)
               embark-exporters-alist)
 
@@ -12018,14 +12125,6 @@
         ;;         nil
         ;;         (window-parameters (mode-line-format . none)))
         ;;       display-buffer-alist)
-
-        (defun embark-find-mkdir+ (dir)
-          "Mkdirectory and then find it."
-          (interactive (list (read-file-name "Directory")))
-          (if (file-exists-p dir)
-              (message "Warning path already exists: %s" dir)
-            (mkdir dir t))
-          (find-file dir))
 
         (defun embark-act-noexit ()
           (interactive)
@@ -12042,7 +12141,43 @@
                   (defun embark-collect-disable-read-only-mode+ ()
                     (read-only-mode -1)))
 
+        :config
+        (defun embark-find-mkdir+ (dir)
+          "Mkdirectory and then find it."
+          (interactive (list (read-file-name "Directory")))
+          (if (file-exists-p dir)
+              (message "Warning path already exists: %s" dir)
+            (mkdir dir t))
+          (find-file dir))
+
+        :config
+        (when (package! magit)
+          (defun embark-magit-status+ (file)
+            (interactive "fFile: ")
+            (setq file (file-chase-links file))
+            (if-let ((root (project-current-root+
+                            (or (when (file-directory-p file)
+                                  file)
+                                (file-name-directory file)))))
+                (magit-status root)
+              (user-error "Could not find project root for %s" root)))
+
+          (general-define-key :keymaps 'embark-file-map "g" #'embark-magit-status+)
+
+          (defun embark-magit-library-status+ (lib)
+            (interactive (list (read-library-name)))
+            (embark-magit-status+ (find-library-name lib)))
+
+          (general-define-key :keymaps 'embark-library-map "g" #'embark-magit-library-status+))
+
         :general
+        (:keymaps 'embark-file-map
+         "m" 'embark-find-mkdir+
+         "+" 'embark-find-mkdir+)
+
+        :general
+        (:states '(normal visual)
+         "<C-return>" 'embark-act)
         (:keymaps '(selectrum-minibuffer-map
                     vertico-map)
          "<C-return>" 'embark-act
@@ -12068,10 +12203,7 @@
         (:keymaps 'embark-file-map
          "=" 'vdiff-files
          "W" nil
-         "Y" 'embark-save-relative-path
-         "m" 'embark-find-mkdir+
-         "+" 'embark-find-mkdir+
-         "o" 'xopen-url+)
+         "Y" 'embark-save-relative-path)
         (:keymaps 'embark-command-map
          "g" 'embark-find-definition
          "b" 'global-set-key
@@ -12128,7 +12260,7 @@
         (consult-fontify-max-size 100000)
         (register-preview-function #'consult-register-preview)
         (consult-ripgrep-args                                                      ; Variant command which disregards no-matches
-         "ignore-exit 1 rg --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number .")
+         "ignore-exit 1 rg --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number .")
         (consult-async-refresh-delay 0.05)
         (consult-narrow-key (kbd "M-SPC"))
         (consult-widen-key (kbd "S-SPC"))
@@ -12238,6 +12370,23 @@
                                 evil-ex-search-direction 'forward)
                           (when evil-ex-search-persistent-highlight
                             (evil-ex-search-activate-highlight evil-ex-search-pattern))))))
+
+        :config
+        (defvar consult--source-dired
+          `(:name     "Dired"
+            :narrow   ?d
+            :hidden   t
+            :category buffer
+            :face     dired-directory
+            :state    ,#'consult--buffer-state
+            :items
+            ,(lambda ()
+               (consult--buffer-query :mode 'dired-mode
+                                      :sort 'visibility
+                                      :as #'buffer-name)))
+          "Dired buffer candidate source for `consult-buffer'.")
+
+        (push #'consult--source-dired consult-buffer-sources)
 
         :leader
         (:mode '(selectrum-mode
@@ -12431,8 +12580,7 @@
 
     #+begin_src emacs-lisp
       (use-package consult-company
-        :straight (consult-company :host 'github
-                                   :repo "mohkale/consult-company")
+        :straight t
         :general
         (:keymaps 'company-mode-map
          [remap completion-at-point] #'consult-company))
@@ -12989,7 +13137,7 @@
               :require-match t
               :history '(:input +dot-open-bookmark-history)
               :initial (consult--async-split-initial "*")))))
-         (xopen-url+ bookmark))
+         (+xopen-url bookmark))
      #+END_SRC
 
      #+BEGIN_SRC emacs-lisp
@@ -13096,8 +13244,11 @@
    #+begin_src emacs-lisp
      (use-package browse-at-remote
        :straight t
-       :leader
-       ("go" 'browse-at-remote))
+       :leader ("go" 'browse-at-remote)
+
+       :general
+       (:keymaps 'magit-mode-map
+        [remap +xopen-url] 'browse-at-remote))
    #+end_src
 
 ** bufler
@@ -13341,6 +13492,7 @@
         (show-week-agenda-p       t)
         (dashboard-show-shortcuts t)
         (dashboard-set-heading-icons nil)
+        (dashboard-page-separator "\n\f\n")
 
         :preface
         (push 'dashboard-mode +whitespace-exempt-modes)
@@ -13927,7 +14079,7 @@
      (use-package engine-mode
        :straight t
        :custom
-       (engine/browser-function #'xopen-url+))
+       (engine/browser-function #'+xopen-url))
    #+END_SRC
 
    Here's a list of all the search-engines my emacs will setup alongside the
@@ -13978,6 +14130,7 @@
    | Rust              | spu     | rust                     | https://doc.rust-lang.org/std/?search=%s                                                                          |
    | Python            | spp     | python                   | https://docs.python.org/3/search.html?q=%s                                                                        |
    | W3SchoolsColors   | spx     | w3schools-colors         | https://www.w3schools.com/colors/colors_converter.asp?color=%s                                                    |
+   | MicrosoftDocs     | spw     | microsoft-docs           | https://docs.microsoft.com/en-us/search/?terms=%s                                                                |
 
    Lastly heres some prefix keys (leader prefixes) that don't connect to commands,
    but to groups of commands.
@@ -14060,6 +14213,7 @@
        :custom
        (flycheck-python-pycompile-executable "python3")
        (flycheck-disabled-checkers '(emacs-lisp-checkdoc))
+       ;; (flycheck-indication-mode 'left-margin)
        (flycheck-default-margin-str "•")
 
        :init
@@ -14136,6 +14290,7 @@
         [remap flymake-start] 'flycheck-buffer
         [remap flymake-first-error+] 'flycheck-first-error
         [remap flymake-last-error+] 'flycheck-last-error
+        [remap flymake-rest-change-checker] 'flycheck-select-checker
         [remap flymake-show-diagnostics-buffer] 'flycheck-list-errors)
 
        (:keymaps 'flycheck-error-list-mode-map
@@ -14151,7 +14306,6 @@
         ;; "eC" 'flycheck-set-checker-executable
         ;; "ev" 'flycheck-verify-setup
         "ed" 'flycheck-explain-error-at-point
-        "ec" 'flycheck-select-checker
         "ex" 'flycheck-clear)
 
        :lazy-leader
@@ -14585,11 +14739,23 @@
    #+BEGIN_SRC emacs-lisp
      (use-package magit
        :straight t
+       :custom
+       (magit-revision-show-gravatars  '("^Author:     " . "^Commit:     "))
+       (magit-display-buffer-function 'magit-display-buffer-fullframe-status-v1
+        "Show magit status in a full screen window.")
+
        :init
-       (setq magit-revision-show-gravatars  '("^Author:     " . "^Commit:     ")
-             ;; show magit status in a full screen window.
-             magit-display-buffer-function 'magit-display-buffer-fullframe-status-v1)
        (defvaralias 'magit-repository-directories 'projectile-project-search-path)
+
+       :custom (magit-bury-buffer-function #'magit-bury-buffer-function+)
+       :config
+       (defun magit-bury-buffer-function+ (&optional kill-buffer)
+         "Burying a magit status buffer restores the previous window configuration."
+         (funcall
+          (if (eq major-mode 'magit-status-mode)
+              'magit-restore-window-configuration
+            'magit-mode-quit-window)
+          kill-buffer))
 
        :config
        (add-hook 'magit-mode-hook
@@ -15186,6 +15352,7 @@
           ("H" . notmuch-search-H-face+)
           ("flagged" . notmuch-search-flagged-face)))
        (notmuch-show-all-tags-list t)
+       (notmuch-draft-folder "local/Drafts")
 
        :preface
        (defface notmuch-search-H-face+ '((t (:foreground "#FF6EB4")))
@@ -15201,6 +15368,8 @@
        (evil-set-initial-state 'notmuch-hello-mode 'normal)
 
        (push 'notmuch-show-mode +whitespace-exempt-modes)
+
+       (push '("replied" (propertize tag 'face 'shadow)) notmuch-tag-formats)
 
        ;; Needs to be an absolute path when `notmuch-maildir-use-notmuch-insert' isn't
        ;; true. This won't adapt to changes in database.path while emacs is already
@@ -15263,6 +15432,33 @@
 
        (defun notmuch-revert-buffer-function+ (&optional ignore-auto no-confirm)
          (notmuch-refresh-this-buffer))
+
+       :init
+       (defvar notmuch-open-remote-urls+
+         ;; Sadly gmail doesn't let us view a message based solely on its
+         ;; message id. The best we can do is open a search that should
+         ;; have only one result.
+         `((,(rx "@gmail.com" (optional ">") eol) .
+            ,(lambda (mail)
+               (format "https://mail.google.com/mail/u/%s/#search/rfc822msgid:%s"
+                       mail (url-hexify-string (notmuch-show-get-message-id t)))))))
+
+       :config
+       (defun notmuch-open-remote+ ()
+         (interactive)
+         (unless (derived-mode-p 'notmuch-show-mode)
+           (user-error "%s can only be called in `notmuch-show' buffers" this-command))
+
+         (let ((to (car (mail-header-parse-address (notmuch-show-get-to)))))
+           (if-let ((url-gen (cdr
+                              (cl-find-if (lambda (it)
+                                            (string-match-p (car it) to))
+                                          notmuch-open-remote-urls+))))
+               (browse-url (funcall url-gen to))
+             (user-error "No opener configured for mail from %s" to))))
+       :general
+       (:keymaps 'notmuch-show-mode-map
+        [remap +xopen-url] 'notmuch-open-remote+)
 
        :general
        ([remap message-mail] 'notmuch)
@@ -15439,8 +15635,12 @@
          "Keymap containing commands to act upon emails.")
 
        :lazy-leader
+       (:mode 'notmuch-message-mode
+        "d" 'notmuch-draft-postpone
+        "s" 'notmuch-draft-save)
        (:mode 'notmuch-hello-mode
         leader-major-mode-key 'notmuch-jump-search
+        "i" 'notmuch-jump-search
         "j" 'notmuch-jump-search
         "c" 'notmuch-mua-new-mail
         "G" 'notmuch-poll-and-refresh-this-buffer
@@ -15457,6 +15657,7 @@
         "a" 'notmuch-show-advance-and-archive
         "#" 'notmuch-show-print-message
         "$" 'notmuch-show-toggle-process-crypto
+        "d" 'notmuch-show-resume-message
         "u" 'notmuch-show-browse-urls
         "F" 'notmuch-show-forward-open-messages
         "G" 'notmuch-poll-and-refresh-this-buffer
@@ -16013,6 +16214,15 @@
        (defalias 'rake-refresh #'rake-regenerate-cache))
    #+END_SRC
 
+** secret-mode
+   Provides a mode to obfuscate the text in a buffer in a way that's still legible for
+   screenshots.
+
+   #+begin_src emacs-lisp :tangle no
+     (use-package secret-mode
+       :straight (secret-mode :host github :repo "bkaestner/secret-mode.el"))
+   #+end_src
+
 ** skeletor
    :PROPERTIES:
    :header-args+: :tangle (package-yes! skeletor)
@@ -16051,7 +16261,7 @@
        ;; for configuring stuff.
        (require 'cl-lib)
        (advice-add 'skeletor--dir->SkeletorTemplate :filter-return
-                   (defun skeletor-dir-template-exclude-dotfiles (template)
+                   (defun skeletor-dir-template-exclude-dotfiles+ (template)
                      ;; (setf (SkeletorTemplate-files template)
                      ;;       (seq-filter (lambda (it) (not
                      ;;                            (string-prefix-p "." (file-name-base it))))
@@ -16061,11 +16271,8 @@
                      (aset template
                            (cl-position 'files (mapcar #'car (cl-struct-slot-info 'SkeletorTemplate)))
                            (seq-filter
-                            (lambda
-                              (it)
-                              (not
-                               (string-prefix-p "."
-                                                (file-name-base it))))
+                            (lambda (it)
+                              (not (string-prefix-p "." (file-name-base it))))
                             (SkeletorTemplate-files template)))
                      template))
 
@@ -17101,6 +17308,17 @@
          ))
     #+END_SRC
 
+*** flymake-package-lint
+    #+begin_src emacs-lisp
+      (use-package package-lint-flymake
+        :straight t
+        :flymake-hook
+        (emacs-lisp-mode
+         elisp-flymake-byte-compile
+         elisp-flymake-checkdoc
+         (package-lint-flymake :disabled t)))
+    #+end_src
+
 ** python
    :PROPERTIES:
    :header-args+: :tangle (package-yes! python)
@@ -17235,18 +17453,6 @@
       (use-package pip-requirements
         :straight t
         :mode ("^requirements\\.txt$" . pip-requirements-mode))
-    #+END_SRC
-
-*** yapfify
-    auto format the current python buffer.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package yapfify
-        :straight t
-        :leader
-        (:mode 'python-mode
-         "y" 'yapfify-buffer
-         "Y" 'yapfify-region))
     #+END_SRC
 
 ** ruby
@@ -17648,6 +17854,11 @@
        :mode (rx ".json")
        :hook (json-mode . +flylint)
 
+       :preface
+       ;; Try [[https://www.npmjs.com/package/vscode-json-languageserver][VSCode JSON Language Server]] which has jsonschema support.
+       (push `(json-mode . :global) +lsp-maybe-connect)
+       (add-hook 'json-mode-hook +lsp-command)
+
        :lazy-leader
        (:mode 'json-mode
         "p" 'json-mode-beautify
@@ -17747,7 +17958,6 @@
    #+BEGIN_SRC emacs-lisp
      (use-package yaml-mode
        :straight t
-       :mode (rx "." (or "yaml" "yml"))
        :hook (yaml-mode . +flylint)
        :init
        (push '(yaml-mode . 2) +indent-config)
@@ -18086,6 +18296,8 @@
         :custom
         (markdown-indent-on-enter 'indent-and-new-item)
         (markdown-fontify-code-blocks-natively t)
+        (markdown-ordered-list-enumeration nil
+         "It bothers mdlint for some reason.")
 
         :config
         (modify-syntax! '((?_ . "w")) markdown-mode-syntax-table)
@@ -18370,6 +18582,12 @@
        ;; WARN never do this, it breaks commenting in weird places.
        ;; (c-toggle-comment-style +1)
 
+       :init
+       (push '((c-mode c++-mode)
+               (?\; . after))
+             electric-layout-mode-rules+)
+
+       :config
        (dolist (tbl (list c-mode-syntax-table
                           c++-mode-syntax-table))
          (modify-syntax! '((?_ . "w")) tbl))
@@ -18387,8 +18605,9 @@
    #+END_SRC
 
 *** modern-cpp-font-lock
-    #+BEGIN_SRC emacs-lisp (package-yes! c (not tree-sitter))
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! c (not tree-sitter))
       (use-package modern-cpp-font-lock
+        :diminish modern-c++-font-lock-mode
         :straight (modern-cpp-font-lock
                    :repo "ludwigpacifici/modern-cpp-font-lock")
         :hook (c++-mode . modern-c++-font-lock-mode))
@@ -18711,14 +18930,12 @@
       (use-package typescript-mode
         :straight t
         :mode ("\\.tsx" . typescript-react-mode)
-        :hook ((typescript-react-mode . emmet-mode)
-               (typescript-react-mode . typescript-react-setup-tsx+))
-        :preface
-        (defun typescript-react-setup-tsx+ ()
-          (setq-local emmet-expand-jsx-className? t))
-
+        :hook ((typescript-react-mode . emmet-mode))
         :init
         (push '(typescript-react-mode . 2) +indent-config)
+
+        (with-eval-after-load 'emmet-mode
+          (push 'typescript-react-mode emmet-jsx-major-modes))
 
         :commands (typescript-react-mode)
         :config
@@ -19038,6 +19255,7 @@
        :custom
        (rustic-format-trigget 'on-save)
        (rustic-lsp-client nil)
+       (rustic-lsp-server 'rust-analyzer)
 
        :commands (rustic-compile
                   rustic-cargo-test
@@ -19057,12 +19275,8 @@
                ("rust:run" . ,#'rustic-cargo-run))
              compile-multi-config)
 
-       :custom
-       (rustic-lsp-server 'rust-analyzer)
-
        :init
        (push 'rustic-popup-mode +whitespace-exempt-modes)
-       ;; (push 'rustic-compilation-mode compilation-auto-kill-ignore-modes+)
        (push 'rustic-cargo-test-mode compilation-auto-kill-ignore-modes+)
 
        :config
@@ -19546,7 +19760,7 @@
                                          +docs-home
                                          (join-path +docs-home "unidocs/")))
         (bibtex-completion-pdf-extension '(".pdf" ".epub" ".pptx" ".doc" ".docx"))
-        (bibtex-completion-pdf-open-function 'xopen-url+)
+        (bibtex-completion-pdf-open-function '+xopen-url)
 
         :preface
         (defvaralias 'bibtex-completion-bibliography 'org-cite-global-bibliography)
@@ -19848,7 +20062,7 @@
         (setq org-file-apps
               (append org-file-apps
                       `((t . ,(defun org-open-file-xopen+ (path _link)
-                                (xopen-url+ path))))))
+                                (+xopen-url path))))))
 
         :init
         (advice-add 'evil-ret-gen :before-until
@@ -19943,7 +20157,6 @@
          "o" 'org-clock-out
          "O" 'org-sort
          "p" 'org-set-property
-         "P" 'org-pomodoro
          "q" 'org-set-tags-command
          "r" 'org-refile
          "R" 'org-refile-goto-last-stored
@@ -21008,7 +21221,7 @@
 
            (if-let* ((key (match-string 1 link))
                      (pdf (car (bibtex-completion-find-pdf key))))
-               (xopen-pdf+ pdf (match-string 2 link))
+               (+xopen-pdf pdf (match-string 2 link))
              (user-error "Failed to find PDF for bibentry with key: %s" key))))
 
        (defun +org-pdf-bib-export (link description format)
@@ -21168,6 +21381,7 @@
         (org-plantuml-jar-path (cache! "org/bin/plantuml.jar"))
         (org-export-with-toc nil)
         (org-latex-default-class "article")
+        (org-confirm-babel-evaluate nil)
         (org-latex-classes
          '(("article" "\\documentclass[11pt]{article} \\setlength{\\parindent}{0in} \\setlength{\\parskip}{\\baselineskip}"
             ("\\section{%s}" . "\\section*{%s}")
@@ -21952,8 +22166,7 @@
        `(minibuffer-depth-indicator ((,cls (:foreground ,yellow-256 :weight bold))))
        `(tooltip ((,cls (:background ,dark-grey :foreground ,very-light-grey))))
 
-       `(highlight ((,cls (:foreground ,very-dark-grey :background ,blue
-                           :distant-foreground ,blue :inherit bold))))
+       `(highlight ((,cls (:foreground ,very-dark-grey :background ,blue :inherit bold))))
 
        `(region ((,cls (:background ,dark-grey :weight bold))))
        `(secondary-selection ((,cls (:inherit region))))
@@ -21991,6 +22204,7 @@
        `(mode-line-inactive ((,cls
                               (:weight light :foreground "grey80" :background "grey30"
                                :box (:line-width 1 :color "grey40" :style none)))))
+       `(mode-line-highlight ((,cls (:inherit italic))))
 
        `(+mode-line-linter-info ((,cls (:foreground ,green-dim))))
        `(+mode-line-linter-warning ((,cls (:foreground ,blue-dim))))
@@ -22509,4 +22723,9 @@
 #  LocalWords:  alltheicon ebuku DuckDuckGo ggtags parsers ctags magit rebase scrapy
 #  LocalWords:  neotree olivetti pdftools skeletor Makefile golang gradle lua xml ql
 #  LocalWords:  hindent powershell contrib orgit fragtog vscode css haskell nimlsp
-#  LocalWords:  gitattributes gitconfig yapfify makefile citeproc ebdb
+#  LocalWords:  gitattributes gitconfig yapfify makefile citeproc ebdb asm nim php
+#  LocalWords:  JavaDocs Github MicrosoftDocs NyaaLiterature MyAnimeList Youtube
+#  LocalWords:  NyaaLiteratureAll Nyaa NyaaGames NyaaSoftware NyaaImages NyaaMusic
+#  LocalWords:  NyaaLiveActionAll NyaaLiveAction NyaaAnimeAll NyaaAnime CppReference
+#  LocalWords:  microsoft github godoc SchoolsColors StackOverflow GoogleMaps cmake
+#  LocalWords:  GoogleImages separedit

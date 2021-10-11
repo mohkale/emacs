@@ -110,7 +110,7 @@
      # key: !
      # contributor : @mohkale
      # --
-     #!/usr/bin/$0
+     #!${1:/usr}/bin/$0
    #+END_SRC
 
 ** bang-env
@@ -251,6 +251,14 @@
       # --
       *$1*$0
    #+END_SRC
+
+** caption
+   #+begin_src snippet :tangle snippets/org-mode/caption
+     # name: caption
+     # key: cap
+     # --
+     ,#+CAPTION: $0
+   #+end_src
 
 ** quote
    #+BEGIN_SRC snippet :tangle snippets/org-mode/quote
@@ -2250,7 +2258,7 @@
 
      ;; Copyright (C) `(format-time-string "%Y")`  `(user-full-name)`
 
-     ;; Author: `(or user-full-name "name")` <`(cadar smtpmail-multi-accounts)`@`(caddar smtpmail-multi-accounts)`>
+     ;; Author: `(or user-full-name "name")` <`(+mail-conf-email)`>
      ;; Keywords: ${3:`(and
                          (require 'finder)
                          (s-join ", "
@@ -2261,23 +2269,14 @@
                              "Keyword, C-h: " (mapcar (lambda (x) (symbol-name (car x)))
                                                       finder-known-keywords)
                              nil t))))`}
+     ;; Package-Requires: ((emacs . "`emacs-major-version`.`emacs-minor-version`"))
+     ;; Version: ${4:0.1}
 
-     ;; This program is free software; you can redistribute it and/or modify
-     ;; it under the terms of the GNU General Public License as published by
-     ;; the Free Software Foundation, either version 3 of the License, or
-     ;; (at your option) any later version.
-
-     ;; This program is distributed in the hope that it will be useful,
-     ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-     ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-     ;; GNU General Public License for more details.
-
-     ;; You should have received a copy of the GNU General Public License
-     ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+     `(+license-comment-template (+license-project-license))`
 
      ;;; Commentary:
 
-     ;; $4
+     ;; $5
 
      ;;; Code:
 
@@ -2326,11 +2325,11 @@
 
 ** lambda
    #+BEGIN_SRC snippet :tangle snippets/emacs-lisp-mode/lambda
-      # contributor: Xah Lee (XahLee.org)
-      # name: lambda
-      # key: lam
-      # --
-      (lambda ($1) ${2:(interactive${3: "$4"}) }$0)
+     # contributor: Xah Lee (XahLee.org)
+     # name: lambda
+     # key: lam
+     # --
+     (lambda ($1) ${2:(interactive${3: "$4"}) }$0)
    #+END_SRC
 
 ** defalias
