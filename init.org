@@ -16328,7 +16328,17 @@
                       ((symbol-function 'skeletor--read-project-name)
                        (lambda () (if is-empty basename
                                (skeletor--actual-read-project-name)))))
-             (skeletor-create-project-at dir skeleton)))))
+             (skeletor-create-project-at dir skeleton))))
+
+       :config
+       (defmacro skeletor-conf+ (key &optional default)
+         "Retrieve a value from the skeletor substitions."
+         `(if-let ((val (assoc ,key subs)))
+              (cdr val)
+            ,default))
+
+       ;; Easier to use in skeleter projects.
+       (defalias 'skeletor-conf #'skeletor-conf+))
    #+END_SRC
 
 ** tramp-term
