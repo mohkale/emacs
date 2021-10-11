@@ -16069,8 +16069,13 @@
                             (SkeletorTemplate-files template)))
                      template))
 
-       ;; I keep definitions for skeletor templates alongside the skeleton directory.
-       (dolist (it (file-expand-wildcards (join-path skeletor-user-directory "*" ".skeletor.el")))
+       ;; I keep definitions for skeletor templates and constructors within my skeleton
+       ;; user directory.
+       (dolist (it (append
+                    (file-expand-wildcards
+                     (join-path skeletor-user-directory "*.el"))
+                    (file-expand-wildcards
+                     (join-path skeletor-user-directory "*" ".skeletor.el"))))
          (load it nil t))
 
        (advice-add 'skeletor--initialize-git-repo :override
@@ -16116,46 +16121,7 @@
                       ((symbol-function 'skeletor--read-project-name)
                        (lambda () (if is-empty basename
                                (skeletor--actual-read-project-name)))))
-             (skeletor-create-project-at dir skeleton))))
-
-       :config
-       ;; A template to bootstrap a [[https://www.rust-lang.org/][rust]] project with cargo.
-       (skeletor-define-constructor "rust-cargo"
-         :title "Rust [cargo]"
-         :requires-executables '(("rustc" . "https://www.rust-lang.org/")
-                                 ("cargo" . "https://doc.rust-lang.org/book/ch01-03-hello-cargo.html"))
-         :initialise
-         (lambda (spec)
-           (let-alist spec
-             (skeletor-shell-command (concat "cargo init --color never --vcs none "
-                                             (if (yes-or-no-p "Create a binary template instead of a library?")
-                                                 "--bin "
-                                               "--lib ")
-                                             (let ((name (read-string "Package name: ")))
-                                               (unless (string-empty-p name)
-                                                 (concat "--name " (shell-quote-argument name) " ")))
-                                             .project-name)
-                                     .project-dir))))
-
-       ;; Generator for a scrapy project using poetry for dependency management.
-       (skeletor-define-constructor "python-scrapy"
-         :title "Python [scrapy]"
-         :requires-executables '(("python3" . "https://www.python.org/")
-                                 ("poetry" . "https://python-poetry.org/"))
-         :initialise
-         (lambda (spec)
-           (let-alist spec
-             (mkdir .dest t)
-             (skeletor--log-info "Initialising project using poetry and installing scrapy")
-             (skeletor-shell-command
-              "poetry init --no-interaction --no-ansi --dependency scrapy --dev-dependency pytest" .dest)
-             (skeletor-shell-command "poetry install" .dest)
-
-             (skeletor--log-info "Bootstrapping new scrapy project")
-             (skeletor-shell-command (concat "poetry run scrapy startproject "
-                                             (shell-quote-argument .project-name)
-                                             " .")
-                                     .dest)))))
+             (skeletor-create-project-at dir skeleton)))))
    #+END_SRC
 
 ** tramp-term
