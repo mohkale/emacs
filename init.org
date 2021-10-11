@@ -21107,40 +21107,29 @@
     #+BEGIN_SRC emacs-lisp
       (use-package ol :commands (org-insert-link-global))
 
-      (use-package org-link-minor-mode
-        :straight (org-link-minor-mode :host github
-                                       :repo "seanohalpin/org-link-minor-mode")
-        :hook (org-follow-link . recenter)
-        :diminish org-link-minor-mode
+      (use-package orglink
+        :straight t
         :after org
         :demand t
-        :preface
-        (defvar org-link-enable-modes+ '(hledger-mode text-mode prog-mode conf-mode)
-          "List of major modes in which `org-link-minor-mode' should be enabled.")
 
-        :init
-        (defvaralias 'org-any-re 'org-link-any-re)                                    ; deprecated in org 9.3, not yet updated upstream.
+        :diminish orglink-mode
+        :hook (org-follow-link . recenter)
 
-        (defun enable-org-link-minor-mode (&rest _)
-          (unless (derived-mode-p 'org-mode)
-            (org-link-minor-mode +1)))
+        :custom
+        (orglink-activate-in-modes
+         '(hledger-mode text-mode prog-mode conf-mode))
+        (orglink-match-anywhere t)
 
         :config
-        ;; We defer these hook setups and enabling `org-link-minor-mode' until
-        ;; after `org-mode' has been loaded because `org-link-minor-mode' forces
-        ;; all of `org-mode' to be loaded, and that's a large overhead for both
-        ;; startup and regular editing.
-        ;;
-        ;; This provides a mild but definite performance and startup boost.
-        (dolist (mode org-link-enable-modes+)
-          (add-hook (intern (concat (symbol-name mode) "-hook"))
-                    #'enable-org-link-minor-mode))
+        (global-orglink-mode +1)
 
+        :config
+        ;; Enable in all the existing buffers it should be enabled in.
         (dolist (buf (buffer-list))
           (with-current-buffer buf
-            (when (and (not (bound-and-true-p org-link-minor-mode))
-                       (apply #'derived-mode-p org-link-enable-modes+))
-              (enable-org-link-minor-mode)))))
+            (when (and (not (bound-and-true-p orglink--mode))
+                       (not (derived-mode-p 'org-mode)))
+              (turn-on-orglink-mode-if-desired)))))
     #+END_SRC
 
 **** pdftools
