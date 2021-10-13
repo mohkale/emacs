@@ -178,6 +178,7 @@
          markdown
          ;; nim
          org
+         ;; perl
          python
          ;; php
          ;; powershell
@@ -21765,6 +21766,188 @@
         :straight t
         :init
         (set-company-backend! 'lua-mode 'company-lua))
+    #+end_src
+
+** Perl
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! perl)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package cperl-mode
+       :mode (rx "." (or (and "p" (or "l" "m") (optional "x"))
+                         (and "P" (or "L" "M") (optional "X")))
+                 eol)
+       :interpreter "perl"
+       :interpreter "perl5"
+       :hook ((perl-mode cperl-mode) . +flylint)
+       :custom
+       (cperl-highlight-variables-indiscriminately t)
+       (cperl-indent-parens-as-block t "Parentheses are indented with the block and not with scope")
+       ;; These should be set by `+indent-config' but it can't support negatives yet.
+       (cperl-indent-level 4 "4 spaces is the standard indentation")
+       (cperl-close-paren-offset -4 "Indent the closing paren back four spaces")
+       (cperl-continued-statement-offset 4 "If a statement continues indent it to four spaces")
+
+       :config
+       ;; Don't highlight arrays and hashes in comments, from [[https://github.com/syl20bnr/spacemacs/blob/63056ecb50f93808781b97feab1c3225d35c7aa1/layers/%2Blang/perl5/packages.el#L65][here]].
+       (font-lock-remove-keywords 'cperl-mode
+        '(("\\(\\([@%]\\|\\$#\\)[a-zA-Z_:][a-zA-Z0-9_:]*\\)" 1
+           (if (eq (char-after (match-beginning 2)) 37)
+               'cperl-hash-face 'cperl-array-face) t)
+          ("\\(\\([$@]+\\)[a-zA-Z_:][a-zA-Z0-9_:]*\\)[ \t]*\\([[{]\\)" 1
+           (if (= (- (match-end 2) (match-beginning 2)) 1)
+               (if (eq (char-after (match-beginning 3)) 123)
+                   'cperl-hash-face 'cperl-array-face)
+             font-lock-variable-name-face) t)
+          ("\\([]}\\\\%@>*&]\\|\\$[a-zA-Z0-9_:]*\\)[ \t]*{[ \t]*\\(-?[a-zA-Z0-9_:]+\\)[ \t]*}"
+           (2 font-lock-string-face t)
+           ("\\=[ \t]*{[ \t]*\\(-?[a-zA-Z0-9_:]+\\)[ \t]*}" nil nil
+            (1 font-lock-string-face t)))
+          ("[[ \t{,(]\\(-?[a-zA-Z0-9_:]+\\)[ \t]*=>" 1 font-lock-string-face t)))
+       (font-lock-add-keywords 'cperl-mode
+        '(("\\(\\([@%]\\|\\$#\\)[a-zA-Z_:][a-zA-Z0-9_:]*\\)" 1
+           (if (nth 4 (syntax-ppss))
+               'font-lock-comment-face
+             (if (eq (char-after (match-beginning 2)) ?%)
+                 'cperl-hash-face
+               'cperl-array-face)) t)
+          ("\\(\\([$@]+\\)[a-zA-Z_:][a-zA-Z0-9_:]*\\)[ \t]*\\([[{]\\)" 1
+           (if (nth 4 (syntax-ppss))
+               'font-lock-comment-face
+             (if (= (- (match-end 2) (match-beginning 2)) 1)
+                 (if (eq (char-after (match-beginning 3)) ?{)
+                     'cperl-hash-face
+                   'cperl-array-face)
+               font-lock-variable-name-face)) t)
+          ("\\([]}\\\\%@>*&]\\|\\$[a-zA-Z0-9_:]*\\)[ \t]*{[ \t]*\\(-?[a-zA-Z0-9_:]+\\)[ \t]*}"
+           (2 (if (nth 4 (syntax-ppss))
+                  'font-lock-comment-face
+                'font-lock-string-face) t)
+           ("\\=[ \t]*{[ \t]*\\(-?[a-zA-Z0-9_:]+\\)[ \t]*}" nil nil
+            (1 (if (nth 4 (syntax-ppss))
+                   'font-lock-comment-face
+                 'font-lock-string-face) t)))
+          ("[[ \t{,(]\\(-?[a-zA-Z0-9_:]+\\)[ \t]*=>" 1
+           (if (nth 4 (syntax-ppss))
+               'font-lock-comment-face
+             'font-lock-string-face) t)))
+
+       (font-lock-add-keywords 'cperl-mode
+        '(("\\_<say\\_>" . cperl-nonoverridable-face)))
+
+        :custom (cperl-lazy-help-time nil "Permanently disable non-eldoc help.")
+        :config
+        ;; Eldoc intergration using `cperl-lazy-install'.
+
+        (defun cperl-eldoc--regexp+ (word)
+          "Taken directly from `cperl-describe-perl-symbol'."
+          (cond
+           ((string-match "^[&*][a-zA-Z_]" word)
+            (setq word (concat (substring word 0 1) "NAME")))
+           ((string-match "^[$@]\\([a-zA-Z_:0-9]+\\)[ \t]*\\[" word)
+            (setq word (concat "@" (substring word 1 (match-end 1)))))
+           ((string-match "^[$@]\\([a-zA-Z_:0-9]+\\)[ \t]*{" word)
+            (setq word (concat "%" (substring word 1 (match-end 1)))))
+           ((and (string= word "x") (string-match "^x=" word))
+            (setq word "x="))
+           ((string-match "^\\$[\C-a-\C-z]" word)
+            (setq word (concat "$^" (char-to-string (+ ?A -1 (aref word 1))))))
+           ((string-match "^CORE::" word)
+            (setq word "CORE::"))
+           ((string-match "^SUPER::" word)
+            (setq word "SUPER::"))
+           ((and (string= "<" word) (string-match "^<\\$?[a-zA-Z0-9_:]+>" word))
+            (setq word "<NAME>")))
+
+          (concat "^"
+                  "\\([^a-zA-Z0-9_:]+[ \t]+\\)?"
+                  (regexp-quote word)
+                  "\\([ \t([/]\\|$\\)"))
+
+        (defun cperl-eldoc+ (cb)
+          (when-let ((val (save-excursion
+                            ;; moves point for some reason..
+                            (cperl-word-at-point-hard))))
+            (let ((cperl-message-on-help-error nil)
+                  (cperl-help-from-timer t)
+                  (case-fold-search nil)
+                  (regexp (cperl-eldoc--regexp+ val)))
+              (cperl-switch-to-doc-buffer)
+              (with-current-buffer cperl-doc-buffer
+                (save-excursion
+                  (goto-char (point-min))
+                  (when (re-search-forward regexp (point-max) t)
+                    (save-excursion
+                      (beginning-of-line 1)
+                      (let ((lnstart (point)))
+                        (end-of-line)
+                        (funcall cb (buffer-substring lnstart (point)))))))))))
+
+        (defun cperl-setup-eldoc+ ()
+          (add-hook 'eldoc-documentation-functions 'cperl-eldoc+ nil t))
+        :hook ((perl-mode cperl-mode) . cperl-setup-eldoc+)
+
+        :general
+        (:keymaps 'cperl-mode-map
+         [override-state] 'insert                                                    ; Gives access to a bunch of electric keys
+         "TAB" nil                                                                   ; Restore indent-for-tab-command
+         "C-j" nil)
+        :lazy-leader
+        (:mode '(perl-mode cperl-mode)
+         ;; Unbound commands:
+         ;; + cperl-next-interpolated-REx
+         ;; + cperl-next-interpolated-REx-0
+         ;; + cperl-next-interpolated-REx-1
+
+         "b" 'cperl-find-bad-style
+         "d" 'cperl-here-doc-spell
+         "n" 'cperl-narrow-to-here-doc
+         "p" 'cperl-pod-spell
+         "i" 'cperl-invert-if-unless
+
+         "h" '(:ignore t :wk "help")
+         "hF" 'cperl-info-on-command
+         "hf" 'cperl-info-on-current-command
+         "hP" 'cperl-perldoc-at-point
+         "hp" 'cperl-perldoc
+         "hh" 'cperl-get-help
+
+         "t" '(:ignore t :wk "toggle")
+         "ta" 'cperl-toggle-auto-newline
+         "tk" 'cperl-toggle-abbrev
+         "te" 'cperl-toggle-electric
+         "tw" 'cperl-toggle-construct-fix))
+   #+end_src
+
+*** company-plsense                                                    :comp:
+    #+begin_src emacs-lisp
+      (use-package company-plsense
+        :straight t
+        :after perl-mode
+        :when (executable-find "plsense")
+        :init
+        (set-company-backend! 'perl-mode 'company-plsense)
+        (set-company-backend! 'cperl-mode 'company-plsense))
+    #+end_src
+
+*** perl-languageserver                                                 :lsp:
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! perl :lsp)
+    :END:
+    Requires [[https://github.com/richterger/Perl-LanguageServer][Perl-LanguageServer]].
+
+    #+begin_src emacs-lisp
+      (add-hook 'perl-mode-hook +lsp-command)
+    #+end_src
+
+    #+begin_src emacs-lisp :tangle (package-yes! perl eglot)
+      (with-eval-after-load 'eglot
+        (push `(perl-mode . ("perl"
+                             "-MPerl::LanguageServer"
+                             "-e" "Perl::LanguageServer::run"
+                             "--" "--port" :autoport "--version" "2.1.0"))
+              eglot-server-programs))
     #+end_src
 
 * Script
