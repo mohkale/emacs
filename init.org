@@ -152,6 +152,7 @@
          ;; assembly
          bibtex
          c
+         ;; csharp
          clojure
          ;; crystal
          ;; cmake
@@ -7569,6 +7570,7 @@
                git-commit-mode
                lisp-interaction-mode
                TeX-mode LaTeX-mode
+               csharp-mode
                c-mode c++-mode)
                . abbrev-mode)
        :custom
@@ -18631,6 +18633,32 @@
       (add-hook 'c-mode-hook   +lsp-command)
       (add-hook 'c++-mode-hook +lsp-command)
     #+END_SRC
+
+** csharp
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! csharp)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package csharp-mode
+       :straight t)
+   #+end_src
+
+*** omnisharp-roslyn                                                    :lsp:
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! csharp :lsp)
+    :END:
+    The most recent language server implementation for csharp: [[https://github.com/OmniSharp/omnisharp-roslyn][omnisharp-roslyn]].
+
+    #+begin_src emacs-lisp
+      (add-hook 'perl-mode-hook +lsp-command)
+    #+end_src
+
+    #+begin_src emacs-lisp :tangle (package-yes! csharp eglot)
+      (with-eval-after-load 'eglot
+        (push `(csharp-mode . ("omnisharp" "-lsp"))
+              eglot-server-programs))
+    #+end_src
 
 ** kotlin
    :PROPERTIES:
