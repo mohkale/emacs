@@ -130,7 +130,7 @@
      ;;; Package Enhancements
          ;; diredfl                                                        ; Make dired /extra/ colorful
          ;; image-dired                                                    ; View images in dired like sessions
-         ;; edit-indirect                                                  ; Edit regions of a buffer in another mode.
+         edit-indirect                                                     ; Edit regions of a buffer in another mode.
          ;; hydra-posframe                                                 ; Show hydras in a posframe
          ;; ebib                                                           ; Nice emacs based interface for editing bibtex files
                                                                            ; NOTE: This package requires bibtex to be enabled
@@ -2657,6 +2657,9 @@
 
        :config
        (push '(plantuml-mode plantuml-indent-level)
+             editorconfig-indentation-alist)
+
+       (push '(asm-mode comment-column)
              editorconfig-indentation-alist))
    #+end_src
 
@@ -5217,7 +5220,15 @@
                      (and (or (getenv "DISPLAY")
                               (getenv "WAYLAND_DISPLAY"))
                           (executable-find "xopen"))))
-       (advice-add #'consult-file-externally :override #'+xopen-url)
+
+       :config
+       (defun +xopen-file (file &optional arg)
+         (interactive "fP")
+         (+xopen-url file))
+       :commands +xopen-file
+       :general
+       (:keymaps 'embark-file-map
+        [remap consult-file-externally] '+xopen-file)
 
        :leader ("fo" '+xopen-url)
        :config
@@ -5225,13 +5236,11 @@
          "Open visited file in default external program.
      When in dired mode, open file under the cursor.
      With a prefix ARG always prompt for command to use."
-         (interactive (list (or (smart-buffer-file-name)
+         (interactive (list (or (when (derived-mode-p 'dired-mode)
+                                  (dired-get-file-for-visit))
+                                (smart-buffer-file-name)
                                 (user-error "Cannot determine file name for buffer."))
                             current-prefix-arg))
-         (unless url
-           (setq url (if (eq major-mode 'dired-mode)
-                         (dired-get-file-for-visit)
-                       buffer-file-name)))
 
          (when (string-prefix-p "~" url)
            (setq url (expand-file-name url)))
@@ -6051,7 +6060,8 @@
 ** undo-tree
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! undo-tree)
      (use-package undo-tree
-       :straight t
+       :straight (undo-tree :fork (:host gitlab
+                                   :repo "tsc25/undo-tree"))
        :diminish
        :custom
        (evil-undo-system 'undo-tree)
@@ -7574,6 +7584,7 @@
                git-commit-mode
                lisp-interaction-mode
                TeX-mode LaTeX-mode
+               go-mode
                csharp-mode
                c-mode c++-mode)
                . abbrev-mode)
@@ -8551,46 +8562,11 @@
         :init
         (require 'flymake-rest-hook-use-package)
 
-        :leader
-        ("ec" 'flymake-rest-change-checker))
+        :init
+        (with-eval-after-load 'flymake-rest-hook
+          (require 'flymake-rest-hook-langs))
 
-      (use-package flymake-rest
-        :flymake-hook
-        (python-mode
-         flymake-rest-pycodestyle
-         (flymake-mypy :disabled t)
-         (flymake-rest-pylint :disabled t))
-        (awk-mode flymake-rest-awk-gawk)
-        (c-mode
-         flymake-rest-clang
-         (flymake-rest-gcc :disabled t))
-        (c++-mode
-         flymake-rest-clang
-         (flymake-rest-gcc :disabled t))
-        (js-mode flymake-rest-eslint)
-        (js2-mode flymake-rest-eslint)
-        (typescript-mode flymake-rest-eslint)
-        (json-mode
-         flymake-rest-jq
-         (flymake-rest-jsonlint :disabled t))
-        (less-mode flymake-rest-less)
-        (markdown-mode
-         flymake-rest-markdownlint
-         flymake-rest-proselint)
-        (lua-mode
-         flymake-rest-luacheck
-         (flymake-rest-lua :disabled t))
-        (sql-mode
-         flymake-rest-sql-lint
-         (flymake-rest-sqlint :disabled t))
-        (ruby-mode flymake-rest-rubocop)
-        ;; (hledger-mode flymake-rest-hledger)
-        (sh-mode flymake-rest-shellcheck)
-        (yaml-mode flymake-rest-yamllint)
-        (web-mode flymake-rest-html-tidy)
-        (org-mode flymake-rest-proselint)
-        (notmuch-message-mode flymake-rest-proselint)
-        (nxml-mode flymake-rest-xmllint))
+        :leader ("ec" 'flymake-rest-change-checker))
     #+end_src
 
 *** flymake-diagnostics-at-point
@@ -10896,8 +10872,8 @@
          (advice-add func :around #'display-buffer-no-select-window-advice))
 
        :leader
-       ("bf" 'flush-lines
-        "bd" 'keep-lines))
+       ("x DEL" 'flush-lines
+        "x RET" 'keep-lines))
    #+END_SRC
 
 ** save-place
@@ -12024,8 +12000,8 @@
 
        :config
        (advice-add #'vertico--arrange-candidates :around
-                   (defun vertico-format-candidates+ (func metadata)
-                     (let ((hl-func (or (+completion-category-hl-func metadata)
+                   (defun vertico-format-candidates+ (func &rest args)
+                     (let ((hl-func (or (+completion-category-hl-func vertico--metadata)
                                         #'identity)))
                        (cl-letf* (((symbol-function 'actual-vertico-format-candidate)
                                    (symbol-function #'vertico--format-candidate))
@@ -12037,7 +12013,7 @@
                                                (apply #'actual-vertico-format-candidate cand args)))
                                          (apply #'actual-vertico-format-candidate
                                                 (funcall hl-func cand) args)))))
-                         (funcall func metadata)))))
+                         (apply func args)))))
 
        (advice-add #'vertico--sort-function :before-until #'+completion-category-sort-func)
 
@@ -13193,17 +13169,62 @@
    #+begin_src emacs-lisp
      (use-package apheleia
        :straight t
+       :hook (go-mode . apheleia-mode)
        :leader
-       ("tma" 'apheleia-mode)
+       ("tma" 'apheleia-mode
+        "bf" 'apheleia-format-buffer)
 
-       :custom
-       (apheleia-formatters
-        '((black "black" "--stdin-filename" filepath "-")
-          (brittany "brittany" file)
-          (prettier npx "prettier" "--stdin-filepath" filepath)
-          (gofmt "gofmt")
-          (ocamlformat "ocamlformat" file)
-          (terraform "terraform" "fmt" "-"))))
+       :config
+       ;; When in doubt, see [[https://github.com/rishirdua/awesome-code-formatters][awesome-code-formatters]] and [[https://github.com/lassik/emacs-format-all-the-code][emacs-format-all-the-code]].
+       (push '(perltidy . ("perltidy" "--quiet" "--standard-error-output")) apheleia-formatters)
+       (push '(perl-mode . perltidy) apheleia-mode-alist)
+
+       (push '(rufo . ("rufo" "--filename" filepath)) apheleia-formatters)
+       (push '(rubocop . ("ignore-exit" "1" "rubocop" "--stdin" filepath "--auto-correct" "--format" "quiet" "--stderr"))
+             apheleia-formatters)
+       (setf (alist-get 'ruby-mode apheleia-mode-alist) 'rubocop)
+       (push '(enh-ruby-mode . rubocop) apheleia-mode-alist)
+
+       (push '(isort . ("isort" "--stdout" "-")) apheleia-formatters)
+       (setf (alist-get 'python-mode apheleia-mode-alist) '(isort black))
+
+       (push '(typescript-react-mode . prettier) apheleia-mode-alist)
+       (push '(js2-jsx-mode . prettier) apheleia-mode-alist)
+
+       ;; Can be used with C, Java, and many more.
+       (setf (alist-get 'clang-format apheleia-formatters)
+             '("clang-format" "--assume-filename" filepath))
+
+       ;; WARN: Won't work until [[https://github.com/raxod502/apheleia/pull/50][#50]] is merged in.
+       (push '(shfmt . ("shfmt"
+                        "-filename" filepath
+                        "-ln" (cl-case sh-shell
+                                ((zsh bash) "bash")
+                                (t "posix"))
+                        "-i" (number-to-string
+                              (cond
+                               (indent-tabs-mode 0)
+                               (t sh-basic-offset)))
+                        "-"))
+             apheleia-formatters)
+       (push '(shfmt . ("beautysh"
+                        "-filename" filepath
+                        (when-let ((indent (bound-and-true-p sh-basic-offset)))
+                          (list "--indent-size" (number-to-string indent)))
+                        (when indent-tabs-mode "--tab")
+                        "-"))
+             apheleia-formatters)
+       (push '(sh-mode . shfmt) apheleia-mode-alist)
+
+       (push '(asmfmt . ("asmfmt")) apheleia-formatters)
+       (push '(asm-mode . asmfmt) apheleia-mode-alist)
+       (push '(nasm-mode . asmfmt) apheleia-mode-alist)
+
+       (push '(gawk . ("gawk" "-f" "-" "--pretty-print=-")) apheleia-formatters)
+       (push '(awk-mode . gawk) apheleia-mode-alist)
+
+       (push '(goimports . ("goimports" )) apheleia-formatters)
+       (setf (alist-get 'go-mode apheleia-mode-alist) 'goimports))
    #+end_src
 
 ** adaptive-wrap
@@ -15707,6 +15728,7 @@
         :hook (message-setup . gnus-alias-determine-identity)
         :custom
         (gnus-alias-default-identity (symbol-name (caar +mail-conf)))
+        (gnus-alias-allow-forward-as-reply t)
         (gnus-alias-identity-alist
          (cl-loop for (it . conf) in +mail-conf
                   collect (list (symbol-name it)
@@ -15716,8 +15738,13 @@
                                 nil ; No extra headers
                                 nil ; No extra body text
                                 (+mail-conf-get 'signature-file conf))))
-
-        (gnus-alias-allow-forward-as-reply t)
+        (gnus-alias-identity-rules
+         (cl-loop for (it . conf) in +mail-conf
+                  with email = nil do (setq email (+mail-conf-email conf))
+                  collect (list (concat "Match " email)
+                                `("from" ,(regexp-quote email))
+                                (symbol-name it)))
+         "Automatically pick the right id for a response.")
 
         :leader
         (:mode '(message-mode notmuch-message-mode)
@@ -16389,8 +16416,8 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package tree-sitter
+       :straight (tree-sitter :branch "master")
        :delight (tree-sitter-mode " T")
-       :straight t
        :hook ((emacs-startup . global-tree-sitter-mode)
               (tree-sitter-mode . tree-sitter-hl-mode)))
    #+END_SRC
@@ -16402,7 +16429,7 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package tree-sitter-langs
-       :straight t
+       :straight (tree-sitter-langs :branch "master")
        :after tree-sitter
        :demand t
        :config
@@ -17221,7 +17248,8 @@
        (modify-syntax!
          '((?_ . "w")
            (?- . "w")
-           (?! . "w"))
+           (?! . "w")
+           (?& . "w"))
          emacs-lisp-mode-syntax-table)
 
        ;; Show lambda as an actual lambda symbol... pretty cool, if I do say
@@ -17458,19 +17486,6 @@
          "i"  '(:ignore t :wk "imports")
          "ii" 'pytimport-remove-unused
          "iu" 'pyimport-insert-missing))
-    #+END_SRC
-
-*** py-isort
-    tidy up imports.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package py-isort
-        :straight t
-        :leader
-        (:mode 'python-mode
-         "i"  '(:ignore t :wk "imports")
-         "is" 'py-isort-buffer
-         "ir" 'py-isort-region))
     #+END_SRC
 
 *** pip-requirements
@@ -18061,6 +18076,16 @@
        :mode ("\\.vs$" . glsl-mode))
    #+END_SRC
 
+*** company-glsl                                                       :comp:
+    #+begin_src emacs-lisp
+      (use-package company-glsl
+        :straight t
+        ;; Requires the openGL [[https://www.khronos.org/opengles/sdk/tools/Reference-Compiler/][reference compiler]].
+        :when (executable-find "glslangValidator")
+        :init
+        (set-company-backend! 'glsl-mode 'company-glsl))
+    #+end_src
+
 ** shell-script
    :PROPERTIES:
    :header-args+: :tangle (package-yes! sh-script)
@@ -18069,8 +18094,13 @@
     #+BEGIN_SRC emacs-lisp
       (use-package sh-script
         :hook (sh-mode . +flylint)
-        :config
+        :preface
+        (push '(sh-mode . 2) +indent-config)
+
+        :init
         (advice-add 'sh-set-shell :around 'inhibit-messages-wrapper!)
+
+        :config
         (modify-syntax! '((?_ . "w")
                           (?- . "w"))
           sh-mode-syntax-table)
@@ -18579,7 +18609,7 @@
 *** company-cmake                                                       :comp:
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! cmake company) :tangle no
       (use-package company-cmake
-        :straight (company-cmake :host github :fork "company-cmake")
+        :straight (company-cmake :host github :repo "purcell/company-cmake")
         :after cmake
         :init
         (set-company-backend! 'cmake-mode
@@ -19219,17 +19249,9 @@
    #+BEGIN_SRC emacs-lisp
      (use-package go-mode
        :straight t
-       :hook (go-mode . go-mode-setup+)
-       :preface
-       (defun go-mode-setup+ ()
-         ;; Recommended by the official style guide for golang.
-         (setq indent-tabs-mode t))
-
+       :hook (go-mode . indent-tabs-mode)
        :init
        (push '(go-mode . 4) +indent-config)
-
-       :config
-       (add-hook 'before-save-hook 'gofmt-before-save)                               ; Only run when current buffer is in go-mode
 
        :lazy-leader
        (:mode 'go-mode
@@ -19242,10 +19264,9 @@
         "gi" 'go-goto-imports
         "gc" 'go-coverage
 
-        "i" '(:ignore t :wk "imports")
+        "i" '(:ignore t :wk "imports/insert")
         "ia" 'go-import-add
-        "ig" 'go-goto-imports
-        "ir" 'go-remove-unused-imports
+        "ix" 'go-remove-unused-imports
 
         "e" '(:ignore t :wk "playground")
         "eb" 'go-play-buffer
@@ -19285,6 +19306,18 @@
          "gg" 'go-guru-definition
          "gf" 'go-guru-freevars))
     #+END_SRC
+
+*** go-impl
+    Generate boilerplate for interface implementations in go.
+    Requires ~go get -u github.com/josharian/impl~.
+
+    #+begin_src emacs-lisp
+      (use-package go-impl
+        :straight t
+        :leader
+        (:mode 'go-mode
+         "ii" 'go-impl))
+    #+end_src
 
 *** gopls                                                               :lsp:
     The golang language server.
@@ -21148,7 +21181,7 @@
     View org links in non-org buffers as you would in org buffers.
 
     #+BEGIN_SRC emacs-lisp
-      (use-package ol :commands (org-insert-link-global))
+      (use-package ol :commands (org-insert-link-global org-store-link))
 
       (use-package orglink
         :straight t
@@ -21643,6 +21676,19 @@
 
              (message "Opening new figure in inkscape.")
              (start-process "inkscape" nil "inkscape" copy)))
+
+         :commands org-roam-node-formatter+
+         :custom (org-roam-node-formatter #'org-roam-node-formatter+)
+         :config
+         ;; If an anagram (all uppercase) keep as is, otherwise downcase.
+         (defun org-roam-node-formatter+ (node)
+           (let* ((title (org-roam-node-title node))
+                  (title-upcase (upcase title)))
+             (cond
+              ((string-equal title title-upcase)
+               title-upcase)
+              (t
+               (downcase title)))))
 
          :leader
          ("ox" 'org-roam-capture
@@ -22952,4 +22998,5 @@
 #  LocalWords:  NyaaLiteratureAll Nyaa NyaaGames NyaaSoftware NyaaImages NyaaMusic
 #  LocalWords:  NyaaLiveActionAll NyaaLiveAction NyaaAnimeAll NyaaAnime CppReference
 #  LocalWords:  microsoft github godoc SchoolsColors StackOverflow GoogleMaps cmake
-#  LocalWords:  GoogleImages separedit
+#  LocalWords:  GoogleImages separedit csharp impl gopls analyzer plsense glsl
+#  LocalWords:  languageserver roslyn

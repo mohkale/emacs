@@ -5,6 +5,15 @@
     ("st" "struct" nil :count 0)
    ))
 
+(define-abbrev-table 'csharp-mode-abbrev-table
+  '(
+    ("cl" "class" nil :count 1)
+    ("ns" "namespace" nil :count 1)
+    ("pb" "public" nil :count 2)
+    ("pv" "private" nil :count 1)
+    ("us" "using" nil :count 2)
+   ))
+
 (define-abbrev-table 'global-abbrev-table
   '(
     ("bg" "background" nil :count 6)
@@ -19,9 +28,16 @@
     ("pve" "positive" nil :count 1)
     ("rhs" "right hand side" nil :count 0)
     ("teh" "the" nil :count 0)
-    ("thatre" "that are" nil :count 0)
-    ("thatve" "that have" nil :count 0)
     ("that're" "that are" nil :count 0)
     ("that've" "that have" nil :count 0)
+    ("thatre" "that are" nil :count 0)
+    ("thatve" "that have" nil :count 0)
+   ))
+
+(define-abbrev-table 'go-mode-abbrev-table
+  '(
+    ("imp" "import" nil :count 1)
+    ("pkg" "package" nil :count 2)
+    ("st" "struct" nil :count 1)
    ))
 

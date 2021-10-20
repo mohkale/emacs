@@ -2191,6 +2191,37 @@
    #+END_SRC
 
 * sh-mode
+  #+begin_src emacs-lisp :tangle snippets/sh-mode/.yas-setup.el :shebang ";; -*- lexical-binding: t -*-"
+    (autoinsert-register-yas+ (rx ".sh" eol) 'sh-mode "autoinsert")
+  #+end_src
+
+** autoinsert
+   #+BEGIN_SRC snippet :tangle snippets/sh-mode/autoinsert
+     # name: autoinsert
+     # contributor: Mohsin Kaleem mohkale@kisara.moe
+     # --
+     print_usage() {
+         echo "Usage: ${1:`(if-let ((file (buffer-file-name))) (concat (file-name-nondirectory file)) "name")`} ${2:[-h]}"
+     }
+
+     print_help() {
+         print_usage
+         cat <<EOF
+     Optional arguments
+     ${3:  -h  Show this help message and exit.}
+     EOF
+     }
+
+     while getopts '${4:h}' OPTION; do
+         case "$OPTION" in
+             ${5:h) print_help
+                exit 0 ;;}$0
+             \?) print_usage >&2
+                 exit 1 ;;
+         esac
+     done
+   #+END_SRC
+
 ** while
    #+BEGIN_SRC snippet :tangle snippets/sh-mode/while
       # name: while loop
