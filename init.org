@@ -313,6 +313,9 @@
      There's a bunch of different mail extensions I have setup and each
      seem to redefine or re-reference the same core variables so I define
      and reference them from this variable to minimise the duplication.")
+
+     (defvar +completions-icon nil
+       "When true enable `all-the-icons' for minibuffer completion.")
    #+END_SRC
 
 ** require
@@ -5050,6 +5053,7 @@
          ":filter-return advice for all-the-icons functions which appends
      an extra space to the icon when displaying icons on the tty."
          (if (and value
+                  (not (string-empty-p value))
                   (not (display-graphic-p)))
              (all-the-icons-pad+ value suffix)
            value))
@@ -12607,6 +12611,16 @@
         :general
         (:states '(insert normal)
          "C-M-i" 'consult-yasnippet))
+    #+end_src
+
+*** all-the-icons-completion
+    #+begin_src emacs-lisp :tangle (if (and (package! :consult) +completions-icon) "yes" "no")
+      (use-package all-the-icons-completion
+        :straight t
+        :hook (after-init . all-the-icons-completion-mode)
+
+        :init
+        (advice-add 'all-the-icons-completion-get-icon :filter-return #'all-the-icons-pad-on-tty-advice+))
     #+end_src
 
 *** consult-extensions
