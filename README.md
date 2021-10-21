@@ -19,12 +19,12 @@
 
 This emacs configuration requires:
 
-- emacs >= 27.1
+- emacs >= 28.0
 - ruby >= 2.6 (optional)
 
 ## Building
 
-1. Run `git clone "https://github.com/mohkale/.emacs.d" ~/.emacs.d`.
+1. Run `git clone "https://github.com/mohkale/.emacs.d" ~/.config/emacs`.
 1. Open `init.org` in emacs and run `M-x org-babel-tangle` to tangle
    the configuration.
 1. Restart emacs and everything should start installing.
@@ -45,30 +45,35 @@ other dependent org files) when one of their tangle targets are out of date.
 
 I like to tinker with everything I use, so my emacs does everything I do. For an
 abridged list of supported features, see my entry-point [config](./init.org#config).
-Some **cool** features include:
 
 <div>
   <div>
-    <a href="./.github/dired.png" target="_blank">
-      <img alt="dired" src="./.github/dired.png" title="dired" />
+    <a href="./.github/dashboard.png" target="_blank">
+      <img alt="dashboard" src="./.github/dashboard.png" title="dashboard" />
+    </a>
+  </div>
+
+  <div>
+    <a href="./.github/c-project.png" target="_blank">
+      <img alt="c-project" src="./.github/c-project.png" title="C Project" />
+    </a>
+  </div>
+
+  <div>
+    <a href="./.github/python-project.png" target="_blank">
+      <img alt="python-project" src="./.github/python-project.png" title="Python Project" />
     </a>
   </div>
 
   <div>
     <a href="./.github/magit.png" target="_blank">
-      <img alt="magit" src="./.github/magit.png" title="magit" />
+      <img alt="magit" src="./.github/magit.png" title="Magit" />
     </a>
   </div>
 
   <div>
-    <a href="./.github/ivy.png" target="_blank">
-      <img alt="ivy" src="./.github/ivy.png" title="ivy" />
-    </a>
-  </div>
-
-  <div>
-    <a href="./.github/rust.png" target="_blank">
-      <img alt="rust" src="./.github/rust.png" title="rust" />
+    <a href="./.github/notmuch-mail.png" target="_blank">
+      <img alt="notmuch" src="./.github/notmuch-mail.png" title="Notmuch Mail" />
     </a>
   </div>
 </div>
