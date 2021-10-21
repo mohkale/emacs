@@ -3659,7 +3659,7 @@
         :custom
         (completion-styles '(orderless))
         (completion-category-overrides
-         '((file (styles partial-completion))))
+         '((file (styles orderless partial-completion))))
         (orderless-component-separator #'orderless-escapable-split-on-space
          "Allows escaping space with a backslash.")
 
@@ -8079,6 +8079,7 @@
                                        (or "."
                                            ".."
                                            ".git"
+                                           ".github"
                                            ".bundle"
                                            ".dired"
                                            "__pycache__"
@@ -11157,6 +11158,9 @@
         "i RET" 'split-line
         "i SPC" 'just-one-space)
 
+       :init
+       (add-to-list 'minor-mode-alist '(indent-tabs-mode " \\t") t)
+
        :config
        (push 'messages-buffer-mode +whitespace-exempt-modes)
 
@@ -12771,10 +12775,6 @@
      #+end_src
 
      #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "+org-ref-consult-cite.el") :consult)
-       (defvar org-ref-ivy-cite-keymap (make-sparse-keymap))
-       (defvar org-ref-ivy-set-keywords-keymap (make-sparse-keymap))
-       (require 'org-ref-ivy-cite) ; Provides `org-ref-cite-hydra', and other helpers.
-
        (setq org-ref-completion-library '+org-ref-consult-cite)
 
        (setq
@@ -12783,7 +12783,7 @@
         org-ref-insert-label-function 'org-ref-consult-insert-label-link
         org-ref-insert-ref-function 'org-ref-consult-insert-ref-link
         org-ref-cite-onclick-function (lambda (_)
-                                        (org-ref-cite-hydra/body)))
+                                        (org-ref-citation-hydra/body)))
 
        (defun org-ref-use-consult-bibtex+ (type &optional arg)
          (concat type ":" (consult-bibtex--read-entry)))
@@ -13583,7 +13583,7 @@
                  (funcall
                   (all-the-icons--function-name (intern (nth 0 footer-item)))
                   (nth 1 footer-item) :height 0.75 :v-adjust -0.05
-                  :face 'font-lock-keyword-face)))))
+                  :face 'dashboard-navigator)))))
 
       (setq dashboard-footer (car (seq-random-elt dashboard-quotes)))
     #+end_src
@@ -17345,6 +17345,7 @@
          '((?_ . "w")
            (?- . "w")
            (?! . "w")
+           (?: . "w")
            (?& . "w"))
          emacs-lisp-mode-syntax-table)
 
@@ -21846,8 +21847,6 @@
 
          :init
          (defvaralias 'reftex-default-bibliography 'org-cite-global-bibliography)
-         (defvaralias 'org-ref-default-bibliography 'org-cite-global-bibliography)
-         (defvaralias 'org-ref-bibliography-notes 'bibtex-completion-notes-path)
 
          :custom
          (org-ref-bibtex-completion-add-keywords-field nil)
@@ -21856,8 +21855,6 @@
 
          :config
          (setq org-ref-latex-bibliography-absolute-p t
-               org-ref-pdf-directory (let ((path bibtex-completion-library-path))
-                                       (if (listp path) (car path) path))
                org-ref-latex-bib-resolve-func #'expand-file-name))
      #+END_SRC
 
