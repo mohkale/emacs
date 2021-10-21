@@ -5041,14 +5041,14 @@
    #+BEGIN_SRC emacs-lisp
      (use-package all-the-icons
        :straight t
-       :commands (all-the-icons--insert-all-icons
-                  all-the-icons-family+)
+       :commands (all-the-icons-insert-all
+                  all-the-icons-insert-all-icons)
        :leader ("ii" 'all-the-icons-insert)
 
        :custom
        (inhibit-compacting-font-caches t)
 
-       :preface
+       :init
        (defsubst all-the-icons-pad+ (icon &optional suffix)
          (concat icon (or suffix " ")))
 
@@ -5061,9 +5061,90 @@
              (all-the-icons-pad+ value suffix)
            value))
 
+       :init
+       (defconst +icon-nerd-to-all-the-icons '((mdi . material)
+                                               (fa . faicon)
+                                               (oct . octicon)
+                                               (weather . wicon))
+         "Family translations between `nerd-fonts' and `all-the-icons'.")
+
+       (defun all-the-icons-prefer-nerd-fonts+ (func &rest args)
+         ":around advice to prefer nerd-fonts over all-the-icons fonts."
+         (eval
+          `(cl-letf ,(cl-loop for (nerd-icon . ati-icon) in +icon-nerd-to-all-the-icons
+                              append `(((symbol-function ',(all-the-icons--function-name ati-icon))
+                                        (symbol-function ',(all-the-icons--function-name (intern (concat "nerd-" (symbol-name nerd-icon))))))))
+             (apply ',func ',args))))
+
+       (defun all-the-icons-pad-families-on-tty-advice+ (func &rest args)
+         ":around advice that ensures any `all-the-icons-%s' result is padded on terminals.
+     This isn't the most performant implementation possible so you should assign it to the
+     highest level function possible that ends up calling a family function."
+         (if (display-graphic-p)
+             (apply func args)
+           ;; Needs to be evaluated since the cl-letf spec is calculated here.
+           (eval
+            `(cl-letf ,(cl-loop for it in all-the-icons-font-families
+                                with func-name = nil
+                                do (setq func-name (all-the-icons--function-name it))
+                                with new-func-name = nil
+                                do (setq new-func-name (intern (concat (symbol-name func-name) "--default")))
+                                append `(((symbol-function ',new-func-name)
+                                          (symbol-function ',func-name))
+                                         ((symbol-function ',func-name)
+                                          (lambda (&rest icon-args)
+                                            (all-the-icons-pad-on-tty-advice+
+                                             (apply ',new-func-name icon-args))))))
+               (apply ',func ',args)))))
+
+       (defmacro +icon (family &rest args)
+         "Retrieve an icon from FAMILY smartly.
+     This function acts as a proxy for the various `all-the-icons-%s-icon'
+     functions. It can smartly fallback to a built-in `all-the-icons' font
+     when a nerd-font icon is requested but not available.
+
+     Note: This may throw an error when `all-the-icons' doesn't have an
+     association for a font in the same family that nerd font does have.
+     This can happen because `all-the-icons' associations are out of date."
+         (when (and (not +icons-prefer-nerd-font)
+                    (string-prefix-p "nerd-" (symbol-name family)))
+           (if-let ((new-family (alist-get (intern (substring (symbol-name family) 5))
+                                           +icon-nerd-to-all-the-icons)))
+               (setq family new-family)
+             (error "Nerd fonts not enabled but need to return a %s icon" family)))
+         ;; Function name calculation copied from `all-the-icons--function-name'.
+         `(,(intern (concat "all-the-icons-" (downcase (symbol-name family)))) ,@args))
+
+       (defmacro +icon-for (for target &rest args)
+         "Generic icon fetcher for TARGET.
+     TARGET can be a buffer, directory path, file-name, mode-symbol, etc. depending
+     on the value of FOR. ARGS when supported will be passed to the associated icon
+     fetcher and can be used to set :height or :face properties."
+         (if-let ((func (cl-case for
+                          (file #'all-the-icons-icon-for-file)
+                          (mode #'all-the-icons-icon-for-mode)
+                          (url  #'all-the-icons-icon-for-url)
+                          ((dir directory) #'all-the-icons-icon-for-dir))))
+             `(,func ,target ,@args)
+           (cl-case for
+             ;; `all-the-icons-icon-for-buffer'.
+             (buffer `(with-current-buffer ,target
+                        (if (and (buffer-file-name)
+                                 (all-the-icons-auto-mode-match?))
+                            (apply #'all-the-icons-icon-for-file
+                                   (file-name-nondirectory (buffer-file-name))
+                                   ',args)
+                          (apply #'all-the-icons-icon-for-mode major-mode ',args))))
+             ;; TODO: Args aren't used by the following.
+             ((dir+chevron directory+chevron)
+              `(all-the-icons-icon-for-dir-with-chevron ,target))
+             (t (error "Don't know how to fetch an icon for %s" for)))))
+
        :config
        (push '(rustic-mode all-the-icons-alltheicon "rust") all-the-icons-mode-icon-alist)
        (push '(web-mode    all-the-icons-faicon     "html5") all-the-icons-mode-icon-alist)
+       (setf (car (assoc "^Makefile$" all-the-icons-regexp-icon-alist))
+             (rx bol (or (any "M" "m")) "akefile" eol))
 
        (defun all-the-icons-insert-all ()
          (interactive)
@@ -5085,11 +5166,7 @@
                     (name (car args))
                     (type (substring (symbol-name func) 14)))
                (unless (= (length args) 0)
-                 (insert "\n" (apply func args) " " type " - " name))))))
-
-       (defun all-the-icons-family+ (family name &rest args)
-         "Retrieve icon with NAME from FAMILY with ARGS"
-         (apply (all-the-icons--function-name family) name args)))
+                 (insert "\n" (apply func args) " " type " - " name)))))))
    #+END_SRC
 
 *** nerd-fonts
@@ -5099,21 +5176,17 @@
     #+BEGIN_SRC emacs-lisp
       (use-package nerd-fonts
         :straight (nerd-fonts :host github :repo "mohkale/nerd-fonts.el")
+        :when +icons-prefer-nerd-font
         :after all-the-icons
         :demand t
         :config
-        (defvar nerd-fonts-families+
+        (defconst nerd-fonts-families+
           (seq-uniq
-           (cl-loop with pos = nil
-                    for (icon . _) in nerd-fonts-alist
-                    do (setq pos (cl-loop with count = 0
-                                          for char across icon
-                                          when (eq char ?-)
-                                          return count
-                                          else
-                                          do (setq count (1+ count))))
-                    collect (substring icon 0 pos))))
+           (cl-loop for (icon . _) in nerd-fonts-alist
+                    collect (intern (substring icon 0 (cl-position ?- icon))))))
 
+        :config
+        ;; Define new `all-the-icons' families for available nerd fonts.
         (defmacro all-the-icons-nerd-font-family+ (family)
           (let* ((nerd-family (concat "nerd-" family))
                  (font-alist (intern (concat "all-the-icons-data/" nerd-family "-alist")))
@@ -5131,66 +5204,97 @@
 
         (dolist (it nerd-fonts-families+)
           (eval
-           `(all-the-icons-nerd-font-family+ ,it)))
+           `(all-the-icons-nerd-font-family+ ,(symbol-name it))))
 
         ;; Replace any none nerd-font lookups with nerd-font lookups.
-        (when +icons-prefer-nerd-font
-          (let ((family-subs (cl-loop for (family . ati-var) in '(("fa" . all-the-icons-faicon)
-                                                                  ("mdi" . all-the-icons-material)
-                                                                  ("oct" . all-the-icons-octicon)
-                                                                  ("weather" . all-the-icons-wicon))
-                                      when (member family nerd-fonts-families+)
-                                      collect (cons ati-var
-                                                    (intern (concat "all-the-icons-nerd-" family)))))
-                (match-subs '(((all-the-icons-alltheicon . "aws")              .    (all-the-icons-nerd-fa     . "amazon"))
-                              ((all-the-icons-alltheicon . "c-line")           .    (all-the-icons-nerd-custom . "c"))
-                              ((all-the-icons-alltheicon . "clojure-line")     .    (all-the-icons-nerd-dev    . "clojure"))
-                              ((all-the-icons-alltheicon . "cplusplus-line")   .    (all-the-icons-nerd-custom . "cpp"))
-                              ((all-the-icons-alltheicon . "csharp-line")      .    (all-the-icons-nerd-mdi    . "language-csharp"))
-                              ((all-the-icons-alltheicon . "elixir")           .    (all-the-icons-nerd-custom . "elixir"))
-                              ((all-the-icons-alltheicon . "git")              .    (all-the-icons-nerd-mdi    . "git"))
-                              ((all-the-icons-alltheicon . "go")               .    (all-the-icons-nerd-seti   . "go"))
-                              ((all-the-icons-alltheicon . "google-drive")     .    (all-the-icons-nerd-mdi    . "google-drive"))
-                              ((all-the-icons-alltheicon . "gulp")             .    (all-the-icons-nerd-seti   . "gulp"))
-                              ((all-the-icons-alltheicon . "haskell")          .    (all-the-icons-nerd-seti   . "haskell"))
-                              ((all-the-icons-alltheicon . "html5")            .    (all-the-icons-nerd-fa     . "html5"))
-                              ((all-the-icons-alltheicon . "java")             .    (all-the-icons-nerd-fae    . "java"))
-                              ((all-the-icons-alltheicon . "nodejs")           .    (all-the-icons-nerd-mdi    . "nodejs"))
-                              ((all-the-icons-alltheicon . "prolog")           .    (all-the-icons-nerd-dev    . "prolog"))
-                              ((all-the-icons-alltheicon . "python")           .    (all-the-icons-nerd-fa     . "-python"))
-                              ((all-the-icons-alltheicon . "react")            .    (all-the-icons-nerd-mdi    . "react"))
-                              ((all-the-icons-alltheicon . "ruby-alt")         .    (all-the-icons-nerd-oct    . "ruby"))
-                              ((all-the-icons-alltheicon . "rust")             .    (all-the-icons-nerd-dev    . "rust"))
-                              ((all-the-icons-alltheicon . "sass")             .    (all-the-icons-nerd-dev    . "sass"))
-                              ((all-the-icons-alltheicon . "scala")            .    (all-the-icons-nerd-dev    . "scala"))
-                              ((all-the-icons-alltheicon . "script")           .    (all-the-icons-nerd-seti   . "html"))
-                              ((all-the-icons-alltheicon . "swift")            .    (all-the-icons-nerd-dev    . "swift"))
-                              ((all-the-icons-alltheicon . "terminal")         .    (all-the-icons-nerd-fa     . "terminal"))
-                              ((all-the-icons-fileicon   . "tex")              .    (all-the-icons-nerd-oct    . "text-size"))
-                              ((all-the-icons-alltheicon . "test-ruby")        .    (all-the-icons-nerd-oct    . "ruby"))
-                              ((all-the-icons-fileicon   . "cljs")             .    (all-the-icons-nerd-dev    . "clojure"))
-                              ((all-the-icons-fileicon   . "docker")           .    (all-the-icons-nerd-linux  . "docker"))
-                              ((all-the-icons-fileicon   . "bib")              .    (all-the-icons-nerd-fa     . "book"))
-                              ((all-the-icons-fileicon   . "php")              .    (all-the-icons-nerd-dev    . "php"))
-                              ((all-the-icons-fileicon   . "racket")           .    (all-the-icons-fileicon    . "lisp")))))
-            ;; For each variable all-the-icons uses to lookup contextual icons.
-            (dolist (var '(all-the-icons-icon-alist
-                           all-the-icons-dir-icon-alist
-                           all-the-icons-weather-icon-alist
-                           all-the-icons-mode-icon-alist
-                           all-the-icons-url-alist
-                           all-the-icons-extension-icon-alist))
-              ;; For each entry in those lists do key-value substitution with `subs'.
-              (dolist (assoc (symbol-value var))
-                (if-let ((new-icon-func (alist-get (nth 1 assoc) family-subs)))
-                    (setcar (cdr assoc) new-icon-func)
-                  (when-let ((new-assoc (alist-get (cons (nth 1 assoc) (nth 2 assoc))
-                                                   match-subs nil nil
-                                                   (lambda (a b)
-                                                     (and (eq    (car a) (car b))
-                                                          (equal (cdr a) (cdr b)))))))
-                    (setcar (cdr assoc)       (car new-assoc))
-                    (setcar (cdr (cdr assoc)) (cdr new-assoc)))))))))
+        (let ((family-subs (cl-loop for (family . ati-family) in +icon-nerd-to-all-the-icons
+                                    when (member family nerd-fonts-families+)
+                                    collect (cons (intern (concat "all-the-icons-" (symbol-name ati-family)))
+                                                  (intern (concat "all-the-icons-nerd-" (symbol-name family))))))
+              (match-subs '(((all-the-icons-alltheicon . "aws")              .    (all-the-icons-nerd-fa     . "amazon"))
+                            ((all-the-icons-alltheicon . "c-line")           .    (all-the-icons-nerd-custom . "c"))
+                            ((all-the-icons-alltheicon . "clojure-line")     .    (all-the-icons-nerd-dev    . "clojure"))
+                            ((all-the-icons-alltheicon . "cplusplus-line")   .    (all-the-icons-nerd-custom . "cpp"))
+                            ((all-the-icons-alltheicon . "csharp-line")      .    (all-the-icons-nerd-mdi    . "language-csharp"))
+                            ((all-the-icons-alltheicon . "elixir")           .    (all-the-icons-nerd-custom . "elixir"))
+                            ((all-the-icons-alltheicon . "git")              .    (all-the-icons-nerd-mdi    . "git"))
+                            ((all-the-icons-alltheicon . "go")               .    (all-the-icons-nerd-seti   . "go"))
+                            ((all-the-icons-alltheicon . "google-drive")     .    (all-the-icons-nerd-mdi    . "google-drive"))
+                            ((all-the-icons-alltheicon . "gulp")             .    (all-the-icons-nerd-seti   . "gulp"))
+                            ((all-the-icons-alltheicon . "haskell")          .    (all-the-icons-nerd-seti   . "haskell"))
+                            ((all-the-icons-alltheicon . "html5")            .    (all-the-icons-nerd-fa     . "html5"))
+                            ((all-the-icons-alltheicon . "java")             .    (all-the-icons-nerd-fae    . "java"))
+                            ((all-the-icons-alltheicon . "javascript")       .    (all-the-icons-nerd-seti   . "javascript"))
+                            ((all-the-icons-alltheicon . "nodejs")           .    (all-the-icons-nerd-mdi    . "nodejs"))
+                            ((all-the-icons-alltheicon . "prolog")           .    (all-the-icons-nerd-dev    . "prolog"))
+                            ((all-the-icons-alltheicon . "python")           .    (all-the-icons-nerd-fa     . "-python"))
+                            ((all-the-icons-alltheicon . "react")            .    (all-the-icons-nerd-mdi    . "react"))
+                            ((all-the-icons-alltheicon . "ruby-alt")         .    (all-the-icons-nerd-oct    . "ruby"))
+                            ((all-the-icons-alltheicon . "rust")             .    (all-the-icons-nerd-dev    . "rust"))
+                            ((all-the-icons-alltheicon . "sass")             .    (all-the-icons-nerd-dev    . "sass"))
+                            ((all-the-icons-alltheicon . "scala")            .    (all-the-icons-nerd-dev    . "scala"))
+                            ((all-the-icons-alltheicon . "script")           .    (all-the-icons-nerd-seti   . "html"))
+                            ((all-the-icons-alltheicon . "swift")            .    (all-the-icons-nerd-dev    . "swift"))
+                            ((all-the-icons-alltheicon . "terminal")         .    (all-the-icons-nerd-fa     . "terminal"))
+                            ((all-the-icons-octicon    . "file-submodule")   .    (all-the-icons-nerd-oct    . "file-submodule"))
+                            ((all-the-icons-fileicon   . "tex")              .    (all-the-icons-nerd-oct    . "text-size"))
+                            ((all-the-icons-alltheicon . "test-ruby")        .    (all-the-icons-nerd-oct    . "ruby"))
+                            ((all-the-icons-fileicon   . "cljs")             .    (all-the-icons-nerd-dev    . "clojure"))
+                            ((all-the-icons-fileicon   . "dockerfile")       .    (all-the-icons-nerd-linux  . "docker"))
+                            ((all-the-icons-fileicon   . "bib")              .    (all-the-icons-nerd-fa     . "book"))
+                            ((all-the-icons-fileicon   . "php")              .    (all-the-icons-nerd-dev    . "php"))
+                            ((all-the-icons-fileicon   . "racket")           .    (all-the-icons-fileicon    . "lisp")))))
+          ;; For each variable all-the-icons uses to lookup contextual icons.
+          (dolist (var '(all-the-icons-icon-alist
+                         all-the-icons-dir-icon-alist
+                         all-the-icons-weather-icon-alist
+                         all-the-icons-mode-icon-alist
+                         all-the-icons-url-alist
+                         all-the-icons-extension-icon-alist))
+            ;; For each entry in those lists do key-value substitution with `subs'.
+            (dolist (assoc (symbol-value var))
+              (if-let ((new-icon-func (alist-get (nth 1 assoc) family-subs)))
+                  (setcar (cdr assoc) new-icon-func)
+                (when-let ((new-assoc (alist-get (cons (nth 1 assoc) (nth 2 assoc))
+                                                 match-subs nil nil
+                                                 (lambda (a b)
+                                                   (and (eq    (car a) (car b))
+                                                        (equal (cdr a) (cdr b)))))))
+                  (setcar (cdr assoc)       (car new-assoc))
+                  (setcar (cdr (cdr assoc)) (cdr new-assoc)))))))
+
+        :config
+        (setf (cdr (assoc "\\.git" all-the-icons-dir-icon-alist))
+              '(all-the-icons-nerd-custom "folder-git" :height 1.0)
+              (cdr (assoc "download" all-the-icons-dir-icon-alist))
+              '(all-the-icons-nerd-mdi "folder-download" :height 1.0))
+
+        (setq all-the-icons-mode-icon-alist
+              (append
+               `((notmuch-search-mode all-the-icons-nerd-mdi "email" :height 1.0)
+                 (notmuch-hello-mode all-the-icons-nerd-mdi "email" :height 1.0)
+                 (notmuch-tree-mode all-the-icons-nerd-mdi "email" :height 1.0)
+                 (notmuch-show-mode all-the-icons-nerd-mdi "email-open" :height 1.0))
+               all-the-icons-mode-icon-alist))
+
+        (push `(messages-buffer-mode all-the-icons-nerd-mdi "message-text" :height 1.0)
+              all-the-icons-mode-icon-alist)
+        (push `(,(rx ".github") all-the-icons-nerd-custom "folder-github" :height 1.0)
+              all-the-icons-dir-icon-alist)
+        (push `(,(rx ".editorconfig") all-the-icons-fileicon "editorconfig" :face all-the-icons-yellow)
+              all-the-icons-regexp-icon-alist)
+        (push `(,(rx bol ".gitignore" eol) all-the-icons-nerd-mdi "git" :face all-the-icons-red)
+              all-the-icons-regexp-icon-alist)
+        (push `(,(rx bol ".gitattributes" eol) all-the-icons-nerd-mdi "git" :face all-the-icons-red)
+              all-the-icons-regexp-icon-alist)
+        (push `(,(rx bol ".gitmodules" eol) all-the-icons-nerd-mdi "git" :face all-the-icons-red)
+              all-the-icons-regexp-icon-alist)
+        (push `(,(rx "Thorfile") all-the-icons-nerd-oct "ruby" :face all-the-icons-lred)
+              all-the-icons-regexp-icon-alist)
+        (push `(,(rx "thor") all-the-icons-nerd-oct "ruby" :face all-the-icons-lred)
+              all-the-icons-extension-icon-alist)
+        (push `(,(rx "." eol) all-the-icons-nerd-oct "file-directory" :height 1.0 :v-adjust -0.1)
+              all-the-icons-regexp-icon-alist))
     #+END_SRC
 
 ** avy
@@ -7958,22 +8062,8 @@
         (push '(dired-aux dired-upcase all-the-icons-dired--refresh-advice) all-the-icons-dired-advice-alist)
         (push '(dired-aux dired-downcase all-the-icons-dired--refresh-advice) all-the-icons-dired-advice-alist)
 
-        :config
-        (advice-add 'all-the-icons-dired--refresh :around
-                    (defun all-the-icons-dired-setup-tty-icons+ (func &rest args)
-                      (cl-letf (((symbol-function 'all-the-icons-icon-for-file--default)
-                                 (symbol-function 'all-the-icons-icon-for-file))
-                                ((symbol-function 'all-the-icons-icon-for-file)
-                                 (lambda (&rest icon-args)
-                                   (all-the-icons-pad-on-tty-advice+
-                                    (apply 'all-the-icons-icon-for-file--default icon-args))))
-                                ((symbol-function 'all-the-icons-icon-for-dir--default)
-                                 (symbol-function 'all-the-icons-icon-for-dir))
-                                ((symbol-function 'all-the-icons-icon-for-dir)
-                                 (lambda (&rest icon-args)
-                                   (all-the-icons-pad-on-tty-advice+
-                                    (apply 'all-the-icons-icon-for-dir--default icon-args)))))
-                        (apply func args)))))
+        :init
+        (advice-add 'all-the-icons-dired--refresh :around #'all-the-icons-pad-families-on-tty-advice+))
     #+END_SRC
 
 *** dired-omit
@@ -8773,9 +8863,6 @@
    :END:
 
    #+BEGIN_SRC emacs-lisp
-     (defvar ibuffer-show-buffer-icons+ nil
-       "Whether to show icons alongside the buffer")
-
      (use-package ibuffer
        :hook (ibuffer-mode . hl-line-mode)
        :leader
@@ -8788,7 +8875,7 @@
        (ibuffer-formats
         `((mark modified read-only locked
            " "
-           ,@(when ibuffer-show-buffer-icons+
+           ,@(when +icons-available
                (list '(icon 2 2 :left :elide)
                      (propertize " " 'display `(space :align-to 8))))
            (name 20 20 :left :elide)
@@ -8798,9 +8885,9 @@
            (mode+ 16 16 :left :elide)
            " " filename-and-process+)
           (mark " "
-           ,@(when ibuffer-show-buffer-icons+
+           ,@(when +icons-available
                (list '(icon 2 2 :left :elide)
-                     (propertize " " 'display `(space :align-to 8))))
+                     " "))
            (name 30 30 :left :elide)
            " "
            filename)))
@@ -9187,9 +9274,7 @@
               (if +icons-available
                   (concat
                    (all-the-icons-pad-on-tty-advice+
-                    (all-the-icons-nerd-oct "file-directory"
-                                            :face ibuffer-filter-group-name-face
-                                            :v-adjust -0.05))
+                    (+icon nerd-oct "repo" :face ibuffer-filter-group-name-face))
                    " ")
                 "Project: "))
 
@@ -9919,22 +10004,14 @@
     When available we should try to show an icon for the current file.
 
     #+BEGIN_SRC emacs-lisp
-      (defun +mode-line-buffer-file-icon (&rest props)
-        ;; Adapted from `all-the-icons-icon-for-buffer' because it doesn't let you supply
-        ;; any face properties for the buffer icon face :cry:.
-        (if (and (buffer-file-name)
-                 (all-the-icons-auto-mode-match?))
-            (apply #'all-the-icons-icon-for-file (file-name-nondirectory (buffer-file-name)) props)
-          (apply #'all-the-icons-icon-for-mode major-mode props)))
-
       (defvar-local +mode-line-buffer-file-icon nil)
       (defun +mode-line-update-buffer-file-icon (&rest _)
         "Update file icon in `mode-line'."
         (setq +mode-line-buffer-file-icon
               (when (and +icons-available (featurep 'all-the-icons))
-                (let ((icon (or (+mode-line-buffer-file-icon :face nil))))
+                (let ((icon (+icon-for buffer (current-buffer) :face nil)))
                   (propertize (if (or (null icon) (symbolp icon))
-                                  (all-the-icons-faicon "file-o" :face nil)
+                                  (+icon nerd-fa "file-o" :face nil)
                                 icon)
                               'help-echo (format "Major-mode: %s" (format-mode-line mode-name))
                               'display '(raise -0.135))))))
@@ -10119,7 +10196,8 @@
               (propertize
                (concat
                 (if (featurep 'all-the-icons)
-                    (all-the-icons-pad+ (all-the-icons-nerd-mdi icon))
+                    (all-the-icons-pad+
+                     (+icon nerd-mdi icon))
                   +mode-line-checker-bullet)
                 count)
                'face face)))
@@ -10235,10 +10313,10 @@
          (setq +mode-line-lsp-text
                (let* ((workspaces (lsp-workspaces)))
                  (propertize (all-the-icons-pad+
-                              (all-the-icons-faicon "rocket"
-                                                    :face (if workspaces
-                                                              nil
-                                                            'compilation-mode-line-fail)))
+                              (+icon nerd-fa "rocket"
+                                     :face (if workspaces
+                                               nil
+                                             'compilation-mode-line-fail)))
                              'help-echo
                              (if workspaces
                                  (concat "LSP Connected "
@@ -10295,7 +10373,7 @@
                                           ((and pending (cl-plusp pending)) 'compilation-mode-line-run)
                                           (nick nil)
                                           (t 'compilation-mode-line-run))))
-                   (propertize (all-the-icons-pad+ (all-the-icons-faicon "rocket" :face face))
+                   (propertize (all-the-icons-pad+ (+icon nerd-fa "rocket" :face face))
                                'help-echo (cond
                                            (last-error
                                             (format "EGLOT\nAn error occured: %s
@@ -10371,7 +10449,7 @@
       (defun +mode-line-status-icons ()
         (let ((msg (concat (and (buffer-narrowed-p)
                                 (featurep 'all-the-icons)
-                                (all-the-icons-pad+ (all-the-icons-nerd-mdi "eye")))
+                                (all-the-icons-pad+ (+icon nerd-mdi "eye")))
                            +mode-line-eglot-text
                            +mode-line-lsp-text)))
           (unless (string-empty-p msg)
@@ -11371,8 +11449,10 @@
        :config
        (require 'all-the-icons)
        (setq tab-bar-close-button (propertize "  " 'display (get-text-property 0 'display tab-bar-close-button))
-             tab-bar-back-button (all-the-icons-pad-on-tty-advice+ (all-the-icons-nerd-fa "arrow-circle-left"))
-             tab-bar-forward-button  (all-the-icons-pad-on-tty-advice+ (all-the-icons-nerd-fa "arrow-circle-right")))
+             tab-bar-back-button (all-the-icons-pad-on-tty-advice+
+                                  (+icon nerd-fa "arrow-circle-left"))
+             tab-bar-forward-button (all-the-icons-pad-on-tty-advice+
+                                     (+icon nerd-fa "arrow-circle-right")))
 
        :preface
        (defvar tab-bar-separator+ "▌" ;; '("▌" . "▐")
@@ -11401,9 +11481,8 @@
                              (propertize
                               (or (ignore-errors
                                     (and name
-                                         (with-current-buffer name
-                                           (all-the-icons-icon-for-buffer))))
-                                  (all-the-icons-nerd-mdi "buffer"))
+                                         (+icon-for buffer name)))
+                                  (+icon nerd-mdi "buffer"))
                               'face face)
                              (propertize " " 'face face))))
                  (concat (propertize (if tab-bar-tab-hints (format "%d " i) "") 'face face)
@@ -12593,7 +12672,7 @@
     #+begin_src emacs-lisp :tangle (if (and (package! :consult) +completions-icon) "yes" "no")
       (use-package all-the-icons-completion
         :straight t
-        :hook (after-init . all-the-icons-completion-mode)
+        :hook (marginalia-mode . all-the-icons-completion-marginalia-setup)
 
         :init
         (advice-add 'all-the-icons-completion-get-icon :filter-return #'all-the-icons-pad-on-tty-advice+))
@@ -13524,12 +13603,10 @@
         (dashboard-items '((recents  . 5)
                            (projects . 15)))
         (dashboard-center-content nil)
-        (dashboard-set-file-icons t)
         (dashboard-set-navigator  t)
         (dashboard-set-init-info  t)
         (show-week-agenda-p       t)
         (dashboard-show-shortcuts t)
-        (dashboard-set-heading-icons nil)
         (dashboard-page-separator "\n\f\n")
 
         :preface
@@ -13570,25 +13647,25 @@
         (setq dashboard-navigator-buttons
               `((;; line 01
                  (,(all-the-icons-pad-on-tty-advice+
-                    (all-the-icons-faicon "github" :height 0.75 :v-adjust 0.0))
+                    (+icon nerd-fa "github" :height 0.75 :v-adjust 0.0))
                   "Homepage"
                   "Browse Homepage"
                   (lambda (&rest _)
                     (browse-url "https://github.com/MoHKale")))
                  (,(all-the-icons-pad-on-tty-advice+
-                    (all-the-icons-faicon "google" :height 0.75 :v-adjust 0.0))
+                    (+icon nerd-fa "google" :height 0.75 :v-adjust 0.0))
                   "Google"
                   "Browse Google"
                   (lambda (&rest _)
                     (browse-url "https://www.google.co.uk")))
                  (,(all-the-icons-pad-on-tty-advice+
-                    (all-the-icons-fileicon "org" :height 0.75 :v-adjust 0.0))
+                    (+icon fileicon "org" :height 0.75 :v-adjust 0.0))
                   "Manual"
                   "Browse Emacs Manual"
                   (lambda (&rest _)
                     (browse-url "https://www.gnu.org/software/emacs/manual/html_node/emacs/index.html")))
                  (,(all-the-icons-pad-on-tty-advice+
-                    (all-the-icons-faicon "cog" :height 0.75 :v-adjust 0.0))
+                    (+icon nerd-fa "cog" :height 0.75 :v-adjust 0.0))
                   "Update Packages"
                   "Update Packages"
                   #'update-installed-packages)
@@ -13722,6 +13799,25 @@
                     (when-let ((dash (get-buffer dashboard-buffer-name)))
                       (with-current-buffer dash
                         (dashboard-refresh-buffer)))))
+
+        :custom
+        (dashboard-set-file-icons +icons-available)
+        (dashboard-set-heading-icons +icons-available)
+        (dashboard-heading-icons '((recents   . "file-text")
+                                   (bookmarks . "bookmark")
+                                   (agenda    . "calendar")
+                                   (projects  . "briefcase")
+                                   (registers . "database")))
+        :config
+        ;; (advice-add 'dashboard-insert-startupify-lists :around 'all-the-icons-pad-families-on-tty-advice+)
+        (when +icons-prefer-nerd-font
+          (advice-add #'dashboard-insert-heading :around
+                      (defun dashboard-insert-heading-use-nerd-fonts+ (func &rest args)
+                        (cl-letf (((symbol-function 'all-the-icons-octicon)
+                                   (lambda (&rest icon-args)
+                                     (all-the-icons-pad-on-tty-advice+
+                                      (apply #'all-the-icons-nerd-oct icon-args)))))
+                          (apply func args)))))
 
         :general
         (:keymaps 'dashboard-mode-map
@@ -15320,13 +15416,13 @@
            (cl-destructuring-bind (chevron . icon)
                (cl-case name
                  (open
-                  (cons (all-the-icons-nerd-mdi "chevron-down")
-                        (all-the-icons-icon-for-dir (directory-file-name node-name))))
+                  (cons (+icon nerd-mdi "chevron-down")
+                        (+icon-for dir (directory-file-name node-name))))
                  (close
                   (cons (all-the-icons-nerd-mdi "chevron-right")
-                        (all-the-icons-icon-for-dir (directory-file-name node-name))))
+                        (+icon-for dir (directory-file-name node-name))))
                  (t ; leaf
-                  (cons nil (all-the-icons-icon-for-file node-name))))
+                  (cons nil (+icon-for file node-name))))
              (setq icon (all-the-icons-pad-on-tty-advice+ icon))
              (insert
               (if chevron
@@ -19864,8 +19960,8 @@
         :init
         (with-eval-after-load 'all-the-icons
           (setq
-           bibtex-completion-pdf-symbol   (all-the-icons-pad+ (all-the-icons-nerd-oct "file-pdf" :face '(:weight normal :inherit)))
-           bibtex-completion-notes-symbol (all-the-icons-pad+ (all-the-icons-fileicon "org" :face '(:weight normal :inherit)))))
+           bibtex-completion-pdf-symbol   (all-the-icons-pad+ (+icon nerd-oct "file-pdf" :face '(:weight normal :inherit)))
+           bibtex-completion-notes-symbol (all-the-icons-pad+ (+icon fileicon "org" :face '(:weight normal :inherit)))))
 
         :config
         (defun bibtex-completion-format-citation-org-mode-cite+ (keys)
