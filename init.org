@@ -213,7 +213,8 @@
        "When true `all-the-icons' will be available even in terminal emacs.")
 
      (defvar +icons-prefer-nerd-font t
-       "When true override `all-the-icons' fonts with nerd-fonts")
+       "When true override `all-the-icons' fonts with nerd-fonts.
+     Set to a string to use that as nerd-font font family.")
 
      (defvar +find-file-ignore-regexp
        (rx (or (and ".#" (one-or-more any))
@@ -465,7 +466,7 @@
      The output will be a collection of conses of the form (PATH . DEPTH)
      specifying we want to look in any directory upto DEPTH paths down in
      PATH. The result of this can be set to `magit-repository-directories'."
-       (cl-loop for path in (split-string repo-path ":")
+       (cl-loop for path in (split-string (or repo-path "") ":")
                 with depth = nil
                 do (setq depth 0)
                 if (string-suffix-p "/" path)
@@ -631,6 +632,11 @@
 
    #+NAME: setup-path-xdg
    #+begin_src emacs-lisp
+     ;; See [[https://www.gnu.org/software/emacs/manual/html_node/efaq-w32/Location-of-init-file.html][location of init file]].
+     (require 'subr-x)
+     (when (member system-type '(cygwin ms-dos windows-nt))
+       (setenv "HOME" (string-remove-suffix "\\AppData\\Roaming" (getenv "HOME"))))
+
      (require 'xdg)
 
      (defun xdg-documents-dir ()
@@ -665,7 +671,7 @@
               (func-sym (intern (concat "dotemacs-join-" path-type-name "-path"))))
          `(progn
             (defconst ,path-sym
-              (eval-when-compile (join-path user-emacs-directory ,path)))
+              (eval-when-compile (join-path (expand-file-name user-emacs-directory) ,path)))
 
             (eval-when-compile
               (unless (file-exists-p ,path-sym)
@@ -1043,9 +1049,13 @@
     Auto saves and backup files, both important parts of emacs
 
     #+BEGIN_SRC emacs-lisp
+
       (setq
        ;; where do autosave files get stored
-       auto-save-file-name-transforms `((".*" ,(state! "auto-save" "sessions/") t))
+       auto-save-file-name-transforms
+       (let ((auto-save-dir (state! "auto-save" "sessions/")))
+         (mkdir auto-save-dir t)
+         `((".*" ,auto-save-dir t)))
 
        ;; where do backup files get stored
        backup-directory-alist `(("." . ,(state! "backups/"))))
@@ -1683,9 +1693,10 @@
     Root level remaps.
 
     #+begin_src emacs-lisp
-      (general-define-key
-       [remap revert-buffer] 'revert-buffer-quick                                     ; Why ever be prompted if nothings been modified?
-       )
+      (when (functionp 'revert-buffer-quick)
+        (general-define-key
+         [remap revert-buffer] 'revert-buffer-quick                                   ; Why ever be prompted if nothings been modified?
+         ))
     #+end_src
 
     My window map, like ~C-w~ in vim.
@@ -4905,11 +4916,10 @@
         "C-r"    'company-search-repeat-backward
         "C-n"    'company-search-repeat-forward
         "C-p"    'company-search-repeat-backward
-        "ESC"    'company-search-abort)
+        "<escape>"    'company-search-abort)
        (:keymaps 'company-active-map
         "<override-state>" 'all
         "C-w"    nil                                                                 ; was company-show-location
-        "ESC"    nil
         "C-1"    'company-complete-tooltip-row
         "C-2"    'company-complete-tooltip-row
         "C-3"    'company-complete-tooltip-row
@@ -5203,7 +5213,10 @@
                                           icon))))
 
                ;; The font on my linux machine, maybe needs updating depending on platform
-               (all-the-icons-define-icon ,name ,font-alist ,nerd-family "Symbols Nerd Font"))))
+               (all-the-icons-define-icon ,name ,font-alist ;; ,nerd-family
+                                          ,(if (stringp +icons-prefer-nerd-font)
+                                               +icons-prefer-nerd-font
+                                             "Symbols Nerd Font")))))
 
         (dolist (it nerd-fonts-families+)
           (eval
@@ -11653,7 +11666,7 @@
 
        :general
        (:keymaps 'tabulated-list-mode-map
-        "SPC" nil "ESC" nil "0" nil "<" nil ">" nil "?" nil
+        "SPC" nil "0" nil "<" nil ">" nil "?" nil
         "g" nil "h" nil "n" nil "p" nil "DEL" nil "S-SPC" nil))
    #+END_SRC
 
@@ -15426,7 +15439,7 @@
         :general
         ;; escape means quit too
         (:keymaps 'transient-base-map
-         "ESC"      'transient-quit-one
+         ;; "ESC"      'transient-quit-one
          "<escape>" 'transient-quit-one))
     #+END_SRC
 
@@ -19564,20 +19577,11 @@
    :header-args+: :tangle (package-yes! git-langs)
    :END:
 
-*** gitignore
-    #+BEGIN_SRC emacs-lisp
-     (use-package gitignore-mode :straight t)
-    #+END_SRC
-
-*** gitconfig
-    #+BEGIN_SRC emacs-lisp
-     (use-package gitconfig-mode :straight t)
-    #+END_SRC
-
-*** gitattributes
-    #+BEGIN_SRC emacs-lisp
-     (use-package gitattributes-mode :straight t)
-    #+END_SRC
+   #+BEGIN_SRC emacs-lisp
+     (use-package git-modes
+       :straight t
+       )
+   #+END_SRC
 
 ** latex
    :PROPERTIES:
@@ -21472,7 +21476,7 @@
                                   :eldoc    #'+org-pdf-bib-eldoc))
 
        (with-eval-after-load 'org-ref
-         (push "pdfbib" org-ref-cite-types))
+         (push '("pdfbib" "Citation type for pdfs at a specific page") org-ref-cite-types))
 
        (with-eval-after-load 'citeproc-org
          (advice-add #'citeproc-org-setup :after
@@ -21508,7 +21512,7 @@
 
        (with-eval-after-load 'org-ref
          (dolist (link org-ref-cite-types)
-           (org-link-set-parameters link :eldoc #'org-ref-eldoc-cite+)))
+           (org-link-set-parameters (if (consp link) (car link) link) :eldoc #'org-ref-eldoc-cite+)))
 
        (defun org-ref-eldoc-ref+ (path)
          (if (= (org-ref-count-labels path)
@@ -22314,12 +22318,7 @@
 
 * Themes
   #+BEGIN_SRC emacs-lisp
-    (set-face-attribute 'default nil
-                        :family "Source Code Pro"
-                        ;; height value is 1/10pt. so 100 = 10pt
-                        :height (if (unix-p) 110 100)
-                        :weight 'normal
-                        :width 'normal)
+    (set-face-attribute 'default nil :family "Meslo LG S DZ")
   #+END_SRC
 
   #+BEGIN_SRC emacs-lisp
