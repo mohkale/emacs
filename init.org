@@ -314,7 +314,7 @@
      seem to redefine or re-reference the same core variables so I define
      and reference them from this variable to minimise the duplication.")
 
-     (defvar +completions-icon nil
+     (defvar +completions-icon t
        "When true enable `all-the-icons' for minibuffer completion.")
    #+END_SRC
 
@@ -1963,11 +1963,20 @@
 
         (add-hook 'emacs-startup-hook
                   (defun display-buffer-remove-warnings-handler+ ()
-                    (setq display-buffer-alist
-                          (cl-delete-if (lambda (it)
-                                          (and (stringp (car it))
-                                               (string-equal (car it) pattern)))
-                                        display-buffer-alist)))))
+                    ;; A variant of `display-buffer-fallback-action' that only selects
+                    ;; when the warnings window is not already visible. Makes it a whole
+                    ;; lot less annoying.
+                    (setf (cdr (assoc (rx "*Warnings*") display-buffer-alist))
+                          `((display-buffer--maybe-same-window
+                             display-buffer-reuse-window
+                             display-buffer--maybe-pop-up-frame-or-window-and-focus
+                             display-buffer-in-previous-window-and-focus
+                             display-buffer-use-some-window-and-focus
+                             display-buffer-pop-up-frame-and-focus)
+                            (reusable-frames . t)
+                            (side . right)
+                            (window-width . 0.5)
+                            (body-function . nil))))))
     #+end_src
 
 *** uniarg
@@ -5132,6 +5141,11 @@
        :config
        (push '(rustic-mode all-the-icons-alltheicon "rust") all-the-icons-mode-icon-alist)
        (push '(web-mode    all-the-icons-faicon     "html5") all-the-icons-mode-icon-alist)
+       (push `(,(rx bol (or "pyproject.toml" "poetry.lock" "scrapy.cfg")) all-the-icons-alltheicon "python")
+             all-the-icons-regexp-icon-alist)
+       (push `(,(rx ".editorconfig") all-the-icons-fileicon "editorconfig" :face all-the-icons-yellow)
+             all-the-icons-regexp-icon-alist)
+
        (setf (car (assoc "^Makefile$" all-the-icons-regexp-icon-alist))
              (rx bol (or (any "M" "m")) "akefile" eol))
 
@@ -5263,27 +5277,26 @@
                `((notmuch-search-mode all-the-icons-nerd-mdi "email" :height 1.0)
                  (notmuch-hello-mode all-the-icons-nerd-mdi "email" :height 1.0)
                  (notmuch-tree-mode all-the-icons-nerd-mdi "email" :height 1.0)
-                 (notmuch-show-mode all-the-icons-nerd-mdi "email-open" :height 1.0))
+                 (notmuch-show-mode all-the-icons-nerd-mdi "email-open" :height 1.0)
+                 (notmuch-messages-mode all-the-icons-nerd-mdi "email" :height 1.0))
                all-the-icons-mode-icon-alist))
 
         (push `(messages-buffer-mode all-the-icons-nerd-mdi "message-text" :height 1.0)
               all-the-icons-mode-icon-alist)
         (push `(,(rx ".github") all-the-icons-nerd-custom "folder-github" :height 1.0)
               all-the-icons-dir-icon-alist)
-        (push `(,(rx ".editorconfig") all-the-icons-fileicon "editorconfig" :face all-the-icons-yellow)
-              all-the-icons-regexp-icon-alist)
-        (push `(,(rx bol ".gitignore" eol) all-the-icons-nerd-mdi "git" :face all-the-icons-red)
-              all-the-icons-regexp-icon-alist)
-        (push `(,(rx bol ".gitattributes" eol) all-the-icons-nerd-mdi "git" :face all-the-icons-red)
-              all-the-icons-regexp-icon-alist)
-        (push `(,(rx bol ".gitmodules" eol) all-the-icons-nerd-mdi "git" :face all-the-icons-red)
+        (push `(,(rx bol (or ".gitignore" ".gitattributes" ".gitmodules") eol)
+                all-the-icons-nerd-mdi "git" :face all-the-icons-red)
               all-the-icons-regexp-icon-alist)
         (push `(,(rx "Thorfile") all-the-icons-nerd-oct "ruby" :face all-the-icons-lred)
               all-the-icons-regexp-icon-alist)
         (push `(,(rx "thor") all-the-icons-nerd-oct "ruby" :face all-the-icons-lred)
               all-the-icons-extension-icon-alist)
         (push `(,(rx "." eol) all-the-icons-nerd-oct "file-directory" :height 1.0 :v-adjust -0.1)
-              all-the-icons-regexp-icon-alist))
+              all-the-icons-regexp-icon-alist)
+        (push `(,(rx bol (or "news" "NEWS") (optional "." (+ num))) all-the-icons-nerd-mdi "newspaper")
+              all-the-icons-regexp-icon-alist)
+        )
     #+END_SRC
 
 ** avy
@@ -6506,7 +6519,9 @@
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package +yas-license
         :commands (+insert-license
-                   +project-license)
+                   +project-license
+                   +license-project-license
+                   +license-comment-template)
         :leader
         ("ih" '+insert-license))
     #+END_SRC
@@ -12475,6 +12490,16 @@
 
         (push #'consult--source-dired consult-buffer-sources)
 
+        :init
+        ;; Fix cookie suffixes with some commands make $ (EOL) matching fail.
+        (defun consult-fix-dollar+ (args)
+          (if (string-suffix-p "$" (car args))
+              (list (concat (substring (car args) 0 -1)
+                            (rx (zero-or-more (any "\x100000-\x10FFFD")) eol)))
+            args))
+        (advice-add #'orderless-regexp :filter-args #'consult-fix-dollar+)
+        (advice-add #'prescient-regexp-regexp :filter-args #'consult-fix-dollar+)
+
         :leader
         (:mode '(selectrum-mode
                  vertico-mode)
@@ -13240,7 +13265,7 @@
 *** affe
     An experiment for asynchronous fuzzy finding in emacs based on consult.
 
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package affe
         :straight t
         :custom
@@ -15939,7 +15964,10 @@
          (setq ebdb-sources (seq-uniq
                              (append (list (join-path default-directory "main.el"))
                                      (file-expand-wildcards "*.el" t))
-                             #'string-equal)))
+                             #'string-equal))
+         (unless ebdb-sources
+           (warning "No sources for ebdb setup."))
+         (ebdb-load))
 
        :init
        (with-eval-after-load 'notmuch
@@ -21307,7 +21335,6 @@
         :demand t
 
         :diminish orglink-mode
-        :hook (org-follow-link . recenter)
 
         :custom
         (orglink-activate-in-modes
@@ -23046,6 +23073,26 @@
          ((t (:inherit diff-removed :foreground unspecified :background unspecified))))
        `(evil-ex-substitute-replacement
          ((t (:inherit diff-added :foreground unspecified :background unspecified))))
+
+      ;; ansi-colors
+       ;; TODO: On terminal frames inherit from terminal instead of custom colors.
+       `(ansi-color-red ((,cls (:foreground ,red :background ,red))))
+       `(ansi-color-blue ((,cls (:foreground ,blue :background ,blue))))
+       `(ansi-color-cyan ((,cls (:foreground ,turquoise :background ,turquoise))))
+       `(ansi-color-black ((,cls (:foreground ,black :background ,black))))
+       `(ansi-color-green ((,cls (:foreground ,green :background ,green))))
+       `(ansi-color-white ((,cls (:foreground ,white :background ,white))))
+       `(ansi-color-yellow ((,cls (:foreground ,yellow :background ,yellow))))
+       `(ansi-color-magenta ((,cls (:foreground ,purple :background ,purple))))
+
+       `(ansi-color-bright-red ((,cls (:foreground ,red-int :background ,red-int))))
+       `(ansi-color-bright-blue ((,cls (:foreground ,blue-int :background ,blue-int))))
+       `(ansi-color-bright-cyan ((,cls (:foreground ,turquoise-int :background ,turquoise-int))))
+       `(ansi-color-bright-black ((,cls (:foreground ,dark-grey :background ,dark-grey))))
+       `(ansi-color-bright-green ((,cls (:foreground ,green-int :background ,green-int))))
+       `(ansi-color-bright-white ((,cls (:foreground ,white :background ,white))))
+       `(ansi-color-bright-yellow ((,cls (:foreground ,yellow-int :background ,yellow-int))))
+       `(ansi-color-bright-magenta ((,cls (:foreground ,purple-int :background ,purple-int))))
        )
 
       (custom-theme-set-variables 'an-old-hope
