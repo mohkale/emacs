@@ -5189,95 +5189,24 @@
     #+BEGIN_SRC emacs-lisp
       (use-package nerd-fonts
         :straight (nerd-fonts :host github :repo "mohkale/nerd-fonts.el")
+        :when +icons-prefer-nerd-font)
+
+      (use-package all-the-icons-nerd-fonts
+        :straight (all-the-icons-nerd-fonts :host github :repo "mohkale/all-the-icons-nerd-fonts")
         :when +icons-prefer-nerd-font
         :after all-the-icons
         :demand t
-        :config
-        (defconst nerd-fonts-families+
-          (seq-uniq
-           (cl-loop for (icon . _) in nerd-fonts-alist
-                    collect (intern (substring icon 0 (cl-position ?- icon))))))
+        :custom
+        (all-the-icons-nerd-fonts-family
+         (if (stringp +icons-prefer-nerd-font)
+             +icons-prefer-nerd-font
+           "Symbols Nerd Font"))
+
+        :preface
+        (defvaralias 'all-the-icons-nerd-fonts-convert-families '+icon-nerd-to-all-the-icons)
 
         :config
-        ;; Define new `all-the-icons' families for available nerd fonts.
-        (defmacro all-the-icons-nerd-font-family+ (family)
-          (let* ((nerd-family (concat "nerd-" family))
-                 (font-alist (intern (concat "all-the-icons-data/" nerd-family "-alist")))
-                 (name (intern nerd-family)))
-            `(progn
-               (defvar ,font-alist
-                 (eval-when-compile
-                   (cl-loop for (name . icon) in nerd-fonts-alist
-                            when (string-prefix-p ,family name)
-                            collect (cons (substring name ,(1+ (length family)))
-                                          icon))))
-
-               ;; The font on my linux machine, maybe needs updating depending on platform
-               (all-the-icons-define-icon ,name ,font-alist ;; ,nerd-family
-                                          ,(if (stringp +icons-prefer-nerd-font)
-                                               +icons-prefer-nerd-font
-                                             "Symbols Nerd Font")))))
-
-        (dolist (it nerd-fonts-families+)
-          (eval
-           `(all-the-icons-nerd-font-family+ ,(symbol-name it))))
-
-        ;; Replace any none nerd-font lookups with nerd-font lookups.
-        (let ((family-subs (cl-loop for (family . ati-family) in +icon-nerd-to-all-the-icons
-                                    when (member family nerd-fonts-families+)
-                                    collect (cons (intern (concat "all-the-icons-" (symbol-name ati-family)))
-                                                  (intern (concat "all-the-icons-nerd-" (symbol-name family))))))
-              (match-subs '(((all-the-icons-alltheicon . "aws")              .    (all-the-icons-nerd-fa     . "amazon"))
-                            ((all-the-icons-alltheicon . "c-line")           .    (all-the-icons-nerd-custom . "c"))
-                            ((all-the-icons-alltheicon . "clojure-line")     .    (all-the-icons-nerd-dev    . "clojure"))
-                            ((all-the-icons-alltheicon . "cplusplus-line")   .    (all-the-icons-nerd-custom . "cpp"))
-                            ((all-the-icons-alltheicon . "csharp-line")      .    (all-the-icons-nerd-mdi    . "language-csharp"))
-                            ((all-the-icons-alltheicon . "elixir")           .    (all-the-icons-nerd-custom . "elixir"))
-                            ((all-the-icons-alltheicon . "git")              .    (all-the-icons-nerd-mdi    . "git"))
-                            ((all-the-icons-alltheicon . "go")               .    (all-the-icons-nerd-seti   . "go"))
-                            ((all-the-icons-alltheicon . "google-drive")     .    (all-the-icons-nerd-mdi    . "google-drive"))
-                            ((all-the-icons-alltheicon . "gulp")             .    (all-the-icons-nerd-seti   . "gulp"))
-                            ((all-the-icons-alltheicon . "haskell")          .    (all-the-icons-nerd-seti   . "haskell"))
-                            ((all-the-icons-alltheicon . "html5")            .    (all-the-icons-nerd-fa     . "html5"))
-                            ((all-the-icons-alltheicon . "java")             .    (all-the-icons-nerd-fae    . "java"))
-                            ((all-the-icons-alltheicon . "javascript")       .    (all-the-icons-nerd-seti   . "javascript"))
-                            ((all-the-icons-alltheicon . "nodejs")           .    (all-the-icons-nerd-mdi    . "nodejs"))
-                            ((all-the-icons-alltheicon . "prolog")           .    (all-the-icons-nerd-dev    . "prolog"))
-                            ((all-the-icons-alltheicon . "python")           .    (all-the-icons-nerd-fa     . "-python"))
-                            ((all-the-icons-alltheicon . "react")            .    (all-the-icons-nerd-mdi    . "react"))
-                            ((all-the-icons-alltheicon . "ruby-alt")         .    (all-the-icons-nerd-oct    . "ruby"))
-                            ((all-the-icons-alltheicon . "rust")             .    (all-the-icons-nerd-dev    . "rust"))
-                            ((all-the-icons-alltheicon . "sass")             .    (all-the-icons-nerd-dev    . "sass"))
-                            ((all-the-icons-alltheicon . "scala")            .    (all-the-icons-nerd-dev    . "scala"))
-                            ((all-the-icons-alltheicon . "script")           .    (all-the-icons-nerd-seti   . "html"))
-                            ((all-the-icons-alltheicon . "swift")            .    (all-the-icons-nerd-dev    . "swift"))
-                            ((all-the-icons-alltheicon . "terminal")         .    (all-the-icons-nerd-fa     . "terminal"))
-                            ((all-the-icons-octicon    . "file-submodule")   .    (all-the-icons-nerd-oct    . "file-submodule"))
-                            ((all-the-icons-fileicon   . "tex")              .    (all-the-icons-nerd-oct    . "text-size"))
-                            ((all-the-icons-alltheicon . "test-ruby")        .    (all-the-icons-nerd-oct    . "ruby"))
-                            ((all-the-icons-fileicon   . "cljs")             .    (all-the-icons-nerd-dev    . "clojure"))
-                            ((all-the-icons-fileicon   . "dockerfile")       .    (all-the-icons-nerd-linux  . "docker"))
-                            ((all-the-icons-fileicon   . "bib")              .    (all-the-icons-nerd-fa     . "book"))
-                            ((all-the-icons-fileicon   . "php")              .    (all-the-icons-nerd-dev    . "php"))
-                            ((all-the-icons-fileicon   . "racket")           .    (all-the-icons-fileicon    . "lisp")))))
-          ;; For each variable all-the-icons uses to lookup contextual icons.
-          (dolist (var '(all-the-icons-icon-alist
-                         all-the-icons-dir-icon-alist
-                         all-the-icons-weather-icon-alist
-                         all-the-icons-mode-icon-alist
-                         all-the-icons-url-alist
-                         all-the-icons-extension-icon-alist))
-            ;; For each entry in those lists do key-value substitution with `subs'.
-            (dolist (assoc (symbol-value var))
-              (if-let ((new-icon-func (alist-get (nth 1 assoc) family-subs)))
-                  (setcar (cdr assoc) new-icon-func)
-                (when-let ((new-assoc (alist-get (cons (nth 1 assoc) (nth 2 assoc))
-                                                 match-subs nil nil
-                                                 (lambda (a b)
-                                                   (and (eq    (car a) (car b))
-                                                        (equal (cdr a) (cdr b)))))))
-                  (setcar (cdr assoc)       (car new-assoc))
-                  (setcar (cdr (cdr assoc)) (cdr new-assoc)))))))
+        (all-the-icons-nerd-fonts-prefer)
 
         :config
         (setf (cdr (assoc "\\.git" all-the-icons-dir-icon-alist))
