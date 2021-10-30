@@ -724,7 +724,6 @@
       org-projectile-projects-file                       (join-path +notes-home "projects/global.org")
       org-preview-latex-image-directory                  (cache! "org/latex")
       package-quickstart-file                            (state! "package-qs.el")
-      recentf-save-file                                  (state! "recentf.el")
       server-auth-dir                                    (state! "server/")
       shared-game-score-directory                        (share! "gamescore/")
       tramp-auto-save-directory                          (share! "tramp/auto-save/")
@@ -951,7 +950,6 @@
              help-window-select t                                                   ; always select the help window when it pops up
              enable-recursive-minibuffers t                                         ; allow entering minibuffer, when already in minibuffer
              find-file-suppress-same-file-warnings t                                ; don't warn when finding a file that's already open.
-             recentf-max-saved-items 2048                                           ; keep this many files in the recentf history.
              completion-ignore-case t                                               ; make completion case insensitive, holding down shift is annoying.
              use-short-answers t                                                    ; never use `yes-or-no-p', prefer `y-or-n-p'.
              remote-file-name-inhibit-locks t
@@ -963,7 +961,6 @@
              confirm-nonexistent-file-or-buffer nil                                 ; Don't require confirmation when creating a new file
              history-length 1000                                                    ; Maximum size of a history variable for completing-read
              recenter-positions '(top middle bottom)
-             recentf-auto-cleanup (* 60 60)
              user-mail-address "mohkale@kisara.moe"
              user-full-name "Mohsin Kaleem")
      #+END_SRC
@@ -1051,29 +1048,7 @@
        auto-save-file-name-transforms `((".*" ,(state! "auto-save" "sessions/") t))
 
        ;; where do backup files get stored
-       backup-directory-alist `(("." . ,(state! "backups/")))
-
-       ;; don't show files matching these regexps in recentf alist.
-       recentf-exclude (list (rx (or (and bol
-                                          (or "/tmp/"
-                                              "/ssh:"
-                                              "/sudo:"
-                                              (eval straight-base-dir)))
-                                     "COMMIT_EDITMSG"
-                                     (and (or "/TAGS"
-                                              "/GTAGS"
-                                              "/GRAGS"
-                                              "/GPATH"
-                                              ".mkv"
-                                              ".avi"
-                                              (and ".mp" (any "3" "4"))
-                                              (and ".doc" (? "x"))
-                                              ".sub"
-                                              ".srt"
-                                              ".ass"
-                                              ".elc"
-                                              (and "tmp." (+ (not (any "/" "\\")))))
-                                          eol)))))
+       backup-directory-alist `(("." . ,(state! "backups/"))))
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
@@ -10955,6 +10930,38 @@
         "gk" 'reb-prev-match
         [remap quit-window] 'reb-quit))
    #+END_SRC
+
+** recentf
+   #+begin_src emacs-lisp
+     (use-package recentf
+       :hook (after-init . recentf-mode)
+       :custom
+       (recentf-save-file (state! "recentf.el"))
+       (recentf-max-saved-items 2048
+        "Keep this many files in the recentf history.")
+       (recentf-auto-cleanup (* 60 60))
+       (recentf-exclude (list (rx (or (and bol
+                                           (or "/tmp/"
+                                               "/ssh:"
+                                               "/sudo:"
+                                               (eval straight-base-dir)))
+                                      "COMMIT_EDITMSG"
+                                      (and (or "/TAGS"
+                                               "/GTAGS"
+                                               "/GRAGS"
+                                               "/GPATH"
+                                               ".mkv"
+                                               ".avi"
+                                               (and ".mp" (any "3" "4"))
+                                               (and ".doc" (? "x"))
+                                               ".sub"
+                                               ".srt"
+                                               ".ass"
+                                               ".elc"
+                                               (and "tmp." (+ (not (any "/" "\\")))))
+                                           eol))))
+        "Don't show files matching these regexps in recentf alist."))
+   #+end_src
 
 ** replace
    #+BEGIN_SRC emacs-lisp
@@ -23106,4 +23113,4 @@
 #  LocalWords:  NyaaLiveActionAll NyaaLiveAction NyaaAnimeAll NyaaAnime CppReference
 #  LocalWords:  microsoft github godoc SchoolsColors StackOverflow GoogleMaps cmake
 #  LocalWords:  GoogleImages separedit csharp impl gopls analyzer plsense glsl
-#  LocalWords:  languageserver roslyn
+#  LocalWords:  languageserver roslyn recentf
