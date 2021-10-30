@@ -3660,8 +3660,22 @@
         (completion-styles '(orderless))
         (completion-category-overrides
          '((file (styles orderless partial-completion))))
-        (orderless-component-separator #'orderless-escapable-split-on-space
-         "Allows escaping space with a backslash.")
+
+        :preface
+        (defun orderless-double-space-escapes+ (string)
+          "Split STRING on spaces, which can be escaped with two subsequent spaces."
+          ;; Works by replacing each escaped space with a C-@ character
+          ;; and then splitting on single spaces, before turning the
+          ;; C-@'s back to regular spaces.
+          (mapcar
+           (lambda (piece) (replace-regexp-in-string (string 0) " " piece))
+           (split-string (replace-regexp-in-string
+                          (rx (repeat 2 " "))
+                          (lambda (x) (if (>= (length x) 2) (string 0) x))
+                          string 'fixedcase 'literal)
+                         " +" t)))
+        :custom
+        (orderless-component-separator #'orderless-double-space-escapes+)
 
         :preface
         (defun flex-if-twiddle (pattern _index _total)
