@@ -207,7 +207,7 @@
    #+NAME: config-options
    #+BEGIN_SRC emacs-lisp :tangle no
      (defvar +man-command (if (member system-type '(cygwin ms-dos windows-nt)) 'woman 'man)
-       "Preferred command used for manuals")
+       "Preferred command used for manuals.")
 
      (defvar +icons-available t
        "When true `all-the-icons' will be available even in terminal emacs.")
@@ -227,10 +227,6 @@
                (and ".bundle/")
                (and "~" eol)
                (and (any ?. ?-) "lock" (zero-or-one ".json") eol))))
-
-     (defvar +orderless-requires-prescient nil
-       "When true, if `prescient' and `orderless' are both configured,
-     when prescient is disabled orderless is also disabled.")
 
      (defvar +TeX-view-in-emacs nil
        "When true, view latex documents in emacs PDFTools.
@@ -12075,6 +12071,8 @@
                                          (apply #'actual-vertico-format-candidate
                                                 (funcall hl-func cand) args)))))
                          (apply func args)))))
+       (with-eval-after-load 'vertico-grid
+         (advice-add #'vertico-grid--arrange-candidates :around #'vertico-format-candidates+))
 
        (advice-add #'vertico--sort-function :before-until #'+completion-category-sort-func)
 
@@ -12280,7 +12278,7 @@
 
 *** consult
     #+BEGIN_SRC emacs-lisp
-      (defvar consult-manual-preview-key (kbd "M-p")
+      (defvar consult-manual-preview-key (list [27 105] (kbd "M-i"))
         "Manual key to trigger `consult--read' previews.")
 
       (use-package consult
@@ -12356,18 +12354,20 @@
          consult--source-file
          consult--source-project-file
          +dot-goto-fsmap
-         :preview-key consult-manual-preview-key)
-
-        (consult-customize consult-recent-file :sort nil)
-
-        ;; Async commands that produce a lot of output so it's useful for them to be async
-        ;; but once produced you won't be re-running the command again.
-        (consult-customize
-         consult-find consult-find-no-project+ +dot-goto-repo +dot-goto-executable +dot-goto-fsmap +dot-open-bookmark
-         :initial (concat "/*/"))
-
-        (consult-customize
-         switch-to-scratch-buffer :state #'consult--buffer-state)
+         :preview-key consult-manual-preview-key
+         consult-recent-file
+         :sort nil
+         ;; Async commands that produce a lot of output so it's useful for them to be async
+         ;; but once produced you won't be re-running the command again.
+         consult-find
+         consult-find-no-project+
+         +dot-goto-repo
+         +dot-goto-executable
+         +dot-goto-fsmap
+         +dot-open-bookmark
+         :initial (concat "/*/")
+         switch-to-scratch-buffer
+         :state #'consult--buffer-state)
 
         (defvar consult-font-lock-exclude+ nil
           "The equivalent of `swiper-font-lock-exclude'")
@@ -13260,7 +13260,12 @@
 
        ;; Can be used with C, Java, and many more.
        (setf (alist-get 'clang-format apheleia-formatters)
-             '("clang-format" "--assume-filename" filepath))
+             '("clang-format" "--assume-filename" filepath
+               ;; This should ideally be set in a .clang-format file
+               ;; but since I'm more inclined to use editorconfig it
+               ;; shouldn't really matter.
+               (when-let ((indent (bound-and-true-p c-basic-offset)))
+                 (list "--style" (format "{IndentWidth: %d}" indent)))))
 
        ;; WARN: Won't work until [[https://github.com/raxod502/apheleia/pull/50][#50]] is merged in.
        (push '(shfmt . ("shfmt"
@@ -13290,7 +13295,7 @@
        (push '(gawk . ("gawk" "-f" "-" "--pretty-print=-")) apheleia-formatters)
        (push '(awk-mode . gawk) apheleia-mode-alist)
 
-       (push '(goimports . ("goimports" )) apheleia-formatters)
+       (push '(goimports . ("goimports")) apheleia-formatters)
        (setf (alist-get 'go-mode apheleia-mode-alist) 'goimports))
    #+end_src
 
@@ -14049,6 +14054,7 @@
                   eglot-create-local-command+)
        :custom
        (eglot-autoreconnect nil)
+       (eglot-extend-to-xref t)
        (eglot-stay-out-of '(company))                                                ; I'll set my backends myself, thank you.
        (eglot-ignored-server-capabilites '(:documentHighlightProvider))              ; Prevent eglot highlighting the symbol at point
        (eglot-confirm-server-initiated-edits nil)
@@ -14119,38 +14125,16 @@
      setting up the PATH configuration (or if necessary installation) needed to
      run CMD. When no entry in CONF is found relative to the current project root
      we return CMD as is, otherwise we preppend the cdr of CONF entry that does
-     exist. "
+     exist."
          (declare (indent 2))
          `(defun ,(intern (concat "eglot-local-server-" (symbol-name name) "+")) (&optional _interactive)
             (append
              (when-let ((default-directory (project-current-root+)))
                (cl-loop for (file . cmds) in ,conf
-                        when (file-exists-p file)
+                        when (and (file-exists-p file)
+                                  (executable-find (car cmds) t))
                           return cmds))
              (list ,@cmd))))
-
-       (push (cons '(js-mode typescript-mode)
-                   (eglot-create-local-command+ node
-                       '(("package-lock.json" "npx")
-                         ("yarn.lock" "yarn" "run"))
-                     "typescript-language-server" "--stdio"))
-             eglot-server-programs)
-
-       (push (cons 'ruby-mode
-                   (eglot-create-local-command+ ruby
-                       '(("Gemfile.lock" "bundle" "exec"))
-                     "solargraph" "socket" "--port" :autoport))
-             eglot-server-programs)
-
-       (push '((css-mode scss-mode) "css-languageserver" "--stdio")
-             eglot-server-programs)
-
-       (push '((nim-mode nimscript-mode)
-               "nimlsp")
-             eglot-server-programs)
-
-       (push '(lua-mode "lua-language-server")
-             eglot-server-programs)
 
        :leader
        (:prefix leader-server-leader-prefix
@@ -17629,6 +17613,15 @@
       (add-hook 'ruby-mode-hook +lsp-command)
     #+END_SRC
 
+    #+begin_src emacs-lisp :tangle (package-yes! ruby eglot)
+      (with-eval-after-load 'eglot
+        (push (cons '(enh-ruby-mode ruby-mode)
+                    (eglot-create-local-command+ ruby
+                        '(("Gemfile.lock" "bundle" "exec"))
+                      "solargraph" "socket" "--port" :autoport))
+              eglot-server-programs))
+    #+end_src
+
 *** inferior-ruby
     #+BEGIN_SRC emacs-lisp
       (use-package inf-ruby
@@ -19022,6 +19015,16 @@
       (add-hook 'js2-mode-hook +lsp-command)
     #+END_SRC
 
+    #+begin_src emacs-lisp :tangle (package-yes! javascript eglot)
+      (with-eval-after-load 'eglot
+        (push (cons '(js-mode typescript-mode)
+                    (eglot-create-local-command+ node
+                        '(("package-lock.json" "npx")
+                          ("yarn.lock" "yarn" "run"))
+                      "typescript-language-server" "--stdio"))
+              eglot-server-programs))
+    #+end_src
+
 *** js-doc
     #+BEGIN_SRC emacs-lisp
       (use-package js-doc
@@ -19152,6 +19155,13 @@
       (add-hook 'css-mode-hook  +lsp-command)
       (add-hook 'scss-mode-hook +lsp-command)
     #+END_SRC
+
+    #+begin_src emacs-lisp :tangle (package-yes! css eglot)
+      (with-eval-after-load 'eglot
+        (push '((css-mode scss-mode)
+                "css-languageserver" "--stdio")
+              eglot-server-programs))
+    #+end_src
 
 *** less-css-mode
     #+BEGIN_SRC emacs-lisp
@@ -19328,6 +19338,13 @@
       (add-hook 'nim-mode-hook +lsp-command)
       (remove-hook 'nim-mode-hook 'nim-eldoc-on)                                      ; eldoc is taken care of by my lsp package.
     #+END_SRC
+
+    #+begin_src emacs-lisp :tangle (package-yes! nim eglot)
+      (with-eval-after-load 'eglot
+        (push '((nim-mode nimscript-mode)
+                "nimlsp")
+              eglot-server-programs))
+    #+end_src
 
 ** golang
    :PROPERTIES:
@@ -21928,6 +21945,17 @@
         :straight t
         :init
         (set-company-backend! 'lua-mode 'company-lua))
+    #+end_src
+
+*** lus-language-server                                                 :lsp:
+    #+begin_src emacs-lisp :tangle (package-yes! lua :lsp)
+      (add-hook 'lua-mode-hook +lsp-command)
+    #+end_src
+
+    #+begin_src emacs-lisp :tangle (package-yes! lua eglot)
+      (with-eval-after-load 'eglot
+        (push '(lua-mode "lua-language-server")
+              eglot-server-programs))
     #+end_src
 
 ** Perl
