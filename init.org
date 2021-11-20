@@ -698,7 +698,7 @@
      (defconst +bib-home (join-path (xdg-documents-dir) "bib")
        "Base directory containing bibliography files.")
 
-     (setq org-roam-directory (join-path (xdg-documents-dir) "brain"))
+     (defvar org-roam-directory (join-path (xdg-documents-dir) "brain"))
 
      (defconst +docs-home (join-path (xdg-documents-dir) "books/")
        "Base directory containing bib documents.")
@@ -954,6 +954,7 @@
              find-file-suppress-same-file-warnings t                                ; don't warn when finding a file that's already open.
              completion-ignore-case t                                               ; make completion case insensitive, holding down shift is annoying.
              use-short-answers t                                                    ; never use `yes-or-no-p', prefer `y-or-n-p'.
+             frame-resize-pixelwise t                                               ; Fix weird gaps around windows in GUI frames through X.
              remote-file-name-inhibit-locks t
              read-file-name-completion-ignore-case t
              read-buffer-completion-ignore-case t
@@ -1544,6 +1545,7 @@
          ;; frame
          "fx" 'delete-frame
          "fX" 'delete-other-frames
+         "fm" '(make-frame-command :wk "new-frame")
          "f RET" '(make-frame-command :wk "new-frame")
          "f TAB" 'other-frame
          "f DEL" 'save-buffers-kill-emacs
@@ -5226,6 +5228,9 @@
         (push `(,(rx bol (or ".gitignore" ".gitattributes" ".gitmodules") eol)
                 all-the-icons-nerd-mdi "git" :face all-the-icons-red)
               all-the-icons-regexp-icon-alist)
+        (push `(,(rx (or "LICENSE" (and ".license" eol)))
+                all-the-icons-nerd-fa "drivers-license" :face all-the-icons-lorange)
+              all-the-icons-regexp-icon-alist)
         (push `(,(rx "Thorfile") all-the-icons-nerd-oct "ruby" :face all-the-icons-lred)
               all-the-icons-regexp-icon-alist)
         (push `(,(rx "thor") all-the-icons-nerd-oct "ruby" :face all-the-icons-lred)
@@ -5905,7 +5910,6 @@
 
        :custom
        (projectile-tags-backend 'xref) ;; opt into gtags
-       (projectile-indexing-method 'alien) ;; never use native
        (projectile-tags-command "ctags -Re -f \"%s\" %s \"%s\"")
 
        :config
@@ -7281,6 +7285,7 @@
             :states  'motion
             "x"   'kill-compilation
 
+            "RET" 'compile-goto-error
             ;; Flash error location in another-window without selecting it.
             "o"     'compilation-display-error
             "M-RET" 'compilation-display-error
@@ -7830,7 +7835,6 @@
         :straight (dired :type built-in)
         :custom
         (ls-lisp-dirs-first t)
-        (ls-lisp-use-insert-directory-program t)
         (dired-listing-switches "-laXhv --group-directories-first")
         (dired-auto-revert-buffer t)
         (dired-hide-details-hide-symlink-targets nil)
@@ -7839,6 +7843,10 @@
         :config
         (push '(dired-mode . 1) +indent-config)
         (push 'dired-mode +whitespace-exempt-modes)
+
+        :init
+        (with-eval-after-load 'ls-lisp
+          (setq ls-lisp-use-insert-directory-program (executable-find "ls")))
 
         :commands (dired-goto-home-dir+
                    dired-evil-scroll-down+
@@ -12301,8 +12309,6 @@
            (perl :initial "#" :type perl)))
         (consult-fontify-max-size 100000)
         (register-preview-function #'consult-register-preview)
-        (consult-ripgrep-args                                                      ; Variant command which disregards no-matches
-         "ignore-exit 1 rg --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number .")
         (consult-async-refresh-delay 0.05)
         (consult-narrow-key (kbd "M-SPC"))
         (consult-widen-key (kbd "S-SPC"))
@@ -12336,6 +12342,12 @@
                                   (?v "Variable" font-lock-variable-name-face)))
              (sh-mode :types ((?f "Function" font-lock-function-name-face)
                               (?v "Variable" font-lock-variable-name-face))))))
+        :config
+        (setq consult-ripgrep-args                                                      ; Variant command which disregards no-matches
+              (concat
+               (when (executable-find "ignore-exit")
+                 "ignore-exit 1 ")
+               "rg --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number ."))
 
         :config
         (evil-set-command-property 'consult-outline :jump t)
@@ -13242,12 +13254,17 @@
         "bf" 'apheleia-format-buffer)
 
        :config
+       (push '(c++-mode . clang-format) apheleia-mode-alist)
+
+       :config
        ;; When in doubt, see [[https://github.com/rishirdua/awesome-code-formatters][awesome-code-formatters]] and [[https://github.com/lassik/emacs-format-all-the-code][emacs-format-all-the-code]].
        (push '(perltidy . ("perltidy" "--quiet" "--standard-error-output")) apheleia-formatters)
        (push '(perl-mode . perltidy) apheleia-mode-alist)
 
        (push '(rufo . ("rufo" "--filename" filepath)) apheleia-formatters)
-       (push '(rubocop . ("ignore-exit" "1" "rubocop" "--stdin" filepath "--auto-correct" "--format" "quiet" "--stderr"))
+       (push `(rubocop . (,@(when (executable-find "ignore-exit")
+                              (list "ignore-exit" "1"))
+                          "rubocop" "--stdin" filepath "--auto-correct" "--format" "quiet" "--stderr"))
              apheleia-formatters)
        (setf (alist-get 'ruby-mode apheleia-mode-alist) 'rubocop)
        (push '(enh-ruby-mode . rubocop) apheleia-mode-alist)
@@ -16830,8 +16847,7 @@
      (use-package vterm
        :straight t
        :commands (vterm-toggle
-                  vterm-toggle-fullscreen
-                  vterm-toggle-new-buffer+)
+                  vterm-toggle-fullscreen)
        :config
        (push 'vterm-mode +whitespace-exempt-modes)
        (evil-set-initial-state 'vterm-mode 'emacs)
@@ -16841,46 +16857,6 @@
              vterm-buffer-name-string "*vterm: %s*"
              multi-vterm-buffer-name "*vterminal*"
              vterm-keymap-exceptions '("C-SPC" "C-g" "C-c" "M-x"))
-
-       (use-package vterm-toggle
-         :straight t
-         :init
-         (defun vterm-toggle-fullscreen (&optional arg)
-           (interactive "P")
-
-           (setq vterm-toggle-fullscreen-p
-                 (if (not arg)
-                     (not vterm-toggle-fullscreen-p)
-                   (or (listp arg)
-                       (not (zerop arg)))))
-
-           (setq vterm-toggle-reset-window-configration-after-exit vterm-toggle-fullscreen-p)
-
-           (message "vterm fullscreen: %s"
-                    (if vterm-toggle-fullscreen-p
-                        (propertize "enabled" 'face 'compilation-info)
-                      (propertize "disabled" 'face 'compilation-error))))
-
-         :config
-         (setq vterm-toggle-cd-auto-create-buffer t)
-
-         (let ((inhibit-message t))
-           (vterm-toggle-fullscreen +1)))
-
-       ;; prevent vterm being opened in a new window
-       (advice-add 'vterm-toggle--new :override #'vterm)
-
-       (defun vterm-toggle-new-buffer+ ()
-         (interactive)
-         "create a new vterm buffer using vterm-toggle's interface."
-         (let ((current-config (current-window-configuration)))
-           (if vterm-toggle-fullscreen-p
-               (progn
-                 (delete-other-windows)
-                 (switch-to-buffer (vterm)))
-             (pop-to-buffer (vterm)))
-
-           (setq vterm-toggle--window-configration current-config)))
 
        (defvar-local vterm-send-escape-to-vterm-p nil
          "Track whether or not we send ESC to `vterm' or `emacs'.")
@@ -16979,13 +16955,10 @@
                      (when vterm--term
                        (process-send-string vterm--process "\C-m"))))
 
-       :leader
-       ("av" '(vterm-toggle :wk "vterm")
-        "at" '(vterm-toggle-new-buffer+ :wk "vterm-new")
-        ;; "tv" '(vterm-toggle-fullscreen :wk "toggle-vterm-fullscreen")
-        )
-
        :general
+       (:keymaps 'vterm-mode-map
+        :states 'emacs
+        "C-w" 'vterm-send-C-w)
        (:keymaps 'vterm-mode-map
         "<mouse-1>" 'vterm-mouse-set-point
         "<C-backspace>" 'vterm-send-C-w
@@ -17001,6 +16974,7 @@
         "M-ESC" 'vterm-send-escape
 
         ;; this is Magic :space_invader:.
+        "C-S-v" 'vterm-yank
         "C-S-n" 'vterm-toggle-forward
         "C-S-p" 'vterm-toggle-backward)
        (:keymaps 'vterm-copy-mode-map
@@ -17009,18 +16983,89 @@
         "gj" 'vterm-next-prompt
         "gk" 'vterm-previous-prompt
         "RET" 'vterm-copy-mode)
+       (:keymaps 'vterm-mode-map :states 'emacs "C-q" leader-nnorm-key)
+       (:keymaps 'vterm-mode-map :states 'motion "C-q" leader-key)
+
+       :leader
+       (:mode 'vterm-mode
+        "v" '(vterm-copy-mode :wk "copy-mode"))
+
+       :config
        ;; TMUX compatibility bindings
-       (:states 'emacs
-        :prefix leader-nnorm-key
-        :keymaps 'vterm-mode-map
-        "v" '(vterm-copy-mode :wk "copy-mode")
-        "p" 'vterm-yank)
-       (:prefix leader-nnorm-key
-        :states 'motion
-        :keymaps 'vterm-copy-mode-map
-        "v" 'vterm-copy-mode
-        "p" 'vterm-yank))
+       (let ((bindings `("v" '(vterm-copy-mode :wk "copy-mode")
+                         "p" 'vterm-yank
+                         "C-u" ,(lambda! ()
+                                  (vterm-copy-mode +1)
+                                  (call-interactively 'scroll-up-command)))))
+         (apply #'general-define-key
+                :states 'emacs
+                :prefix leader-nnorm-key
+                :keymaps 'vterm-mode-map
+                bindings)
+         (apply #'general-define-key
+                :prefix leader-nnorm-key
+                :states 'motion
+                :keymaps 'vterm-copy-mode-map
+                bindings)))
    #+END_SRC
+
+*** vterm-toggle
+    #+begin_src emacs-lisp
+      (use-package vterm-toggle
+        :straight t
+        :init
+        (defun vterm-toggle-fullscreen (&optional arg)
+          (interactive "P")
+
+          (setq vterm-toggle-fullscreen-p
+                (if (not arg)
+                    (not vterm-toggle-fullscreen-p)
+                  (or (listp arg)
+                      (not (zerop arg)))))
+
+          (setq vterm-toggle-reset-window-configration-after-exit
+                vterm-toggle-fullscreen-p)
+
+          (message "vterm fullscreen: %s"
+                   (if vterm-toggle-fullscreen-p
+                       (propertize "enabled" 'face 'compilation-info)
+                     (propertize "disabled" 'face 'compilation-error))))
+
+        :config
+        (setq vterm-toggle-cd-auto-create-buffer t)
+
+        (let ((inhibit-message t))
+          (vterm-toggle-fullscreen 0))
+
+        ;; prevent vterm being opened in a new window.
+        (advice-add 'vterm-toggle--new :override #'vterm)
+
+        :commands (vterm-toggle-new-buffer+)
+        :config
+        (defun vterm-toggle-new-buffer+ ()
+          "Create a new vterm buffer using vterm-toggle's interface."
+          (interactive)
+          (let ((current-config (current-window-configuration)))
+            (if vterm-toggle-fullscreen-p
+                (progn
+                  (delete-other-windows)
+                  (switch-to-buffer (vterm '(4))))
+              (select-window (display-buffer (vterm '(4)))))
+
+            (setq vterm-toggle--window-configration current-config)))
+
+        :config
+        (push `(,(regexp-quote vterm-buffer-name)
+                (display-buffer-same-window
+                 display-buffer-reuse-window
+                 display-buffer-no-window))
+              display-buffer-alist)
+
+        :leader
+        ("av" '(vterm-toggle :wk "vterm")
+         "at" '(vterm-toggle-new-buffer+ :wk "vterm-new")
+         "tv" '(vterm-toggle-fullscreen :wk "toggle-vterm-fullscreen")))
+    #+end_src
 
 *** vterm-commands
     define elisp commands accessible through the ~vterm_cmd~ shell function.
@@ -17036,7 +17081,7 @@
 
     #+BEGIN_SRC emacs-lisp :var cmds=vterm-cmds :results silent
       (use-package vterm
-        :config
+        :init
         (setq vterm-eval-cmds
               (cl-loop for (name cmd) in cmds
                        do (setq cmd-sym (intern cmd))
@@ -20229,7 +20274,9 @@
                     (setq electric-pair-preserve-balance t)))
 
         :config
-        (setq org-cite-global-bibliography (directory-files +bib-home t ".bib"))
+        (setq org-cite-global-bibliography
+              (when (file-exists-p +bib-home)
+                (directory-files +bib-home t ".bib")))
 
         :config
         (setq org-agenda-files
@@ -20786,6 +20833,10 @@
 
         :config
         (require '+org-capture)
+
+        (let ((local-conf (etc! "+capture.el")))
+          (when (file-exists-p local-conf)
+            (load local-conf)))
 
         (advice-add 'org-edit-src-code :after
                     (lambda (&rest args)
@@ -22797,6 +22848,7 @@
        `(org-link ((,cls (:inherit (link bold)))))
        `(org-footnote ((,cls (:foreground ,blue))))
        `(org-tag ((,cls (:foreground ,purple-int :inherit bold))))
+       `(org-code ((,cls (:inherit shadow))))
 
       ;;; org-ref
        ;; All of these have their own distinct look and feel, but honestly
