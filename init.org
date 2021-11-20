@@ -101,7 +101,7 @@
          ;; vlc-rc                                                         ; Control [[https://www.videolan.org/vlc/index.en-GB.html][VLC]] from emacs
          ;; tab-bar                                                        ; Enable browser like tabs showing buffer information
          ;; vterm                                                          ; A virtual terminal emulator... interfaced with emacs
-         ;; vimish-fold                                                    ; Fold regions of code just like vim.
+         vimish-fold                                                       ; Fold regions of code just like vim.
          ;; ztree                                                          ; Directory tree viewer, think NERDTree
          git-gutter                                                        ; Show version control information in the window fringe.
 
@@ -4391,68 +4391,25 @@
     Folding like vim
 
     #+BEGIN_SRC emacs-lisp
-      (use-package vimish-fold
+      (use-package evil-vimish-fold
         :straight t
-        :hook (after-init . vimish-fold-global-mode)
+        ;; :hook (after-init . vimish-fold-global-mode)
         :custom
+        (evil-vimish-fold-lighter "z")
         (vimish-fold-allow-nested t)
         (vimish-fold-dir (state! "vimish-fold/"))
-
-        :config
-        (add-hook 'vimish-fold-mode-hook
-                  (defun vimish-fold-setup-evil+ ()
-                    (if vimish-fold-mode
-                        (add-to-list 'evil-fold-list
-                                     `((vimish-fold-mode)
-                                       :delete     vimish-fold-delete
-                                       :open-all   vimish-fold-unfold-all
-                                       :close-all  vimish-fold-refold-all
-                                       :toggle     vimish-fold-toggle
-                                       :open       vimish-fold-unfold
-                                       :open-rec   nil
-                                       :close      vimish-fold-refold))
-                      (setq evil-fold-list (cl-remove-if
-                                            (lambda (e) (eq (caar e) 'vimish-fold-mode))
-                                            evil-fold-list)))))
-
-        (evil-define-operator vimish-fold-create+ (beg end)
-          "Create a fold from the current region.
-      See also `evil-delete-fold'."
-          (vimish-fold beg end))
-
-        (evil-define-motion vimish-fold-next-fold+ (count)
-          "Go to the start of the next fold."
-          :type inclusive
-          (unless (numberp count)
-            (setq count 1))
-          (dotimes (_ count nil)
-            (vimish-fold-next-fold)))
-
-        (evil-define-motion vimish-fold-prev-fold+ (count)
-          "Go to the start of the previous fold."
-          :type inclusive
-          (unless (numberp count)
-            (setq count 1))
-          (dotimes (_ count nil)
-            (vimish-fold-previous-fold)))
+        (vimish-fold-persist-on-saving nil "Prefer using marks.")
+        :hook (vimish-fold-mode . vimish-fold-refold-all)
 
         :general
-        (:keymaps 'vimish-fold-mode-map
+        (:keymaps 'evil-vimish-fold-mode-map
          :states '(normal motion)
-         "zx" 'vimish-fold-toggle
-         "zX" 'vimish-fold-toggle-recursively
-         "zj" 'vimish-fold-next-fold+
-         "zk" 'vimish-fold-prev-fold+
-         "zo" 'vimish-fold-unfold
-         "zO" 'vimish-fold-unfold-recursively
-         "zd" 'vimish-fold-delete
-         "zD" 'vimish-fold-delete-all
-         "zf" 'vimish-fold-create+)
-        ;; (:keymaps '(vimish-fold-unfolded-keymap
-        ;;             vimish-fold-folded-keymap)
-        ;;  "TAB"   'vimish-fold-toggle
-        ;;  "<tab>" 'vimish-fold-toggle)
-        )
+         "zA" 'vimish-fold-toggle-recursively
+         "zC" 'vimish-fold-refold-all
+         "zF" 'vimish-fold-refold-all
+         "zd" 'evil-vimish-fold/delete
+         "zD" 'evil-vimish-fold/delete-all
+         "zO" 'vimish-fold-unfold-all))
     #+END_SRC
 
 *** evil-mode
@@ -4519,6 +4476,7 @@
         (:states 'normal
          "gU" nil
          "gq" nil
+         "zf" 'evil-close-fold
          "K"  'evil-join-backwards
          "gu" 'evil-upcase
          "gd" 'evil-downcase
