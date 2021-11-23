@@ -12324,7 +12324,7 @@
               (concat
                (when (executable-find "ignore-exit")
                  "ignore-exit 1 ")
-               "rg --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number ."))
+               "rg --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number --with-filename ."))
 
         :config
         (evil-set-command-property 'consult-outline :jump t)
@@ -12993,6 +12993,45 @@
          ("i" consult-ebdb-cite-records+))
 
        (add-to-list 'embark-keymap-alist '(ebdb . embark-ebdb-completion-actions+))
+     #+end_src
+
+**** consult-line-or-grep
+     #+begin_src emacs-lisp :tangle (package-yes! :consult)
+       (autoload 'consult-line-or-ripgrep+ "+consult-custom.el" nil t)
+       (general-define-key [remap consult-line] 'consult-line-or-ripgrep+)
+     #+end_src
+
+     #+begin_src emacs-lisp
+       (defvar consult-line-or-ripgrep-line-limit+ (* 2 1024 1024) ; 2 MiB
+         "Buffer size threshold for `consult-line-or-ripgrep+'.
+       When the number of characters in a buffer exceeds this threshold,
+       `consult-ripgrep' will be used instead of `consult-line'.")
+
+       (defun consult-line-or-ripgrep--builder+ (file-name)
+         (lambda (input)
+           (when-let ((it (consult--ripgrep-builder input)))
+             (plist-put it :command
+                        (append (plist-get it :command)
+                                (list "--" (shell-quote-argument file-name)))))))
+
+       (defun consult-line-or-ripgrep+ (&optional initial)
+         "Call `consult-line' for small buffers or `consult-ripgrep' for large files."
+         (interactive)
+         (if (or (not buffer-file-name)
+                 (buffer-narrowed-p)
+                 (ignore-errors
+                   (file-remote-p buffer-file-name))
+                 (jka-compr-get-compression-info buffer-file-name)
+                 (<= (buffer-size)
+                     (/ consult-line-or-ripgrep-line-limit+
+                        (if (eq major-mode 'org-mode) 2 1))))
+             (call-interactively 'consult-line)
+           (when (file-writable-p buffer-file-name)
+             (save-buffer))
+           (let ((consult-ripgrep-args (string-remove-suffix " ." consult-ripgrep-args)))
+             (consult--grep "Ripgrep"
+                            (consult-line-or-ripgrep--builder+ buffer-file-name)
+                            nil initial))))
      #+end_src
 
 **** consult-extensions-eob
