@@ -158,6 +158,7 @@
          ;; cmake
          css
          csv
+         ;; docker
          elisp
          git-langs
          ;; haskell
@@ -17332,6 +17333,36 @@
        :straight t
        :mode ((rx ".edn") . clojure-mode))
    #+END_SRC
+
+** docker
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! docker)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package dockerfile-mode
+       :straight t
+       :custom
+       (dockerfile-use-buildkit
+        (string-equal (or (getenv "DOCKER_BUILDKIT") "1") "0")
+        "Whether to use buildkit. By default we do unless the
+     DOCKER_BUILDKIT environment variable explicitly disables
+     it.")
+
+       :preface
+       (push '(dockerfile-mode . 2) +indent-config))
+   #+end_src
+
+*** docker-transient
+    #+begin_src emacs-lisp :tangle no
+      (use-package docker
+        :straight t
+        :leader
+        (:prefix "pqd"
+         "" '(:ignore t :wk "docker")
+         "d" 'docker
+         "c" 'docker-compose))
+    #+end_src
 
 ** restclient
    :PROPERTIES:
