@@ -1022,6 +1022,10 @@
     #+begin_src emacs-lisp
       (push "node_modules/" completion-ignored-extensions)
       (push "__pycache__/" completion-ignored-extensions)
+      (push "CMakeCache.txt" completion-ignored-extensions)
+      (push "cmake_install.cmake" completion-ignored-extensions)
+      (push "CMakeFiles/" completion-ignored-extensions)
+      (push "eln-cache/" completion-ignored-extensions)
     #+end_src
 
     Set the string shown on the title bar of emacs frames.
@@ -5997,8 +6001,8 @@
         (projectile-update-project-type 'haskell-stack :run "stack run")
 
         (projectile-update-project-type 'cmake
-         :compilation-dir "build"
-         :run "cmake --build . --target run"))
+         :compile "cmake --build build"
+         :run "cmake --build build --target run"))
     #+END_SRC
 
 *** project-integration
@@ -7610,6 +7614,7 @@
                TeX-mode LaTeX-mode
                go-mode
                csharp-mode
+               js-mode js2-mode js-jsx-mode typescript-react-mode typescript-mode
                c-mode c++-mode)
                . abbrev-mode)
        :custom
@@ -7640,6 +7645,11 @@
 
        (with-eval-after-load 'cc-mode
          (abbrev-table-put c++-mode-abbrev-table :parents (list c-mode-abbrev-table)))
+
+       (with-eval-after-load 'js2-mode
+         (abbrev-table-put js2-mode-abbrev-table :parents (list js-mode-abbrev-table)))
+       (with-eval-after-load 'typescript-mode
+         (abbrev-table-put typescript-mode-abbrev-table :parents (list js-mode-abbrev-table)))
 
        :config
        (push `(git-commit-mode . ,git-commit-mode-abbrev-table) abbrev-minor-mode-table-alist)
@@ -8004,6 +8014,7 @@
                                            ".git"
                                            ".github"
                                            ".bundle"
+                                           ".clangd"
                                            ".dired"
                                            "__pycache__"
                                            "node_modules"
@@ -8011,7 +8022,11 @@
                                            ".gradle"
                                            ".sass-cache"
                                            ".jekyll-cache"
-                                           "Pipfile")
+                                           "Pipfile"
+                                           "CMakeFiles"
+                                           "CMakeCache"
+                                           "cmake_install.cmake"
+                                           (and "service.log." (one-or-more (any digit "_"))))
                                        eol))))
         :leader
         (:mode '(dired-mode
@@ -11107,6 +11122,7 @@
 ** simple
    #+BEGIN_SRC emacs-lisp
      (use-package simple
+       :commands (indent-tabs-mode)
        :leader
        ("i TAB" 'indent-hydra/body
         "i |"   'indent-to-column
@@ -13301,6 +13317,22 @@
                (when-let ((indent (bound-and-true-p c-basic-offset)))
                  (list "--style" (format "{IndentWidth: %d}" indent)))))
 
+       (setf (alist-get 'prettier apheleia-formatters)
+             '(npx
+               "prettier"
+               "--stdin-filepath" filepath
+               (when (bound-and-true-p indent-tabs-mode)
+                 "--use-tabs")
+               (when-let ((indent-var
+                           (cl-case major-mode
+                             ('js-mode 'js-indent-level)
+                             ('js2-mode 'js2-basic-offset)
+                             ('(js-jsx-mode typescript-react-mode)
+                              'js-indent-level)))
+                          (indent (and (boundp indent-var)
+                                       (symbol-value indent-var))))
+                 (list "--tab-width" (number-to-string indent)))))
+
        ;; WARN: Won't work until [[https://github.com/raxod502/apheleia/pull/50][#50]] is merged in.
        (push '(shfmt . ("shfmt"
                         "-filename" filepath
@@ -13490,12 +13522,34 @@
        (setq compile-multi-config
              `(((file-exists-p "go.sum")
                 ("go:build" . "go build -v")
-                ("go:test" . "go test"))
-               ((file-exists-p "CMakeLists.txt")
-                ("cmake:build" . "cmake build"))))
+                ("go:test" . "go test"))))
 
        (push `((file-exists-p "Makefile")
                ,#'compile-multi-make-targets)
+             compile-multi-config)
+
+       :init
+       (defun compile-multi-cmake-targets+ ()
+         (with-temp-buffer
+           (insert
+            (shell-command-to-string "cmake --build build --target help"))
+           (goto-char (point-min))
+           (let (res)
+             (save-match-data
+               (while (re-search-forward (rx bol (one-or-more ".") " "
+                                             (group (minimal-match (one-or-more any)))
+                                             (optional " (the default if no target is provided)")
+                                             eol)
+                                         nil t)
+                 (let ((target (match-string 1)))
+                   (push (cons (concat "cmake:" target)
+                               (concat "cmake --build build --target "
+                                       (shell-quote-argument target)))
+                         res))))
+             (nreverse res))))
+
+       (push `((file-exists-p "CMakeLists.txt")
+               ,#'compile-multi-cmake-targets+)
              compile-multi-config)
 
        :init
@@ -16562,7 +16616,9 @@
        :straight (tree-sitter :branch "master")
        :delight (tree-sitter-mode " T")
        :hook ((emacs-startup . global-tree-sitter-mode)
-              (tree-sitter-mode . tree-sitter-hl-mode)))
+              (tree-sitter-mode . tree-sitter-hl-mode))
+       :custom
+       (js2-highlight-level 0))
    #+END_SRC
 
    Tree sitter itself provides the backbone for tree-sitter parsing but it doesn't
@@ -19232,6 +19288,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package typescript-mode
        :straight t
+       :hook (typescript-mode . +flylint)
        :init
        (push '(typescript-mode . 2) +indent-config)
 
@@ -19245,7 +19302,8 @@
       (use-package typescript-mode
         :straight t
         :mode ("\\.tsx" . typescript-react-mode)
-        :hook ((typescript-react-mode . emmet-mode))
+        :hook ((typescript-react-mode . emmet-mode)
+               (typescript-react-mode . +flylint))
         :init
         (push '(typescript-react-mode . 2) +indent-config)
 
@@ -21051,7 +21109,7 @@
                (:group "Default"
                 :type entry
                 :hook ,#'flyspell-mode
-                :file ,org-default-notes-file
+                ;; :file ,org-default-notes-file
                 :prepend t
                 :empty-lines 0
                 :children

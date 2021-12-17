@@ -14,7 +14,7 @@
     ("us" "using" nil :count 2)
    ))
 
-(define-abbrev-table 'global-abbrev-table
+(define-abbrev-table 'text-mode-abbrev-table
   '(
     ("bg" "background" nil :count 6)
     ("btw" "by the way" nil :count 0)
@@ -39,5 +39,12 @@
     ("imp" "import" nil :count 1)
     ("pkg" "package" nil :count 2)
     ("st" "struct" nil :count 1)
+   ))
+
+(define-abbrev-table 'js-mode-abbrev-table
+  '(
+    ("exp" "export" nil :count 1)
+    ("imp" "import" nil :count 1)
+    ("req" "require" nil :count 1)
    ))
 
