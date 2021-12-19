@@ -41,10 +41,14 @@
     ("st" "struct" nil :count 1)
    ))
 
+(define-abbrev-table 'org-mode-abbrev-table
+  '(
+    ("ex" "example" nil :count 1)
+   ))
+
 (define-abbrev-table 'js-mode-abbrev-table
   '(
     ("exp" "export" nil :count 1)
     ("imp" "import" nil :count 1)
     ("req" "require" nil :count 1)
    ))
-

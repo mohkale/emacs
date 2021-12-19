@@ -9344,6 +9344,7 @@
         "l" 'evil-forward-char
         "h" 'evil-backward-char
 
+        "RET" 'Info-follow-nearest-node
         "S-TAB" 'Info-prev-reference
         "TAB" 'Info-next-reference
         [C-i] 'Info-next-reference
@@ -9631,6 +9632,7 @@
 
       (defun minibuffer-override-face-chunks+ (str)
         "Find regions in STR where a different face should be applied."
+        ;; TODO: use `next-single-property-change'.
         (cl-loop for i from 0 to (length str)
                  with last-face = nil
                  with current-face = nil
@@ -12078,6 +12080,13 @@
                    (defun vertico--sort-function+ ()
                      (+completion-category-sort-func vertico--metadata)))
 
+       :config
+       (advice-add #'ffap-menu-ask :around
+                   (lambda (&rest args)
+                     (cl-letf (((symbol-function #'minibuffer-completion-help)
+                                #'ignore))
+                       (apply args))))
+
        :general
        (:keymaps 'vertico-map
         "<C-i>" 'vertico-insert
@@ -12308,34 +12317,76 @@
         (consult-widen-key (kbd "S-SPC"))
         (xref-show-xrefs-function #'consult-xref)
         (xref-show-definitions-function #'consult-xref)
+        :init
+        (defconst consult-imenu-assoc+
+          '(("Class"                  ?c font-lock-type-face)
+            ("Struct"                 ?s font-lock-type-face)
+            ("Interface"              ?i font-lock-type-face)
+            ("Types"                  ?t font-lock-type-face)
+
+            (("Module" "Packages")    ?p font-lock-preprocessor-face)
+
+            ("Macros"                 ?@ font-lock-preprocesser-face)
+            ("Method"                 ?m font-lock-function-name-face)
+            ("Constructor"            ?K font-lock-function-name-face)
+            (("Function" "Functions") ?f font-lock-function-name-face)
+
+            ("Constant"               ?k  font-lock-variable-name-face)
+            (("Variable" "Variables") ?v  font-lock-variable-name-face)
+            ("Field"                  ?V  font-lock-variable-name-face)
+            ("Property"               ?P  font-lock-variable-name-face))
+          "Language agnostic `consult-imenu-config'.
+      This forces consistency in narrowing keys across all languages.")
+
+        (defun consult-imenu-gen-types+ (&rest types)
+          "Build a `consult-imenu' configuration for TYPES."
+          (cl-loop for type in types
+                   with conf = nil
+                   do (setq conf (cdr
+                                  (cl-find-if (lambda (it)
+                                                (cond ((stringp it)
+                                                       (string-equal it type))
+                                                      ((consp it)
+                                                       (cl-member type it :test #'string-equal))))
+                                              consult-imenu-assoc+
+                                              :key #'car)))
+                   when conf
+                     collect (append (list (car conf) type) (cdr conf))))
+
+        :custom
         ;; NOTE: Be careful when changing this, consult caches imenu items
         ;; and attaches `consult--type' indicators to candidates in the cache.
         ;; Changing this variable probably won't show any changes until the
         ;; cache is invalidated.
         (consult-imenu-config
-         (eval-when-compile
-           `((emacs-lisp-mode :toplevel "Functions"
-                              :types ((?f "Functions" font-lock-function-name-face)
-                                      (?m "Macros"    font-lock-function-name-face)
-                                      (?p "Packages"  font-lock-constant-face)
-                                      (?t "Types"     font-lock-type-face)
-                                      (?v "Variables" font-lock-variable-name-face)))
-             ,@(cl-loop for mode in '(c++-mode c-mode)
-                        collect (list mode :types '((?c "Class" font-lock-type-face)
-                                                    (?e "Enum" font-lock-type-face)
-                                                    (?F "Field" font-lock-variable-name-face)
-                                                    (?C "Constructor" font-lock-function-name-face)
-                                                    (?m "Method" font-lock-function-name-face)
-                                                    (?v "Variable" font-lock-variable-name-face)
-                                                    (?f "Function" font-lock-function-name-face))))
-             (python-mode :types ((?F "Field" font-lock-variable-name-face)
-                                  (?c "Class" font-lock-type-face)
-                                  (?m "Method" font-lock-function-name-face)
-                                  (?i "Module" font-lock-preprocessor-face)
-                                  (?f "Function" font-lock-function-name-face)
-                                  (?v "Variable" font-lock-variable-name-face)))
-             (sh-mode :types ((?f "Function" font-lock-function-name-face)
-                              (?v "Variable" font-lock-variable-name-face))))))
+         `(;; Minor-mode configurations come first so major-mode ones don't
+           ;; override them.
+           ;;
+           ;; Re-use the same configuration for both lsp-mode and eglot.
+           ,@(let ((conf `(:types ,(consult-imenu-gen-types+
+                                    "Class"
+                                    "Struct"
+                                    "Interface"
+                                    "Module"
+                                    "Method"
+                                    "Function"
+                                    "Constant"
+                                    "Variable"
+                                    "Field"))))
+               `((eglot--managed-mode ,@conf)
+                 (lsp-mode ,@conf)))
+           (emacs-lisp-mode :toplevel "Functions"
+                            :types ,(consult-imenu-gen-types+
+                                     "Functions"
+                                     "Macros"
+                                     "Packages"
+                                     "Types"
+                                     "Variables"))
+           ;; Both c-mode and c++-mode have almost identicle imenu functions.
+           ,@(let ((conf `(:toplevel "Function"
+                           :types ,(consult-imenu-gen-types+ "Function" "Class"))))
+               `((c-mode ,@conf)
+                 (c++-mode ,@conf)))))
         :config
         (setq consult-ripgrep-args                                                      ; Variant command which disregards no-matches
               (concat
@@ -22899,8 +22950,8 @@
        `(company-template-field ((,cls (:foreground ,turquoise-int))))
 
        ;; scrollbar
-       `(company-scrollbar-bg ((,cls (:background ,line-highlight-bg :foreground ,very-light-grey))))
-       `(company-scrollbar-fg ((,cls (:background ,red               :foreground ,dark-grey))))
+       `(company-tooltip-scrollbar-track ((,cls (:background ,line-highlight-bg :foreground ,very-light-grey))))
+       `(company-tooltip-scrollbar-thumb ((,cls (:background ,red               :foreground ,dark-grey))))
 
        `(company-preview ((,cls (:foreground ,blue-int :weight bold :inherit hl-line))))
        `(company-preview-common ((,cls (:inherit company-preview))))
