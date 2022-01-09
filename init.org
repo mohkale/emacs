@@ -12414,6 +12414,9 @@
                                      "Packages"
                                      "Types"
                                      "Variables"))
+           (perl-mode :toplevel "Functions"
+                      :types ((?v "Variables" font-lock-variable-name-face)
+                              (?f "Functions" font-lock-function-name-face)))
            ;; Both c-mode and c++-mode have almost identicle imenu functions.
            ,@(let ((conf `(:toplevel "Function"
                            :types ,(consult-imenu-gen-types+
@@ -14333,6 +14336,7 @@
                         (plugins
                          (pydocstyle (enabled . t))
                          (pylint (enabled . t))
+                         (pyls_mypy (enabled . t))
                          (jedi_completion
                           (fuzzy . t)
                           (follow_builtin_imports . :json-false))))
@@ -21304,6 +21308,23 @@
                                          "  DEADLINE: %^{deadline}t"
                                          "%^{LOCATION}p%^{DURATION}p"
                                          "  %?"))))
+                 ("Work"
+                  :keys "w"
+                  :type plain
+                  :children (("Standup" :keys "s"
+                              :file (lambda ()
+                                      (format-time-string (join-path +notes-home "standup" "%Y-%m-%d.org")))
+                              :template ("#+title: Standup %(format-time-string \"Q%q\")"
+                                         ""
+                                         "* What I did last time"
+                                         "  %?"
+                                         ""
+                                         "* Plan for today"
+                                         ""
+                                         "* Questions"
+                                         ""
+                                         "* Notes"
+                                         ""))))
                  (;; Group for notes. These are entire org-mode files containing detailed
                   ;; notes isolated to a specific topic for example a lecture or some agenda.
                   ;; Notes that go into here are often bisected and moved into my [[file:init.org::*org-roam][org-brain]].
