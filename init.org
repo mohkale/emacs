@@ -84,7 +84,6 @@
          ;; expand-region                                                  ; Expand visual mode by semantic units
          eyebrowse                                                         ; Provides switchable window configurations
          ;; flycheck                                                       ; A better buffer linter and error-checker package
-         ;; frog-jump-buffer                                               ; Posframe to jump to a buffer
          ;; hide-comnt                                                     ; Minor mode to disable rendering of comments
          ;; neotree                                                        ; Tree like directory viewer for emacs
          ;; notmuch                                                        ; Mail client and manager
@@ -1026,6 +1025,7 @@
       (push "cmake_install.cmake" completion-ignored-extensions)
       (push "CMakeFiles/" completion-ignored-extensions)
       (push "eln-cache/" completion-ignored-extensions)
+      (push "#" completion-ignored-extensions)
     #+end_src
 
     Set the string shown on the title bar of emacs frames.
@@ -1051,16 +1051,20 @@
     Auto saves and backup files, both important parts of emacs
 
     #+BEGIN_SRC emacs-lisp
-
       (setq
-       ;; where do autosave files get stored
+       ;; Where do autosave files get stored.
        auto-save-file-name-transforms
        (let ((auto-save-dir (state! "auto-save" "sessions/")))
          (mkdir auto-save-dir t)
          `((".*" ,auto-save-dir t)))
 
-       ;; where do backup files get stored
-       backup-directory-alist `(("." . ,(state! "backups/"))))
+       ;; Where do backup files get stored.
+       backup-directory-alist `(("." . ,(state! "backups/")))
+
+       ;; How to format lock files, for our use cases just append
+       ;; a "#" to the end of it so we can exclude it from `find-file'.
+       ;; A ".#" will also be prepended to it automatically.
+       lock-file-name-transforms `(("$" "#")))
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
@@ -3688,7 +3692,7 @@
         (defun without-if-bang (pattern _index _total)
           "Exclude literal when leading punctuation-mark."
           (when (string-prefix-p "!" pattern)
-            (if (not (eq pattern "!"))
+            (if (eq pattern "!")
                 `(orderless-literal . "")                                             ; Ignore single ! by default.
               `(orderless-without-literal . ,(substring pattern 1)))))
 
@@ -5211,6 +5215,9 @@
         (push `(,(rx bol "*Flymake diagnostics for " (one-or-more any) "*" eol)
                 all-the-icons-nerd-mdi "buffer")
               all-the-icons-regexp-icon-alist)
+        (push `(,(rx ".journal" eol)
+                all-the-icons-nerd-fa "book")
+              all-the-icons-regexp-icon-alist)
         )
     #+END_SRC
 
@@ -5937,6 +5944,15 @@
        (advice-add 'projectile-run-project     :around #'projectile-compile--double-prefix-means-run-comint)
        (advice-add 'projectile-compile-project :around #'projectile-compile--double-prefix-means-run-comint)
        (advice-add 'projectile-test-project    :around #'projectile-compile--double-prefix-means-run-comint)
+
+       :config
+       (advice-add 'projectile-switch-project :around
+                   (defun projectile-switch-project+ (func &optional arg)
+                     "Make prefix for `projectile-switch-project' reload project list."
+                     (interactive "P")
+                     (when arg
+                       (projectile-diblacscover-projects-in-search-path))
+                     (funcall func)))
 
        :general
        (:keymaps 'projectile-mode-map
@@ -8588,13 +8604,6 @@
          (join-path (xdg-config-home) "mdlstyle.rb"))
         (flymake-rest-hook-ignore-modes '(eglot--managed-mode))
 
-        :init
-        (require 'flymake-rest-hook-use-package)
-
-        :init
-        (with-eval-after-load 'flymake-rest-hook
-          (require 'flymake-rest-hook-langs))
-
         :leader ("ec" 'flymake-rest-change-checker))
     #+end_src
 
@@ -8676,6 +8685,14 @@
                  (defun ispell-save-pdict-on-quit+ ()
                    (ispell-pdict-save t))))
    #+END_SRC
+
+** gpg
+   #+begin_src emacs-lisp
+     (use-package epg
+       :custom
+       (epg-pinentry-mode 'loopback)
+       (epg-user-id user-mail-address))
+   #+end_src
 
 ** grep
    emacs mode for interacting with output from the grep executable.
@@ -9814,6 +9831,27 @@
         (with-eval-after-load 'smtpmail
           (require 'smtpmail-multi)))
     #+END_SRC
+
+*** mml
+    GPG support for message mail.
+
+    #+begin_src emacs-lisp
+      (use-package mml
+        ;; :hook
+        ;; (;; (message-setup . mml-secure-sign-pgpmime)
+        ;;  (message-setup . mml-secure-message-sign-pgpmime))
+
+        :custom
+        (mml-secure-openpgp-sign-with-sender t)
+
+        :leader
+        (:mode '(message-mode notmuch-message-mode)
+         :prefix "m"
+         "" '(:ignore t :wk "mml")
+         "m" 'mml-secure-message-encrypt ; Encrypt and sign
+         "s" 'mml-secure-message-sign ; sign
+         "x" 'mml-unsecure-message))
+    #+end_src
 
 ** mode-line
    Here we define customisation options and other helpers for building mode-lines.
@@ -12319,22 +12357,32 @@
         (xref-show-definitions-function #'consult-xref)
         :init
         (defconst consult-imenu-assoc+
-          '(("Class"                  ?c font-lock-type-face)
-            ("Struct"                 ?s font-lock-type-face)
-            ("Interface"              ?i font-lock-type-face)
-            ("Types"                  ?t font-lock-type-face)
+          '(("Class"                         ?c font-lock-type-face)
+            ("Struct"                        ?s font-lock-type-face)
+            ("Interface"                     ?i font-lock-type-face)
+            ("Types"                         ?t font-lock-type-face)
+            ("Enum"                          ?e font-lock-type-face)
 
-            (("Module" "Packages")    ?p font-lock-preprocessor-face)
+            ("Namespace"                     ?n font-lock-preprocessor-face)
+            (("Module" "Package" "Packages") ?p font-lock-preprocessor-face)
 
-            ("Macros"                 ?@ font-lock-preprocesser-face)
-            ("Method"                 ?m font-lock-function-name-face)
-            ("Constructor"            ?K font-lock-function-name-face)
-            (("Function" "Functions") ?f font-lock-function-name-face)
+            ("Macros"                        ?@ font-lock-preprocesser-face)
+            ("Method"                        ?m font-lock-function-name-face)
+            ("Constructor"                   ?K font-lock-function-name-face)
+            (("Function" "Functions")        ?f font-lock-function-name-face)
 
-            ("Constant"               ?k  font-lock-variable-name-face)
-            (("Variable" "Variables") ?v  font-lock-variable-name-face)
-            ("Field"                  ?V  font-lock-variable-name-face)
-            ("Property"               ?P  font-lock-variable-name-face))
+            ("Array"                         ?A font-lock-variable-name-face)
+            ("Boolean"                       ?B font-lock-variable-name-face)
+            ("Enum Member"                   ?E font-lock-variable-name-face)
+            ("Enum Member"                   ?B font-lock-variable-name-face)
+            ("Number"                        ?N font-lock-variable-name-face)
+            ("Object"                        ?O font-lock-variable-name-face)
+            ("String"                        ?S font-lock-variable-name-face)
+
+            ("Constant"                      ?k font-lock-variable-name-face)
+            (("Variable" "Variables")        ?v font-lock-variable-name-face)
+            ("Field"                         ?V font-lock-variable-name-face)
+            ("Property"                      ?P font-lock-variable-name-face))
           "Language agnostic `consult-imenu-config'.
       This forces consistency in narrowing keys across all languages.")
 
@@ -12359,23 +12407,7 @@
         ;; Changing this variable probably won't show any changes until the
         ;; cache is invalidated.
         (consult-imenu-config
-         `(;; Minor-mode configurations come first so major-mode ones don't
-           ;; override them.
-           ;;
-           ;; Re-use the same configuration for both lsp-mode and eglot.
-           ,@(let ((conf `(:types ,(consult-imenu-gen-types+
-                                    "Class"
-                                    "Struct"
-                                    "Interface"
-                                    "Module"
-                                    "Method"
-                                    "Function"
-                                    "Constant"
-                                    "Variable"
-                                    "Field"))))
-               `((eglot--managed-mode ,@conf)
-                 (lsp-mode ,@conf)))
-           (emacs-lisp-mode :toplevel "Functions"
+         `((emacs-lisp-mode :toplevel "Functions"
                             :types ,(consult-imenu-gen-types+
                                      "Functions"
                                      "Macros"
@@ -12384,9 +12416,50 @@
                                      "Variables"))
            ;; Both c-mode and c++-mode have almost identicle imenu functions.
            ,@(let ((conf `(:toplevel "Function"
-                           :types ,(consult-imenu-gen-types+ "Function" "Class"))))
+                           :types ,(consult-imenu-gen-types+
+                                    "Function" "Class"))))
                `((c-mode ,@conf)
                  (c++-mode ,@conf)))))
+
+        :init
+        ;; Override the types for the current major-mode with types.
+        ;; Used for minor-mode configurations since consult doesn't support
+        ;; this.
+        (defun consult-imenu-override-types+ (&rest types)
+          (make-variable-buffer-local 'consult-imenu-config)
+          (push `(,major-mode :types ,(apply #'consult-imenu-gen-types+ types))
+                consult-imenu-config)
+          (setq consult-imenu--cache nil))
+
+        (defun consult-imenu-setup-lsp+ ()
+          (consult-imenu-override-types+
+           "Class"
+           "Struct"
+           "Interface"
+           "Module"
+           "Function"
+           "Enum"
+           "Namespace"
+           "Package"
+           "Type Parameter"
+           "Variable"
+           "Array"
+           "Boolean"
+           "Constant"
+           "Enum Member"
+           "Field"
+           "Method"
+           "Number"
+           "Object"
+           "Property"
+           "String"))
+
+        :hook
+        ((eglot--managed-mode
+          lsp-mode
+          tree-sitter-imenu-mode)
+         . consult-imenu-setup-lsp+)
+
         :config
         (setq consult-ripgrep-args                                                      ; Variant command which disregards no-matches
               (concat
@@ -12418,7 +12491,6 @@
          ;; but once produced you won't be re-running the command again.
          consult-find
          consult-find-no-project+
-         +dot-goto-repo
          +dot-goto-executable
          +dot-goto-fsmap
          +dot-open-bookmark
@@ -13116,41 +13188,15 @@
 
      #+BEGIN_SRC emacs-lisp :tangle (package-yes! :consult)
        (use-package +consult-dotfiles
-         :commands (+dot-goto-repo
-                    +dot-goto-fsmap
+         :commands (+dot-goto-fsmap
                     +dot-goto-executable
                     +dot-open-bookmark)
          :leader
          ("fd" '(:ignore t :wk "dotfiles")
-          "fdp" '+dot-goto-repo
           "fda" '+dot-goto-fsmap
           "fdf" '+dot-goto-fsmap
           "fdx" '+dot-goto-executable
           "fdb" '+dot-open-bookmark))
-     #+END_SRC
-
-     #+BEGIN_SRC emacs-lisp
-       (defvar +dot-goto-repo-history nil)
-
-       (defun +dot-goto-repo (repo)
-         "List repositories using my [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-repos][ls-projects]] script and ask for one to jump to."
-         (interactive
-          (list (consult--read
-                 (consult--async-command
-                     (lambda (input)
-                       (pcase-let ((`(,arg . ,opts) (consult--command-split input)))
-                         (unless (string-blank-p arg)
-                           (list :command `("ls-projects" ,arg ,@opts)
-                                 :highlight (cdr (consult--default-regexp-compiler input 'basic)))))))
-                 :prompt "Repo: "
-                 :category 'project-file
-                 :require-match t
-                 :history '(:input +dot-goto-repo-history)
-                 :initial (consult--async-split-initial "*"))))
-         (cond
-          ((functionp 'projectile-switch-project-by-name)
-           (projectile-switch-project-by-name repo))
-          (t (dired repo))))
      #+END_SRC
 
      #+BEGIN_SRC emacs-lisp
@@ -13169,7 +13215,7 @@
                  :prompt "Find executable: "
                  :category 'file
                  :require-match t
-                 :history '(:input +dot-goto-repo-history)
+                 :history '(:input +dot-goto-executable-history)
                  :initial (consult--async-split-initial "*"))))
          (find-file executable))
      #+END_SRC
@@ -13338,120 +13384,165 @@
        ("tma" 'apheleia-mode
         "bf" 'apheleia-format-buffer)
 
-       :config
+       :custom
+       (apheleia-hide-log-buffers t)
+
+       :preface
+       (defun apheleia-indent+ (tab-flag indent-flag indent-var)
+         (cond
+          (indent-tabs-mode tab-flag)
+          (indent-var
+           (when-let ((indent (and (boundp indent-var)
+                                   (symbol-value indent-var))))
+             (list indent-flag (number-to-string indent))))))
+
+       (defun apheleia-fill-column+ (fill-flag)
+         (when-let ((wrap (bound-and-true-p fill-column)))
+           (list fill-flag (number-to-string wrap))))
+
+       (defun apheleia-locate-file+ (file-flag file-name)
+         (when-let ((file (locate-dominating-file default-directory file-name)))
+           (list file-flag file)))
+
+       (defun apheleia-extension-p+ (&rest exts)
+         (when-let ((name (or buffer-file-name
+                              (apheleia--safe-buffer-name)))
+                    (ext (file-name-extension name)))
+           (cl-find-if (apply-partially #'string-equal ext)
+                       exts)))
+
+       (defun apheleia-mode-ext-assoc+ ()
+         (cl-case major-mode
+           (c-mode ".c")
+           (c++-mode ".cpp")
+           (glsl-mode ".glsl")
+           (java-mode ".java")))
+
+       :custom
+       (apheleia-formatters
+        `((asmfmt "asmfmt")
+          (astyle "astyle" (apheleia-locate-file+ "--options" ".astylerc"))
+          (atsfmt "atsfmt")
+          (black "black" "--quiet" (when (apheleia-extension-p+ "pyi") "--pyi") "-")
+          (brittany "brittany")
+          (bsrefmt "bsrefmt")
+          (buildifier "buildifier")
+          (cabal-fmt "cabal-fmt")
+          (clang-format "clang-format"
+                        "--assume-filename" (or (buffer-file-name)
+                                                (apheleia-mode-ext-assoc+))
+                        ;; This should ideally be set in a .clang-format file
+                        ;; but since I'm more inclined to use editorconfig it
+                        ;; shouldn't really matter.
+                        (when-let ((indent (bound-and-true-p c-basic-offset)))
+                          (list "--style" (format "{IndentWidth: %d}" indent))))
+          (cmake-format "cmake-format" "-")
+          (crystal-tool "crystal" "tool" "format" "-")
+          (gawk "gawk" "-f" "-" "--pretty-print=-")
+          (gofmt "gofmt")
+          (goimports "goimports")
+          (google-java-format "google-java-format" "-")
+          (html-tidy "tidy"
+                     "--quiet" "yes" "-indent" "auto" "--vertical-space" "yes"
+                     "--tidy-mark" "no"
+                     (when (derived-mode-p 'nxml-mode)
+                       "-xml")
+                     (apheleia-indent+
+                      (list "--indent-with-tabs" "yes")
+                      "--indent-spaces"
+                      (cond
+                       ((derived-mode-p 'nxml-mode)
+                        'nxml-child-indent)
+                       ((derived-mode-p 'web-mode)
+                        'web-mode-indent-style)))
+                     (apheleia-fill-column+ "-wrap"))
+          (isort "isort" "--stdout" "-")
+          (jq "jq" "."
+              (apheleia-indent+ "--tab" "--indent" 'js-indent-level))
+          (latexindent "latexindent")
+          (mix-format "mix" "format" "-")
+          (ocamlformat "ocamlformat" "-" "--name" filepath)
+          (perltidy "perltidy" "--quiet" "--standard-error-output")
+          (prettier npx
+                    "prettier"
+                    "--stdin-filepath" filepath
+                    (apheleia-indent+
+                     "--use-tabs" "--tab-width"
+                     (cl-case major-mode
+                       ('js-mode 'js-indent-level)
+                       ('js2-mode 'js2-basic-offset)
+                       ('(js-jsx-mode typescript-react-mode)
+                        'js-indent-level))))
+          (rubocop "rubocop" "--stdin" filepath "--auto-correct"
+                   "--stderr" "--format" "quiet" "--fail-level" "fatal")
+          (rufo "rufo" "--filename" filepath)
+          (rustfmt "rustfmt" "--unstable-features" "--skip-children"
+                   "--quiet" "--emit" "stdout")
+          (shfmt "shfmt"
+                 "-filename" filepath
+                 "-ln" (cl-case sh-shell
+                         ((zsh bash) "bash")
+                         (t "posix"))
+                 "-i" (number-to-string
+                       (cond
+                        (indent-tabs-mode 0)
+                        (t sh-basic-offset)))
+                 "-")
+          (beautysh "beautysh"
+                    (when-let ((indent (bound-and-true-p sh-basic-offset)))
+                      (list "--indent-size" (number-to-string indent)))
+                    (when indent-tabs-mode "--tab")
+                    "-")
+          (terraform "terraform" "fmt" "-"))
+        "Formatter command generation configuration.")
+
+       :preface
+       (defun apheleia-unpack-mode-alist+ (conf)
+         (cl-loop
+         for (mode . formatter) in conf
+         ;; Unpack keys mode-lists into individual entries.
+         if (consp mode)
+           append (cl-loop for mode in mode
+                           collect (cons mode formatter))
+         else
+           collect (cons mode formatter)))
+
+       :custom
        ;; When in doubt, see [[https://github.com/rishirdua/awesome-code-formatters][awesome-code-formatters]] and [[https://github.com/lassik/emacs-format-all-the-code][emacs-format-all-the-code]].
-       (push '(c++-mode . clang-format) apheleia-mode-alist)
-
-       (push '(perltidy . ("perltidy" "--quiet" "--standard-error-output")) apheleia-formatters)
-       (push '(perl-mode . perltidy) apheleia-mode-alist)
-
-       (push '(rufo . ("rufo" "--filename" filepath)) apheleia-formatters)
-       (push `(rubocop . (,@(when (executable-find "ignore-exit")
-                              (list "ignore-exit" "1"))
-                          "rubocop" "--stdin" filepath "--auto-correct" "--format" "quiet" "--stderr"))
-             apheleia-formatters)
-       (setf (alist-get 'ruby-mode apheleia-mode-alist) 'rubocop)
-       (push '(enh-ruby-mode . rubocop) apheleia-mode-alist)
-
-       (push '(isort . ("isort" "--stdout" "-")) apheleia-formatters)
-       (setf (alist-get 'python-mode apheleia-mode-alist) '(isort black))
-
-       (push '(typescript-react-mode . prettier) apheleia-mode-alist)
-       (push '(js2-jsx-mode . prettier) apheleia-mode-alist)
-
-       ;; Can be used with C, Java, and many more.
-       (setf (alist-get 'clang-format apheleia-formatters)
-             '("clang-format" "--assume-filename" filepath
-               ;; This should ideally be set in a .clang-format file
-               ;; but since I'm more inclined to use editorconfig it
-               ;; shouldn't really matter.
-               (when-let ((indent (bound-and-true-p c-basic-offset)))
-                 (list "--style" (format "{IndentWidth: %d}" indent)))))
-
-       (setf (alist-get 'prettier apheleia-formatters)
-             '(npx
-               "prettier"
-               "--stdin-filepath" filepath
-               (when (bound-and-true-p indent-tabs-mode)
-                 "--use-tabs")
-               (when-let ((indent-var
-                           (cl-case major-mode
-                             ('js-mode 'js-indent-level)
-                             ('js2-mode 'js2-basic-offset)
-                             ('(js-jsx-mode typescript-react-mode)
-                              'js-indent-level)))
-                          (indent (and (boundp indent-var)
-                                       (symbol-value indent-var))))
-                 (list "--tab-width" (number-to-string indent)))))
-
-       ;; WARN: Won't work until [[https://github.com/raxod502/apheleia/pull/50][#50]] is merged in.
-       (push '(shfmt . ("shfmt"
-                        "-filename" filepath
-                        "-ln" (cl-case sh-shell
-                                ((zsh bash) "bash")
-                                (t "posix"))
-                        "-i" (number-to-string
-                              (cond
-                               (indent-tabs-mode 0)
-                               (t sh-basic-offset)))
-                        "-"))
-             apheleia-formatters)
-       (push '(shfmt . ("beautysh"
-                        "-filename" filepath
-                        (when-let ((indent (bound-and-true-p sh-basic-offset)))
-                          (list "--indent-size" (number-to-string indent)))
-                        (when indent-tabs-mode "--tab")
-                        "-"))
-             apheleia-formatters)
-       (push '(sh-mode . shfmt) apheleia-mode-alist)
-
-       (push '(asmfmt . ("asmfmt")) apheleia-formatters)
-       (push '(asm-mode . asmfmt) apheleia-mode-alist)
-       (push '(nasm-mode . asmfmt) apheleia-mode-alist)
-
-       (push '(gawk . ("gawk" "-f" "-" "--pretty-print=-")) apheleia-formatters)
-       (push '(awk-mode . gawk) apheleia-mode-alist)
-
-       (push '(crystal-tool . ("crystal" "tool" "format" "-")) apheleia-formatters)
-       (push '(crystal-mode . crystal-tool) apheleia-mode-alist)
-
-       (push '(jq . ("jq" "."
-                     (if indent-tabs-mode
-                         "--tab"
-                       (when-let ((indent (bound-and-true-p js-indent-level)))
-                         (list "--indent" (number-to-string indent))))))
-             apheleia-formatters)
-       (push '(json-mode . jq) apheleia-mode-alist)
-
-       (push '(html-tidy . ("tidy"
-                            (when (derived-mode-p 'nxml-mode)
-                              "-xml")
-                            "--quiet" "yes"
-                            "-indent" "auto"
-                            (if indent-tabs-mode
-                                (list "--indent-with-tabs" "yes")
-                              (when-let ((indent-var
-                                          (cond
-                                           ((derived-mode-p 'nxml-mode)
-                                            'nxml-child-indent)
-                                           ((derived-mode-p 'web-mode)
-                                            'web-mode-indent-style)))
-                                         (indent (and (boundp indent-var)
-                                                      (symbol-value indent-var))))
-                                (list "--indent-spaces" (number-to-string indent))))
-                            "--vertical-space" "yes"
-                            "--tidy-mark" "no"
-                            (when-let ((wrap (bound-and-true-p fill-column)))
-                              (list "-wrap" (number-to-string wrap)))))
-             apheleia-formatters)
-       (push '(nxml-mode . html-tidy) apheleia-mode-alist)
-       (push '(web-mode . html-tidy) apheleia-mode-alist)
-
-       (push '(cmake-format . ("cmake-format" "-")) apheleia-formatters)
-       (push '(cmake-mode . cmake-format) apheleia-mode-alist)
-
-       (push '(goimports . ("goimports")) apheleia-formatters)
-       (setf (alist-get 'go-mode apheleia-mode-alist) 'goimports))
+       (apheleia-mode-alist
+        (apheleia-unpack-mode-alist+
+         `(((asm-mode nasm-mode) . asmfmt)
+           (ats-mode . atsfmt)
+           (awk-mode . gawk)
+           (bazel-mode . buildifier)
+           ((cc-mode c-mode c++-mode) . clang-format)
+           (haskell-cabal-mode . cabal-fmt)
+           (cmake-mode . cmake-format)
+           (crystal-mode . crystal-tool)
+           (css-mode . prettier)
+           (elixir-mode . mix-format)
+           (go-mode . goimports)
+           (haskell-mode . brittany)
+           ((html-mode web-mode nxml-mode) . apheleia-mode-alist)
+           (java-mode . google-java-format)
+           ((js-mode js2-mode js3-mode js2-jsx-mode
+             typescript-mode typescript-react-mode)
+            . prettier)
+           (json-mode . jq)
+           ((latex-mode LaTeX-mode TeX-mode TeX-latex-mode)
+            . latexindent)
+           (perl-mode . perltidy)
+           (php-mode . nil)
+           (python-mode . (isort black))
+           (reason-mode . bsrefmt)
+           ((ruby-mode enh-ruby-mode) . rubocop)
+           ((rust-mode rustic-mode) . rustfmt)
+           (sass-mode . prettier)
+           (sh-mode . shfmt)
+           (terraform-mode . terraform)
+           (tuareg-mode . ocamlformat)
+           (yaml-mode . prettier)))
+        "Mode list to formatter/s configuration."))
    #+end_src
 
 ** adaptive-wrap
@@ -14349,6 +14440,39 @@
         "wc" 'eglot-signal-didChangeConfiguration))
    #+END_SRC
 
+   #+begin_src emacs-lisp :tangle (package-yes! eglot :consult)
+     (defun eglot-imenu-make-markers+ (cands)
+       "Helper which makes `eglot-imenu' return points instead of special items.
+     This is technically not as powerful as what what `eglot-imenu' currently
+     returns since that also has the ability highlight the range over which an
+     imenu entry is valid, but at the moment the only significant difference is
+     eglots approach is slightly faster since it defers calculating the point of
+     an entry until that entry is chosen. That's useful for basic imenu
+     functionality but `consult-imenu' lets you preview positions and that would
+     conflict with this."
+       (cl-labels
+           ((unfurl (item)
+                    (if (imenu--subalist-p item)
+                        (mapcar #'unfurl (cdr item))
+                      (pcase (cdr item)
+                        ;; We ignore anything not of this form, but all entries
+                        ;; should be like this so it doesn't really matter.
+                        (`(,pos ,_fn . ,_args)
+                         (setcdr
+                          item
+                          (car
+                           (eglot--range-region
+                            (eglot--dcase (aref pos 0)
+                              (((SymbolInformation) location)
+                               (plist-get location :range))
+                              (((DocumentSymbol) selectionRange)
+                               selectionRange))))))))))
+         (mapcar #'unfurl cands)
+         cands))
+
+     (advice-add 'eglot-imenu :filter-return #'eglot-imenu-make-markers+)
+   #+end_src
+
 ** engine-mode
    :PROPERTIES:
    :header-args+: :tangle (package-yes! engine-mode)
@@ -14727,17 +14851,6 @@
         :hook (flycheck-mode . flycheck-pos-tip-mode)
         :commands flycheck-pos-tip-mode)
     #+END_SRC
-
-** frog-jump-buffer
-   Display an avy like popup of your most recent buffers and then jump to it.
-   now that I have ibuffer and ~counsel-switch-buffer~, I don't really need it.
-
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! frog-jump-buffer)
-     (use-package frog-jump-buffer
-       :straight t
-       :leader
-       ("jb" 'frog-jump-buffer))
-   #+END_SRC
 
 ** ggtags
    Tags are the classic source-code navigation system that predates LSP.
@@ -17422,7 +17535,7 @@
        :hook (awk-mode . awk-mode-reset-electric-pair+))
    #+END_SRC
 
-** Crystal
+** crystal
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! crystal)
      (use-package crystal-mode
        :straight t
@@ -22001,7 +22114,7 @@
                (concat
                 " "
                 (propertize " " 'display `(space :align-to (- right ,(+ 1 (length tags)))))
-                tags))))
+                (propertize tags 'face 'completions-annotations)))))
 
          :commands (org-roam-create-new-img+)
          :leader (:mode 'org-mode "f" 'org-roam-create-new-img+)
@@ -22221,7 +22334,7 @@
               eglot-server-programs))
     #+end_src
 
-** Perl
+** perl
    :PROPERTIES:
    :header-args+: :tangle (package-yes! perl)
    :END:
@@ -23232,10 +23345,11 @@
        `(notmuch-tag-unread ((,cls (:inherit font-lock-type-face))))
        `(notmuch-tag-flagged ((,cls (:inherit font-lock-string-face))))
        `(notmuch-tree-match-tag-face ((,cls (:inherit (bold notmuch-tag-face)))))
-       `(notmuch-crypto-signature-bad ((,cls (:inherit error))))
-       `(notmuch-crypto-signature-unknown ((,cls (:inherit notmuch-crypto-signature-bad))))
-       `(notmuch-crypto-signature-good ((,cls (:inherit success))))
-       `(notmuch-crypto-signature-good-key ((,cls (:background ,orange-int))))
+       `(notmuch-crypto-signature-bad ((,cls (:inherit error :weight normal))))
+       `(notmuch-crypto-signature-unknown ((,cls (:foreground ,yellow))))
+       `(notmuch-crypto-signature-good ((,cls (:foreground ,green-int))))
+       `(notmuch-crypto-signature-good-key ((,cls (:inherit notmuch-crypto-signature-good))))
+       `(notmuch-crypto-decryption ((,cls (:inherit notmuch-crypto-signature-good))))
        `(notmuch-search-matching-authors ((,cls (:inherit notmuch-tree-match-author-face))))
 
       ;;; tab-bar
@@ -23375,9 +23489,9 @@
 #  LocalWords:  neotree olivetti pdftools skeletor Makefile golang gradle lua xml ql
 #  LocalWords:  hindent powershell contrib orgit fragtog vscode css haskell nimlsp
 #  LocalWords:  gitattributes gitconfig yapfify makefile citeproc ebdb asm nim php
-#  LocalWords:  JavaDocs Github MicrosoftDocs NyaaLiterature MyAnimeList Youtube
+#  LocalWords:  JavaDocs Github MicrosoftDocs NyaaLiterature MyAnimeList Youtube gpg
 #  LocalWords:  NyaaLiteratureAll Nyaa NyaaGames NyaaSoftware NyaaImages NyaaMusic
 #  LocalWords:  NyaaLiveActionAll NyaaLiveAction NyaaAnimeAll NyaaAnime CppReference
 #  LocalWords:  microsoft github godoc SchoolsColors StackOverflow GoogleMaps cmake
-#  LocalWords:  GoogleImages separedit csharp impl gopls analyzer plsense glsl
+#  LocalWords:  GoogleImages separedit csharp impl gopls analyzer plsense glsl mml
 #  LocalWords:  languageserver roslyn recentf
