@@ -8035,6 +8035,8 @@
                                            "__pycache__"
                                            "node_modules"
                                            ".pytest_cache"
+                                           ".mypy_cache"
+                                           ".tox"
                                            ".gradle"
                                            ".sass-cache"
                                            ".jekyll-cache"
@@ -10933,7 +10935,12 @@
                                            (or "/tmp/"
                                                "/ssh:"
                                                "/sudo:"
-                                               (eval straight-base-dir)))
+                                               (eval straight-base-dir)
+                                               ;; Matches a temporarily generated container id.
+                                               (and
+                                                "/docker:"
+                                                (** 12 12 (any alnum))
+                                                ":")))
                                       "COMMIT_EDITMSG"
                                       (and (or "/TAGS"
                                                "/GTAGS"
@@ -11639,6 +11646,7 @@
      (use-package tramp
        :custom
        (tramp-default-method "sshx")
+       (tramp-verbose 1)
 
        :config
        ;; google cloud integration... curtesy of:
@@ -12601,7 +12609,7 @@
          "psr" 'consult-ripgrep
          "psf" 'consult-find
          "psv" 'consult-git-grep
-         "psg" 'consult-grep
+         "psb" 'consult-grep
          "psi" 'consult-imenu-multi)
         (:mode '(org-mode
                  outline-mode
@@ -17125,8 +17133,6 @@
    #+BEGIN_SRC emacs-lisp
      (use-package vterm
        :straight t
-       :commands (vterm-toggle
-                  vterm-toggle-fullscreen)
        :config
        (push 'vterm-mode +whitespace-exempt-modes)
        (evil-set-initial-state 'vterm-mode 'emacs)
@@ -17292,7 +17298,11 @@
     #+begin_src emacs-lisp
       (use-package vterm-toggle
         :straight t
+        :commands (vterm-toggle
+                   vterm-toggle-fullscreen)
         :init
+        (defvar vterm-toggle-fullscreen-p nil)
+
         (defun vterm-toggle-fullscreen (&optional arg)
           (interactive "P")
 
@@ -17586,6 +17596,12 @@
          "" '(:ignore t :wk "docker")
          "d" 'docker
          "c" 'docker-compose))
+    #+end_src
+
+*** docker-tramp
+    #+begin_src emacs-lisp
+      (use-package docker-tramp
+        :straight t)
     #+end_src
 
 ** restclient
@@ -19070,7 +19086,6 @@
    #+BEGIN_SRC emacs-lisp
      (use-package cc-mode
        :straight (cc-mode :type built-in)
-       :mode ("\\.h$" . c++-mode)
        ;; :hook ((c-mode . +flylint)
        ;;        (c++-mode . +flylint))
        :custom
@@ -23448,6 +23463,16 @@
        `(ansi-color-bright-white ((,cls (:foreground ,white :background ,white))))
        `(ansi-color-bright-yellow ((,cls (:foreground ,yellow-int :background ,yellow-int))))
        `(ansi-color-bright-magenta ((,cls (:foreground ,purple-int :background ,purple-int))))
+
+      ;; outline
+       ;; `(outline-1 ((,cls (:inherit font-lock-function-name-face))))
+       ;; '(outline-2 ((,cls (:inherit font-lock-variable-name-face))))
+       ;; '(outline-3 ((,cls (:inherit font-lock-keyword-face))))
+       ;; '(outline-4 ((,cls (:inherit font-lock-comment-face))))
+       ;; '(outline-5 ((,cls (:inherit font-lock-type-face))))
+       '(outline-6 ((,cls (:inherit font-lock-constant-face :weight normal))))
+       ;; '(outline-7 ((,cls (:inherit font-lock-builtin-face))))
+       ;; '(outline-8 ((,cls (:inherit font-lock-string-face))))
        )
 
       (custom-theme-set-variables 'an-old-hope

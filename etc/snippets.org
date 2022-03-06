@@ -2858,10 +2858,10 @@
 
 ** inc.1
    #+BEGIN_SRC snippet :tangle snippets/c-lang-common/incl
-      # name: #include "..."
-      # key  : incl
-      # --
-      #include "$1"
+     # name: #include "..."
+     # key  : incl
+     # --
+     #include "${1:`(when-let ((file-name (buffer-file-name))) (file-name-nondirectory (file-name-sans-extension file-name)))`}"
    #+END_SRC
 
 ** inc
@@ -2869,7 +2869,7 @@
       # name: #include <...>
       # key  : inc
       # --
-      #include <$1>
+      #include <${1:`(when-let ((file-name (buffer-file-name))) (file-name-nondirectory (file-name-sans-extension file-name)))`}>
    #+END_SRC
 
 ** ifdef
@@ -3115,7 +3115,7 @@
 
 * c++-mode
    #+BEGIN_SRC text :tangle snippets/c++-mode/.yas-parents :shebang
-      cc-mode
+      c-mode
       c-lang-common
    #+END_SRC
 
@@ -3385,9 +3385,7 @@
       # key: ns
       # --
       namespace ${1:Namespace} {
-
-                `yas/selected-text`
-
+        `yas/selected-text`$0
       }  // $1
    #+END_SRC
 
@@ -3529,14 +3527,6 @@
       # key: d+=
       # --
       ${1:Name}& operator+=(${2:const $1 &});
-   #+END_SRC
-
-** cpp
-   #+BEGIN_SRC snippet :tangle snippets/c++-mode/cpp
-      # name: cpp
-      # key: cpp
-      # --
-      #include "`(file-name-nondirectory (file-name-sans-extension (buffer-file-name)))`.h"
    #+END_SRC
 
 ** constructor

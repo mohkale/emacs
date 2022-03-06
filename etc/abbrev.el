@@ -1,4 +1,9 @@
 ;;-*-coding: utf-8;-*-
+(define-abbrev-table 'c++-mode-abbrev-table
+  '(
+    ("ns" "namespace" nil :count 1)
+   ))
+
 (define-abbrev-table 'c-mode-abbrev-table
   '(
     ("en" "enum" nil :count 0)
