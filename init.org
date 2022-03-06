@@ -6261,6 +6261,10 @@
        :demand t
        :diminish
        :commands (which-key-M-x+)
+       :config
+       (which-key-setup-minibuffer)
+       (setq which-key-show-prefix 'bottom)
+
        :init
        ;; prefix-completion courtesy of clemara
        ;; see https://with-emacs.com/posts/ui-hacks/prefix-command-completion/
@@ -8531,10 +8535,11 @@
        ("ej" 'flymake-goto-next-error
         "ek" 'flymake-goto-prev-error
         "er" 'flymake-start
-        "ea" 'flymake-first-error+
-        "e$" 'flymake-last-error+
+        "e1" 'flymake-first-error+
+        "e2" 'flymake-last-error+
         "el" 'flymake-show-diagnostics-buffer
-        "eL" 'flymake-switch-to-log-buffer
+        ;; "e2" 'flymake-switch-to-log-buffer
+        "eL" 'flymake-show-project-diagnostics
         ;; TODO implement
         ;; (flymake-unsupported-command+ toggle-flycheck-messages)
         "ex" (flymake-unsupported-command+ flycheck-clear)
@@ -11936,10 +11941,10 @@
        ("jb" 'xref-go-back
         "jr" 'xref-find-references
         "js" 'xref-find-apropos
+        "jq" 'xref-find-references-and-replace
         "jg" 'xref-find-definitions
-        "jo" 'xref-find-definitions-other-window
-        ;; "axf" 'xref-find-definitions-other-frame
-        )
+        "jG" 'xref-find-definitions-other-frame
+        "jo" 'xref-find-definitions-other-window)
 
        :lazy-leader
        (:mode 'xref--xref-buffer-mode
@@ -12172,9 +12177,13 @@
 *** marginalia
     #+BEGIN_SRC emacs-lisp
       (use-package marginalia
-        :straight (marginalia :build (:not autoloads))                                ; TODO: Re-support autoloads after [[https://github.com/minad/marginalia/issues/105][marginalia#105]].
+        :straight t
         :hook ((selectrum-mode . marginalia-mode)
                (vertico-mode . marginalia-mode))
+        :custom
+        (marginalia-align 'right)
+        (marginalia-align-offset -1)
+
         :general
         (:keymaps 'embark-general-map
          "A" 'marginalia-cycle)
@@ -12348,7 +12357,7 @@
                    consult--lookup-cdr)
         :hook (completion-list-mode . consult-preview-at-point-mode)
         :custom
-        (consult-project-root-function #'project-current-root+)
+        (consult-async-min-input 2)
         (consult-async-split-style 'slash)
         (consult-async-split-styles-alist
          '((space :separator ?\s :type separator)
@@ -12472,11 +12481,13 @@
          . consult-imenu-setup-lsp+)
 
         :config
-        (setq consult-ripgrep-args                                                      ; Variant command which disregards no-matches
-              (concat
-               (when (executable-find "ignore-exit")
-                 "ignore-exit 1 ")
-               "rg --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number --with-filename ."))
+        (defun consult-ripgrep-prefix-ignore-exit+ (func &rest args)
+          (let ((consult-ripgrep-args
+                 (concat (when (executable-find "ignore-exit" t)
+                           "ignore-exit 1 ")
+                         consult-ripgrep-args)))
+            (apply func args)))
+        (advice-add 'consult-ripgrep :around #'consult-ripgrep-prefix-ignore-exit+)
 
         :config
         (evil-set-command-property 'consult-outline :jump t)
@@ -12493,7 +12504,6 @@
          xref-find-references
          consult-recent-file
          consult--source-recent-file
-         consult--source-project-file
          +dot-goto-fsmap
          :preview-key consult-manual-preview-key
          consult-recent-file
@@ -12529,7 +12539,7 @@
           `(defun ,(intern (concat (symbol-name func) "-no-project+")) ()
              ,(format "Variant of `%s' which skips project checks." func)
              (interactive)
-             (let ((consult-project-root-function nil))
+             (let ((consult-project-function nil))
                (funcall-interactively (quote ,func)))))
 
         (with-consult-ignore-project+ consult-ripgrep)
@@ -12633,11 +12643,14 @@
          [remap keep-lines] 'consult-keep-lines
          [remap load-theme] 'consult-theme
          [remap org-agenda] 'consult-org-agenda
+         [remap project-switch-to-buffer] 'consult-project-buffer
          ;; [remap flush-lines] 'consult-flush-lines
-         ;; [remap man] 'consult-man
-         ;; [remap woman] 'consult-man
+         [remap man] 'consult-man
+         [remap woman] 'consult-man
          "C-M-y" 'consult-yank-pop
          "C-s" 'consult-line)
+        (:keymaps 'projectile-mode-map
+         [remap project-switch-to-buffer] 'consult-project-buffer)
         (:keymaps 'evil-ex-completion-map
          "C-s" 'consult-history)
         (:keymaps 'minibuffer-local-map
@@ -12718,7 +12731,8 @@
 
         :general
         (:keymaps 'eglot-mode-map
-         [remap xref-find-apropos] 'consult-eglot-symbols))
+         [remap xref-find-apropos] 'consult-eglot-symbols
+         [remap xref-find-references-and-replace] 'eglot-rename))
     #+END_SRC
 
 *** consult-notmuch
@@ -13222,7 +13236,8 @@
                        (pcase-let ((`(,arg . ,opts) (consult--command-split input)))
                          (unless (string-blank-p arg)
                            (list :command `("ls-exec" ,arg ,@opts)
-                                 :highlight (cdr (consult--default-regexp-compiler input 'basic)))))))
+                                 :highlight (cdr (consult--default-regexp-compiler
+                                                  input 'basic completion-ignore-case)))))))
                  :prompt "Find executable: "
                  :category 'file
                  :require-match t
@@ -13282,7 +13297,8 @@
                                   (pcase-let* ((`(,arg . ,opts) (consult--command-split input)))
                                     (unless (string-blank-p arg)
                                       (list :command `("ls-fsmaps" "-er" ,arg ,@opts)
-                                            :highlight (cdr (consult--default-regexp-compiler input 'basic))))))))
+                                            :highlight (cdr (consult--default-regexp-compiler
+                                                             input 'basic completion-ignore-case))))))))
                    (consult--read
                     (consult--async-command builder
                       (+dot-goto-fsmap-format-lines builder))
@@ -13342,7 +13358,8 @@
                             (pcase-let* ((`(,arg . ,opts) (consult--command-split input)))
                               (unless (string-blank-p arg)
                                 (list :command `("ls-bookmarks" ,arg ,@opts)
-                                      :highlight (cdr (consult--default-regexp-compiler input 'basic))))))))
+                                      :highlight (cdr (consult--default-regexp-compiler
+                                                       input 'basic completion-ignore-case))))))))
              (consult--read
               (consult--async-command builder
                 (+dot-open-bookmark-format-lines builder))
@@ -13884,16 +13901,11 @@
         :preface
         (push 'dashboard-mode +whitespace-exempt-modes)
 
-        (defmacro dashboard-defun-shortcut-function+ (shortcut-char search-label &optional no-next-line)
-          "translation of `dashboard-insert-shortcut' but less bizarre."
-          (let* ((func-name (intern (concat "dashboard-" shortcut-char "-shortcut"))))
-            `(defun ,func-name ()
-               (interactive)
-               (unless (search-forward ,search-label (point-max) t)
-                 (search-backward ,search-label (point-min) t))
-               ,@(unless no-next-line
-                   '((forward-line 1)))
-               (back-to-indentation))))
+        (defun dashboard-defun-shortcut-function+ (func)
+          (lambda! ()
+            (if (functionp func)
+                (funcall-interactively func)
+              (user-error "Section using `%s' not yet defined" func))))
 
         :init
         (when (< (length command-line-args) 2)
@@ -13951,22 +13963,7 @@
         :preface
         (defun dashboard-startup-handler+ ()
           "Update initial dashboard information."
-          (setq dashboard-init-info
-                (concat
-                 "Emacs loaded "
-                 (when-let ((count
-                             (cond ((bound-and-true-p package-alist)
-                                    (length package-activated-list))
-                                   ((bound-and-true-p straight--profile-cache)
-                                    (let ((count 0))
-                                      (maphash (lambda (_key val)
-                                                 (when val (setq count (1+ count))))
-                                               straight--success-cache)
-                                      count)))))
-                   (format "%d packages " count))
-                 "in " (emacs-init-time)))
-
-          ;; don't switch to dashboard on error buffer
+          ;; Don't switch to dashboard on error buffer.
           (unless (eq 1 (length (window-list)))
             (winum-select-window-1)))
         :hook (emacs-startup . dashboard-startup-handler+)
@@ -14094,7 +14091,6 @@
         :general
         (:keymaps 'dashboard-mode-map
          :states  'motion
-         [remap revert-buffer]           'dashboard-refresh-buffer
          [remap evil-next-line]          'dashboard-next-line
          [remap evil-previous-line]      'dashboard-previous-line
          [remap evil-forward-paragraph]  'dashboard-next-section
@@ -14108,13 +14104,11 @@
          "TAB"   'widget-forward
          "S-TAB" 'widget-backward
 
-         "r" (dashboard-defun-shortcut-function+ "r" "Recent Files:")
-         ;; "m" (dashboard-defun-shortcut-function "m" "Bookmarks:")
-         "p" (dashboard-defun-shortcut-function+ "p" "Projects:")
-         ;; "e" (dashboard-defun-shortcut-function "e" "Registers:")
-         "a" (dashboard-defun-shortcut-function+ "a" (if (bound-and-true-p show-week-agenda-p)
-                                                         "Agenda for the coming week:"
-                                                       "Agenda for today:"))))
+         "r" (dashboard-defun-shortcut-function+ #'dashboard-jump-to-recents)
+         "m" (dashboard-defun-shortcut-function+ #'dashboard-jump-to-bookmarks)
+         "p" (dashboard-defun-shortcut-function+ #'dashboard-jump-to-projects)
+         "e" (dashboard-defun-shortcut-function+ #'dashboard-jump-to-registers)
+         "a" (dashboard-defun-shortcut-function+ #'dashboard-jump-to-agenda)))
     #+END_SRC
 
 ** deft
@@ -15036,6 +15030,7 @@
                   lsp-mode-server-all-p+)
        :custom
        (lsp-auto-guess-root t)
+       (lsp-enable-indentation nil)
        (lsp-enable-snippet t)
        ;; (lsp-auto-configure nil)
        (lsp-modeline-diagnostics-enable nil)
@@ -15107,7 +15102,11 @@
         "gg" 'lsp-goto-type-definition
         "gG" 'lsp-goto-implementation
         "gF" 'lsp-find-implementation
-        "gf" 'lsp-find-type-definition))
+        "gf" 'lsp-find-type-definition)
+
+       :general
+       (:keymaps 'lsp-mode-map
+        [remap xref-find-references-and-replace] 'lsp-rename))
    #+END_SRC
 
 *** lsp-ui
@@ -15835,6 +15834,9 @@
                                        (if (bound-and-true-p notmuch-tree-mode)
                                            "--output=messages"
                                          "--output=threads")
+                                       (if (bound-and-true-p notmuch-search-exclude)
+                                           "--exclude=true"
+                                         "--exclude=false")
                                        notmuch-search-query-string)))
                   (1- (count-lines (point-min) (point-max))))))))
 
@@ -16038,6 +16040,11 @@
              (defun notmuch-tag-set-flagged+ ()
                (interactive)
                (notmuch-tag+ '("+flagged") nil)))
+
+           (define-key map "i"
+             (defun notmuch-tag-remove-from-inbox+ ()
+               (interactive)
+               (notmuch-tag+ '("-inbox" "-unread"))))
 
            map)
          "Keymap containing commands to act upon emails.")
@@ -17353,7 +17360,8 @@
         :leader
         ("av" '(vterm-toggle :wk "vterm")
          "at" '(vterm-toggle-new-buffer+ :wk "vterm-new")
-         "tv" '(vterm-toggle-fullscreen :wk "toggle-vterm-fullscreen")))
+         ;; "tv" '(vterm-toggle-fullscreen :wk "toggle-vterm-fullscreen")
+         ))
     #+end_src
 
 *** vterm-commands
@@ -17812,7 +17820,8 @@
         :flymake-hook
         (emacs-lisp-mode
          elisp-flymake-byte-compile
-         elisp-flymake-checkdoc
+         ;; Some weird conflict with company?
+         (elisp-flymake-checkdoc :disabled t)
          (package-lint-flymake :disabled t)))
     #+end_src
 
@@ -18101,7 +18110,9 @@
        (evil-set-initial-state 'ledger-mode 'normal)
 
        :config
-       (modify-syntax! '((?- . "w")) ledger-mode-syntax-table))
+       (modify-syntax! '((?- . "w")
+                         (?+ . "w"))
+         ledger-mode-syntax-table))
    #+end_src
 
    #+begin_src emacs-lisp
@@ -18121,7 +18132,9 @@
        (evil-set-initial-state 'hledger-mode 'normal)
 
        :config
-       (modify-syntax! '((?- . "w")) hledger-mode-syntax-table)
+       (modify-syntax! '((?- . "w")
+                         (?+ . "w"))
+         hledger-mode-syntax-table)
        (set-company-backend! 'hledger-mode 'hledger-company)
 
        (defun hledger-pulse-momentary-current-entry-no-args+ (&rest _)
@@ -18819,24 +18832,9 @@
          "It bothers mdlint for some reason.")
 
         :config
-        (modify-syntax! '((?_ . "w")) markdown-mode-syntax-table)
-
-        (advice-add 'markdown-insert-list-item :before
-                    (defun markdown-insert-list-item--adjust-line+ (&rest _args)
-                      "By default, inserting a new list item goes below the current item."
-                      (when (markdown-list-item-at-point-p)
-                        (save-excursion
-                          (goto-char (line-end-position))
-                          (newline))
-
-                        (markdown-forward-paragraph))))
-
-        (advice-add 'markdown-insert-list-item :after
-                    (defun markdown-insert-list-item--force-evil-insert+ (&rest _args)
-                      (if (eq (char-before)
-                              ?\ )
-                          (evil-insert nil)
-                        (evil-append nil))))
+        (modify-syntax! '((?_ . "$")
+                          (?- . "_"))
+          markdown-mode-syntax-table)
 
       ;;; evil-markdown-mode (Somelauw/evil-markdown)
         (with-eval-after-load 'evil
@@ -19042,19 +19040,6 @@
         (:mode 'markdown-mode
          "r" 'gh-md-render-buffer
          "R" 'gh-md-render-region))
-    #+END_SRC
-
-*** org-toc
-    Automatically [[https://github.com/snosov1/toc-org][refreshes]] any table of contents in the current org or markdown
-    buffer on save. Works by finding org any headings with ~:TOC:~ field (or markdown
-    headings with a trailing ~<-- :TOC: -->~ comment) and then rebuilding them whenever
-    the file is saved.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package toc-org
-        :straight t
-        :hook (;; (org-mode . toc-org-mode)
-               (markdown-mode . toc-org-mode)))
     #+END_SRC
 
 ** cmake
@@ -19808,7 +19793,7 @@
 
 *** gopls                                                               :lsp:
     The golang language server.
-    requires: ~GO111MODULE=on  go get -u golang.org/x/tools/gopls@latest~.
+    requires: ~GO11MODULE=on go get -u golang.org/x/tools/gopls@latest~.
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! golang :lsp)
       (add-hook 'go-mode-hook +lsp-command)
@@ -19863,6 +19848,9 @@
                             (compilation-was-visible (when (get-buffer-window buf t) t)))
                        (with-current-buffer (process-buffer (funcall func cmd args))
                          (setq-local compilation-was-open-p+ compilation-was-visible)))))
+
+       :config
+       (modify-syntax! '((?_ . "w")) rust-mode-syntax-table)
 
        :lazy-leader
        (:mode 'rustic-mode
@@ -20570,384 +20558,389 @@
    #+end_src
 
    #+BEGIN_SRC emacs-lisp
-      (use-package org
-        :straight t
-        :hook ((org-mode . display-line-numbers-mode)
-               (org-mode . auto-fill-mode))
-        :custom
-        (org-clock-idle-time 15)
-        (org-fontify-done-headline nil)
-        (org-archive-file-header-format "\
-      # -*- mode: org; coding: utf-8-unix -*-
-      ,#+TITLE: Archive
-      ,#+STARTUP: content")
-        (org-goto-interface 'outline-path-completion)
-        (org-log-done 'time)                                                          ; Record when a TODO item is done.
-        (org-outline-path-complete-in-steps nil)                                      ; Refile in a single go
-        (org-cycle-separator-lines 0)                                                 ; Prevents weird coloring of collapsed trees
-        (org-log-into-drawer "LOGBOOK")                                               ; Where org-add-note stores notes
-        (org-todo-keywords (list
-                            '(sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED")))
-        (org-refile-use-outline-path t)                                               ; Show full paths for refiling
-        (org-archive-location (concat (join-path +notes-home "archive.org") "::* %s"))                 ; Archive to the same file from everywhere
-        (org-refile-targets (list
-                             (cons (join-path user-emacs-directory "init.org") '(:maxlevel . 1))
-                             (cons nil '(:maxlevel . 9))
-                             (cons 'org-agenda-files '(:maxlevel . 2))))
-        (org-highlight-latex-and-related '(latex script entities))
-        (org-adapt-indentation t)
+     (use-package org
+       :straight t
+       :hook ((org-mode . display-line-numbers-mode)
+              (org-mode . auto-fill-mode))
+       :custom
+       (org-clock-idle-time 15)
+       (org-fontify-done-headline nil)
+       (org-archive-file-header-format "\
+     # -*- mode: org; coding: utf-8-unix -*-
+     ,#+TITLE: Archive
+     ,#+STARTUP: content")
+       (org-goto-interface 'outline-path-completion)
+       (org-log-done 'time)                                                          ; Record when a TODO item is done.
+       (org-outline-path-complete-in-steps nil)                                      ; Refile in a single go
+       (org-cycle-separator-lines 0)                                                 ; Prevents weird coloring of collapsed trees
+       (org-log-into-drawer "LOGBOOK")                                               ; Where org-add-note stores notes
+       (org-todo-keywords (list
+                           '(sequence "TODO" "DOING" "VERIFY" "|" "DONE" "DELAGATED" "SKIPPED")))
+       (org-refile-use-outline-path t)                                               ; Show full paths for refiling
+       (org-archive-location (concat (join-path +notes-home "archive.org") "::* %s"))                 ; Archive to the same file from everywhere
+       (org-refile-targets (list
+                            (cons (join-path user-emacs-directory "init.org") '(:maxlevel . 1))
+                            (cons nil '(:maxlevel . 9))
+                            (cons 'org-agenda-files '(:maxlevel . 2))))
+       (org-highlight-latex-and-related '(latex script entities))
+       (org-adapt-indentation t)
 
-        :init
-        (push '(org-mode . 2) +indent-config)
+       :init
+       (push '(org-mode . 2) +indent-config)
 
-        (modify-syntax-hook! 'org-mode
-          '((?< . "_")
-            (?> . "_")
-            (?- . "w")
-            (?_ . "w")))
+       (modify-syntax-hook! 'org-mode
+         '((?< . "_")
+           (?> . "_")
+           (?- . "w")
+           (?_ . "w")))
 
-        (add-hook 'org-mode-hook
-                  (defun org-disable-electric-balance+ ()
-                    (setq electric-pair-preserve-balance t)))
+       (add-hook 'org-mode-hook
+                 (defun org-disable-electric-balance+ ()
+                   (setq electric-pair-preserve-balance t)))
 
-        :config
-        (setq org-cite-global-bibliography
-              (when (file-exists-p +bib-home)
-                (directory-files +bib-home t ".bib")))
+       :config
+       (setq org-cite-global-bibliography
+             (when (file-exists-p +bib-home)
+               (directory-files +bib-home t ".bib")))
 
-        :config
-        (setq org-agenda-files
-              (cl-remove-if
-               (apply-partially #'string-match-p (rx (and "archive.org" eol)))
-               (cl-loop for path in (list org-default-notes-file
-                                          (concat projectile-org-projects-directory+ "*.org"))
-                        nconc (file-expand-wildcards path))))
+       :config
+       (setq org-agenda-files
+             (cl-remove-if
+              (apply-partially #'string-match-p (rx (and "archive.org" eol)))
+              (cl-loop for path in (list org-default-notes-file
+                                         (concat projectile-org-projects-directory+ "*.org"))
+                       nconc (file-expand-wildcards path))))
 
-        :config
-        ;; Prefer xopen to whatever mailcap plans to use.
-        (setq org-file-apps
-              (append org-file-apps
-                      `((t . ,(defun org-open-file-xopen+ (path _link)
-                                (+xopen-url path))))))
+       :config
+       ;; Prefer xopen to whatever mailcap plans to use.
+       (setq org-file-apps
+             (append org-file-apps
+                     `((t . ,(defun org-open-file-xopen+ (path _link)
+                               (+xopen-url path))))))
 
-        :init
-        (advice-add 'evil-ret-gen :before-until
-                    (defun evil-ret-open-org-links+ (&rest _)
-                      "hitting return in evil-normal-state on an org-link
-      opens the org-link."
-                      (when (and
-                             (evil-normal-state-p)
-                             (or (featurep 'org)
-                                 (bound-and-true-p org-link-minor-mode))
-                             (ignore-errors
-                               (org-openable-p)))
-                        (org-open-at-point)
-                        t)))
+       :init
+       (advice-add 'evil-ret-gen :before-until
+                   (defun evil-ret-open-org-links+ (&rest _)
+                     "hitting return in evil-normal-state on an org-link
+     opens the org-link."
+                     (when (and
+                            (evil-normal-state-p)
+                            (or (featurep 'org)
+                                (bound-and-true-p org-link-minor-mode))
+                            (ignore-errors
+                              (org-openable-p)))
+                       (org-open-at-point)
+                       t)))
 
-        (defmacro evil-org-eol-call-anon (&rest body)
-          "define an anonymous function running body at the end of the line"
-          `(lambda! (end-of-visual-line) ,@body (evil-append nil)))
+       (defmacro evil-org-eol-call-anon (&rest body)
+         "define an anonymous function running body at the end of the line"
+         `(lambda! (end-of-visual-line) ,@body (evil-append nil)))
 
-        (defmacro org-read-date-command (name &rest body)
-          "define a function for use in the calendar buffer for `calendar-read-date'."
-          `(defun ,(intern (concat "org-read-date-" (symbol-name name) "+")) ()
-             ,(when (stringp (car body))
-                (concat (pop body) "\nThis function was generated by `org-read-date-command'."))
-             (interactive)
-             (org-eval-in-calendar (quote (progn ,@body)))))
-        (put 'org-read-date-command 'lisp-indent-function 'defun)
+       (defmacro org-read-date-command (name &rest body)
+         "define a function for use in the calendar buffer for `calendar-read-date'."
+         `(defun ,(intern (concat "org-read-date-" (symbol-name name) "+")) ()
+            ,(when (stringp (car body))
+               (concat (pop body) "\nThis function was generated by `org-read-date-command'."))
+            (interactive)
+            (org-eval-in-calendar (quote (progn ,@body)))))
+       (put 'org-read-date-command 'lisp-indent-function 'defun)
 
-        :config
-        (setq org-read-date-minibuffer-local-map (make-sparse-keymap))
-        (set-keymap-parent org-read-date-minibuffer-local-map minibuffer-local-map)
+       :config
+       (let ((dir (file-name-directory org-id-locations-file)))
+         (unless (file-exists-p dir)
+           (make-directory dir t)))
 
-        ;;             _ _       _     _           _ _
-        ;;   _____   _(_) |     | |__ (_)_ __   __| (_)_ __   __ _ ___
-        ;;  / _ \ \ / / | |_____| '_ \| | '_ \ / _` | | '_ \ / _` / __|
-        ;; |  __/\ V /| | |_____| |_) | | | | | (_| | | | | | (_| \__ \
-        ;;  \___| \_/ |_|_|     |_.__/|_|_| |_|\__,_|_|_| |_|\__, |___/
-        ;;                                                   |___/
+       :config
+       (setq org-read-date-minibuffer-local-map (make-sparse-keymap))
+       (set-keymap-parent org-read-date-minibuffer-local-map minibuffer-local-map)
 
-        (evil-set-command-property 'org-forward-heading-same-level :jump t)
-        (evil-set-command-property 'org-backward-heading-same-level :jump t)
-        (evil-set-command-property 'org-next-visible-heading :jump t)
+       ;;             _ _       _     _           _ _
+       ;;   _____   _(_) |     | |__ (_)_ __   __| (_)_ __   __ _ ___
+       ;;  / _ \ \ / / | |_____| '_ \| | '_ \ / _` | | '_ \ / _` / __|
+       ;; |  __/\ V /| | |_____| |_) | | | | | (_| | | | | | (_| \__ \
+       ;;  \___| \_/ |_|_|     |_.__/|_|_| |_|\__,_|_|_| |_|\__, |___/
+       ;;                                                   |___/
 
-        :config
-        (add-to-list 'org-latex-default-packages-alist '("" "babel" t nil) t)
+       (evil-set-command-property 'org-forward-heading-same-level :jump t)
+       (evil-set-command-property 'org-backward-heading-same-level :jump t)
+       (evil-set-command-property 'org-next-visible-heading :jump t)
 
-        :leader
-        ("o"  '(:ignore t :wk "org-notes")
-         "oc" 'org-capture
-         "og" 'org-capture-goto-last-stored
-         "oa" 'org-agenda
-         "ol" 'org-store-link
-         "oi" 'org-insert-link-global
-         "oy" 'org-copy-subtree
-         "oY" 'org-cut-subtree
-         "on" 'org-next-link
-         "op" 'org-previous-link
+       :config
+       (add-to-list 'org-latex-default-packages-alist '("" "babel" t nil) t)
 
-         "oh" 'org-completing-goto+)
+       :leader
+       ("o"  '(:ignore t :wk "org-notes")
+        "oc" 'org-capture
+        "og" 'org-capture-goto-last-stored
+        "oa" 'org-agenda
+        "ol" 'org-store-link
+        "oi" 'org-insert-link-global
+        "oy" 'org-copy-subtree
+        "oY" 'org-cut-subtree
+        "on" 'org-next-link
+        "op" 'org-previous-link
 
-        :lazy-leader
-        (:mode 'org-mode
-         "RET" 'org-ctrl-c-ret
-         "TAB" 'org-todo
-         "SPC" 'org-display-outline-path
-         "!" 'org-time-stamp-inactive
-         "'" 'org-edit-special
-         "*" 'org-ctrl-c-star
-         "," 'org-ctrl-c-ctrl-c
-         "-" 'org-ctrl-c-minus
-         "." 'org-time-stamp
-         "/" 'org-sparse-tree
-         ":" 'org-set-tags-command
-         "#" 'org-priority
-         "`" 'org-toggle-latex-fragment
-         "^" 'org-sort
-         ;; "\\" 'org-match-sparse-tree
-         "A" 'org-agenda
-         "a" 'org-archive-subtree
-         "b" 'org-tree-to-indirect-buffer
-         ;; "C" 'evil-org-recompute-clocks
-         "D" 'org-insert-drawer
-         "d" 'org-deadline
-         "F" 'org-set-effort
-         "i" 'org-clock-in
-         "H" 'org-shiftleft
-         "J" 'org-shiftdown
-         "K" 'org-shiftup
-         "L" 'org-shiftright
-         "l" 'org-insert-link
-         "N" 'org-add-note
-         "o" 'org-clock-out
-         "O" 'org-sort
-         "p" 'org-set-property
-         "q" 'org-set-tags-command
-         "r" 'org-refile
-         "R" 'org-refile-goto-last-stored
-         "s" 'org-schedule
-         "T" 'org-show-todo-tree
-         "X" 'org-update-all-dblocks
-         "x" 'org-dblock-update
-         "u" 'org-id-get-create
-         ;; "C-h" 'org-shiftcontrolleft
-         ;; "C-j" 'org-shiftcontroldown
-         ;; "C-k" 'org-shiftcontrolup
-         ;; "C-l" 'org-shiftcontrolright
-         "M-a" 'org-attach
-         "M-c" 'org-columns
-         "M-p" 'org-delete-property
+        "oh" 'org-completing-goto+)
 
-         "c"  '(:ignore t :wk "clock/calendar")
-         "c<" 'org-date-from-calendar
-         "c>" 'org-goto-calendar
-         "cC" 'org-clock-out
-         "cc" 'org-clock-in
-         ;; "cf" 'org-clock-modify-effort-estimate
-         "cg" 'org-clock-goto
-         "ch" 'org-clock-remove-overlays
-         "ci" 'org-timer-item
-         "cr" 'org-clock-report
-         "cs" 'org-clock-display
-         "c C-c" 'org-clock-cancel
+       :lazy-leader
+       (:mode 'org-mode
+        "RET" 'org-ctrl-c-ret
+        "TAB" 'org-todo
+        "SPC" 'org-display-outline-path
+        "!" 'org-time-stamp-inactive
+        "'" 'org-edit-special
+        "*" 'org-ctrl-c-star
+        "," 'org-ctrl-c-ctrl-c
+        "-" 'org-ctrl-c-minus
+        "." 'org-time-stamp
+        "/" 'org-sparse-tree
+        ":" 'org-set-tags-command
+        "#" 'org-priority
+        "`" 'org-toggle-latex-fragment
+        "^" 'org-sort
+        ;; "\\" 'org-match-sparse-tree
+        "A" 'org-agenda
+        "a" 'org-archive-subtree
+        "b" 'org-tree-to-indirect-buffer
+        ;; "C" 'evil-org-recompute-clocks
+        "D" 'org-insert-drawer
+        "d" 'org-deadline
+        "F" 'org-set-effort
+        "i" 'org-clock-in
+        "H" 'org-shiftleft
+        "J" 'org-shiftdown
+        "K" 'org-shiftup
+        "L" 'org-shiftright
+        "l" 'org-insert-link
+        "N" 'org-add-note
+        "o" 'org-clock-out
+        "O" 'org-sort
+        "p" 'org-set-property
+        "q" 'org-set-tags-command
+        "r" 'org-refile
+        "R" 'org-refile-goto-last-stored
+        "s" 'org-schedule
+        "T" 'org-show-todo-tree
+        "X" 'org-update-all-dblocks
+        "x" 'org-dblock-update
+        "u" 'org-id-get-create
+        ;; "C-h" 'org-shiftcontrolleft
+        ;; "C-j" 'org-shiftcontroldown
+        ;; "C-k" 'org-shiftcontrolup
+        ;; "C-l" 'org-shiftcontrolright
+        "M-a" 'org-attach
+        "M-c" 'org-columns
+        "M-p" 'org-delete-property
 
-         "e"  '(:ignore t :wk "export")
-         "ee" 'org-export-dispatch
-         "eh" 'org-html-export-to-html
-         "ep" (lambda!
-                (org-latex-export-to-pdf org-export-in-background))
+        "c"  '(:ignore t :wk "clock/calendar")
+        "c<" 'org-date-from-calendar
+        "c>" 'org-goto-calendar
+        "cC" 'org-clock-out
+        "cc" 'org-clock-in
+        ;; "cf" 'org-clock-modify-effort-estimate
+        "cg" 'org-clock-goto
+        "ch" 'org-clock-remove-overlays
+        "ci" 'org-timer-item
+        "cr" 'org-clock-report
+        "cs" 'org-clock-display
+        "c C-c" 'org-clock-cancel
 
-         "h"  '(:ignore t :wk "headings")
-         "hI" 'org-insert-heading
-         "hi" 'org-insert-heading-after-current
-         "hs" 'org-insert-subheading
+        "e"  '(:ignore t :wk "export")
+        "ee" 'org-export-dispatch
+        "eh" 'org-html-export-to-html
+        "ep" (lambda!
+               (org-latex-export-to-pdf org-export-in-background))
 
-         "I"  '(:ignore t :wk "insert")
-         "Ia" 'org-attach
-         "If" 'org-footnote-new
-         ;; "Ik" 'insert-keybinding-org
-         "It" 'org-table-create
-         ;; "Is" 'org-download-screenshot
-         ;; "Iy" 'org-download-yank
+        "h"  '(:ignore t :wk "headings")
+        "hI" 'org-insert-heading
+        "hi" 'org-insert-heading-after-current
+        "hs" 'org-insert-subheading
 
-         "m"  '(:ignore t :wk "mark/move")
-         "ms" 'org-mark-subtree
-         "me" 'org-mark-element
-         "mb" 'org-babel-mark-block
+        "I"  '(:ignore t :wk "insert")
+        "Ia" 'org-attach
+        "If" 'org-footnote-new
+        ;; "Ik" 'insert-keybinding-org
+        "It" 'org-table-create
+        ;; "Is" 'org-download-screenshot
+        ;; "Iy" 'org-download-yank
 
-         "n"  '(:ignore t :wk "narrow")
-         "nb" 'org-narrow-to-block
-         "ns" 'org-narrow-to-subtree
-         "ne" 'org-narrow-to-element
-         "nw" 'widen
+        "m"  '(:ignore t :wk "mark/move")
+        "ms" 'org-mark-subtree
+        "me" 'org-mark-element
+        "mb" 'org-babel-mark-block
 
-         "S"  '(:ignore t :wk "subtrees")
-         "Sh" 'org-promote-subtree
-         "Sj" 'org-move-subtree-down
-         "Sk" 'org-move-subtree-up
-         "Sl" 'org-demote-subtree
+        "n"  '(:ignore t :wk "narrow")
+        "nb" 'org-narrow-to-block
+        "ns" 'org-narrow-to-subtree
+        "ne" 'org-narrow-to-element
+        "nw" 'widen
 
-         "t" '(:ignore t :wk "tables")
-         "t'"  'org-table-edit-field
-         "ta"  'org-table-align
-         "tb"  'org-table-blank-field
-         "tc"  'org-table-convert
-         "tE"  'org-table-export
-         "te"  'org-table-eval-formula
-         "tH"  'org-table-move-column-left
-         "th"  'org-table-previous-field
-         "tI"  'org-table-import
-         "tJ"  'org-table-move-row-down
-         "tj"  'org-table-next-row
-         "tK"  'org-table-move-row-up
-         "tL"  'org-table-move-column-right
-         "tl"  'org-table-next-field
-         "tN"  'org-table-create-with-table.el
-         "tn"  'org-table-create
-         "tp"  'org-plot/gnuplot
-         "tr"  'org-table-recalculate
-         "ts"  'org-table-sort-lines
-         "tw"  'org-table-wrap-region
+        "S"  '(:ignore t :wk "subtrees")
+        "Sh" 'org-promote-subtree
+        "Sj" 'org-move-subtree-down
+        "Sk" 'org-move-subtree-up
+        "Sl" 'org-demote-subtree
 
-         "td"  '(:ignore t :wk "delete")
-         "tdc" 'org-table-delete-column
-         "tdr" 'org-table-delete-row
+        "t" '(:ignore t :wk "tables")
+        "t'"  'org-table-edit-field
+        "ta"  'org-table-align
+        "tb"  'org-table-blank-field
+        "tc"  'org-table-convert
+        "tE"  'org-table-export
+        "te"  'org-table-eval-formula
+        "tH"  'org-table-move-column-left
+        "th"  'org-table-previous-field
+        "tI"  'org-table-import
+        "tJ"  'org-table-move-row-down
+        "tj"  'org-table-next-row
+        "tK"  'org-table-move-row-up
+        "tL"  'org-table-move-column-right
+        "tl"  'org-table-next-field
+        "tN"  'org-table-create-with-table.el
+        "tn"  'org-table-create
+        "tp"  'org-plot/gnuplot
+        "tr"  'org-table-recalculate
+        "ts"  'org-table-sort-lines
+        "tw"  'org-table-wrap-region
 
-         "ti"  '(:ignore t :wk "insert")
-         "tic" 'org-table-insert-column
-         "ti-" 'org-table-hline-and-move
-         "tih" 'org-table-insert-hline
-         "tir" 'org-table-insert-row
+        "td"  '(:ignore t :wk "delete")
+        "tdc" 'org-table-delete-column
+        "tdr" 'org-table-delete-row
 
-         "tt"  '(:ignore t :wk "toggle")
-         "tta" 'org-toggle-async-export+
-         "ttf" 'org-table-toggle-formula-debugger
-         "tto" 'org-table-toggle-coordinate-overlays
+        "ti"  '(:ignore t :wk "insert")
+        "tic" 'org-table-insert-column
+        "ti-" 'org-table-hline-and-move
+        "tih" 'org-table-insert-hline
+        "tir" 'org-table-insert-row
 
-         ;; "x"  '(:ignore t :wk "text")
-         ;; "xb" 'org-bold
-         ;; "xc" 'org-code
-         ;; "xi" 'org-italic
-         ;; "xr" 'org-clear
-         ;; "xs" 'org-strike-through
-         ;; "xu" 'org-underline
-         ;; "xv" 'org-verbose
-         )
+        "tt"  '(:ignore t :wk "toggle")
+        "tta" 'org-toggle-async-export+
+        "ttf" 'org-table-toggle-formula-debugger
+        "tto" 'org-table-toggle-coordinate-overlays
 
-        :general
-        (:keymaps 'org-mode-map
-         ;; "C-M-<return>" 'org-meta-return
-         "<C-tab>" nil
-         "M-S-<return>" nil
-         "C-e" nil
-         "M-e" nil
-         "M-h" nil
-         "C-j" nil)
-        (:keymaps 'org-mode-map
-         :states 'insert
-         "DEL" 'org-delete-backward-char
-         "<S-backspace>" 'org-delete-char)
-        (:keymaps 'org-mode-map
-         :states 'normal
-         "o" (lambda!
-              (let ((org-clever-return--insert-headings t))
-                (org-clever-return nil)))
-         "O" (lambda!
-              (let ((org-clever-return--insert-headings t))
-                (org-clever-return t)))
-         ;; "M-u" 'org-metaleft
-         ;; "M-i" 'org-metadown
-         ;; "M-o" 'org-metaup
-         ;; "M-p" 'org-metaright
-         ;; "M-U" 'org-shiftmetaleft
-         ;; "M-I" 'org-shiftmetadown
-         ;; "M-O" 'org-shiftmetaup
-         ;; "M-P" 'org-shiftmetaright
-         )
-        (:keymaps 'org-mode-map
-         :states '(normal insert)
-         ;; NOTE meta keys insert headings with changed priority, shift keys insert todo headings
-         ;; FIXME prefix arg doesn't work
-         "C-<return>"   (evil-org-eol-call-anon
-                         (org-insert-heading nil))
+        ;; "x"  '(:ignore t :wk "text")
+        ;; "xb" 'org-bold
+        ;; "xc" 'org-code
+        ;; "xi" 'org-italic
+        ;; "xr" 'org-clear
+        ;; "xs" 'org-strike-through
+        ;; "xu" 'org-underline
+        ;; "xv" 'org-verbose
+        )
 
-         "C-M-<return>" (evil-org-eol-call-anon
-                         (org-insert-heading nil)
-                         (if current-prefix-arg
-                             (org-metaleft)
-                           (org-metaright)))
+       :general
+       (:keymaps 'org-mode-map
+        ;; "C-M-<return>" 'org-meta-return
+        "<C-tab>" nil
+        "M-S-<return>" nil
+        "C-e" nil
+        "M-e" nil
+        "M-h" nil
+        "C-j" nil)
+       (:keymaps 'org-mode-map
+        :states 'insert
+        "DEL" 'org-delete-backward-char
+        "<S-backspace>" 'org-delete-char)
+       (:keymaps 'org-mode-map
+        :states 'normal
+        "o" (lambda!
+             (let ((org-clever-return--insert-headings t))
+               (org-clever-return nil)))
+        "O" (lambda!
+             (let ((org-clever-return--insert-headings t))
+               (org-clever-return t)))
+        ;; "M-u" 'org-metaleft
+        ;; "M-i" 'org-metadown
+        ;; "M-o" 'org-metaup
+        ;; "M-p" 'org-metaright
+        ;; "M-U" 'org-shiftmetaleft
+        ;; "M-I" 'org-shiftmetadown
+        ;; "M-O" 'org-shiftmetaup
+        ;; "M-P" 'org-shiftmetaright
+        )
+       (:keymaps 'org-mode-map
+        :states '(normal insert)
+        ;; NOTE meta keys insert headings with changed priority, shift keys insert todo headings
+        ;; FIXME prefix arg doesn't work
+        "C-<return>"   (evil-org-eol-call-anon
+                        (org-insert-heading nil))
 
-         "C-S-<return>"   (evil-org-eol-call-anon
-                           (org-insert-todo-heading nil))
+        "C-M-<return>" (evil-org-eol-call-anon
+                        (org-insert-heading nil)
+                        (if current-prefix-arg
+                            (org-metaleft)
+                          (org-metaright)))
 
-         "C-S-M-<return>" (evil-org-eol-call-anon
-                           (org-insert-todo-heading nil)
-                           (if current-prefix-arg
-                               (org-metaleft)
-                             (org-metaright)))
+        "C-S-<return>"   (evil-org-eol-call-anon
+                          (org-insert-todo-heading nil))
 
-         ;; "C-." 'org-toggle-heading
-         )
-        ;; Most evil bindings taken from [[https://github.com/edwtjo/evil-org-mode][evil-org-mode]].
-        (:keymaps 'org-mode-map
-         :states '(normal visual)
-         "gj" 'org-forward-heading-same-level
-         "gk" 'org-backward-heading-same-level
-         "gl" 'outline-next-visible-heading
-         "$" 'org-end-of-line
-         "^" 'org-beginning-of-line)
-        (:keymaps 'org-mode-map
-         :states  'visual
-         "gb" 'org-babel-mark-block
-         "gB" 'org-mark-element)
-        (:keymaps 'org-mode-map
-         :states '(normal visual)
-         :predicate '(or (org-table-p t)
-                         (org-at-heading-p)
-                         (org-at-item-p))
-         [remap drag-stuff-down] 'org-metadown
-         [remap drag-stuff-up]   'org-metaup)
-        ;; navigate throught tables or lists with tab in insert state.
-        (:keymaps 'org-mode-map
-         :states 'insert
-         :predicate '(or (org-table-p t)
-                         (org-at-heading-p)
-                         (org-at-item-p))
-         "TAB"     'org-cycle
-         "<S-tab>" 'org-shifttab)
-        (:keymaps 'org-mode-map
-         :states '(normal visual emacs)
-         "<tab>"   'org-cycle
-         "TAB"     'org-cycle
-         "<S-tab>" 'org-shifttab)
-        (:keymaps 'org-mode-map
-         :states '(normal insert visual)
-         :predicate '(org-at-heading-p)
-         [remap evil-shift-right] 'org-demote-subtree
-         [remap evil-shift-left]  'org-promote-subtree
-         [remap evil-shift-right-line] 'org-demote-subtree
-         [remap evil-shift-left-line]  'org-promote-subtree)
-        (:keymaps 'org-read-date-minibuffer-local-map
-         ;; haven't implemented backward year, or forward year... cause when will
-         ;; I ever need those.
-         "C-M-j" 'exit-minibuffer
-         "C-j" (org-read-date-command forward-week   (calendar-forward-week 1))
-         "C-k" (org-read-date-command backward-week  (calendar-backward-week 1))
-         "C-h" (org-read-date-command backward-day   (calendar-backward-day 1))
-         "C-l" (org-read-date-command forward-day    (calendar-forward-day 1))
-         "C-n" (org-read-date-command forward-month  (calendar-forward-month 1))
-         "C-p" (org-read-date-command backward-month (calendar-backward-month 1))
-         "<"   (org-read-date-command scroll-left    (calendar-scroll-left 1))
-         ">"   (org-read-date-command scroll-right   (calendar-scroll-right 1))
-         "!"   (org-read-date-command view-diary     (diary-view-entries))
-         "."   (org-read-date-command goto-today
-                 "when at end of prompt, goto today in calendar."
-                 (if (looking-back "^[^:]+: "
-                                   (let ((inhibit-field-text-motion t))
-                                     (line-beginning-position)))
-                     (org-eval-in-calendar '(calendar-goto-today))
-                   (insert ".")))))
+        "C-S-M-<return>" (evil-org-eol-call-anon
+                          (org-insert-todo-heading nil)
+                          (if current-prefix-arg
+                              (org-metaleft)
+                            (org-metaright)))
+
+        ;; "C-." 'org-toggle-heading
+        )
+       ;; Most evil bindings taken from [[https://github.com/edwtjo/evil-org-mode][evil-org-mode]].
+       (:keymaps 'org-mode-map
+        :states '(normal visual)
+        "gj" 'org-forward-heading-same-level
+        "gk" 'org-backward-heading-same-level
+        "gl" 'outline-next-visible-heading
+        "$" 'org-end-of-line
+        "^" 'org-beginning-of-line)
+       (:keymaps 'org-mode-map
+        :states  'visual
+        "gb" 'org-babel-mark-block
+        "gB" 'org-mark-element)
+       (:keymaps 'org-mode-map
+        :states '(normal visual)
+        :predicate '(or (org-table-p t)
+                        (org-at-heading-p)
+                        (org-at-item-p))
+        [remap drag-stuff-down] 'org-metadown
+        [remap drag-stuff-up]   'org-metaup)
+       ;; navigate throught tables or lists with tab in insert state.
+       (:keymaps 'org-mode-map
+        :states 'insert
+        :predicate '(or (org-table-p t)
+                        (org-at-heading-p)
+                        (org-at-item-p))
+        "TAB"     'org-cycle
+        "<S-tab>" 'org-shifttab)
+       (:keymaps 'org-mode-map
+        :states '(normal visual emacs)
+        "<tab>"   'org-cycle
+        "TAB"     'org-cycle
+        "<S-tab>" 'org-shifttab)
+       (:keymaps 'org-mode-map
+        :states '(normal insert visual)
+        :predicate '(org-at-heading-p)
+        [remap evil-shift-right] 'org-demote-subtree
+        [remap evil-shift-left]  'org-promote-subtree
+        [remap evil-shift-right-line] 'org-demote-subtree
+        [remap evil-shift-left-line]  'org-promote-subtree)
+       (:keymaps 'org-read-date-minibuffer-local-map
+        ;; haven't implemented backward year, or forward year... cause when will
+        ;; I ever need those.
+        "C-M-j" 'exit-minibuffer
+        "C-j" (org-read-date-command forward-week   (calendar-forward-week 1))
+        "C-k" (org-read-date-command backward-week  (calendar-backward-week 1))
+        "C-h" (org-read-date-command backward-day   (calendar-backward-day 1))
+        "C-l" (org-read-date-command forward-day    (calendar-forward-day 1))
+        "C-n" (org-read-date-command forward-month  (calendar-forward-month 1))
+        "C-p" (org-read-date-command backward-month (calendar-backward-month 1))
+        "<"   (org-read-date-command scroll-left    (calendar-scroll-left 1))
+        ">"   (org-read-date-command scroll-right   (calendar-scroll-right 1))
+        "!"   (org-read-date-command view-diary     (diary-view-entries))
+        "."   (org-read-date-command goto-today
+                "when at end of prompt, goto today in calendar."
+                (if (looking-back "^[^:]+: "
+                                  (let ((inhibit-field-text-motion t))
+                                    (line-beginning-position)))
+                    (org-eval-in-calendar '(calendar-goto-today))
+                  (insert ".")))))
    #+END_SRC
 
 *** org-babel
@@ -22295,6 +22288,19 @@
          (org-appear-autolinks nil))
      #+END_SRC
 
+**** org-toc
+     Automatically [[https://github.com/snosov1/toc-org][refreshes]] any table of contents in the current org or markdown
+     buffer on save. Works by finding org any headings with ~:TOC:~ field (or markdown
+     headings with a trailing ~<-- :TOC: -->~ comment) and then rebuilding them whenever
+     the file is saved.
+
+     #+BEGIN_SRC emacs-lisp
+       (use-package toc-org
+         :straight t
+         :hook (;; (org-mode . toc-org-mode)
+                (markdown-mode . toc-org-mode)))
+     #+END_SRC
+
 ** xml
    :PROPERTIES:
    :header-args+: :tangle (package-yes! xml)
@@ -22359,7 +22365,7 @@
         (set-company-backend! 'lua-mode 'company-lua))
     #+end_src
 
-*** lus-language-server                                                 :lsp:
+*** lua-language-server                                                 :lsp:
     #+begin_src emacs-lisp :tangle (package-yes! lua :lsp)
       (add-hook 'lua-mode-hook +lsp-command)
     #+end_src
@@ -22958,6 +22964,8 @@
        `(evil-ex-search ((,cls (:background ,purple :inherit bold))))
        `(lazy-highlight ((,cls (:background ,blue-int :foreground ,black-dim))))
 
+       `(separator-line ((,cls (:foreground ,blue))))
+
        ;; delimeter colors just taken from https://github.com/gastrodia/rainbow-brackets
        ;; colors 5-9 just recycle 1-4, maybe come up with more.
        `(rainbow-delimiters-depth-1-face ((,cls (:foreground ,(nth 0 rainbow-delimeters-colors)))))
@@ -23307,6 +23315,8 @@
 
       ;;; marginalia
        `(marginalia-documentation ((,cls (:inherit font-lock-comment-face))))
+       `(marginalia-on ((,cls (:foreground ,green-int :inherit bold))))
+       `(marginalia-off ((,cls (:foreground ,red :inherit bold))))
 
       ;;; embark
        `(embark-target ((,cls (:foreground ,blue :inherit bold))))
@@ -23540,4 +23550,4 @@
 #  LocalWords:  NyaaLiveActionAll NyaaLiveAction NyaaAnimeAll NyaaAnime CppReference
 #  LocalWords:  microsoft github godoc SchoolsColors StackOverflow GoogleMaps cmake
 #  LocalWords:  GoogleImages separedit csharp impl gopls analyzer plsense glsl mml
-#  LocalWords:  languageserver roslyn recentf
+#  LocalWords:  languageserver roslyn recentf verilog toc cpp
