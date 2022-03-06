@@ -3718,7 +3718,7 @@
           (advice-add 'company-capf--candidates :around #'orderless-company-fix-face+))
 
         :init
-        (defun consult--orderless-regexp-compiler (input type)
+        (defun consult--orderless-regexp-compiler (input type _ignore-case)
           (setq input (orderless-pattern-compiler input))
           (cons
            (mapcar (lambda (r) (consult--convert-regexp r type)) input)
