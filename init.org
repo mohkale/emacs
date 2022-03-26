@@ -2520,25 +2520,35 @@
      "
        `(defun ,(intern (concat "show-and-copy-" (symbol-name name))) (&optional arg)
           (interactive "P")
-          (let ((msg ,@body))
-            (when msg
-              (or (stringp msg)
-                  (setq msg (format "%s" msg)))                                      ; Force msg to be a string
-              ;; perform insertion behaviour
-              (when (consp arg)
-                (if (eq (car arg) 4)
-                    (insert msg)
-                  (save-excursion
-                    (insert msg))))
-              ;; show and then copy msg
-              (message msg)
-              (kill-new msg)))))
+          (when-let ((msg ,@body))
+            (or (stringp msg)
+                (setq msg (format "%s" msg)))                                      ; Force msg to be a string
+            ;; perform insertion behaviour
+            (when (consp arg)
+              (if (eq (car arg) 4)
+                  (insert msg)
+                (save-excursion
+                  (insert msg))))
+            ;; show and then copy msg
+            (message msg)
+            (kill-new msg))))
 
      (defun-show-and-copy-command buffer-file-basename
        (file-name-nondirectory (or (smart-buffer-file-name) "")))
 
-     (defun-show-and-copy-command buffer-file-name
-       (smart-buffer-file-name))
+     (defun show-and-copy-buffer-file-name (&optional include-line)
+       (interactive "P")
+       (when-let ((file-name (smart-buffer-file-name)))
+           (when include-line
+             ;; This variant uses the prefix-argument to include a
+             ;; line-number.
+             (setq file-name
+                   (concat file-name ":"
+                           (number-to-string
+                            (line-number-at-pos nil t)))))
+
+           (message file-name)
+           (kill-new file-name)))
 
      (defun-show-and-copy-command buffer-name
        (buffer-name))
@@ -8822,13 +8832,6 @@
    #+begin_src emacs-lisp
      (use-package gud
        :straight t
-       ;; :config
-       ;; Fails because gdb parses file-paths from the cmd line and
-       ;; changes to the first one.
-       ;; (let ((conf (shell-quote-argument (join-path (xdg-config-home) "gdb" "init"))))
-       ;;   (setq gud-gdb-command-name (concat "gdb -i=mi -x " conf)
-       ;;         gud-gud-gdb-command-name (concat "gdb -x " conf " --fullname")))
-
        :init
        (push `(,(rx "*gud")
                (display-buffer-reuse-window
@@ -8853,16 +8856,18 @@
        :leader
        (:prefix "v"
         "" '(:ignore t :wk "debugger")
-        "SPC" 'gud-run
+        "SPC" 'gud-gdb
+        "M-SPC" 'gdb-many-windows
         "b" 'gud-break
         "B" 'gud-tbreak                                                              ; temporary breakpoint
         "c" 'gud-cont
         "f" 'gud-finish                                                              ; current function
         "j" 'gud-jump                                                                ; to current line
         "e" 'gud-print                                                               ; eval expression at point
-        "l" 'gud-refresh                                                             ; redraw buffers
+        "g" 'gud-refresh                                                             ; redraw buffers
         "d" 'gud-remove
         "s" 'gud-step
+        "S" 'gud-next
         "t" 'gud-until                                                               ; continue until current line
         "w" 'gud-watch
         "<" 'gud-down                                                                ; stack-frames
