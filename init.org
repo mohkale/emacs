@@ -1922,6 +1922,70 @@
     switching to the compilation-buffer.
 
     #+BEGIN_SRC emacs-lisp
+      (defun display-buffer--compilation (buffer alist)
+        "Display buffer function for compilation buffers."
+        (let* ((windows (window-list))
+               (window-count (length windows))
+               (side-horizontal (alist-get 'side-horizontal alist 'left))
+               (side-vertical (alist-get 'side-vertical alist 'down))
+               (window-height (alist-get 'window-height alist 0.5))
+               (window-width (alist-get 'window-width alist 0.5)))
+          (cond
+           ((eq (length windows) 2)
+            ;; Check if horizontal or vertical split and split appropriately.
+            (setq windows
+                  (seq-sort (lambda (win-a win-b)
+                              (cl-block nil
+                                (dolist (func (list #'window-pixel-left #'window-pixel-top))
+                                  (let ((a-pixel (funcall func win-a))
+                                        (b-pixel (funcall func win-b)))
+                                    (unless (eq a-pixel b-pixel)
+                                      (cl-return (< a-pixel b-pixel)))))
+                                nil))
+                            windows))
+
+            (let* ((horizontal-layout
+                    (with-selected-window (car windows)
+                      (window-in-direction 'right)))
+                   (window
+                    (if horizontal-layout
+                        (split-window
+                         (if (eq side-horizontal 'left)
+                             (car windows)
+                           (cadr windows))
+                         nil
+                         side-vertical)
+                      (split-window
+                       (if (eq side-vertical 'up)
+                           (car windows)
+                         (cadr windows))
+                       nil
+                       side-horizontal))))
+              ;; (window--display-buffer buffer window 'frame alist)
+              ))
+           ((eq (length windows) 3)
+            ;; Find remaining split location needed to get 4 splits total.
+            ;;
+            ;; This is basically the only window that has only one exposed corner.
+            (let ((target-window
+                   (cl-find-if (lambda (window)
+                                 (eq (length
+                                      (cl-loop for direction in '(left right up down)
+                                               with direction-window = nil
+                                               do (setq direction-window
+                                                        (window-in-direction direction window))
+                                               when direction-window
+                                                 collect direction-window))
+                                     1))
+                               windows)))
+              (window--display-buffer
+               buffer
+               (split-window target-window nil side-vertical)
+               'frame alist)))
+           ;; In every other case we create a new split window on the side.
+           (t
+            (funcall #'display-buffer-in-side-window-and-focus buffer alist)))))
+
       (push `(,(rx
                 (or "*Async Shell Command*"
                     "*compilation*"
@@ -1929,11 +1993,15 @@
                     "*cargo-test*"))
               (display-buffer-reuse-window
                display-buffer--maybe-pop-up-frame-or-window-and-focus
-               display-buffer-in-side-window-and-focus)
-              (side . bottom)
+               display-buffer--compilation)
               (window-height . 0.5)
+              (window-width . 0.5)
               (reusable-frames . t)
-              (body-function . nil))
+              (body-function . nil)
+              (side . bottom)
+              ;; Only used by `display-buffer--compilation'.
+              (side-vertical . down)
+              (side-horizontal . left))
             display-buffer-alist)
     #+END_SRC
 
@@ -7313,6 +7381,12 @@
 
 *** compilation-auto-kill
     #+BEGIN_SRC emacs-lisp
+      (defvar compilation-auto-kill-predicate+
+        (defun compilation-auto-kill-predicate+ ()
+          "Skip killing the compilation window if in not in a side-window."
+          (window-at-side-p (get-buffer-window)))
+        "Predicate ran just before killing a compilation buffer.0")
+
       (defvar compilation-auto-kill-window+ 2
         "If non-nil, after a successfull compilation the compilation
       window, if open, will automatically be deleted.
@@ -7381,6 +7455,10 @@
                 (message "Window kill suspended due to encountering: %s"
                          (combine-and-quote-strings notifications)))
               (setq terminate-window nil))
+
+            (when compilation-auto-kill-predicate+
+              (with-current-buffer buf
+                (setq terminate-window (funcall compilation-auto-kill-predicate+))))
 
             (when terminate-window
               (if (numberp compilation-auto-kill-window+) ;; kill after delay
