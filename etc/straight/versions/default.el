@@ -25,7 +25,7 @@
  ("company-org-block" . "115af0a3625f4669358eca568466d468cacc78bd")
  ("company-shell" . "a77f4de75912aa87314cde92c603b831d5050246")
  ("company-web" . "863fb84b81ed283474e50330cd8d27b1ca0d74f1")
- ("compile-multi" . "f4c315734a095a4ca9b0d085ccd5556106008428")
+ ("compile-multi" . "827e2a7ee431d59807273f309c295ccc6fa3bdea")
  ("consult" . "8547e336142e74449b59a6b018e3c96a2b205fd2")
  ("consult-bibtex" . "2f870d6eefb54a53216d90a82cff0ff97ba54725")
  ("consult-company" . "ef1c553b4a72b23297b55708bf6f6dd1b27cc68e")

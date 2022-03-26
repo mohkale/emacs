@@ -13771,41 +13771,7 @@
        :custom
        (compile-multi-default-directory #'project-current-root+)
 
-       :init
-       (setq compile-multi-config
-             `(((file-exists-p "go.sum")
-                ("go:build" . "go build -v")
-                ("go:test" . "go test"))))
-
-       (push `((file-exists-p "Makefile")
-               ,#'compile-multi-make-targets)
-             compile-multi-config)
-
-       :init
-       (defun compile-multi-cmake-targets+ ()
-         (with-temp-buffer
-           (insert
-            (shell-command-to-string "cmake --build build --target help"))
-           (goto-char (point-min))
-           (let (res)
-             (save-match-data
-               (while (re-search-forward (rx bol (one-or-more ".") " "
-                                             (group (minimal-match (one-or-more any)))
-                                             (optional " (the default if no target is provided)")
-                                             eol)
-                                         nil t)
-                 (let ((target (match-string 1)))
-                   (push (cons (concat "cmake:" target)
-                               (concat "cmake --build build --target "
-                                       (shell-quote-argument target)))
-                         res))))
-             (nreverse res))))
-
-       (push `((file-exists-p "CMakeLists.txt")
-               ,#'compile-multi-cmake-targets+)
-             compile-multi-config)
-
-       :init
+       :config
        (defun byte-compile-this-file+ ()
          (byte-compile-file (buffer-file-name)))
 
