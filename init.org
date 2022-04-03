@@ -3800,26 +3800,40 @@
         (orderless-component-separator #'orderless-double-space-escapes+)
 
         :preface
-        (defun flex-if-twiddle (pattern _index _total)
-          "Glob when trailing tilde."
-          (when (string-suffix-p "~" pattern)
-            `(orderless-flex . ,(substring pattern 0 -1))))
+        (cl-defmacro defun-orderless-dispatcher (name &key string style prefix docstring)
+          (declare (indent defun))
+          `(defun ,name (pattern _index _total)
+             ,docstring
+             (when (,(if prefix #'string-prefix-p #'string-suffix-p) ,string pattern)
+               (if (string-equal pattern ,string)
+                   (cons 'orderless-literal pattern)
+                 (cons ,style
+                       (substring pattern
+                                  ,@(if prefix '(1) '(0 -1))))))))
 
-        (defun literal-if-equals (pattern _index _total)
-          (when (string-prefix-p "=" pattern)
-            `(orderless-literal . ,(substring pattern 1))))
+        (defun-orderless-dispatcher flex-if-twiddle
+          :docstring "Glob when trailing tilde."
+          :string "~"
+          :style 'orderless-flex)
 
-        (defun without-if-bang (pattern _index _total)
-          "Exclude literal when leading punctuation-mark."
-          (when (string-prefix-p "!" pattern)
-            (if (eq pattern "!")
-                `(orderless-literal . "")                                             ; Ignore single ! by default.
-              `(orderless-without-literal . ,(substring pattern 1)))))
+        (defun-orderless-dispatcher literal-if-equals
+          :docstring "Match literally if leading equals."
+          :string "="
+          :prefix t
+          :style 'orderless-flex)
 
-        (defun fold-if-percent (pattern _index _total)
-          (when (string-prefix-p "%" pattern)
-            ;; Allows you to [[http://endlessparentheses.com/new-in-emacs-25-1-easily-search-non-ascii-characters.html][search]] unicode characters with ascii queries.
-            `(char-fold-to-regexp . ,(substring pattern 1))))
+        (defun-orderless-dispatcher without-if-bang
+          :docstring "Exclude literal when leading punctuation-mark."
+          :string "!"
+          :prefix t
+          :style 'orderless-without-literal)
+
+        ;; Allows you to [[http://endlessparentheses.com/new-in-emacs-25-1-easily-search-non-ascii-characters.html][search]] unicode characters with ascii queries.
+        (defun-orderless-dispatcher fold-if-percent
+          :docstring "Exclude literal when leading punctuation-mark."
+          :string "%"
+          :prefix t
+          :style 'char-fold-to-regexp)
 
         :custom
         (orderless-matching-styles '(orderless-regexp))
@@ -4904,6 +4918,7 @@
        (company-tooltip-idle-delay nil
         "Show the completion tooltip without any delay.")
        (company-idle-delay 0.4)
+       (company-selection-wrap-around t)
        (company-minimum-prefix-length 2)
        (company-statistics-file (state! "company/statistics.el"))
        (company-tooltip-align-annotations t)
