@@ -43,6 +43,41 @@
   ones must be placed in [[elisp:(find-file (etc! "+config.el"))][etc/+config.el]].
 
   #+BEGIN_SRC emacs-lisp
+    ;;; init.el --- My custom emacs configuration -*- lexical-binding: t; -*-
+
+    ;; Copyright (C) 2022  Mohsin Kaleem
+
+    ;; Author: Mohsin Kaleem <mohkale@gmail.com>
+    ;; Keywords: dotfiles
+    ;; Package-Requires: ((emacs "29.0"))
+
+    ;; Copyright 2021 Mohsin Kaleem
+
+    ;; Permission is hereby granted, free of charge, to any person obtaining a copy
+    ;; of this software and associated documentation files (the "Software"), to deal
+    ;; in the Software without restriction, including without limitation the rights
+    ;; to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    ;; copies of the Software, and to permit persons to whom the Software is
+    ;; furnished to do so, subject to the following conditions:
+
+    ;; The above copyright notice and this permission notice shall be included in all
+    ;; copies or substantial portions of the Software.
+
+    ;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    ;; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    ;; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    ;; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    ;; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    ;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    ;; SOFTWARE.
+
+    ;;; Comentary:
+
+    ;; This files contains my main emacs configuration, which has grown naturally
+    ;; over the years. See [[file:init.org]] for the actual configuration.
+
+    ;;; Code:
+
     ;; <<setup-paths()>>
     ;; <<eval-default-config()>>
     ;; <<load-config()>>
@@ -190,6 +225,7 @@
          sql
          ssh-config
          ;; vimlang
+         ;; verilog
          xml
          yaml
          ;; yarn
@@ -345,10 +381,10 @@
      ;; code-blocks from tangling based on the users emacs-configuration.
      (defvar +modules)
      (defun package-build-cond+ (pkgs)
-       "Build conditions for `package!'.
-     This isn't implemented directly in `package!' because that would require
-     a recursively defined macro that pushes the complexity of building a pkg
-     expression to compile/eval time when it can be done at call-time."
+       "Check build conditions for PKGS.
+     This is a helper for `package!' and isn't implemented directly in `package!' because
+     that would require a recursively defined macro that pushes the complexity of building
+     a pkg expression to compile/eval time when it can be done at call-time."
        (unless (consp pkgs)
          (setq pkgs (list pkgs)))
        (let (pkg res)
@@ -393,12 +429,15 @@
        (package-build-cond+ pkgs))
 
      (defmacro package-yes! (&rest pkgs)
+       "Return yes or no depending on `package!'."
        `(if (package! ,@pkgs) "yes" "no"))
 
      (defmacro package-no! (&rest pkgs)
+       "Wrap `not' around `package-yes!'."
        `(if (package! ,@pkgs) "no" "yes"))
 
      (defmacro package-str! (str &rest pkgs)
+       "Return STR or no depending on `package!'."
        `(if (package! ,@pkgs) ,str "no"))
 
      nil
@@ -413,6 +452,7 @@
 
    #+begin_src emacs-lisp
      (defun +lsp-should-connect (mode check-workspace check-all-workspaces)
+       "Assert whether you should connect to a LSP workspace."
        (when-let ((enable (alist-get mode +lsp-maybe-connect
                                      (alist-get t +lsp-maybe-connect))))
          (when (functionp enable)
@@ -479,6 +519,7 @@
 
    #+begin_src emacs-lisp
      (defun +flylint ()
+       "Enable `flymake' or `flycheck'."
        (interactive)
        (funcall
         (if (called-interactively-p 'interactive)
@@ -647,7 +688,8 @@
    #+NAME: setup-path-builders
    #+BEGIN_SRC emacs-lisp
      (defun join-path (root path &rest rest)
-       "Like python' os.path.join, join a series of paths together."
+       "Join a series of paths together.
+     ROOT is the initial path to join PATH and REST onto."
        (setq path (if (file-name-absolute-p path)
                       path
                     (concat root
@@ -657,9 +699,9 @@
        (if rest (apply 'join-path path rest) path))
 
      (defmacro dotemacs-initialise-path! (path-type path)
-       "Initialise a constant for PATH and a function to join onto PATH.
+       "Initialise a constant for PATH-TYPE and a function to join onto PATH.
      The function will be of the form dotemacs-join-PATH-TYPE-path and will have
-     an alias of the form PATH-TYPE!"
+     an alias of the form PATH-TYPE!."
        (setq path (eval path))
        (let* ((path-type-name (symbol-name path-type))
               (alias (intern (concat path-type-name "!")))
@@ -779,7 +821,7 @@
 
   #+BEGIN_SRC emacs-lisp
     (defvar +transient-hook-counter 0
-      "used to generate a unique function-name for a transient hook.")
+      "Used to generate a unique function-name for a transient hook.")
 
     (defmacro add-transient-hook! (hook-or-function &rest forms)
       "Attaches a self-removing function to HOOK-OR-FUNCTION.
@@ -813,7 +855,7 @@
   #+BEGIN_SRC emacs-lisp
     (defmacro plist-pop! (list prop &optional default)
       "delete PROP from plist LIST, returning value of PROP.
-        if PROP isn't in LIST, DEFAULT will be returned."
+    if PROP isn't in LIST, DEFAULT will be returned."
       `(prog1
            (or (plist-get ,list ,prop) ,default)
          (cl-remf ,list ,prop)))
@@ -12304,9 +12346,9 @@
                 (which-key--show-keymap "Embark" map nil nil 'no-paging))))))
 
         :init
-        (advice-add 'embark-export           :around #'display-buffer-no-select-window-advice)
-        (advice-add 'embark-collect-live     :around #'display-buffer-no-select-window-advice)
-        (advice-add 'embark-collect-snapshot :around #'display-buffer-no-select-window-advice)
+        (advice-add 'embark-export  :around #'display-buffer-no-select-window-advice)
+        (advice-add 'embark-collect :around #'display-buffer-no-select-window-advice)
+        (advice-add 'embark-live    :around #'display-buffer-no-select-window-advice)
 
         :config
         (push (cons 'xref-location #'embark-consult-export-grep)
@@ -12369,12 +12411,15 @@
         :general
         (:states '(normal visual)
          "<C-return>" 'embark-act)
+        (:keymaps '(global-map
+                    org-mode-map)
+         "C-c C-l" 'embark-live)
         (:keymaps '(selectrum-minibuffer-map
                     vertico-map)
          "<C-return>" 'embark-act
          "M-RET" 'embark-act-noexit
-         "C-c C-o" 'embark-collect-snapshot
-         "C-c M-o" 'embark-collect-live
+         "C-c C-o" 'embark-collect
+         "C-c C-l" 'embark-live
          "C-c C-e" 'embark-export
          "C-c C-b" 'embark-become)
         (:keymaps 'embark-collect-mode-map
@@ -12385,6 +12430,9 @@
          "<" 'tabulated-list-narrow-current-column
          ">" 'tabulated-list-widen-current-column
          "x" 'embark-collect-delete+
+         "m" 'embark-collect-mark
+         "u" 'embark-collect-unmark
+         "U" 'embark-collect-unmark-all
          "gj" 'forward-button
          "gk" 'backward-button
          "<C-return>" 'embark-act)
@@ -12457,32 +12505,33 @@
         (xref-show-definitions-function #'consult-xref)
         :init
         (defconst consult-imenu-assoc+
-          '(("Class"                         ?c font-lock-type-face)
-            ("Struct"                        ?s font-lock-type-face)
-            ("Interface"                     ?i font-lock-type-face)
-            ("Types"                         ?t font-lock-type-face)
-            ("Enum"                          ?e font-lock-type-face)
+          '((("Class" "Classes")                       ?c font-lock-type-face)
+            ("Struct"                                  ?s font-lock-type-face)
+            (("Interface" "Interfaces")                ?i font-lock-type-face)
+            ("Types"                                   ?t font-lock-type-face)
+            ("Enum"                                    ?e font-lock-type-face)
 
-            ("Namespace"                     ?n font-lock-preprocessor-face)
-            (("Module" "Package" "Packages") ?p font-lock-preprocessor-face)
+            ("Namespace"                               ?n font-lock-preprocessor-face)
+            (("Module" "Modules" "Package" "Packages") ?p font-lock-preprocessor-face)
 
-            ("Macros"                        ?@ font-lock-preprocesser-face)
-            ("Method"                        ?m font-lock-function-name-face)
-            ("Constructor"                   ?K font-lock-function-name-face)
-            (("Function" "Functions")        ?f font-lock-function-name-face)
+            ("Macros"                                  ?@ font-lock-preprocesser-face)
+            ;; TODO: Makes tasks a proxy for Functions, where both may be needed.
+            (("Method" "Tasks")                        ?m font-lock-function-name-face)
+            ("Constructor"                             ?K font-lock-function-name-face)
+            (("Function" "Functions")                  ?f font-lock-function-name-face)
 
-            ("Array"                         ?A font-lock-variable-name-face)
-            ("Boolean"                       ?B font-lock-variable-name-face)
-            ("Enum Member"                   ?E font-lock-variable-name-face)
-            ("Enum Member"                   ?B font-lock-variable-name-face)
-            ("Number"                        ?N font-lock-variable-name-face)
-            ("Object"                        ?O font-lock-variable-name-face)
-            ("String"                        ?S font-lock-variable-name-face)
+            ("Array"                                   ?A font-lock-variable-name-face)
+            ("Boolean"                                 ?B font-lock-variable-name-face)
+            ("Enum Member"                             ?E font-lock-variable-name-face)
+            ("Enum Member"                             ?B font-lock-variable-name-face)
+            ("Number"                                  ?N font-lock-variable-name-face)
+            ("Object"                                  ?O font-lock-variable-name-face)
+            ("String"                                  ?S font-lock-variable-name-face)
 
-            ("Constant"                      ?k font-lock-variable-name-face)
-            (("Variable" "Variables")        ?v font-lock-variable-name-face)
-            ("Field"                         ?V font-lock-variable-name-face)
-            ("Property"                      ?P font-lock-variable-name-face))
+            ("Constant"                                ?k font-lock-variable-name-face)
+            (("Variable" "Variables")                  ?v font-lock-variable-name-face)
+            ("Field"                                   ?V font-lock-variable-name-face)
+            ("Property"                                ?P font-lock-variable-name-face))
           "Language agnostic `consult-imenu-config'.
       This forces consistency in narrowing keys across all languages.")
 
@@ -12490,14 +12539,16 @@
           "Build a `consult-imenu' configuration for TYPES."
           (cl-loop for type in types
                    with conf = nil
-                   do (setq conf (cdr
-                                  (cl-find-if (lambda (it)
-                                                (cond ((stringp it)
-                                                       (string-equal it type))
-                                                      ((consp it)
-                                                       (cl-member type it :test #'string-equal))))
-                                              consult-imenu-assoc+
-                                              :key #'car)))
+                   do (setq conf
+                            (cdr (cl-find-if
+                                  (lambda (it)
+                                    (cond
+                                     ((stringp it)
+                                      (string-equal it type))
+                                     ((consp it)
+                                      (cl-member type it :test #'string-equal))))
+                                  consult-imenu-assoc+
+                                  :key #'car)))
                    when conf
                      collect (append (list (car conf) type) (cdr conf))))
 
@@ -12517,6 +12568,15 @@
            (perl-mode :toplevel "Functions"
                       :types ((?v "Variables" font-lock-variable-name-face)
                               (?f "Functions" font-lock-function-name-face)))
+           (verilog-mode :toplevel "Modules"
+                         :types ,(consult-imenu-gen-types+
+                                  "Modules"
+                                  "Variables"
+                                  "Classes"
+                                  "Tasks"
+                                  "Functions"
+                                  "Interfaces"
+                                  "Types"))
            ;; Both c-mode and c++-mode have almost identicle imenu functions.
            ,@(let ((conf `(:toplevel "Function"
                            :types ,(consult-imenu-gen-types+
@@ -14147,6 +14207,7 @@
 
          "<down-mouse-1>" 'widget-button-click
 
+         "x"     'dashboard-remove-item-under
          "gj"    'dashboard-next-section
          "gk"    'dashboard-previous-section
          "RET"   'dashboard-return
@@ -22607,6 +22668,24 @@
               eglot-server-programs))
     #+end_src
 
+** verilog
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! verilog)
+   :END:
+   #+begin_src emacs-lisp
+     (use-package verilog-mode
+       :straight t
+       :config
+       ;; Strip the surrounding asterisks from the `imenu' keys.
+       (cl-loop for entry in verilog-imenu-generic-expression
+                with key = nil
+                do (setq key (car entry))
+                when (and key
+                          (string-prefix-p "*" key)
+                          (string-suffix-p "*" key))
+                  do (setcar entry (substring key 1 (1- (length key))))))
+   #+end_src
+
 * Script
   :PROPERTIES:
   :header-args+: :shebang "#!/usr/bin/env emacs-script\n;; -*- mode: emacs-lisp; lexical-binding: t -*-"
@@ -23536,27 +23615,27 @@
 
       (custom-theme-set-variables 'an-old-hope
         `(hl-todo-keyword-faces
-          '(("TODO"        ,red)
-            ("NEXT"        ,red)
-            ("RANT"        ,red)
-            ("SEE"         ,red)
-            ("SKIP"        ,red)
-            ("LATE"        ,red)
-            ("THEM"        ,purple)
-            ("PROG"        ,blue-int)
-            ("OKAY"        ,blue-int)
-            ("DONT"        ,green-int)
-            ("FAIL"        ,red)
-            ("DONE"        ,green-int)
-            ("NOTE"        ,yellow-int)
-            ("WAIT"        ,yellow-int)
-            ("KLUDGE"      ,yellow-int)
-            ("HACK"        ,yellow-int)
-            ("TEMP"        ,yellow-int)
-            ("FIXME"       ,orange)
-            ("WARN"        ,orange)
-            ("XXX+"        ,orange)
-            ("\\?\\?\\?+"  ,orange)))
+          '(("TODO"        . ,red)
+            ("NEXT"        . ,red)
+            ("RANT"        . ,red)
+            ("SEE"         . ,red)
+            ("SKIP"        . ,red)
+            ("LATE"        . ,red)
+            ("THEM"        . ,purple)
+            ("PROG"        . ,blue-int)
+            ("OKAY"        . ,blue-int)
+            ("DONT"        . ,green-int)
+            ("FAIL"        . ,red)
+            ("DONE"        . ,green-int)
+            ("NOTE"        . ,yellow-int)
+            ("WAIT"        . ,yellow-int)
+            ("KLUDGE"      . ,yellow-int)
+            ("HACK"        . ,yellow-int)
+            ("TEMP"        . ,yellow-int)
+            ("FIXME"       . ,orange)
+            ("WARN"        . ,orange)
+            ("XXX+"        . ,orange)
+            ("\\?\\?\\?+"  . ,orange)))
         `(ansi-color-names-vector
           '(,dark-grey ,red ,green ,yellow ,blue ,purple ,turquoise ,white)))
     #+END_SRC
