@@ -8745,19 +8745,17 @@
          ("q"  nil :exit t)))
     #+end_src
 
-*** flymake-rest
+*** flymake-collection
     #+begin_src emacs-lisp
-      (use-package flymake-rest
-        :straight (flymake-rest :host github
-                                :repo "mohkale/flymake-rest"
-                                :files ("*.el" "checkers/*.el"))
-        :hook (after-init . flymake-rest-hook-setup)
+      (use-package flymake-collection
+        :straight t
+        :hook (after-init . flymake-collection-hook-setup)
         :custom
-        (flymake-rest-markdownlint-style
+        (flymake-collection-markdownlint-style
          (join-path (xdg-config-home) "mdlstyle.rb"))
-        (flymake-rest-hook-ignore-modes '(eglot--managed-mode))
+        (flymake-collection-hook-ignore-modes '(eglot--managed-mode))
 
-        :leader ("ec" 'flymake-rest-change-checker))
+        :leader ("ec" 'flymake-collection-change-checker))
     #+end_src
 
 *** flymake-diagnostics-at-point
@@ -14772,7 +14770,7 @@
        (flycheck-default-margin-str "•")
 
        :init
-       (defvaralias 'flycheck-markdown-mdl-style 'flymake-rest-markdownlint-style)
+       (defvaralias 'flycheck-markdown-mdl-style 'flymake-collection-markdownlint-style)
        (evil-set-initial-state 'flycheck-error-message-mode 'motion)
 
        :config ;; Use ● for all flycheck fringe indicators, instead of the defaults.
@@ -14845,7 +14843,7 @@
         [remap flymake-start] 'flycheck-buffer
         [remap flymake-first-error+] 'flycheck-first-error
         [remap flymake-last-error+] 'flycheck-last-error
-        [remap flymake-rest-change-checker] 'flycheck-select-checker
+        [remap flymake-collection-change-checker] 'flycheck-select-checker
         [remap flymake-show-buffer-diagnostics] 'flycheck-list-errors)
 
        (:keymaps 'flycheck-error-list-mode-map
