@@ -3779,9 +3779,9 @@
         :straight t
         :demand t
         :custom
-        (completion-styles '(orderless))
+        (completion-styles '(orderless basic))
         (completion-category-overrides
-         '((file (styles orderless partial-completion))))
+         '((file (styles orderless basic partial-completion))))
 
         :preface
         (defun orderless-double-space-escapes+ (string)
@@ -8646,28 +8646,27 @@
 
        ;; Make the diagnostic buffer auto-move to the closest error.
        :config
-       (advice-add #'flymake-show-diagnostics-buffer :filter-return
-                   (defun flymake-show-diagnostics-buffer-update-point+ (diag-win)
+       (advice-add #'flymake-show-buffer-diagnostics :filter-return
+                   (defun flymake-show-buffer-diagnostics-update-point+ (result)
                      "Move point to the error closest to point in diagnostics buffer.
-     By default when you run `flymake-show-diagnostics-buffer' your point is
+     By default when you run `flymake-show-buffer-diagnostics' your point is
      either the start of the buffer or where it was when you were previously
      in that buffer.
      This isn't ideal when you just want to inspect the error message for the
      error at point. This advice moves the point to the closest error in the
      diagnostics buffer to where you were in the original buffer."
-                     (prog1 diag-win
-                       (when diag-win
-                         (with-current-buffer (window-buffer diag-win)
-                           (when-let* ((source flymake--diagnostics-buffer-source)
-                                       (diag-deltas
-                                        (with-current-buffer source
-                                          (let ((point (point)))
-                                            (cl-loop for it in (cl-sort (flymake-diagnostics) #'<
-                                                                        :key #'flymake-diagnostic-beg)
-                                                     collect (abs (- (flymake-diagnostic-beg it) point)))))))
-                             (goto-char (point-min))
-                             (let ((ix (seq-position diag-deltas (seq-min diag-deltas))))
-                               (forward-line ix))))))))
+                     (with-current-buffer (flymake--diagnostics-buffer-name)
+                       (when-let* ((source flymake--diagnostics-buffer-source)
+                                   (diag-deltas
+                                    (with-current-buffer source
+                                      (let ((point (point)))
+                                        (cl-loop for it in (cl-sort (flymake-diagnostics) #'<
+                                                                    :key #'flymake-diagnostic-beg)
+                                                 collect (abs (- (flymake-diagnostic-beg it) point)))))))
+                         (goto-char (point-min))
+                         (let ((ix (seq-position diag-deltas (seq-min diag-deltas))))
+                           (forward-line ix))))
+                     result))
 
        :init
        (with-eval-after-load 'evil
@@ -8682,7 +8681,7 @@
         "er" 'flymake-start
         "e1" 'flymake-first-error+
         "e2" 'flymake-last-error+
-        "el" 'flymake-show-diagnostics-buffer
+        "el" 'flymake-show-buffer-diagnostics
         ;; "e2" 'flymake-switch-to-log-buffer
         "eL" 'flymake-show-project-diagnostics
         ;; TODO implement
@@ -8731,8 +8730,10 @@
         :hydra
         (flymake-hydra
          (:body-pre (flymake-hydra--setup-window-config+
-                     (save-window-excursion
-                       (window-buffer (flymake-show-diagnostics-buffer))))
+                     (let ((buffer (flymake--diagnostics-buffer-name)))
+                       (save-window-excursion
+                         (flymake-show-buffer-diagnostics))
+                       buffer))
           :post (flymake-hydra--restore-window-config+)
           :hint nil)
          ("j"  flymake-goto-next-error "Next")
@@ -11297,8 +11298,17 @@
            ([remap evil-save-and-close] . server-edit)
            ([remap evil-quit-all-with-error-code] . server-edit-abort)))
 
+       :config
+       (defun server-start+ (&optional rename)
+         (interactive "P")
+         (when rename
+           (when (and (server-running-p) server-process)
+             (user-error "Cannot rename already running server."))
+           (setq server-name (read-string "Server name: " server-name)))
+         (funcall-interactively 'server-start))
+
        :leader
-       ("f SPC" 'server-start
+       ("f SPC" 'server-start+
         "fen" 'next-client-buffer+
         "fep" 'prev-client-buffer+
         "feb" 'find-client-buffer+)
@@ -13604,6 +13614,13 @@
            (glsl-mode ".glsl")
            (java-mode ".java")))
 
+       (defun apheleia-buffer-file-name+ ()
+         (when-let ((name (buffer-file-name)))
+           (let ((remote (file-remote-p name)))
+             (if remote
+                 (substring name (length remote))
+               name))))
+
        :custom
        (apheleia-formatters
         `((asmfmt "asmfmt")
@@ -13615,7 +13632,7 @@
           (buildifier "buildifier")
           (cabal-fmt "cabal-fmt")
           (clang-format "clang-format"
-                        "--assume-filename" (or (buffer-file-name)
+                        "--assume-filename" (or (apheleia-buffer-file-name+)
                                                 (apheleia-mode-ext-assoc+))
                         ;; This should ideally be set in a .clang-format file
                         ;; but since I'm more inclined to use editorconfig it
@@ -14829,7 +14846,7 @@
         [remap flymake-first-error+] 'flycheck-first-error
         [remap flymake-last-error+] 'flycheck-last-error
         [remap flymake-rest-change-checker] 'flycheck-select-checker
-        [remap flymake-show-diagnostics-buffer] 'flycheck-list-errors)
+        [remap flymake-show-buffer-diagnostics] 'flycheck-list-errors)
 
        (:keymaps 'flycheck-error-list-mode-map
         :states  'motion
@@ -19952,11 +19969,12 @@
                                          :run     #'rustic-cargo-run))
 
        ;; Support `compile-multi'.
-       (push `((file-exists-p "Cargo.toml")
-               ("rust:build" . ,#'rustic-compile)
-               ("rust:test" . ,#'rustic-cargo-test)
-               ("rust:run" . ,#'rustic-cargo-run))
-             compile-multi-config)
+       (with-eval-after-load 'compile-multi
+         (push `((file-exists-p "Cargo.toml")
+                 ("rust:build" . ,#'rustic-compile)
+                 ("rust:test" . ,#'rustic-cargo-test)
+                 ("rust:run" . ,#'rustic-cargo-run))
+               compile-multi-config))
 
        :init
        (push 'rustic-popup-mode +whitespace-exempt-modes)

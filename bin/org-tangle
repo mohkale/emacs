@@ -1,0 +1,106 @@
+#!/usr/bin/env sh
+":"; exec emacs --quick --script "$0" -- "$@" # -*- mode: emacs-lisp; lexical-binding: t; -*-
+;;; bin/org-tangle
+;; Adapted from [[https://github.com/hlissner/doom-emacs/blob/7121e993ca1ccaf05bafbfe1c3d9f605fc7c0f78/bin/org-tangle][doom/bin/org-tangle]], this script takes the path to an org-mode
+;; file and then tangles all the source code blocks in it out.
+
+(require 'cl-lib)
+(require 'ox)
+(require 'ob-tangle)
+
+(pop argv)                                        ; Remove the -- argument supplied above.
+(setq make-backup-files nil)
+
+(defvar script "org-tangle"
+  "Basename of this script.")
+
+(defun +princ (&rest args)
+  "`princ' with a trailing newline, just like `message'."
+  (apply #'princ args)
+  (princ "\n"))
+
+(cl-defun print-usage (&optional (msg-function #'+princ))
+  "Print a usage string for this script."
+  (funcall msg-function (format "Usage: %s [-h] [-e] PATH" script)))
+
+(cl-defun print-help (&optional (msg-function #'+princ))
+  "Print a help string for this script."
+  (print-usage msg-function)
+  (with-temp-buffer
+    (insert
+     "\n"
+     "  A command line interface for tangling org-mode files.\n"
+     "\n"
+     "Options:\n"
+     "  -h, --help\n"
+     "    Show this help message and exit.\n"
+     "  -e, --expand-includes\n"
+     "    Expand #+INCLUDE properties for each file in PATH.")
+    (funcall msg-function (buffer-string))))
+
+(defun +expand-paths (paths)
+  (cl-loop for path in paths
+           unless (file-exists-p path)
+           do (progn
+                (message "error: %s: Failed to find path %s" path)
+                (kill-emacs 1))
+           if (file-directory-p path)
+           append (file-expand-wildcards (concat path "*.org"))
+           else
+           collect path))
+
+(defmacro unwind-protect+ (body-form &rest unwind-forms)
+  (declare (indent 1))
+  `(condition-case err
+      (let ((res ,body-form))
+        ,@unwind-forms
+        res)
+    (error
+     ,@unwind-forms
+     (signal (car err) (cdr err)))))
+
+(defmacro with-backup+ (path &rest body)
+  "Backup PATH and run BODY, restoring PATH on exit.
+If PATH is nil then don't back it up and just run BODY as is."
+  (declare (indent defun))
+  `(let ((path ,path))
+     (if path
+         (let ((backup (make-temp-file
+                        (file-name-base file) nil ".backup.org")))
+           ;; For some reason, `unwind-protect' didn't work here.
+           (unwind-protect+
+               (progn
+                 (copy-file file backup t)
+                 ,@body)
+             (ignore-errors (copy-file backup file t))
+             (ignore-errors (delete-file backup))))
+       (progn ,@body))))
+
+(let (paths expand-includes)
+  (while argv
+    (let ((arg (pop argv)))
+      (pcase arg
+        ((or "-h" "--help")
+         (print-help)
+         (kill-emacs 0))
+        ((or "-e" "--expand-includes")
+         (setq expand-includes t))
+        ((guard (string-prefix-p "-" arg))
+         (message "error: %s: unknown command line option %s" script arg)
+         (print-usage #'message)
+         (kill-emacs 1))
+        (_ (push arg paths)))))
+  (setq paths (nreverse paths))
+  (unless paths
+    (message "error: %s: no PATHS to tangle supplied" script)
+    (print-usage #'message)
+    (kill-emacs 1))
+
+  (dolist (file (+expand-paths paths))
+    (with-backup+ (when expand-includes
+                    file)
+      (let (org-mode-hook org-confirm-babel-evaluate)
+        (with-current-buffer (find-file-noselect file)
+          (when expand-includes
+            (org-export-expand-include-keyword))
+          (org-babel-tangle))))))
