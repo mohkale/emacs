@@ -2089,18 +2089,31 @@
                 ,@(cdr display-buffer-fallback-action))
               display-buffer-alist)
 
+        (defun display-buffer-skip-focus-when-minibuffer+ (func-sym)
+          (lambda (&rest args)
+            (apply
+             (if (active-minibuffer-window)
+                 func-sym
+               (intern (concat (symbol-name func-sym) "-and-focus")))
+             args)))
+
         (add-hook 'emacs-startup-hook
                   (defun display-buffer-remove-warnings-handler+ ()
                     ;; A variant of `display-buffer-fallback-action' that only selects
                     ;; when the warnings window is not already visible. Makes it a whole
                     ;; lot less annoying.
-                    (setf (cdr (assoc (rx "*Warnings*") display-buffer-alist))
+                    (setf (cdr (assoc pattern display-buffer-alist))
                           `((display-buffer--maybe-same-window
                              display-buffer-reuse-window
-                             display-buffer--maybe-pop-up-frame-or-window-and-focus
-                             display-buffer-in-previous-window-and-focus
-                             display-buffer-use-some-window-and-focus
-                             display-buffer-pop-up-frame-and-focus)
+                             ;; Also skip selection when in the minibuffer (So annoying :-P).
+                             ,(display-buffer-skip-focus-when-minibuffer+
+                               #'display-buffer--maybe-pop-up-frame-or-window)
+                             ,(display-buffer-skip-focus-when-minibuffer+
+                               #'display-buffer-in-previous-window)
+                             ,(display-buffer-skip-focus-when-minibuffer+
+                               #'display-buffer-use-some-window)
+                             ,(display-buffer-skip-focus-when-minibuffer+
+                               #'display-buffer-pop-up-frame))
                             (reusable-frames . t)
                             (side . right)
                             (window-width . 0.5)
@@ -5353,6 +5366,27 @@
         (push `(,(rx ".journal" eol)
                 all-the-icons-nerd-fa "book")
               all-the-icons-regexp-icon-alist)
+
+        ;; Sadly this can't be configured, we just have to override it.
+        (advice-add
+         #'all-the-icons-icon-for-dir
+         :override
+         (defun all-the-icons-icon-for-dir+ (dir &rest arg-overrides)
+           (let* ((dirname (file-name-base (directory-file-name dir)))
+                  (path (expand-file-name dir))
+                  (icon (all-the-icons-match-to-alist dirname all-the-icons-dir-icon-alist))
+                  (args (cdr icon)))
+             (when arg-overrides (setq args (append `(,(car args)) arg-overrides (cdr args))))
+             (cond
+              ((file-remote-p path)
+               (apply #'all-the-icons-octicon "terminal" (cdr args)))
+              ((file-symlink-p path)
+               (apply #'all-the-icons-nerd-oct "file-symlink-directory" (cdr args)))
+              ((all-the-icons-dir-is-submodule path)
+               (apply #'all-the-icons-nerd-oct "file-submodule" (cdr args)))
+              ((file-exists-p (format "%s/.git" path))
+               (apply #'all-the-icons-nerd-oct "repo" (cdr args)))
+              (t (apply (car icon) args))))))
         )
     #+END_SRC
 
@@ -6136,6 +6170,10 @@
     #+BEGIN_SRC emacs-lisp
       (use-package projectile
         :config
+        (advice-add #'projectile-dotnet-project-p :after-until
+                    (defun projectile-dotnet-sln-p ()
+                      (projectile-verify-file-wildcard "?*.sln")))
+
         (projectile-register-project-type 'rake '("rakefile")
          :compile "rake build"
          :test    "rake test"
@@ -9259,8 +9297,10 @@
     #+BEGIN_SRC emacs-lisp
       (use-package all-the-icons-ibuffer
         :straight t
-        :demand t
-        :after ibuffer
+        :hook (ibuffer-mode . all-the-icons-ibuffer-mode)
+        :custom
+        (all-the-icons-ibuffer-display-predicate
+         (apply-partially #'identity t))
         :config
         ;; Add padding to make sure icons aren't truncated on the terminal.
         (when-let ((cell (assoc 'ibuffer-make-column-icon ibuffer-inline-columns)))
@@ -12786,6 +12826,7 @@
          "psf" 'consult-find
          "psv" 'consult-git-grep
          "psb" 'consult-grep
+         "psg" 'consult-grep
          "psi" 'consult-imenu-multi)
         (:mode '(org-mode
                  outline-mode
@@ -13580,6 +13621,7 @@
 
        :custom
        (apheleia-hide-log-buffers t)
+       (apheleia-remote-algorithm 'remote)
 
        :preface
        (defun apheleia-indent+ (tab-flag indent-flag indent-var)
@@ -14486,7 +14528,13 @@
                         (configurationSources . ["pycodestyle"])
                         (plugins
                          (pydocstyle (enabled . t))
-                         (pylint (enabled . t))))))
+                         (pylint (enabled . t))))
+                       (:omnisharp
+                        (path . "")
+                        (useModernNet . t)
+                        (useGlobalMono . "always")
+                        (useGlobalMono . nil)
+                        (enableEditorConfigSupport . t))))
 
        :config
        (require 'yasnippet)                                                          ; needed or else snippet expansion won't happen.
@@ -17724,15 +17772,24 @@
    #+begin_src emacs-lisp
      (use-package dockerfile-mode
        :straight t
+       :mode (rx ".docker" eol)
        :custom
+       (dockerfile-enable-auto-indent nil)
        (dockerfile-use-buildkit
-        (string-equal (or (getenv "DOCKER_BUILDKIT") "1") "0")
+        (string-equal (or (getenv "DOCKER_BUILDKIT") "1") "1")
         "Whether to use buildkit. By default we do unless the
      DOCKER_BUILDKIT environment variable explicitly disables
      it.")
 
        :preface
-       (push '(dockerfile-mode . 2) +indent-config))
+       (push '(dockerfile-mode . 2) +indent-config)
+
+       (use-package sh-script
+         :commands 'sh-backslash-region)
+
+       :leader
+       (:mode 'dockerfile-mode
+        "\\" 'sh-backslash-region))
    #+end_src
 
 *** docker-transient
@@ -19281,7 +19338,7 @@
     The most recent language server implementation for csharp: [[https://github.com/OmniSharp/omnisharp-roslyn][omnisharp-roslyn]].
 
     #+begin_src emacs-lisp
-      (add-hook 'perl-mode-hook +lsp-command)
+      (add-hook 'csharp-mode-hook +lsp-command)
     #+end_src
 
     #+begin_src emacs-lisp :tangle (package-yes! csharp eglot)
