@@ -4272,7 +4272,16 @@
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! evil-tty-cursor)
       (use-package evil-terminal-cursor-changer
         :straight t
-        :hook (tty-setup . evil-terminal-cursor-changer-activate))
+        :hook (tty-setup . evil-terminal-cursor-changer-activate)
+        :custom
+        (evil-motion-state-cursor 'box) ; █
+        (evil-visual-state-cursor 'box) ; █
+        (evil-normal-state-cursor 'box) ; █
+        (evil-insert-state-cursor 'bar) ; ⎸
+        (evil-emacs-state-cursor  'box) ; █
+
+        :config
+        (advice-add 'etcc--make-tmux-seq :override #'identity))
     #+END_SRC
 
 *** evil-numbers
@@ -7816,6 +7825,7 @@
                lisp-interaction-mode
                TeX-mode LaTeX-mode
                go-mode
+               python-mode
                csharp-mode
                js-mode js2-mode js-jsx-mode typescript-react-mode typescript-mode
                c-mode c++-mode)
@@ -12416,6 +12426,8 @@
         :config
         (push (cons 'xref-location #'embark-consult-export-grep)
               embark-exporters-alist)
+        (push (cons 'consult-xref #'embark-consult-export-grep)
+              embark-exporters-alist)
 
         ;; (push `(,(rx "*Embark " (or "Live" "Completions" "Collect") "*")
         ;;         nil
@@ -13020,6 +13032,14 @@
         :general
         (:states '(insert normal)
          "C-M-i" 'consult-yasnippet))
+    #+end_src
+
+*** consult-ls-git
+    #+begin_src emacs-lisp :tangle (package-yes! :consult)
+      (use-package consult-ls-git
+        :straight t
+        :leader
+        ("gf" 'consult-ls-git))
     #+end_src
 
 *** all-the-icons-completion
@@ -14520,7 +14540,10 @@
                         (plugins
                          (pydocstyle (enabled . t))
                          (pylint (enabled . t))
-                         (pyls_mypy (enabled . t))
+                         (pyls_mypy
+                          (enabled . t)
+                          ;; Fixes mypy import complaints (see [[https://github.com/tomv564/pyls-mypy/issues/36][pyls-mypy#36]])
+                          (live-mode . :json-false))
                          (jedi_completion
                           (fuzzy . t)
                           (follow_builtin_imports . :json-false))))

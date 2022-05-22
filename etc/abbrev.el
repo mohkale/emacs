@@ -57,3 +57,10 @@
     ("imp" "import" nil :count 1)
     ("req" "require" nil :count 1)
    ))
+
+(define-abbrev-table 'python-mode-abbrev-table
+  '(
+    ("cont" "continue" nil :count 2)
+    ("fr" "from" nil :count 1)
+    ("im" "import" nil :count 1)
+    ))
