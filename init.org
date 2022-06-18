@@ -6397,7 +6397,7 @@
    This linear structure of undo can extend up-to an arbitrary depth, the only issue
    is having to manoeuvre through intermittent histories as you navigate.
 
-   #+BEGIN_SRC emacs-lisp :tangle (package-no! undo-tree)
+   #+BEGIN_SRC emacs-lisp
      (use-package undo-fu
        :straight t
        :custom
@@ -6410,6 +6410,31 @@
        (undo-fu-session-directory (state! "undo-fu"))
        (undo-fu-session-incompatible-files (list undo-skip-autosave-regex+)))
    #+END_SRC
+
+*** vundo
+    #+begin_src emacs-lisp
+      (use-package vundo
+        :straight t
+        :config
+        (setq vundo-glyph-alist vundo-unicode-symbols)
+
+        :leader
+        ("au" 'vundo)
+
+        :general
+        (:keymaps 'vundo-mode-map
+         ;; Evil, not emacs :-P.
+         "l" #'vundo-forward   "f" nil
+         "h" #'vundo-backward  "b" nil
+         "j" #'vundo-next      "n" nil
+         "k" #'vundo-previous  "p" nil
+         "u" #'vundo-stem-root "a" nil
+         "d" #'vundo-stem-end  "e" nil
+         "g" #'vundo-stem-root
+         "G" #'vundo-stem-end
+         "q" #'vundo-confirm
+         "<escape>" #'vundo-quit))
+    #+end_src
 
 ** uuidgen
    #+BEGIN_SRC emacs-lisp
@@ -12566,11 +12591,12 @@
         (consult-async-min-input 2)
         (consult-async-split-style 'slash)
         (consult-async-split-styles-alist
-         '((space :separator ?\s :type separator)
-           (comma :separator ?, :type separator)
-           (semicolon :separator ?\; :type separator)
-           (slash :initial "/" :type perl)
-           (perl :initial "#" :type perl)))
+         '((nil :function consult--split-nil)
+           (space :separator ?\s :function consult--split-separator)
+           (comma :separator ?, :function consult--split-separator)
+           (semicolon :separator ?\; :function consult--split-separator)
+           (slash :initial "/" :function consult--split-perl)
+           (perl :initial "#" :function consult--split-perl)))
         (consult-fontify-max-size 100000)
         (register-preview-function #'consult-register-preview)
         (consult-async-refresh-delay 0.05)
@@ -21358,7 +21384,10 @@
 
       ;;; org-notmuch
         (when (package! notmuch)
-          (require 'ol-notmuch)))
+          (use-package ol-notmuch
+            :straight t
+            :demand t
+            :after (org notmuch))))
     #+END_SRC
 
 *** org-capture
@@ -22783,6 +22812,7 @@
    :PROPERTIES:
    :header-args+: :tangle (package-yes! verilog)
    :END:
+
    #+begin_src emacs-lisp
      (use-package verilog-mode
        :straight t
@@ -23713,6 +23743,9 @@
        `(ansi-color-bright-yellow ((,cls (:foreground ,yellow-int :background ,yellow-int))))
        `(ansi-color-bright-magenta ((,cls (:foreground ,purple-int :background ,purple-int))))
 
+      ;; vundo
+       `(vundo-highlight ((,cls (:foreground ,blue :inherit bold))))
+
       ;; outline
        ;; `(outline-1 ((,cls (:inherit font-lock-function-name-face))))
        ;; `(outline-2 ((,cls (:inherit font-lock-variable-name-face))))
@@ -23789,4 +23822,4 @@
 #  LocalWords:  NyaaLiveActionAll NyaaLiveAction NyaaAnimeAll NyaaAnime CppReference
 #  LocalWords:  microsoft github godoc SchoolsColors StackOverflow GoogleMaps cmake
 #  LocalWords:  GoogleImages separedit csharp impl gopls analyzer plsense glsl mml
-#  LocalWords:  languageserver roslyn recentf verilog toc cpp
+#  LocalWords:  languageserver roslyn recentf verilog toc cpp vundo
