@@ -101,11 +101,11 @@
        '(;; apheleia                                                       ; Automatic buffer formatting after save.
          abbrev                                                            ; Enable automatic in text substitutions
          magit                                                             ; It's git... but magical  ,
+         forge                                                             ; Helpers for remote forges (used with magit)
          link-hint                                                         ; Jump to links in the current buffer through an avy interface
          ;; adaptive-wrap                                                  ; Visually wrap long lines. doesn't alter what you write.
          anzu                                                              ; Show the number of search results incrementally
          ;; beacon                                                         ; Highlight suddens jumps (changes in point) using a beacon
-         browse-at-remote                                                  ; Open the current file on github/gitlab/etc.
          ;; auto-highlight-symbol                                          ; Automatically highlight the symbol at point
          browser-edit                                                      ; Interface emacs with [[https://www.chromium.org/][chromium]]
          company                                                           ; Dynamic completion previews through popup dialogs
@@ -13950,6 +13950,9 @@
    #+END_SRC
 
 ** browse-at-remote
+   :PROPERTIES:
+   :header-args+: :tangle (package-no! magit forge)
+   :END:
    Open files in a repository in their configured remote (github/gitlab/etc.).
 
    #+begin_src emacs-lisp
@@ -15578,6 +15581,7 @@
         "TAB"   'magit-section-toggle
         "M-RET" 'magit-visit-thing
 
+        [remap xopen-url+] 'magit-browse-thing
         [remap revert-buffer] 'magit-refresh)
        ;; Use M-RET to visit files in another window.
        (:keymaps '(magit-file-section-map
@@ -15690,17 +15694,6 @@
        (transient-suffix-put 'magit-revert   "V" :key "O") ;; magit-sequencer-continue
        (transient-suffix-put 'magit-tag      "k" :key "x") ;; magit-tag-delete
 
-       (with-eval-after-load 'forge
-         ;; When `forge' is loaded, it maps `forge-dispatch' to ' key which is
-         ;; set for `magit-submodule', wiping it so we add it back after `forge'
-         ;; loads.
-         (transient-append-suffix 'magit-dispatch "M"
-           '("'" "Submodule" magit-submodule))
-         ;; Clear `forge' key and re-add back in as "@".
-         (transient-remove-suffix 'magit-dispatch 'forge-dispatch)
-         (transient-append-suffix 'magit-dispatch "!"
-           '("@" "Forge" forge-dispatch)))
-
        :general
        (:keymaps 'magit-mode-map
         :states '(motion visual)
@@ -15745,7 +15738,6 @@
         "'"     'magit-submodule
         "\""    'magit-subtree
         "="     'magit-diff-less-context
-        "@"     'forge-dispatch
         "j"     'evil-next-line
         "k"     'evil-previous-line
         "gg"    'evil-goto-first-line
@@ -15836,7 +15828,8 @@
                    magit-status-mode-map
                    magit-log-read-revs-map
                    magit-process-mode-map
-                   magit-refs-mode-map)
+                   magit-refs-mode-map
+                   forge-pullreq-list-mode-map)
         leader-key nil                                                               ; GIVE ME BACK MY LEADER!!!
         "<override-state>" 'all)
        (:keymaps '(git-rebase-mode-map
@@ -15932,18 +15925,49 @@
     #+END_SRC
 
 *** git-forge
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! magit forge)
+    :END:
     Interact with forges such as GitHub/gitlab from the comfort of magit.
 
     #+BEGIN_SRC emacs-lisp
       (use-package forge
         :straight t
-        :after magit
+        :leader ("go" 'forge-browse-dwim)
         :custom
         (forge-database-file (state! "forge.db"))
+
+        :init
+        ;; (with-eval-after-load 'magit
+        ;;   (require 'forge))
+
+        :config
+        ;; When `forge' is loaded, it maps `forge-dispatch' to ' key which is
+        ;; set for `magit-submodule', wiping it so we add it back after `forge'
+        ;; loads.
+        (transient-append-suffix 'magit-dispatch "M"
+          '("'" "Submodule" magit-submodule))
+
+        ;; Clear `forge' key and re-add back in as "@".
+        (transient-remove-suffix 'magit-dispatch 'forge-dispatch)
+        (transient-append-suffix 'magit-dispatch "!"
+          '("@" "Forge" forge-dispatch))
+
         :general
         (:keymaps 'forge-issue-list-mode-map
          :states 'motion
-         "RET" "<return>"))
+         "RET" "<return>")
+        (:keymaps 'magit-mode-map
+         :states '(motion visual)
+         "@" 'forge-dispatch)
+        (:keymaps 'forge-pullreq-list-mode
+         "<override-state>" 'all)
+
+        (:keymaps 'magit-mode-map                 [remap +xopen-url] 'forge-browse-dwim)
+        (:keymaps 'forge-topic-mode-map           [remap +xopen-url] 'forge-browse-topic)
+        (:keymaps 'forge-issue-list-mode-map      [remap +xopen-url] 'forge-browse-issues)
+        (:keymaps 'forge-pullreq-list-mode-map    [remap +xopen-url] 'forge-browse-pullreqs)
+        (:keymaps 'forge-repository-list-mode-map [remap +xopen-url] 'forge-browse-repository))
     #+END_SRC
 
 *** transient
