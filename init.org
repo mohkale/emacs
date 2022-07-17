@@ -126,6 +126,7 @@
          ;; indent-guide                                                   ; Show guides for leading indents
          ;; olivetti                                                       ; A nice writing environment for emacs
          ;; pdf-tools                                                      ; Use emacs as quick and dirty pdf viewer
+         projectile                                                        ; Extended project management library for emacs
          ;; piper                                                          ; Interactive shell pipelines with emacs
          rainbow-mode                                                      ; Automatically color/highlight css color names
          skeletor                                                          ; Project skeleton generator package
@@ -349,6 +350,9 @@
 
      (defvar +completions-icon t
        "When true enable `all-the-icons' for minibuffer completion.")
+
+     (defvar +cmake-build-directory "build"
+       "Default CMake build directory location.")
    #+END_SRC
 
 ** require
@@ -4272,13 +4276,30 @@
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! evil-tty-cursor)
       (use-package evil-terminal-cursor-changer
         :straight t
-        :hook (tty-setup . evil-terminal-cursor-changer-activate)
         :custom
-        (evil-motion-state-cursor 'box) ; █
-        (evil-visual-state-cursor 'box) ; █
-        (evil-normal-state-cursor 'box) ; █
-        (evil-insert-state-cursor 'bar) ; ⎸
-        (evil-emacs-state-cursor  'box) ; █
+        (evil-motion-state-cursor   'box)  ; █
+        (evil-visual-state-cursor   'box)  ; █
+        (evil-normal-state-cursor   'box)  ; █
+        (evil-insert-state-cursor   'bar)  ; ⎸
+        (evil-emacs-state-cursor    'box)  ; █
+        (evil-operator-state-cursor 'hbar) ; _
+
+        :hook (tty-setup . evil-terminal-cursor-changer-activate+)
+        :commands (evil-terminal-cursor-changer-activate+)
+        :config
+        (advice-add #'etcc--evil-set-cursor :filter-args #'ignore)
+        (advice-add #'etcc--evil-set-cursor-color :filter-args
+                    (lambda (color &rest _)
+                      (list color)))
+
+        ;; Latest version of cursor changer no longer depends on evil, but
+        ;; this change means it cannot process evil-operator-state-cursor
+        ;; so I've reverted to the prior implementation.
+        (defun evil-terminal-cursor-changer-activate+ ()
+          (when etcc-use-blink
+            (add-hook 'blink-cursor-mode-hook #'etcc--evil-set-cursor))
+          (advice-add 'evil-set-cursor :after #'etcc--evil-set-cursor)
+          (advice-add 'evil-set-cursor-color :after #'etcc--evil-set-cursor-color))
 
         :config
         (advice-add 'etcc--make-tmux-seq :override #'identity))
@@ -6044,7 +6065,45 @@
          [remap consult-org-capture+] 'project-org-capture+))
     #+end_src
 
+*** projector
+    #+begin_src emacs-lisp
+      (use-package projector
+        :straight (projector :host github :repo "mohkale/projector"
+                             :files (:defaults "src/*.el"))
+        :hook (after-init . global-projector-hook-mode)
+        :custom
+        (projector-cmake-configure-options
+         (delq
+          nil
+          (list
+           (when (executable-find "ninja")
+             "-GNinja")
+           "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")))
+
+        :init
+        (defvaralias 'projector-cmake-build-directory '+cmake-build-directory)
+        (with-eval-after-load 'project
+          (require 'projector))
+
+        :general
+        ([remap project-compile] 'projector-build-project)
+
+        :leader
+        (:prefix "p"
+         "C" 'projector-configure-project
+         "t" 'projector-test-project
+         "p" 'projector-run-project
+
+         "RET" 'projector-project-command
+         "DEL" 'projector-reset-project-cache
+         ))
+    #+end_src
+
 ** projectile
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! projectile)
+   :END:
+
    Project management in style.
 
    #+BEGIN_SRC emacs-lisp
@@ -6141,28 +6200,31 @@
         [remap project-switch-to-buffer] 'projectile-switch-to-buffer
         [remap project-dired] 'projectile-dired
         [remap project-find-file] 'projectile-find-file
-        [remap project-compile] 'projectile-compile-project
         [remap project-kill-buffers] 'projectile-kill-buffers
-        [remap project-query-replace-regexp] 'projectile-replace-regexp)
+        [remap project-query-replace-regexp] 'projectile-replace-regexp
+
+        [remap projector-configure-project] 'projectile-configure-project
+        [remap projector-build-project] 'projectile-compile-project
+        [remap projector-test-project] 'projectile-test-project
+        [remap projector-run-project] 'projectile-run-project
+        [remap projector-package-project] 'projectile-package-project
+        [remap projector-install-project] 'projectile-install-project
+
+        [remap projector-reset-project-cache] 'projectile-invalidate-cache
+        )
 
        :leader
        (:prefix "p"
         "TAB" 'projectile-find-other-file
         "RET" 'projectile-toggle-between-implementation-and-test
-        "DEL" 'projectile-invalidate-cache
 
         "so" 'projectile-multi-occur
 
-        "t" 'projectile-test-project
-        "p" 'projectile-run-project
-        "i" 'projectile-install-project
-
-        "d" 'projectile-find-dir
+        ;; "d" 'projectile-find-dir
         "r" 'projectile-recentf
         "F" 'projectile-find-file-in-known-projects                                  ; find-file across all known projects.
         "m" 'projectile-ibuffer                                                      ; Open an ibuffer session with all open project buffers.
 
-        "o" 'projectile-org-project-file+
         "[" 'projectile-previous-project-buffer
         "]" 'projectile-next-project-buffer
         "v" (if (package! vterm)
@@ -6172,7 +6234,8 @@
         "g" '(:ignore t :wk "tags")
         "gr" 'projectile-regenerate-tags
         "gg" 'projectile-find-tag
-        "st" 'projectile-find-tag))
+        "st" 'projectile-find-tag
+        ))
    #+END_SRC
 
 *** project-types
@@ -8229,12 +8292,9 @@
         :hook (dired-mode . all-the-icons-dired-mode)
         :custom
         (all-the-icons-dired-monochrome nil)
-        :config
-        (push '(dired-aux dired-upcase all-the-icons-dired--refresh-advice) all-the-icons-dired-advice-alist)
-        (push '(dired-aux dired-downcase all-the-icons-dired--refresh-advice) all-the-icons-dired-advice-alist)
 
         :init
-        (advice-add 'all-the-icons-dired--refresh :around #'all-the-icons-pad-families-on-tty-advice+))
+        (advice-add 'all-the-icons-dired--icon :around #'all-the-icons-pad-families-on-tty-advice+))
     #+END_SRC
 
 *** dired-omit
@@ -12575,7 +12635,11 @@
 
 *** consult
     #+BEGIN_SRC emacs-lisp
-      (defvar consult-manual-preview-key (list [27 105] (kbd "M-i"))
+      (defvar consult-manual-preview-key
+        (list [3 C-i]               ; C-c C-i
+              [27 105]              ; M-i (variant)
+              (kbd "M-i")
+              )
         "Manual key to trigger `consult--read' previews.")
 
       (use-package consult
@@ -13142,7 +13206,7 @@
          "Jump to an evil-mode jump.
        When ARG is given only jump to marks in the current buffer."
          (interactive "P")
-         (let* ((open (consult--temporary-files))
+         (let* ((open (consult--previewed-files))
                 (cands (consult--with-increased-gc
                         (mapcar (apply-partially #'consult--evil-jumps-format+ open)
                                 (consult--evil-jumps-candidates+ arg)))))
@@ -13727,6 +13791,7 @@
                           (list "--style" (format "{IndentWidth: %d}" indent))))
           (cmake-format "cmake-format" "-")
           (crystal-tool "crystal" "tool" "format" "-")
+          (dotnet "dotnet" "format")
           (gawk "gawk" "-f" "-" "--pretty-print=-")
           (gofmt "gofmt")
           (goimports "goimports")
@@ -13808,6 +13873,7 @@
            (haskell-cabal-mode . cabal-fmt)
            (cmake-mode . cmake-format)
            (crystal-mode . crystal-tool)
+           (csharp-mode . dotnet)
            (css-mode . prettier)
            (elixir-mode . mix-format)
            (go-mode . goimports)
@@ -13948,6 +14014,8 @@
        :leader ("cm" 'compile-multi)
        :custom
        (compile-multi-default-directory #'project-current-root+)
+       (compile-multi-cmake-command
+        (concat "cmake --build " (shell-quote-argument +cmake-build-directory)))
 
        :config
        (defun byte-compile-this-file+ ()
@@ -17842,14 +17910,74 @@
    #+end_src
 
 *** docker-transient
-    #+begin_src emacs-lisp :tangle no
+    #+begin_src emacs-lisp
       (use-package docker
         :straight t
+        :custom
+        (docker-show-messages nil)
+
+        :preface
+        (defvar docker-initial-evil-state+ 'motion)
+
+        :init
+        (evil-set-initial-state 'docker-container-mode docker-initial-evil-state+)
+        (evil-set-initial-state 'docker-image-mode docker-initial-evil-state+)
+        (evil-set-initial-state 'docker-network-mode docker-initial-evil-state+)
+        (evil-set-initial-state 'docker-volume-mode docker-initial-evil-state+)
+
         :leader
-        (:prefix "pqd"
-         "" '(:ignore t :wk "docker")
-         "d" 'docker
-         "c" 'docker-compose))
+        ("pd" 'docker
+         "pD" 'docker-compose)
+
+        :general
+        (:keymaps 'docker-container-mode-map
+         :states docker-initial-evil-state+
+         "l"  'docker-container-ls
+         "?"  'docker-container-help
+         "C"  'docker-container-cp
+         "D"  'docker-container-rm
+         "I"  'docker-container-inspect
+         "K"  'docker-container-kill
+         "L"  'docker-container-logs
+         "O"  'docker-container-stop
+         "P"  'docker-container-pause
+         "R"  'docker-container-restart
+         "S"  'docker-container-start
+         "a"  'docker-container-attach
+         "b"  'docker-container-shells
+         "d"  'docker-container-diff
+         "f"  'docker-container-open
+         "r"  'docker-container-rename-selection)
+
+        (:keymaps 'docker-image-mode-map
+         :states docker-initial-evil-state+
+         "l"  'docker-image-ls
+         "?"  'docker-image-help
+         "D"  'docker-image-rm
+         "F"  'docker-image-pull
+         "I"  'docker-image-inspect
+         "P"  'docker-image-push
+         "R"  'docker-image-run
+         "T"  'docker-image-tag-selection
+         "d"  'docker-image-mark-dangling)
+
+        (:keymaps 'docker-network-mode-map
+         :states docker-initial-evil-state+
+         "l"  'docker-network-ls
+         "?"  'docker-network-help
+         "D"  'docker-network-rm
+         "I"  'docker-network-inspect
+         "d"  'docker-network-mark-dangling)
+
+        (:keymaps 'docker-volume-mode-map
+         :states docker-initial-evil-state+
+         "l"  'docker-volume-ls
+         "?"  'docker-volume-help
+         "D"  'docker-volume-rm
+         "I"  'docker-volume-inspect
+         "d"  'docker-volume-mark-dangling
+         "f"  'docker-volume-dired-selection)
+        )
     #+end_src
 
 *** docker-tramp
@@ -19512,6 +19640,12 @@
          'company-meghanada)
      #+end_src
 
+** groovy
+   #+begin_src emacs-lisp
+     (use-package groovy-mode
+       :straight t)
+   #+end_src
+
 ** javascript
    :PROPERTIES:
    :header-args+: :tangle (package-yes! javascript)
@@ -19749,7 +19883,12 @@
        :lazy-leader
        (:mode '(less-css-mode css-mode)
         "?" 'css-lookup-symbol
-        "b" 'web-beautify-css))
+        "b" 'web-beautify-css)
+
+       :config
+       (modify-syntax! '((?_ . "w")
+                         (?- . "w"))
+         css-mode-syntax-table))
    #+END_SRC
 
 *** company-css                                                        :comp:
@@ -20901,6 +21040,18 @@
        (setq org-read-date-minibuffer-local-map (make-sparse-keymap))
        (set-keymap-parent org-read-date-minibuffer-local-map minibuffer-local-map)
 
+       :config
+       (advice-add #'org-pandoc-startup-check :around
+                   (defun org-pandoc-ignore-command-not-installed-warning+ (func &rest args)
+                     (cl-letf (((symbol-function 'true-display-warning)
+                                (symbol-function 'display-warning))
+                               ((symbol-function 'display-warning)
+                                (lambda (type message &rest args)
+                                  (unless (and (eq type 'ox-pandoc)
+                                               (string-equal message "Pandoc command is not installed."))
+                                    (apply 'true-display-warning type message args)))))
+                       (apply func args))))
+
        ;;             _ _       _     _           _ _
        ;;   _____   _(_) |     | |__ (_)_ __   __| (_)_ __   __ _ ___
        ;;  / _ \ \ / / | |_____| '_ \| | '_ \ / _` | | '_ \ / _` / __|
@@ -21929,9 +22080,6 @@
 
       (use-package orglink
         :straight t
-        :after org
-        :demand t
-
         :diminish orglink-mode
 
         :custom
@@ -21939,8 +22087,9 @@
          '(hledger-mode text-mode prog-mode conf-mode))
         (orglink-match-anywhere t)
 
-        :config
-        (global-orglink-mode +1)
+        :init
+        (with-eval-after-load 'org
+          (global-orglink-mode +1))
 
         :config
         ;; Enable in all the existing buffers it should be enabled in.
@@ -21950,11 +22099,15 @@
                        (not (derived-mode-p 'org-mode)))
               (turn-on-orglink-mode-if-desired))))
 
-        :config
+        :preface
         (defun orglink-enable-only-in-comments+ ()
           (setq-local orglink-match-anywhere nil))
 
-        (add-hook 'sh-mode-hook 'orglink-enable-only-in-comments+))
+        :hook
+        (((sh-mode
+           python-mode
+           dockerfile-mode) .
+          orglink-enable-only-in-comments+)))
     #+END_SRC
 
 **** pdftools
@@ -22357,9 +22510,9 @@
          (org-roam-prefer-id-links t)
          (org-roam-completion-system 'default)
          (org-id-link-to-org-use-id 'use-existing)
-         (org-roam-db-location (state! "org-roam.db"))
 
          :config
+         (setq org-roam-db-location (join-path org-roam-directory "org-roam.db"))
          (org-roam-db-autosync-mode +1)
 
          (require 'org-roam-protocol)
@@ -23822,4 +23975,4 @@
 #  LocalWords:  NyaaLiveActionAll NyaaLiveAction NyaaAnimeAll NyaaAnime CppReference
 #  LocalWords:  microsoft github godoc SchoolsColors StackOverflow GoogleMaps cmake
 #  LocalWords:  GoogleImages separedit csharp impl gopls analyzer plsense glsl mml
-#  LocalWords:  languageserver roslyn recentf verilog toc cpp vundo
+#  LocalWords:  languageserver roslyn recentf verilog toc cpp vundo javascript
