@@ -932,9 +932,10 @@
      (advice-add #'straight--versions-dir  :around #'straight-override-version-path)
      (advice-add #'straight--versions-file :around #'straight-override-version-path)
 
+     (defvar straight-repository-branch "develop")
+
      (let ((bootstrap-file (join-path straight-install-dir "straight/repos/straight.el/bootstrap.el"))
            (bootstrap-version 5))
-       bootstrap-version
        (unless (file-exists-p bootstrap-file)
          (message "Installing the straight package manager")
          (with-current-buffer
@@ -1004,6 +1005,7 @@
              remote-file-name-inhibit-locks t
              read-file-name-completion-ignore-case t
              read-buffer-completion-ignore-case t
+             require-final-newline t                                                ; Always include a final newline in each file when saving.
              completions-detailed t                                                 ; show annotations for certain completion candidates
              Man-notify-method 'pushy                                               ; Open manual buffer in the current window
              inhibit-startup-echo-area-message t                                    ; Don't tell me I'm in GNU emacs... I think I'll know
@@ -10385,6 +10387,13 @@
         "The version control status for the current buffer.
       Adapted from `mood-line'.")
 
+      (defvar +mode-line-vc-branch-max-length 12
+        "Truncate the branch-name when it's larger than this many characters.
+      Set to nil to disable buffer-name truncation.")
+
+      (defvar +mode-line-vc-branch-ellipses "..."
+        "Suffix to be attached to truncated buffer names.")
+
       (defun +mode-line--update-vc-status ()
         (setq +mode-line-vc-text
               (when (and vc-mode buffer-file-name)
@@ -10404,10 +10413,13 @@
                     ;; Hide when there's nothing out of the ordinary to show.
                     (when icon
                       (apply #'propertize
-                             (concat (when icon
-                                       (apply #'propertize (concat icon " ")
-                                              (text-properties-at 0 vc-mode)))
-                                     (substring vc-mode (+ (if (eq backend 'Hg) 2 3) 2)))
+                             (concat (apply #'propertize (concat icon " ")
+                                            (text-properties-at 0 vc-mode))
+                                     (s-truncate +mode-line-vc-branch-max-length
+                                                 (substring
+                                                  vc-mode
+                                                  (+ (if (eq backend 'Hg) 2 3) 2))
+                                                 +mode-line-vc-branch-ellipses))
                              `(,@(when face (list 'face face))
                                mouse-face mode-line-highlight))))))))
 
@@ -12480,11 +12492,15 @@
                         (when (bound-and-true-p selectrum-mode)
                           (selectrum-exhibit)))))
 
+        :config
         (setq marginalia-command-categories
               (append '((projectile-find-file . project-file)
                         (projectile-find-dir . project-file)
-                        (projectile-switch-project . file))
-                      marginalia-command-categories)))
+                        (projectile-switch-project . project))
+                      marginalia-command-categories))
+        (push '(project marginalia-annotate-file builtin none)
+              marginalia-annotator-registry)
+        )
     #+END_SRC
 
 *** embark
@@ -12562,6 +12578,10 @@
             (embark-magit-status+ (find-library-name lib)))
 
           (general-define-key :keymaps 'embark-library-map "g" #'embark-magit-library-status+))
+
+        :config
+        (push '(project embark-file-map)
+              embark-keymap-alist)
 
         :general
         (:keymaps 'embark-file-map
@@ -12788,6 +12808,16 @@
           tree-sitter-imenu-mode)
          . consult-imenu-setup-lsp+)
 
+        :init
+        ;; Fix consult cookie suffixes with some commands make $ (EOL) matching fail.
+        (defun consult-fix-dollar+ (args)
+          (if (string-suffix-p "$" (car args))
+              (list (concat (substring (car args) 0 -1)
+                            (rx (zero-or-more (any "\x100000-\x10FFFD")) eol)))
+            args))
+        (advice-add #'orderless-regexp :filter-args #'consult-fix-dollar+)
+        (advice-add #'prescient-regexp-regexp :filter-args #'consult-fix-dollar+)
+
         :config
         (defun consult-ripgrep-prefix-ignore-exit+ (func &rest args)
           (let ((consult-ripgrep-args
@@ -12798,40 +12828,11 @@
         (advice-add 'consult-ripgrep :around #'consult-ripgrep-prefix-ignore-exit+)
 
         :config
-        (evil-set-command-property 'consult-outline :jump t)
-        (evil-set-command-property 'consult-mark :jump t)
-        (evil-set-command-property 'consult-line :jump t)
-        (evil-set-command-property 'consult-line-symbol-at-point :jump t)
-        (evil-set-command-property 'consult-line-from-isearch :jump t)
-        (evil-set-command-property 'consult-flymake :jump t)
-
-        (consult-customize
-         consult-ripgrep org-roam-rg
-         consult-ripgrep-no-project+
-         consult-grep-no-project+
-         xref-find-references
-         consult-recent-file
-         consult--source-recent-file
-         +dot-goto-fsmap
-         :preview-key consult-manual-preview-key
-         consult-recent-file
-         :sort nil
-         ;; Async commands that produce a lot of output so it's useful for them to be async
-         ;; but once produced you won't be re-running the command again.
-         consult-find
-         consult-find-no-project+
-         +dot-goto-executable
-         +dot-goto-fsmap
-         +dot-open-bookmark
-         :initial (concat "/*/")
-         switch-to-scratch-buffer
-         :state #'consult--buffer-state)
-
         (defvar consult-font-lock-exclude+ nil
           "The equivalent of `swiper-font-lock-exclude'")
 
-        (advice-add 'consult--line-candidates :around
-                    (defun consult--line-candidate-setup (func &rest args)
+        (advice-add #'consult--line-candidates :around
+                    (defun consult--line-candidate-setup+ (func &rest args)
                       (let ((inhibit-field-text-motion t))
                         (apply func args))))
 
@@ -12843,6 +12844,7 @@
                                   (memq major-mode consult-font-lock-exclude+))
                         (apply func args))))
 
+        :config
         (defmacro with-consult-ignore-project+ (func)
           `(defun ,(intern (concat (symbol-name func) "-no-project+")) ()
              ,(format "Variant of `%s' which skips project checks." func)
@@ -12874,7 +12876,7 @@
                             (evil-ex-search-activate-highlight evil-ex-search-pattern))))))
 
         :config
-        (defvar consult--source-dired
+        (defvar consult--source-dired+
           `(:name     "Dired"
             :narrow   ?d
             :hidden   t
@@ -12888,17 +12890,89 @@
                                       :as #'buffer-name)))
           "Dired buffer candidate source for `consult-buffer'.")
 
-        (push #'consult--source-dired consult-buffer-sources)
+        (push #'consult--source-dired+ consult-buffer-sources)
 
-        :init
-        ;; Fix cookie suffixes with some commands make $ (EOL) matching fail.
-        (defun consult-fix-dollar+ (args)
-          (if (string-suffix-p "$" (car args))
-              (list (concat (substring (car args) 0 -1)
-                            (rx (zero-or-more (any "\x100000-\x10FFFD")) eol)))
-            args))
-        (advice-add #'orderless-regexp :filter-args #'consult-fix-dollar+)
-        (advice-add #'prescient-regexp-regexp :filter-args #'consult-fix-dollar+)
+        :config
+        ;; Make `consult-project-buffer' more like [[https://github.com/Qkessler/consult-project-extra][consult-project-extra]].
+
+        (defun consult--project-files+ (project)
+          "Compute the files in PROJECT."
+          (let* ((root (project-root project))
+                 (files (project-files project))
+                 (inv-root (propertize (expand-file-name (project-root project))
+                                       'invisible t)))
+            (mapcar (lambda (f)
+                      (let ((relative-file-name (file-relative-name f root)))
+                        (concat inv-root relative-file-name)))
+                    files)))
+
+        (defvar consult--source-project-file+
+          `(:name     "Project File"
+            :narrow   (?f . "File")
+            :category project-file
+            :face     consult-file
+            :history  file-name-history
+            :state    ,#'consult--file-state
+            :action   ,#'consult--file-action
+            :enabled  ,#'project-current
+            :items
+            ,(lambda ()
+               (consult--project-files+ (project-current)))
+            :new
+            ,(plist-get consult--source-project-recent-file :new)))
+
+        (defvar consult--source-known-projects+
+          `(:name     "Known Project"
+            :narrow   (?p . "Project")
+            :category project
+            :face     consult-project-extra-projects
+            :history  file-name-history
+            :action   ,#'consult--file-action
+            :items    ,#'project-known-project-roots))
+
+        (setq consult-project-buffer-sources
+              `((:hidden nil
+                 :narrow (?b . "Buffer")
+                 ,@consult--source-project-buffer)
+                consult--source-project-file+
+                (:hidden t                                        ; Should be shown by project-file.
+                 :narrow ?r
+                 :narrow (?r . "Recent File")
+                 :name "Project Recent File"
+                 ,@consult--source-project-recent-file)
+                consult--source-known-projects+))
+
+        :config
+        (evil-set-command-property 'consult-outline :jump t)
+        (evil-set-command-property 'consult-mark :jump t)
+        (evil-set-command-property 'consult-line :jump t)
+        (evil-set-command-property 'consult-line-symbol-at-point :jump t)
+        (evil-set-command-property 'consult-line-from-isearch :jump t)
+        (evil-set-command-property 'consult-flymake :jump t)
+
+        (consult-customize
+         consult-ripgrep org-roam-rg
+         consult-ripgrep-no-project+
+         consult-grep-no-project+
+         xref-find-references
+         consult-recent-file
+         consult--source-recent-file
+         consult--source-project-file+
+         +dot-goto-fsmap
+         :preview-key consult-manual-preview-key
+         consult-recent-file
+         :sort nil
+         ;; Async commands that produce a lot of output so it's useful for them to be async
+         ;; but once produced you won't be re-running the command again.
+         consult-find
+         consult-find-no-project+
+         +dot-goto-executable
+         +dot-goto-fsmap
+         +dot-open-bookmark
+         :initial (concat "/*/")
+         switch-to-scratch-buffer
+         :state #'consult--buffer-state)
+
 
         :leader
         (:mode '(selectrum-mode
@@ -12997,7 +13071,7 @@
     #+end_src
 
 *** consult-flycheck
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! :consult flycheck)
       (use-package consult-flycheck
         :straight t
         :leader
@@ -13139,7 +13213,12 @@
         :hook (marginalia-mode . all-the-icons-completion-marginalia-setup)
 
         :init
-        (advice-add 'all-the-icons-completion-get-icon :filter-return #'all-the-icons-pad-on-tty-advice+))
+        (advice-add #'all-the-icons-completion-get-icon :before-until
+                    (lambda (cand cat)
+                      (when (eq cat 'project)
+                        (all-the-icons-completion-get-file-icon cand))))
+        (advice-add 'all-the-icons-completion-get-icon :filter-return
+                    #'all-the-icons-pad-on-tty-advice+))
     #+end_src
 
 *** consult-extensions
@@ -13206,7 +13285,7 @@
          "Jump to an evil-mode jump.
        When ARG is given only jump to marks in the current buffer."
          (interactive "P")
-         (let* ((open (consult--previewed-files))
+         (let* ((open (consult--temporary-files))
                 (cands (consult--with-increased-gc
                         (mapcar (apply-partially #'consult--evil-jumps-format+ open)
                                 (consult--evil-jumps-candidates+ arg)))))
@@ -15896,6 +15975,7 @@
       (use-package magit-todos
         :straight t
         :after magit
+        :demand t
         :lazy-leader
         (:mode 'magit-status-mode
          "T" 'magit-todos-list
@@ -15908,20 +15988,6 @@
         (:keymaps '(magit-todos-item-section-map
                     magit-todos-section-map)
          "j" nil "B" nil "b" nil))
-    #+END_SRC
-
-*** magit-gitflow
-    #+BEGIN_SRC emacs-lisp
-      (use-package magit-gitflow
-        :straight t
-        :after (magit--handle-bookmark magit)
-        :hook (magit-mode . turn-on-magit-gitflow)
-        :delight
-        (magit-gitflow-mode "GitFlow")
-
-        :general
-        (:keymaps 'magit-mode-map
-         "%" 'magit-gitflow-popup))
     #+END_SRC
 
 *** git-forge
@@ -16195,6 +16261,61 @@
                                           notmuch-open-remote-urls+))))
                (browse-url (funcall url-gen to))
              (user-error "No opener configured for mail from %s" to))))
+
+       :commands (notmuch-show-export-to-mbox+)
+       ;; git-am can read from a mbox directly instead of passing the whole mail-dir
+       ;; and getting spotty results. This is copied from [[https://notmuchmail.org/pipermail/notmuch/2016/022860.html][Tomi Ollila]].
+       :preface
+       (defvar notmuch-export-mbox-file+ "~/tmp-mbox"
+         "File where MBOX exports for notmuch-show messages should be left.")
+
+       :config
+       (defun notmuch-show-export-to-mbox+ ()
+         "When this function is executed in notmuch-show buffer all the \"open\"
+     messages will be written to the file ~/tmp-mbox (overwriting it)."
+         (interactive)
+         (let ((search-terms-list (notmuch-show-get-message-ids-for-open-messages))
+               (buffer (get-buffer-create
+                        (format
+                         "* Contents of %s *"
+                         notmuch-export-mbox-file+))))
+           (set-buffer buffer)
+           (setq buffer-read-only nil)
+           (buffer-disable-undo)
+           (save-excursion
+             (pop-to-buffer buffer))
+           (goto-char (point-max))
+           (if (> (buffer-size) 0)
+               (insert "\n\n"))
+           (insert (concat
+                    (format-time-string "%c")
+                    (format ": Writing the following messages to %s:\n "
+                            notmuch-export-mbox-file+))
+                   (mapconcat 'identity search-terms-list "\n ") "\n")
+           (with-temp-file notmuch-export-mbox-file+
+             (call-process notmuch-command nil t nil "show" "--format=mbox"
+                           (mapconcat 'identity search-terms-list " OR ")))
+           (insert (format "\nMessages in %s:\n" notmuch-export-mbox-file+))
+           (call-process "mail" nil t nil
+                         "-H" "-f" (expand-file-name notmuch-export-mbox-file+))))
+
+       :preface
+       (defvar notmuch-collapse-inline-mime-types+
+         '("text/x-diff" "text/x-patch")
+         "List of mimetypes which should automatically be collapsed when showing a message.")
+
+       :config
+       ;; Partially adapted from [[https://www.youtube.com/watch?app=desktop&v=UP2dFk5_ytY][@karthik]].
+       (advice-add #'notmuch-show-insert-bodypart :filter-args
+                   (defun notmuch-show-auto-collapse-patches (args)
+                     (cl-destructuring-bind (msg part depth &optional hide) args
+                       (list msg part depth
+                             (or hide
+                                 (when-let ((mime-type (notmuch-show-mime-type part)))
+                                   (cl-some (apply-partially #'notmuch-match-content-type
+                                                             mime-type)
+                                            notmuch-collapse-inline-mime-types+)))))))
+
        :general
        (:keymaps 'notmuch-show-mode-map
         [remap +xopen-url] 'notmuch-open-remote+)
@@ -16227,6 +16348,9 @@
        (:keymaps 'notmuch-hello-mode-map
         :states 'normal
         ;; Don't need macros in notmuch-hello mode.
+        "s" 'notmuch-search
+        "S" 'notmuch-tree
+        "t" 'notmuch-search-by-tag
         "q" 'quit-window)
 
        (:keymaps 'notmuch-show-mode-map
@@ -16282,10 +16406,11 @@
         "g?" 'notmuch-help
 
         "s" 'notmuch-tree-to-tree
+        "t" 'notmuch-search-by-tag
         "S" 'notmuch-tree-filter
+        "T" 'notmuch-tree-filter-by-tag
         "J" 'notmuch-jump-search
         "K" 'notmuch-tag-jump
-        "t" 'notmuch-tree-filter-by-tag
 
         "C" 'notmuch-mua-new-mail                                                    ; like mu4e
         "cc" 'notmuch-mua-new-mail                                                   ; like mu4e
@@ -16322,10 +16447,11 @@
         "cR" 'notmuch-search-reply-to-thread
 
         "s" 'notmuch-search
+        "t" 'notmuch-search-by-tag
         "S" 'notmuch-search-filter
+        "T" 'notmuch-search-filter-by-tag
         "J" 'notmuch-jump-search
         "K" 'notmuch-tag-jump
-        "t" 'notmuch-search-filter-by-tag
 
         "zv" 'notmuch-tree-from-search-current-query
 
@@ -16358,7 +16484,9 @@
            (define-key map "d"
              (defun notmuch-tag-set-delete+ ()
                (interactive)
-               (notmuch-tag+ '("+deleted" "-inbox" "-unread"))))
+               ;; Removes spam tag because now status has moved from spam
+               ;; to pending deletion.
+               (notmuch-tag+ '("+deleted" "-spam" "-flagged" "-inbox" "-unread"))))
 
            (define-key map "s"
              (defun notmuch-tag-set-spam+ ()
@@ -16402,11 +16530,13 @@
         "#" 'notmuch-show-print-message
         "$" 'notmuch-show-toggle-process-crypto
         "d" 'notmuch-show-resume-message
+        "e" 'notmuch-show-export-to-mbox+
         "u" 'notmuch-show-browse-urls
         "F" 'notmuch-show-forward-open-messages
         "G" 'notmuch-poll-and-refresh-this-buffer
         "z" 'notmuch-tree-from-show-current-query
         "v" 'notmuch-tree-from-show-current-query                                    ; like mu4e-conversation
+        "u" 'notmuch-unthreaded-from-show-current-query
         "r" 'notmuch-show-view-raw-message
 
         "t" '(:ignore t :wk "toggle")
@@ -16416,13 +16546,21 @@
         "t TAB" 'notmuch-show-toggle-thread-indentation)
 
        (:mode 'notmuch-tree-mode
-        "v" 'notmuch-search-from-tree-current-query)
+        "v" 'notmuch-search-from-tree-current-query
+        "u" (defun notmuch-tree-toggle-unthreaded+ ()
+              (interactive)
+              (funcall-interactively
+               (if notmuch-tree-unthreaded
+                   #'notmuch-tree-quit
+                 #'notmuch-unthreaded-from-tree-current-query))))
 
        (:mode 'notmuch-search-mode
         "v" 'notmuch-tree-from-search-current-query
+        "u" 'notmuch-unthreaded-from-search-current-query
 
         "t" '(:ignore t :wk "toggle")
-        "to" 'notmuch-search-toggle-order))
+        "to" 'notmuch-search-toggle-order)
+       )
    #+END_SRC
 
 *** gnus-alias
@@ -21258,7 +21396,8 @@
         "C-e" nil
         "M-e" nil
         "M-h" nil
-        "C-j" nil)
+        "C-j" nil
+        [remap org-insert-link-global] 'org-insert-link)
        (:keymaps 'org-mode-map
         :states 'insert
         "DEL" 'org-delete-backward-char
@@ -21555,14 +21694,14 @@
 
       ;;; org-man
         (require 'ol-man)
-        (setq org-man-command +man-command)
+        (setq org-man-command +man-command))
 
       ;;; org-notmuch
-        (when (package! notmuch)
-          (use-package ol-notmuch
-            :straight t
-            :demand t
-            :after (org notmuch))))
+      (when (package! notmuch)
+        (use-package ol-notmuch
+          :straight t
+          :demand t
+          :after (org notmuch)))
     #+END_SRC
 
 *** org-capture
