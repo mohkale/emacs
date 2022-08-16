@@ -3787,6 +3787,24 @@
 ** completion
    Assistance for various completion frameworks.
 
+   Configure a completion style which explicitly falls back to basic for remote files
+   and retains any other completion styles for other types of find-file prompts. This
+   was lifted from the [[https://github.com/minad/vertico/tree/a2e9b1b9b04c78e15cc2272a122e7005947d7308#tramp-hostname-completion][vertico]] completion guide.
+
+   #+begin_src emacs-lisp
+     (defun basic-remote-try-completion+ (string table pred point)
+       (and (vertico--remote-p string)
+            (completion-basic-try-completion string table pred point)))
+
+     (defun basic-remote-all-completions+ (string table pred point)
+       (and (vertico--remote-p string)
+            (completion-basic-all-completions string table pred point)))
+
+     (add-to-list
+      'completion-styles-alist
+      '(basic-remote+ basic-remote-try-completion+ basic-remote-all-completions+ nil))
+   #+end_src
+
 *** orderless
     A package for building nicer matching regexps for completion using space
     separated components. ATM it doesn't (and has no intentions for) ordering
@@ -3800,7 +3818,7 @@
         :custom
         (completion-styles '(orderless basic))
         (completion-category-overrides
-         '((file (styles orderless basic partial-completion))))
+         '((file (styles basic-remote+ orderless partial-completion))))
 
         :preface
         (defun orderless-double-space-escapes+ (string)
