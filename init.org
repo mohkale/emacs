@@ -12480,6 +12480,15 @@
        ("RET" 'vertico-repeat))
    #+end_src
 
+*** vertico-prescient                                                  :comp:
+    Vertico integration for Prescient, courtesy of the [[https://github.com/minad/vertico/wiki#using-prescientel][wiki]].
+
+    #+begin_src emacs-lisp :tangle (package-yes! prescient vertico)
+      (setq vertico-sort-function #'prescient-sort)
+      (advice-add #'vertico-insert :after
+                  (lambda () (prescient-remember (vertico--candidate))))
+    #+end_src
+
 ** minibuffer
    :PROPERTIES:
    :header-args+: :tangle (package-yes! :consult)
