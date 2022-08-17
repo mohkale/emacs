@@ -18172,7 +18172,48 @@
 *** docker-tramp
     #+begin_src emacs-lisp
       (use-package docker-tramp
-        :straight t)
+        :straight t
+        :config
+        (defun docker-container-mounts+ (container-id)
+          (let ((containers
+                 (with-temp-buffer
+                   (call-process "docker" nil (current-buffer) nil "inspect" container-id)
+                   (buffer-substring (point-min) (point-max)))))
+            (cl-loop for it in
+                     (alist-get
+                      'Mounts
+                      (car (json-parse-string
+                            containers :object-type 'alist :array-type 'list)))
+                     with src = nil
+                     do (setq src (alist-get 'Source it))
+                     with dest = nil
+                     do (setq dest (alist-get 'Destination it))
+                     when (and src dest)
+                       collect (cons src dest))))
+
+        (defun docker-original-default-directory+ ()
+          (when (string-prefix-p
+                 (concat "/" docker-tramp-docker-executable)
+                 default-directory)
+            (when-let* ((tramp-name (tramp-dissect-file-name default-directory))
+                        (local-name (tramp-file-name-localname tramp-name))
+                        (container-id (tramp-file-name-host tramp-name)))
+              (cl-dolist (entry (docker-container-mounts+ container-id))
+                (when (string-prefix-p (cdr entry) local-name)
+                  (cl-return
+                   (concat (car entry)
+                           (substring local-name (1+ (length (cdr entry)))))))))))
+
+        :commands (docker-find-external-directory+)
+        :config
+        (defun docker-find-external-directory+ ()
+          "`find-file' the current `docker-tramp' directory outside of docker.
+      Requires the current directory to be accessed through `docker-tramp' and
+      be mounted from an external file-system into it."
+          (interactive)
+          (if-let ((directory (docker-original-default-directory+)))
+              (find-file directory)
+            (user-error "Could not resolve external mount for %s" default-directory))))
     #+end_src
 
 ** restclient
