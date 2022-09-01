@@ -71,7 +71,7 @@
     ;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     ;; SOFTWARE.
 
-    ;;; Comentary:
+    ;;; Commentary:
 
     ;; This files contains my main emacs configuration, which has grown naturally
     ;; over the years. See [[file:init.org]] for the actual configuration.
@@ -105,7 +105,7 @@
          link-hint                                                         ; Jump to links in the current buffer through an avy interface
          ;; adaptive-wrap                                                  ; Visually wrap long lines. doesn't alter what you write.
          anzu                                                              ; Show the number of search results incrementally
-         ;; beacon                                                         ; Highlight suddens jumps (changes in point) using a beacon
+         ;; beacon                                                         ; Highlight sudden jumps (changes in point) using a beacon
          ;; auto-highlight-symbol                                          ; Automatically highlight the symbol at point
          browser-edit                                                      ; Interface emacs with [[https://www.chromium.org/][chromium]]
          company                                                           ; Dynamic completion previews through popup dialogs
@@ -114,7 +114,7 @@
          ;; deft                                                           ; Note management system based on multiple org files
          ;; ebdb                                                           ; A contact management database for emacs
          ;; ebuku                                                          ; Interface to the, ebuku, bookmark manager
-         engine-mode                                                       ; Run a search on a given search engine and view in brower
+         engine-mode                                                       ; Run a search on a given search engine and view in browser
          ;; eshell                                                         ; A nice lispy shell
          ;; expand-region                                                  ; Expand visual mode by semantic units
          eyebrowse                                                         ; Provides switchable window configurations
@@ -146,7 +146,7 @@
 
      ;;; Completion Assistants
          prescient                                                         ; Sorting/Filtering based on frequency and proximity.
-         orderless                                                         ; Blazingly fast completion regexp generator using space seperated patterns
+         orderless                                                         ; Blazingly fast completion regexp generator using space separated patterns
          ;; hotfuzz                                                        ; Approximate string matching completion style based on fuzzy finding
 
      ;;; Buffer Menus
@@ -1246,7 +1246,8 @@
           ;; terminals which don't specify any special key combinations for the
           ;; reclaimed keys :cry:.
           ;; (define-key function-key-map [C-i]  "	")
-          ;; (define-key function-key-map [C-m]  "")
+          ;; (define-key function-key-map [C-m]  "
+")
           (define-key function-key-map [C-\[] "")                             ; I don't mind this being taken
 
           ;; some extra bindings I've got in st, see term/xterm.el
@@ -1769,7 +1770,7 @@
        "M"   'window-zen-restore+
        "M-m" 'window-zen-restore+)
 
-      ;; tmux leader compatability
+      ;; tmux leader compatibility
       (general-define-key
        :states 'insert
        "C-q" (general-simulate-key "C-w" :state 'normal))
@@ -1808,7 +1809,7 @@
         "Recenter the current window after a search operation.
       This is a smart recentering command. If you're at the end of a buffer and a
       recentering to the middle ends up showing more trailing (empty) lines then
-      it recenters to avoid them. Similair logic is in place for the start of the
+      it recenters to avoid them. Similar logic is in place for the start of the
       buffer. Otherwise it recenters to the middle."
         (let ((current-line (line-number-at-pos (point)))
               (window-height-2 (/ (window-body-height) 2))
@@ -1931,7 +1932,7 @@
       ;; displayed window. You can override this in `display-buffer-alist'
       ;; by setting (body-function . nil) in the actions configuration.
       ;;
-      ;; WARN This is a finnicky solution. If you ever decide to use a
+      ;; WARN This is a finicky solution. If you ever decide to use a
       ;; different body-function or if you only want to select the window
       ;; with a specific handler instead of the global one then you'll
       ;; probably have to defer to one of the display+select actions defined
@@ -2635,7 +2636,7 @@
                  (message "buffer not modified since last save"))
            (or save-before (save-buffer))
 
-           ;; buffer-backed-up is permenently buffer-local so you have to account
+           ;; buffer-backed-up is Permenently buffer-local so you have to account
            ;; for when it's already been backed up and when you first back it up.
            (if buffer-backed-up
                (let (buffer-backed-up)
@@ -3000,7 +3001,7 @@
      (defmacro modify-syntax-hook! (mode syntax)
        "Helper for `modify-syntax!' which modifes syntax on a hook.
           Useful for certain major modes that seem to reset their syntax-tables
-          everytime their initialised."
+          every time their initialised."
        (declare (indent defun))
        (let* ((mode (eval mode))
               (mode-name (symbol-name mode)))
@@ -3290,7 +3291,7 @@
         (custom-insert-line (- (abs (or prefix 1)))))
 
       (defun evil-join-backwards (&optional prefix)
-        "same as join line, except joins line immeadiately before point"
+        "same as join line, except joins line immediately before point"
         (interactive "p")
         (let ((start nil)
               (end   nil))
@@ -4360,7 +4361,7 @@
         (evil-snipe-repeat-keys nil)                                                  ; sniping after a snipe, repeats the last snipe
         (evil-snipe-enable-incremental-highlight t)                                   ; do highlight matching snipe locations
         (evil-snipe-skip-leading-whitespace t)                                        ; whitespace at start of line is ignored
-        (evil-snipe-smart-case t)                                                     ; case sensetive until it's not, like ivy
+        (evil-snipe-smart-case t)                                                     ; case sensitive until it's not, like ivy
         (evil-snipe-tab-increment t)                                                  ; hit tab to raise amount of snipes left
         (evil-snipe-override-evil-repeat-keys nil)                                    ; don't replace ; and , with evil keys
         (evil-snipe-auto-disable-substitute nil)                                      ; keep my substitute key available
@@ -4733,7 +4734,7 @@
          "gn" 'evil-next-match
          "gp" 'evil-previous-match
 
-         ;; NOTE: These will probably always be overidden
+         ;; NOTE: These will probably always be overridden
          "gj" 'evil-next-visual-line
          "gk" 'evil-previous-visual-line
          "gq" 'quit-window
@@ -4885,7 +4886,7 @@
           (barf-if-buffer-read-only)
           (ansi-color-apply-on-region beg end)))
 
-      ;; ;; Enable terminal copy to cliboard
+      ;; ;; Enable terminal copy to clipboard
       ;; (evil-define-operator evil-copy-to-clipboard (beg end)
       ;;   "Copies selection to x-clipboard."
       ;;   :repeat      t
@@ -6166,7 +6167,7 @@
                      (symbol-function 'projectile-project-root))
                     ((symbol-function 'projectile-project-root)
                      (lambda (&rest args)
-                       ;; TODO maybe don't hardcode file name seperator.
+                       ;; TODO maybe don't hardcode file name separator.
                        (string-remove-suffix "/"
                                              (apply 'true-projectile-project-root args)))))
            (apply func args)))
@@ -6562,7 +6563,7 @@
          "Completing read and execute command from prefix-map.
 
      This command can be used as `prefix-help-command'. The optional
-     argument is ignored and only for compatability with
+     argument is ignored and only for compatibility with
      `which-key-C-h-dispatch' so this command can be bound in
      `which-key-C-h-map', too."
          (interactive)
@@ -6578,7 +6579,7 @@
        :config
        (which-key-mode 1)
 
-       ;; order of keys is case insensetive
+       ;; order of keys is case insensitive
        (setq which-key-sort-order 'which-key-key-order-alpha
              which-key-echo-keystrokes 0.02)
 
@@ -8574,7 +8575,7 @@
 
          (defun ediff--kill-ediff-temp-buffers (&rest _args)
            "kills all the spawned ediff buffers... because
-       there's way too many and their named so similairly that
+       there's way too many and their named so similarly that
        there's no point in them existing... Plus I keep ending
        up editing the wrong diffed buffer."
            (when ediff-kill-temporary-buffers-on-exit+
@@ -9938,7 +9939,7 @@
                                            completions-common-part
                                            completions-first-difference
                                            ;; For some reason `consult' async commands and some regular
-                                           ;; commnads such as `completion-in-region' don't use orderless
+                                           ;; commands such as `completion-in-region' don't use orderless
                                            ;; highlighting.
                                            selectrum-prescient-primary-highlight
                                            selectrum-prescient-secondary-highlight)
@@ -9961,7 +9962,7 @@
                  when (and current-face (member current-face minibuffer-override-faces+))
                    when seq-range
                      when (eq current-face last-face)
-                       ;; Incremenet existing sequence
+                       ;; Increment existing sequence
                        do (setcdr seq-range i)
                      else
                        ;; Finished previous sequence and started a new one
@@ -12004,7 +12005,7 @@
        ;;            vc-region-history        ; log of commits affecting region in file
        ;;            vc-register              ; add file
        ;;            vc-retrieve-tag
-       ;;            vc-revert                ; undo changes to working files... permenently
+       ;;            vc-revert                ; undo changes to working files... Permenently
        ;;            vc-revision-other-window ; view file in previous tag/commit
        ;;            vc-root-diff
        ;;            vc-switch-backend        ; not using git... for shame :P
@@ -12789,7 +12790,7 @@
                                   "Functions"
                                   "Interfaces"
                                   "Types"))
-           ;; Both c-mode and c++-mode have almost identicle imenu functions.
+           ;; Both c-mode and c++-mode have almost identical imenu functions.
            ,@(let ((conf `(:toplevel "Function"
                            :types ,(consult-imenu-gen-types+
                                     "Function" "Class"))))
@@ -13008,7 +13009,7 @@
          "aa" 'consult-minor-mode-menu
          "ee" 'consult-compile-error
          "jc" 'consult-compile-error
-         "je" 'consult-compile-error                                                  ; Overriden by flycheck/flymake
+         "je" 'consult-compile-error                                                  ; Overridden by flycheck/flymake
          "ju" 'consult-outline
          "hx" 'consult-complex-command
          "ax" 'consult-mode-command
@@ -14411,7 +14412,7 @@
                           (dashboard-insert-navigator)
                           (dashboard-insert-init-info)))))
 
-        ;; Ensure a random banner is chosen everytime we reload the dashboard and initially.
+        ;; Ensure a random banner is chosen every time we reload the dashboard and initially.
         (advice-add 'dashboard-refresh-buffer :before
                     (lambda (&rest _)
                       (dashboard-select-random-banner+)))
@@ -15640,7 +15641,7 @@
         "a"  'git-commit-insert-pseudo-header
 
         "i"  '(:ignore t :wk "insert")
-        "ia" 'git-commit-ack ;; knowledgement
+        "ia" 'git-commit-ack ;; acknowledgement
         "iS" 'git-commit-suggested
         "im" 'git-commit-modified
         "ic" 'git-commit-cc
@@ -15650,7 +15651,7 @@
         "it" 'git-commit-test)
 
        :preface
-       (defvar magit-blob-mode-map (make-sparse-keymap))                            ; Suprress creation.
+       (defvar magit-blob-mode-map (make-sparse-keymap))                            ; Suppress creation.
        :hook (magit-blob-mode . evil-motion-state)
 
        :leader
@@ -17255,7 +17256,7 @@
               (cdr val)
             ,default))
 
-       ;; Easier to use in skeleter projects.
+       ;; Easier to use in skeletor projects.
        (defalias 'skeletor-conf #'skeletor-conf+))
    #+END_SRC
 
@@ -18408,7 +18409,7 @@
          "C-M-S-L" 'paredit-forward-barf-sexp
 
          "C-S-S" 'paredit-split-sexp
-         "C-S-M-J" 'paredit-join-sexps ;; immeadiately with expression b4 point
+         "C-S-M-J" 'paredit-join-sexps ;; immediately with expression b4 point
 
          ;; splice next argument after point, deleting
          ;; arguments both before and after it
@@ -19022,7 +19023,7 @@
        (evil-set-initial-state 'sql-interactive-mode 'emacs)
 
        :lazy-leader
-       ;; see [[https://truongtx.me/2014/08/23/setup-emacs-as-an-sql-database-client][here]] for a guide on how to make quick database access easier. or if you've
+       ;; see [[https://truongtx.me/2014/08/23/setup-emacs-as-an-sql-database-client][here]] for a guide on how to make quick database access easier. Or if you've
        ;; already got an interactive session running, use sql-save-connection to append
        ;; it to a local variable from which you can just paste it in here.
        (:mode 'sql-mode
@@ -19372,7 +19373,7 @@
        (defun makefile--enable-evil-motion-state (&rest _)
          (evil-motion-state +1))
 
-       ;; tabs for indentation, spaces for allignment
+       ;; tabs for indentation, spaces for alignment
        (advice-add 'makefile-backslash-region :around
                    (defun makefile-backslash-region--no-tabs (func &rest args)
                      (let (indent-tabs-mode)
@@ -19465,7 +19466,7 @@
           (evil-declare-motion 'markdown-previous-visible-heading)
           (evil-declare-motion 'markdown-previous-link)
 
-          ;; non-repeatible
+          ;; non-repeatable
           (evil-declare-change-repeat 'markdown-cycle)
           (evil-declare-change-repeat 'markdown-shifttab))
 
@@ -20864,7 +20865,7 @@
         "-" 'bibtex-fill-entry
         "x" 'bibtex-kill-entry
         "s" 'bibtex-search-crossref
-        "j" 'bibtex-pop-next                                    ; fill out current field with similair value from next entry.
+        "j" 'bibtex-pop-next                                    ; fill out current field with similar value from next entry.
         "k" 'bibtex-pop-previous                                ; same as above but the previous entry.
         "o"   'bibtex-remove-OPT-or-ALT
         "C-o" 'bibtex-remove-OPT-or-ALT
@@ -22094,7 +22095,7 @@
       (defun org-clever-return--default-action (above interactive)
         (when (and (line-empty-p)
                    (not (zerop (column-number (point)))))
-          ;; don't leave a trailing indent on current line unecessarily
+          ;; don't leave a trailing indent on current line unnecessarily
           (delete-trailing-whitespace (line-beginning-position)
                                       (line-end-position)))
 
@@ -22106,7 +22107,7 @@
         "Smartly enter a newline in an org-mode buffer.
 
       Depending on the local state, inserts a heading, a table row an item or newline.
-      this function is functionally similair to the result of evil-org-eol-call-anon, but
+      this function is functionally similar to the result of evil-org-eol-call-anon, but
       instead of checking the line after moving to the end of it (which doesn't work for
       folded lines, such as headings), it checks before moving and then inserts the right
       items depending on how things looked where you were."
@@ -22665,7 +22666,7 @@
 
 **** orgit
      Link to magit buffers directly from org-mode.
-     Autoloads have been disabled because otherwise magit is immeadiately loaded.
+     Autoloads have been disabled because otherwise magit is immediately loaded.
 
      #+BEGIN_SRC emacs-lisp
        (use-package orgit
@@ -22757,7 +22758,7 @@
                  (t (message "No rg package found"))))
 
          :config
-         ;; Fix compatability with v1 when moving to v2... eventually this won't be
+         ;; Fix compatibility with v1 when moving to v2... eventually this won't be
          ;; needed :-).
          (setq org-id-extra-files (directory-files org-roam-directory nil "\\.org$"))
 
@@ -23080,7 +23081,7 @@
 
         :custom (cperl-lazy-help-time nil "Permanently disable non-eldoc help.")
         :config
-        ;; Eldoc intergration using `cperl-lazy-install'.
+        ;; Eldoc integration using `cperl-lazy-install'.
 
         (defun cperl-eldoc--regexp+ (word)
           "Taken directly from `cperl-describe-perl-symbol'."
@@ -23619,7 +23620,7 @@
 
        `(separator-line ((,cls (:foreground ,blue))))
 
-       ;; delimeter colors just taken from https://github.com/gastrodia/rainbow-brackets
+       ;; delimiter colors just taken from https://github.com/gastrodia/rainbow-brackets
        ;; colors 5-9 just recycle 1-4, maybe come up with more.
        `(rainbow-delimiters-depth-1-face ((,cls (:foreground ,(nth 0 rainbow-delimeters-colors)))))
        `(rainbow-delimiters-depth-2-face ((,cls (:foreground ,(nth 1 rainbow-delimeters-colors)))))
@@ -23740,7 +23741,7 @@
       ;;; avy
        `(avy-background-face ((,cls (:foreground ,grey))))
 
-       ;; Same as the corresponding evil faces but adjustedusing [[https://webaim.org/resources/contrastchecker/][contrast-checker]].
+       ;; Same as the corresponding evil faces but adjusted using [[https://webaim.org/resources/contrastchecker/][contrast-checker]].
        `(avy-lead-face   ((,cls (:background "#B00303" :foreground ,white))))
        `(avy-lead-face-0 ((,cls (:background "#124FCA" :foreground ,white))))
        `(avy-lead-face-1 ((,cls (:background ,very-light-grey :foreground ,very-dark-grey))))
@@ -23874,7 +23875,7 @@
 
       ;;; org-ref
        ;; All of these have their own distinct look and feel, but honestly
-       ;; their just links so distinguishing them is unecessary in most cases.
+       ;; their just links so distinguishing them is unnecessary in most cases.
        `(org-ref-ref-face ((,cls (:inherit org-link))))
        `(org-ref-cite-face ((,cls (:foreground ,green-int :inherit org-link))))
        `(org-ref-label-face ((,cls (:inherit org-link))))
