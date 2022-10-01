@@ -16277,8 +16277,7 @@
                        mail (url-hexify-string (notmuch-show-get-message-id t)))))))
 
        :config
-       (defun notmuch-open-remote+ ()
-         (interactive)
+       (defun notmuch-remote+ ()
          (unless (derived-mode-p 'notmuch-show-mode)
            (user-error "%s can only be called in `notmuch-show' buffers" this-command))
 
@@ -16287,8 +16286,20 @@
                               (cl-find-if (lambda (it)
                                             (string-match-p (car it) to))
                                           notmuch-open-remote-urls+))))
-               (browse-url (funcall url-gen to))
+               (funcall url-gen to)
              (user-error "No opener configured for mail from %s" to))))
+
+       (defun notmuch-show-and-copy-remote+ ()
+         (interactive)
+         (if-let ((url (notmuch-remote+)))
+             (kill-new url)
+           (user-error "Failed to resolve remote for current buffer")))
+
+       (defun notmuch-open-remote+ ()
+         (interactive)
+         (if-let ((url (notmuch-remote+)))
+             (browse-url url)
+           (user-error "Failed to resolve remote for current buffer")))
 
        :commands (notmuch-show-export-to-mbox+)
        ;; git-am can read from a mbox directly instead of passing the whole mail-dir
@@ -16346,7 +16357,8 @@
 
        :general
        (:keymaps 'notmuch-show-mode-map
-        [remap +xopen-url] 'notmuch-open-remote+)
+        [remap +xopen-url] 'notmuch-open-remote+
+        [remap show-and-copy-buffer-file-name] 'notmuch-show-and-copy-remote+)
 
        :general
        ([remap message-mail] 'notmuch)
