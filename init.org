@@ -354,6 +354,46 @@
 
      (defvar +cmake-build-directory "build"
        "Default CMake build directory location.")
+
+     (defvar +auto-complete-delay 0.4
+       "Interval before which a completion popup should show up.")
+
+     (defvar +completion-popup-kind-icons
+       '((array :text "a" :icon "code-brackets" :face font-lock-type-face)
+         (boolean :text "b" :icon "circle-half-full" :face font-lock-builtin-face)
+         (class :text "c" :icon "view-grid-plus-outline" :face font-lock-type-face)
+         (color :text "#" :icon "palette" :face aoh-blue-int)
+         (constant :text "c" :icon "lock-remove-outline" :face font-lock-constant-face)
+         ; constructor
+         (enummember :text "e" :icon "format-list-checks" :face aoh-blue-int)
+         (enum :text "e" :icon "format-list-bulleted-square" :face aoh-turquoise-int)
+         ; event
+         (field :text "f" :icon "application-braces-outline" :face aoh-blue-int)
+         (file :text "f" :icon "file-document-outline" :face aoh-very-light-grey)
+         (folder :text "d" :icon "folder" :face dired-directory)
+         (interface :text "i" :icon "application-brackets-outline" :face font-lock-type-face)
+         (keyword :text "k" :icon "key-variant" :face font-lock-keyword-face)
+         ; macro
+         (method :text "m" :icon "function-variant" :face font-lock-function-name-face)
+         (function :text "f" :icon "function" :face font-lock-function-name-face)
+         (module :text "μ" :icon "file-code-outline" :face font-lock-builtin-face)
+         (numeric :text "n" :icon "numeric" :face font-lock-builtin-face)
+         (operator :text "o" :icon "plus-minus" :face font-lock-comment-delimiter-face)
+         (param :text "p" :icon "cog" :face font-lock-builtin-face)
+         (parameter :text "p" :icon "cog" :face font-lock-builtin-face)
+         (property :text "p" :icon "application-parentheses-outline" :face aoh-blue-int)
+         ; reference
+         (ruler :text "r" :face shadow)
+         (snippet :text "S" :icon "note-text-outline" :face font-lock-string-face)
+         (string :text "s" :icon "sticker-text-outline" :face font-lock-string-face)
+         (struct :text "%" :icon "code-braces" :face aoh-orange)
+         (text :text "w" :icon "script-text-outline" :face shadow)
+         ; typeparameter
+         ; unit
+         (value :text "v" :icon "plus-circle-outline" :face font-lock-builtin-face)
+         (variable :text "v" :icon "variable" :face font-lock-variable-name-face)
+         (t :text "•" :icon "crosshairs-question" :face shadow))
+       "Icon associations for completion-kinds in completion popups.")
    #+END_SRC
 
 ** require
@@ -4981,7 +5021,7 @@
        ;; show the completion tooltip without any delay.
        (company-tooltip-idle-delay nil
         "Show the completion tooltip without any delay.")
-       (company-idle-delay 0.4)
+       (company-idle-delay +auto-complete-delay)
        (company-selection-wrap-around t)
        (company-minimum-prefix-length 2)
        (company-statistics-file (state! "company/statistics.el"))
@@ -4992,33 +5032,15 @@
        (company-format-margin-function #'company-text-icons-margin)
        (company-text-icons-add-background t)
        (company-text-icons-mapping
-        '((array "a" font-lock-type-face)
-          (boolean "b" font-lock-builtin-face)
-          (class "c" font-lock-type-face)
-          (color "#" aoh-blue-int)
-          (constant "c" font-lock-constant-face)
-          (enum-member "e" aoh-blue-int)
-          (enum "e" aoh-turquoise-int)
-          (field "f" aoh-blue-int)
-          (file "f" aoh-very-light-grey)
-          (folder "d" dired-directory)
-          (interface "i" font-lock-type-face)
-          (keyword "k" font-lock-keyword-face)
-          (method "m" font-lock-function-name-face)
-          (function "f" font-lock-function-name-face)
-          (module "μ" font-lock-builtin-face)
-          (numeric "n" font-lock-builtin-face)
-          (operator "o" font-lock-comment-delimiter-face)
-          (parameter "p" font-lock-builtin-face)
-          (property "p" aoh-blue-int)
-          (ruler "r" shadow)
-          (snippet "S" font-lock-string-face)
-          (string "s" font-lock-string-face)
-          (struct "%" aoh-orange)
-          (text "w" shadow)
-          (value "v" font-lock-builtin-face)
-          (variable "v" font-lock-variable-name-face)
-          (t "•" shadow)))
+        (eval-when-compile
+          (cl-loop
+           for (kind . plist) in +completion-popup-kind-icons
+           with text = nil do (setq text (plist-get plist :text))
+           with face = nil do (setq face (plist-get plist :face))
+           when text
+             collect `(,kind
+                       ,text
+                       ,(or face 'shadow)))))
 
        :init
        ;; Don't let display steal focus
