@@ -109,6 +109,7 @@
          ;; auto-highlight-symbol                                          ; Automatically highlight the symbol at point
          browser-edit                                                      ; Interface emacs with [[https://www.chromium.org/][chromium]]
          company                                                           ; Dynamic completion previews through popup dialogs
+         ;; corfu                                                          ; Company alternative aiming to be a little more generic
          ;; command-log-mode                                               ; Echo commands as you enter them
          dashboard                                                         ; A feature full emacs dashboard
          ;; deft                                                           ; Note management system based on multiple org files
@@ -5227,6 +5228,106 @@
         :after prescient
         :hook (company-mode . company-prescient-mode))
     #+END_SRC
+
+** corfu
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! corfu)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package corfu
+       :straight (corfu :files (:defaults
+                                "extensions/corfu-info.el"
+                                "extensions/corfu-echo.el"
+                                "extensions/corfu-quick.el"
+                                "extensions/corfu-history.el"))
+       :hook ((corfu-mode . corfu-echo-mode)
+              (corfu-mode . corfu-history-mode))
+       :custom
+       (corfu-cycle t "Cycle back to first completion from last.")
+       (corfu-auto t "Show completion popup after delay.")
+       (corfu-auto-delay +auto-complete-delay)
+
+       :config
+       (global-corfu-mode +1)
+
+       :config
+       ;; TODO: Support, maybe by advising corfu--format-candidates.
+       (defface corfu-completions-common-part+
+         `((t (:inherit completions-common-part)))
+         ""
+         :group 'corfu-faces)
+
+       :init
+       (with-eval-after-load 'savehist
+         (add-to-list 'savehist-additional-variables 'corfu-history))
+
+       :general
+       (:keymaps 'corfu-map
+        "<override-state>" 'all
+        "C-j" 'next-line
+        "C-k" 'previous-line
+        "C-d" 'scroll-down-command
+        "C-u" 'scroll-up-command
+        "C-:" 'completion-at-point
+        "C-h" 'corfu-info-documentation
+        "C-p" 'corfu-info-location
+        [tab] 'corfu-insert
+        "TAB" 'corfu-insert
+        "RET" 'corfu-complete
+        [C-i] 'corfu-complete
+        "C-o" 'corfu-first
+        "M-o" 'corfu-last
+        "C-/" 'corfu-quick-complete
+        "M-/" 'corfu-quick-insert))
+   #+end_src
+
+*** corfu-terminal
+    #+begin_src emacs-lisp
+      (use-package popon
+        :straight
+        (popon
+         :type git
+         :repo "https://codeberg.org/akib/emacs-popon.git"))
+
+      (use-package corfu-terminal
+        :straight
+        (corfu-terminal
+         :type git
+         :repo "https://codeberg.org/akib/emacs-corfu-terminal.git")
+        :hook (corfu-mode . corfu-terminal-mode))
+
+      (use-package corfu-doc-terminal
+        :straight (corfu-doc-terminal
+                   :type git
+                   :repo "https://codeberg.org/akib/emacs-corfu-doc-terminal.git")
+        :after 'corfu-terminal)
+    #+end_src
+
+*** kind-icon
+    #+begin_src emacs-lisp
+      (use-package kind-icon
+        :straight t
+        :custom
+        (kind-default-face 'corfu-default)
+        (kind-icon-blend-background t)
+        (kind-icon-mapping
+         (eval-when-compile
+           (cl-loop
+            for (kind . plist) in +completion-popup-kind-icons
+            with text = nil do (setq text (plist-get plist :text))
+            with icon = nil do (setq icon (plist-get plist :icon))
+            with face = nil do (setq face (plist-get plist :face))
+            collect `(,kind
+                      ,@(when text (list text))
+                      ,@(when icon (list :icon icon))
+                      ,@(when face (list :face face))))))
+
+        :after corfu
+        :commands kind-icon-margin-formatter
+        :init
+        (add-to-list 'corfu-margin-formatters #'kind-icon-margin-formatter))
+    #+end_src
 
 ** all-the-icons
    provides some fonts for rendering graphical icons within emacs; alongside a set
@@ -16314,7 +16415,9 @@
        (defun notmuch-show-and-copy-remote+ ()
          (interactive)
          (if-let ((url (notmuch-remote+)))
-             (kill-new url)
+             (progn
+               (kill-new url)
+               (message "%s" url))
            (user-error "Failed to resolve remote for current buffer")))
 
        (defun notmuch-open-remote+ ()
@@ -16564,6 +16667,11 @@
              (defun notmuch-tag-remove-from-inbox+ ()
                (interactive)
                (notmuch-tag+ '("-inbox" "-unread"))))
+
+           (define-key map "r"
+             (defun notmuch-tag-read+ ()
+               (interactive)
+               (notmuch-tag+ '("-unread"))))
 
            map)
          "Keymap containing commands to act upon emails.")
@@ -23797,13 +23905,14 @@
        `(frog-menu-border ((,cls (:background ,white :foreground ,white))))
        `(frog-menu-posframe-background-face ((,cls (:background ,very-dark-grey))))
 
-      ;;; company - intellisense
+      ;;; company, corfu - intellisense
        `(company-tooltip-mouse ((,cls (:foreground ,turquoise-int))))
        `(company-template-field ((,cls (:foreground ,turquoise-int))))
 
        ;; scrollbar
        `(company-tooltip-scrollbar-track ((,cls (:background ,line-highlight-bg :foreground ,very-light-grey))))
        `(company-tooltip-scrollbar-thumb ((,cls (:background ,red               :foreground ,dark-grey))))
+       `(corfu-bar                       ((,cls (:background ,red               :foreground ,dark-grey))))
 
        `(company-preview ((,cls (:foreground ,blue-int :weight bold :inherit hl-line))))
        `(company-preview-common ((,cls (:inherit company-preview))))
@@ -23811,11 +23920,14 @@
 
        ;; NOTE tooltip is the drop down menu which shows up when multiple results exist
        `(company-tooltip ((,cls (:background ,black-dim :inherit tooltip))))
+       `(corfu-default ((,cls (:background ,black-dim :inherit tooltip))))
+       `(corfu-completions-common-part+ ((,cls (:foreground ,red :inherit (company-tooltip bold)))))
        `(company-tooltip-common ((,cls (:foreground ,red :inherit (company-tooltip bold)))))
        `(company-tooltip-search ((,cls (:foreground ,blue-int :inherit company-tooltip))))
        `(company-tooltip-search-common ((,cls (:inherit company-tooltip-search))))
 
        `(company-tooltip-selection ((,cls (:background ,dark-grey :inherit company-tooltip))))
+       `(corfu-current ((,cls (:background ,dark-grey :inherit corfu-default))))
        `(company-tooltip-common-selection ((,cls (:background ,dark-grey :inherit company-tooltip-common))))
        `(company-tooltip-search-selection ((,cls (:background ,dark-grey :inherit (company-tooltip-search)))))
 
@@ -23825,6 +23937,7 @@
        ;; NOTE annotations are extra information in the tooltip
        `(company-tooltip-annotation ((,cls (:weight bold :foreground ,grey))))
        `(company-tooltip-annotation-selection ((,cls (:inherit company-tooltip-annotation))))
+       `(corfu-annotations ((,cls (:weight bold :foreground ,grey))))
 
        `(popup ((,cls (:inherit popup-face))))
 
@@ -24248,5 +24361,5 @@
 #  LocalWords:  NyaaLiveActionAll NyaaLiveAction NyaaAnimeAll NyaaAnime CppReference
 #  LocalWords:  microsoft github godoc SchoolsColors StackOverflow GoogleMaps cmake
 #  LocalWords:  GoogleImages separedit csharp impl gopls analyzer plsense glsl mml
-#  LocalWords:  languageserver roslyn recentf verilog toc cpp vundo javascript
+#  LocalWords:  languageserver roslyn recentf verilog toc cpp vundo javascript corfu
 #  LocalWords:  crontab
