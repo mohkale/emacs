@@ -2603,9 +2603,13 @@
 
              (kill-buffer buffer)))))
 
-     (defun smart-buffer-file-name (&optional buffer)
+     (defun smart-buffer-file-name (&optional buffer strip-remote)
        (with-current-buffer (or buffer (current-buffer))
-         (or (buffer-file-name)
+         (or (when-let ((bfn (buffer-file-name)))
+               (if-let ((strip-remote strip-remote)
+                        (remote (file-remote-p bfn)))
+                   (string-remove-prefix remote bfn)
+                 bfn))
              (and (derived-mode-p 'dired-mode)
                   (string-trim-right (dired-current-directory) "/"))
              (and (boundp 'org-capture-mode)
@@ -2615,48 +2619,46 @@
              (and (derived-mode-p 'notmuch-show-mode)
                   (notmuch-show-get-filename)))))
 
-     (defmacro defun-show-and-copy-command (name &rest body)
-       "Define a function which uses BODY to generate a string which is then shown and copied.
-     The prefix behaviour of the passed function can be used insert the output of BODY or
-     to save the current point and then do so.
-     "
-       `(defun ,(intern (concat "show-and-copy-" (symbol-name name))) (&optional arg)
-          (interactive "P")
-          (when-let ((msg ,@body))
-            (or (stringp msg)
-                (setq msg (format "%s" msg)))                                      ; Force msg to be a string
-            ;; perform insertion behaviour
-            (when (consp arg)
-              (if (eq (car arg) 4)
-                  (insert msg)
-                (save-excursion
-                  (insert msg))))
-            ;; show and then copy msg
-            (message msg)
-            (kill-new msg))))
+     (defun show-and-copy (msg)
+       (or (stringp msg)
+           (setq msg (format "%s" msg)))                                      ; Force msg to be a string
 
-     (defun-show-and-copy-command buffer-file-basename
-       (file-name-nondirectory (or (smart-buffer-file-name) "")))
+       (when msg
+         (message msg)
+         (kill-new msg)))
 
-     (defun show-and-copy-buffer-file-name (&optional include-line)
+     (defun show-and-copy-buffer-file-basename (&optional include-linum)
        (interactive "P")
-       (when-let ((file-name (smart-buffer-file-name)))
-           (when include-line
-             ;; This variant uses the prefix-argument to include a
-             ;; line-number.
-             (setq file-name
-                   (concat file-name ":"
-                           (number-to-string
-                            (line-number-at-pos nil t)))))
+       (when-let ((file-name (smart-buffer-file-name nil t)))
+         (show-and-copy
+          (concat
+           (file-name-nondirectory file-name)
+           (when include-linum
+             (concat
+              ":"
+              (number-to-string (line-number-at-pos nil t))))))))
 
-           (message file-name)
-           (kill-new file-name)))
+     (defun show-and-copy-buffer-file-name (&optional include-linum)
+       (interactive "P")
+       (when-let ((file-name (smart-buffer-file-name nil t)))
+         (show-and-copy
+          (concat
+           file-name
+           (when include-linum
+             (concat
+              ":"
+              (number-to-string (line-number-at-pos nil t))))))))
 
-     (defun-show-and-copy-command buffer-name
-       (buffer-name))
+     (defun show-and-copy-buffer-name ()
+       (interactive)
+       (show-and-copy (buffer-name)))
 
-     (defun-show-and-copy-command directory
-       (file-name-directory (or (smart-buffer-file-name) default-directory)))
+     (defun show-and-copy-directory ()
+       (interactive)
+       (show-and-copy
+        (if-let ((file-name (smart-buffer-file-name nil t)))
+            (file-name-directory file-name)
+          default-directory)))
 
      (cl-defun write-backup (&optional prefix (silent t))
        "manually force emacs to backup the current buffer.
