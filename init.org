@@ -2559,37 +2559,6 @@
 
 ** buffers
    #+BEGIN_SRC emacs-lisp
-     (defun rename-buffer-file (buffer &optional new-name)
-       "renames the file associated with the buffer BUFFER.
-     if the buffer isn't visiting a file or the visited file
-     doesn't exist on disk, this function is equivalent to
-     simply changing the visited file name for BUFFER."
-       (interactive (list (current-buffer)))
-
-       (or new-name
-           (setq new-name (read-file-name "new-name: ")))
-
-       (let* ((buffer-file (buffer-file-name buffer))
-              (modified-p (buffer-modified-p buffer))
-              (directory (file-name-directory new-name))
-              (src-exists (file-exists-p buffer-file))
-              (dst-exists (file-exists-p new-name)))
-         (with-current-buffer buffer
-           ;; destination doesn't exist, so can write
-           ;; or
-           ;; user agrees to overwrite, so can write
-           (when (or (not dst-exists)
-                     (yes-or-no-p "file already exists, overwrite it:"))
-             ;; only rename buffer file if it exists
-             (when (and buffer-file src-exists)
-               (unless (file-directory-p directory)
-                 (mkdir directory t))
-               (rename-file buffer-file new-name t)
-               (message "moved file '%s' to '%s'" buffer-file new-name))
-
-             (set-visited-file-name new-name)
-             (set-buffer-modified-p modified-p)))))
-
      (defun delete-buffer-file ()
        (interactive)
        (let ((buffer (current-buffer))
@@ -2714,7 +2683,6 @@
        "f~" 'write-backup
        "fa" 'write-autosave
        "fD" 'delete-buffer-file
-       "fR" 'rename-buffer-file
        "by" 'show-and-copy-buffer-name
        "fy" 'show-and-copy-buffer-file-name
        "fu" 'show-and-copy-directory
