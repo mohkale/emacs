@@ -17954,10 +17954,9 @@
         )
     #+end_src
 
-*** docker-tramp
+*** tramp-container
     #+begin_src emacs-lisp
-      (use-package docker-tramp
-        :straight t
+      (use-package tramp-container
         :config
         (defun docker-container-mounts+ (container-id)
           (let ((containers
@@ -17978,7 +17977,7 @@
 
         (defun docker-original-default-directory+ ()
           (when (string-prefix-p
-                 (concat "/" docker-tramp-docker-executable)
+                 (concat "/" tramp-docker-program)
                  default-directory)
             (when-let* ((tramp-name (tramp-dissect-file-name default-directory))
                         (local-name (tramp-file-name-localname tramp-name))
@@ -17992,8 +17991,8 @@
         :commands (docker-find-external-directory+)
         :config
         (defun docker-find-external-directory+ ()
-          "`find-file' the current `docker-tramp' directory outside of docker.
-      Requires the current directory to be accessed through `docker-tramp' and
+          "`find-file' the current docker-tramp directory outside of docker.
+      Requires the current directory to be accessed through docker-tramp and
       be mounted from an external file-system into it."
           (interactive)
           (if-let ((directory (docker-original-default-directory+)))
