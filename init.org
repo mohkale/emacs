@@ -10673,7 +10673,7 @@
              C-mouse-1: Go to server errors
              mouse-1: Go to server events
              mouse-2: Quit server
-             mouse-3: Reconnect to server" nick (eglot--major-mode server)))
+             mouse-3: Reconnect to server" nick (eglot--major-modes server)))
                                            (t "EGLOT Disconnected
              mouse-1: Start server"))
                                'mouse-face 'mode-line-highlight
@@ -14790,7 +14790,8 @@
      workspace."
          (seq-find
           (lambda (server)
-            (derived-mode-p mode (eglot--major-mode server)))
+            (-first (apply-partially #'provided-mode-derived-p mode)
+                    (eglot--major-modes server)))
           (if all-workspaces
               (-flatten (hash-table-values eglot--servers-by-project))
             (gethash (or (project-current) `(transient . ,default-directory))
@@ -14852,6 +14853,7 @@
         "gd" 'eglot-find-declaration
 
         "w"  '(:ignore t :wk "workspace")
+        "ws" 'eglot-show-workspace-configuration
         "wf" 'eglot-forget-pending-continuations
         "wc" 'eglot-signal-didChangeConfiguration))
    #+END_SRC
