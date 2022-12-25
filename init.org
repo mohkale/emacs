@@ -18739,23 +18739,11 @@
    #+END_SRC
 
 ** JSON
-   :PROPERTIES:
-   :header-args+: :tangle (package-yes! json)
-   :END:
-
-   #+BEGIN_SRC emacs-lisp
-     (use-package json-mode
-       :straight t
-       :mode (rx ".json")
-       :hook (json-mode . +flylint)
-
-       :lazy-leader
-       (:mode 'json-mode
-        "p" 'json-mode-beautify
-        "x" 'json-mode-kill-path
-        "t" 'json-toggle-boolean
-        "DEL" 'json-nullify-sexp))
-   #+END_SRC
+   #+begin_src emacs-lisp
+     (use-package js
+       :mode ((rx ".json" eol) . js-json-mode)
+       :hook (js-json-mode . +flylint))
+   #+end_src
 
 *** vscode-json-languageserver                                          :lsp:
     Try [[https://www.npmjs.com/package/vscode-json-languageserver][VSCode JSON Language Server]] which has jsonschema support.
@@ -18763,13 +18751,17 @@
     #+begin_src emacs-lisp :tangle (package-yes! json :lsp)
       (push `(json-mode . :global) +lsp-maybe-connect)
       (push `(jsonc-mode . :global) +lsp-maybe-connect)
+      (push `(js-json-mode . :global) +lsp-maybe-connect)
+
       (add-hook 'json-mode-hook +lsp-command)
       (add-hook 'jsonc-mode-hook +lsp-command)
+      (add-hook 'js-json-mode-hook +lsp-command)
     #+end_src
 
     #+begin_src emacs-lisp :tangle (package-yes! json eglot)
       (with-eval-after-load 'eglot
-        (push '((json-mode jsonc-mode) . ("vscode-json-languageserver" "--stdio"))
+        (push '((json-mode jsonc-mode js-json-mode) .
+                ("vscode-json-languageserver" "--stdio"))
               eglot-server-programs))
     #+end_src
 
@@ -19694,7 +19686,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package js2-mode
         :straight t
-        :mode (rx ".js")
+        :mode (rx ".js" eol)
         :hook ((js2-mode . electric-layout-local-mode)
                (js2-mode . +flylint))
         :commands (js-jsdoc-return+)
