@@ -1500,7 +1500,8 @@
          "bH" 'htmlfontify-buffer
          "bk" 'kill-this-buffer
          "bK" 'kill-this-buffer-and-window-maybe+
-         "bM" '(switch-to-messages-buffer+ :wk "switch-to-messages"))
+         "bM" '(switch-to-messages-buffer+ :wk "switch-to-messages")
+         "bs" 'scratch-buffer)
 
        (leader-set-keys
          "c" '(:ignore t :wk "compile/comments")
@@ -2231,20 +2232,20 @@
     creating a new scratch buffer interactively.
 
     #+BEGIN_SRC emacs-lisp
-      (defconst scratch-buffer-name "*scratch*"
+      (defconst scratch-buffer-name+ "*scratch*"
         "Name of users scratch buffer")
 
-      (defun scratch-buffer-p (&optional buffer)
+      (defun scratch-buffer-p+ (&optional buffer)
         (string-match
-         (regexp-quote scratch-buffer-name)
+         (regexp-quote scratch-buffer-name+)
          (buffer-name buffer) 0))
 
-      (defun create-new-empty-buffer (&optional buffer-name)
+      (defun new-scratch-buffer+ (&optional buffer-name interactive)
         "Creates and returns a new empty scratch like buffer
       with prefix it prompts you for the name of the buffer.
       if called interactively, the new buffer is switched to."
-        (interactive "P")
-        (let* ((def-buf-name scratch-buffer-name)
+        (interactive "Pp")
+        (let* ((def-buf-name scratch-buffer-name+)
                (buffer-name
                 (cond
                  ((stringp buffer-name) buffer-name)
@@ -2253,7 +2254,11 @@
                (buffer-name (generate-new-buffer-name buffer-name))
                (buffer (get-buffer-create buffer-name)))
           (with-current-buffer buffer
-            (funcall-interactively initial-major-mode))
+            ;; Setup copied from `get-scratch-buffer-create'.
+            ;; (when initial-scratch-message
+            ;;   (insert (substitute-command-keys initial-scratch-message))
+            ;;   (set-buffer-modified-p nil))
+            (funcall initial-major-mode))
           (when (called-interactively-p 'interactive)
             (switch-to-buffer buffer))
           buffer))
@@ -2262,31 +2267,31 @@
     Now a command to list and jump to scratch buffers.
 
     #+BEGIN_SRC emacs-lisp
-      (defun scratch-buffers ()
+      (defun scratch-buffers+ ()
         (require 'persistent-scratch)                                                               ; Make sure scratches have been restored
         (sort
-         (seq-filter #'scratch-buffer-p (buffer-list))
+         (seq-filter #'scratch-buffer-p+ (buffer-list))
          (lambda (x y) (string< (buffer-name x) (buffer-name y)))))
 
-      (defun switch-to-scratch-buffer (&optional prefix)
+      (defun scratch-buffer+ (&optional prefix)
         "Switch to the scratch buffer
-      with prefix, prompts for which buffer named like the scratch
+      with PREFIX, prompts for which buffer named like the scratch
       buffer to switch to. If none exists, a new scratch buffer will
       be made. If only one exists, it will be switched to and if more
       than one exists then prompts for it."
         (interactive "P")
         (let ((buf
                (if prefix
-                   (let* ((buffer-list (scratch-buffers))
+                   (let* ((buffer-list (scratch-buffers+))
                           (buffer-names (mapcar #'buffer-name buffer-list)))
                      (cond
                       ((zerop (length buffer-list))
-                       (create-new-empty-buffer))
+                       (get-scratch-buffer-create))
                       ((eq 1 (length buffer-list))
                        (car buffer-list))
                       (t (completing-read "Switch to buffer: " buffer-names))))
-                 (or (get-buffer scratch-buffer-name)
-                     (call-interactively 'create-new-empty-buffer)))))
+                 (or (get-buffer scratch-buffer-name+)
+                     (get-scratch-buffer-create)))))
           (when (called-interactively-p 'any)
             (switch-to-buffer buf))
           buf))
@@ -2298,30 +2303,32 @@
       (use-package persistent-scratch
         :straight t
         :init
-        (defun multiscratch-scratch-buffer-p (&optional buffer)
+        (defun multiscratch-scratch-buffer-p+ (&optional buffer)
           "Persist all but the main scratch buffer."
-          (and (not (string= (buffer-name buffer) scratch-buffer-name))
-               (scratch-buffer-p buffer)))
+          (and (not (string= (buffer-name buffer) scratch-buffer-name+))
+               (scratch-buffer-p+ buffer)))
 
         (setq persistent-scratch-save-file (share! "scratch.el")
               persistent-scratch-autosave-interval 800
-              persistent-scratch-scratch-buffer-p-function #'multiscratch-scratch-buffer-p)
+              persistent-scratch-scratch-buffer-p-function #'multiscratch-scratch-buffer-p+)
 
         (let* ((loaded)
                (handle (lambda ()
                          (when (and (not loaded)
                                     (file-exists-p persistent-scratch-save-file))
-                           (persistent-scratch-restore)
+                           (save-window-excursion
+                             (persistent-scratch-restore))
                            (setq loaded t)))))
-          (add-transient-hook! #'scratch-buffers         (funcall handle))
-          (add-transient-hook! #'create-new-empty-buffer (funcall handle)))
+          (add-transient-hook! #'scratch-buffers+    (funcall handle))
+          (add-transient-hook! #'new-scratch-buffer+ (funcall handle)))
 
         :config
         (add-hook 'kill-emacs-hook #'persistent-scratch-save)
 
+        :general
+        ([remap scratch-buffer] 'scratch-buffer+)
         :leader
-        ("bs"    'switch-to-scratch-buffer
-         "b RET" 'create-new-empty-buffer))
+        ("b RET" 'new-scratch-buffer+))
     #+END_SRC
 
 *** birthday
@@ -13026,7 +13033,7 @@
          +dot-goto-fsmap
          +dot-open-bookmark
          :initial (concat "/*/")
-         switch-to-scratch-buffer
+         scratch-buffer+
          :state #'consult--buffer-state)
 
 
@@ -18013,7 +18020,7 @@
        (defun restclient ()
          "Create a new buffer in restclient mode"
          (interactive)
-         (let ((buffer (create-new-empty-buffer "*restclient*")))
+         (let ((buffer (new-scratch-buffer+ "*restclient*")))
            (with-current-buffer buffer
              (restclient-mode))
            (display-buffer buffer)))
