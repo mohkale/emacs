@@ -9430,8 +9430,8 @@
           (:description "filename"
            :reader (file-truename
                     (read-directory-name "List files from file/directory name: ")))
-          (ibuffer-awhen (or (buffer-local-value 'buffer-file-name buf)
-                             (buffer-local-value 'dired-directory buf))
+          (when-let ((it (or (buffer-local-value 'buffer-file-name buf)
+                             (buffer-local-value 'dired-directory buf))))
             ;; (message "qual: %s, it: %s" qualifier (file-truename it))
             (string-prefix-p qualifier (file-truename it))))
 
