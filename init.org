@@ -1645,11 +1645,12 @@
          "fx" 'delete-frame
          "fX" 'delete-other-frames
          "fm" '(make-frame-command :wk "new-frame")
-         "f RET" '(make-frame-command :wk "new-frame")
-         "f TAB" 'other-frame
+         "fn" 'other-frame
          "f DEL" 'save-buffers-kill-emacs
-         "fn" 'set-frame-name
+         "f RET" 'set-frame-name
          "fg" 'select-frame-by-name
+         "fR" 'rename-visited-file
+         "f TAB" 'find-sibling-file
 
          "fe" '(:ignore t :wk "emacs")
          "fev" 'emacs-version
@@ -2870,6 +2871,45 @@
 
      (add-hook 'after-change-major-mode-hook #'set-indent-offset)
    #+END_SRC
+
+** sibling-files
+   =find-sibling-files= is an Emacs function that can jump between related files in a
+   project. This is useful for example in C to jump between header and implementation
+   files. In my configuration I define all the sibling rules for a given major-mode in
+   a common config variable and then automatically set them locally in those modes.
+   This prevents me having to write a bunch of hook functions for each mode which
+   just sets a single local variable.
+
+   #+begin_src emacs-lisp
+     (defvar +find-sibling-rules-mode-alist nil
+       "Alist associating major-modes with `find-sibling-rules' values.")
+
+     (defun +find-sibling-rules (mode &rest config)
+       "Setup a series of `find-sibling-rules' for MODE.
+     CONFIG should be a series of MATCH EXPANSION pairs. EXPANSION can be set
+     to a list of expansions to associate them all with MATCH. If you supply
+     a MODE that is already configured in `+find-sibling-rules-mode-alist'
+     then the new CONFIG entries will be appended to the existing config."
+       (declare (indent defun))
+       (unless (eq (mod (length config) 2) 0)
+         (error "CONFIG must be a series of MATCH EXPANSION pairs."))
+
+       (when-let (rules (cl-loop
+                         for (match expansion) in (-partition 2 config)
+                         collect `(,match ,@(-flatten expansion))))
+         (if-let ((entry (assoc mode +find-sibling-rules-mode-alist)))
+             (progn
+               (setcdr entry (append (cdr entry) rules))
+               +find-sibling-rules-mode-alist)
+           (push (cons mode rules) +find-sibling-rules-mode-alist))))
+
+     (defun +find-sibling-rules-setup ()
+       (setq-local find-sibling-rules
+                   (alist-get major-mode +find-sibling-rules-mode-alist)))
+
+     (add-hook 'change-major-mode-after-body-hook
+               #'+find-sibling-rules-setup)
+   #+end_src
 
 ** lisp-indent
    Lisp indent-function taken from [[https://emacs.stackexchange.com/questions/10230/how-to-indent-keywords-aligned][here]].
@@ -19411,19 +19451,12 @@
    #+BEGIN_SRC emacs-lisp
      (use-package cc-mode
        :straight (cc-mode :type built-in)
-       ;; :hook ((c-mode . +flylint)
-       ;;        (c++-mode . +flylint))
        :custom
        (c-default-style '((java-mode . "linux")
                           (awk-mode . "awk")
                           (other . "k&r")))
 
-       ;; :hook
-       ;; ((c-mode . c-toggle-auto-newline)
-       ;;  (c++-mode . c-toggle-auto-newline))
-
-       ;; WARN never do this, it breaks commenting in weird places.
-       ;; (c-toggle-comment-style +1)
+       ;; (c-toggle-comment-style +1)                            ; WARN never do this, it breaks commenting in weird places.
 
        :init
        (push '((c-mode c++-mode)
@@ -19434,6 +19467,20 @@
        (dolist (tbl (list c-mode-syntax-table
                           c++-mode-syntax-table))
          (modify-syntax! '((?_ . "w")) tbl))
+
+       :config
+       (+find-sibling-rules 'c-mode
+         (rx (group (+ (not "/"))) ".c") "\\1.h"
+         (rx (group (+ (not "/"))) ".h") "\\1.c")
+
+       (+find-sibling-rules 'c++-mode
+         ;; NOTE: Some C++ projects use .h even when they contain C++ code.
+         (rx (group (+ (not "/"))) ".cpp") '("\\1.h" "\\1.hh" "\\1.hpp")
+         (rx (group (+ (not "/"))) ".cc")  '("\\1.h" "\\1.hh" "\\1.hpp")
+
+         (rx (group (+ (not "/"))) ".h")   '("\\1.cc" "\\1.cpp")
+         (rx (group (+ (not "/"))) ".hpp") '("\\1.cc" "\\1.cpp")
+         (rx (group (+ (not "/"))) ".hh")  '("\\1.cc" "\\1.cpp"))
 
        :leader
        (:mode '(java-mode c-mode cc-mode)
