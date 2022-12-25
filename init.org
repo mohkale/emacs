@@ -6305,7 +6305,7 @@
       (use-package projectile
         :config
         (advice-add #'projectile-dotnet-project-p :after-until
-                    (defun projectile-dotnet-sln-p ()
+                    (defun projectile-dotnet-sln-p (&rest _)
                       (projectile-verify-file-wildcard "?*.sln")))
 
         (projectile-register-project-type 'rake '("rakefile")
@@ -6327,34 +6327,6 @@
          :compile "cmake --build build"
          :run "cmake --build build --target run"))
     #+END_SRC
-
-*** project-integration
-    Built-in =project.el= integration courtesy of [[https://github.com/bbatsov/projectile/issues/1591#issuecomment-895111852][@wurosh]].
-
-    #+begin_src emacs-lisp
-      (use-package projectile
-        :straight t
-        :after (project)
-        :config
-        (push (defun project-projectile+ (dir)
-                (when-let ((root (projectile-project-root dir)))
-                  (cons 'projectile root)))
-              project-find-functions)
-
-        (require 'cl-lib)
-
-        (cl-defmethod project-root ((project (head projectile)))
-          (cdr project))
-
-        (cl-defmethod project-files ((project (head projectile)) &optional _dirs)
-          (let ((root (project-root project)))
-            ;; Make paths absolute and ignore the optional dirs argument, see [[https://github.com/bbatsov/projectile/issues/1591#issuecomment-896423965][here]].
-            (mapcar (apply-partially #'concat root)
-                    (projectile-project-files root))))
-
-        (cl-defmethod project-buffers ((project (head projectile)))
-          (projectile-project-buffers (project-root project))))
-    #+end_src
 
 ** real-auto-save-mode
    #+BEGIN_SRC emacs-lisp
@@ -9977,6 +9949,7 @@
                                            orderless-match-face-3
                                            completions-common-part
                                            completions-first-difference
+                                           consult-highlight-match
                                            ;; For some reason `consult' async commands and some regular
                                            ;; commands such as `completion-in-region' don't use orderless
                                            ;; highlighting.
@@ -12701,8 +12674,15 @@
          "I" nil
          "i" nil
          "i" 'embark-insert
+         "g" 'embark-find-definition
          "/" 'make-face-italic
          "?" 'make-face-unitalic)
+        (:keymaps 'embark-variable-map
+         "g" 'embark-find-definition)
+        (:keymaps 'embark-function-map
+         "g" 'embark-find-definition)
+        (:keymaps 'embark-symbol-map
+         "g" 'embark-find-definition)
 
         :lazy-leader
         (:mode 'embark-collect-mode
@@ -22433,6 +22413,11 @@
      *Note*: protocol installation requires some manual setup, see [[https://www.orgroam.com/manual/Installation-_00281_0029.html#Installation-_00281_0029][here]].
 
      #+BEGIN_SRC emacs-lisp
+       (use-package emacsql-sqlite-builtin
+         :straight t
+         :custom
+         (org-roam-database-connector 'sqlite-builtin))
+
        (use-package org-roam
          :straight t
          :hook ((org-roam-file-setup . flyspell-mode))
