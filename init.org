@@ -437,13 +437,16 @@
                   (setq pkgs (cdr pkgs)))
            (if (consp pkg)
                (cl-case (car pkg)
-                 ('not (push `(not ,(package-build-cond+ (cdr pkg))) res))
-                 ('or  (push `(or
-                               ,@(mapcar #'package-build-cond+ (cdr pkg)))
-                             res))
-                 ('and (push `(and
-                               ,@(mapcar #'package-build-cond+ (cdr pkg)))
-                             res))
+                 (not
+                  (push `(not ,(package-build-cond+ (cdr pkg))) res))
+                 (or
+                  (push `(or
+                          ,@(mapcar #'package-build-cond+ (cdr pkg)))
+                        res))
+                 (and
+                  (push `(and
+                          ,@(mapcar #'package-build-cond+ (cdr pkg)))
+                        res))
                  (t (warn "`package!' got an unexpected conditional argument %s" (car pkg))))
              (cond ((eq pkg :lsp)
                     (push `(or ,(package-build-cond+ 'lsp-mode)
