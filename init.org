@@ -2892,12 +2892,13 @@
      (defvar +find-sibling-rules-mode-alist nil
        "Alist associating major-modes with `find-sibling-rules' values.")
 
-     (defun +find-sibling-rules (mode &rest config)
-       "Setup a series of `find-sibling-rules' for MODE.
+     (defun +find-sibling-rules (modes &rest config)
+       "Setup a series of `find-sibling-rules' for MODES.
      CONFIG should be a series of MATCH EXPANSION pairs. EXPANSION can be set
      to a list of expansions to associate them all with MATCH. If you supply
      a MODE that is already configured in `+find-sibling-rules-mode-alist'
-     then the new CONFIG entries will be appended to the existing config."
+     then the new CONFIG entries will be appended to the existing config.
+     MODES can either be a single mode symbol or a list of modes."
        (declare (indent defun))
        (unless (eq (mod (length config) 2) 0)
          (error "CONFIG must be a series of MATCH EXPANSION pairs."))
@@ -2905,11 +2906,12 @@
        (when-let (rules (cl-loop
                          for (match expansion) in (-partition 2 config)
                          collect `(,match ,@(-flatten expansion))))
-         (if-let ((entry (assoc mode +find-sibling-rules-mode-alist)))
-             (progn
-               (setcdr entry (append (cdr entry) rules))
-               +find-sibling-rules-mode-alist)
-           (push (cons mode rules) +find-sibling-rules-mode-alist))))
+         (dolist (mode (if (consp modes) modes (list modes)))
+           (if-let ((entry (assoc mode +find-sibling-rules-mode-alist)))
+               (progn
+                 (setcdr entry (append (cdr entry) rules)))
+             (push (cons mode rules) +find-sibling-rules-mode-alist))))
+       +find-sibling-rules-mode-alist)
 
      (defun +find-sibling-rules-setup ()
        (setq-local find-sibling-rules
@@ -12870,8 +12872,7 @@
 
         :hook
         ((eglot--managed-mode
-          lsp-mode
-          tree-sitter-imenu-mode)
+          lsp-mode)
          . consult-imenu-setup-lsp+)
 
         :init
@@ -14014,34 +14015,35 @@
            (ats-mode . atsfmt)
            (awk-mode . gawk)
            (bazel-mode . buildifier)
-           ((cc-mode c-mode c++-mode) . clang-format)
+           ((cc-mode c-mode c-ts-mode c++-mode c++-ts-mode) . clang-format)
            (haskell-cabal-mode . cabal-fmt)
-           (cmake-mode . cmake-format)
+           ((cmake-mode cmake-ts-mode) . cmake-format)
            (crystal-mode . crystal-tool)
-           (csharp-mode . dotnet)
-           (css-mode . prettier)
+           ((csharp-mode csharp-ts-mode) . dotnet)
+           ((css-mode css-ts-mode) . prettier)
            (elixir-mode . mix-format)
-           (go-mode . goimports)
+           ((go-mode go-ts-mode) . goimports)
            (haskell-mode . brittany)
            ((html-mode web-mode nxml-mode) . apheleia-mode-alist)
-           (java-mode . google-java-format)
-           ((js-mode js2-mode js3-mode js2-jsx-mode
-             typescript-mode typescript-react-mode)
+           ((java-mode java-ts-mode) . google-java-format)
+           ((js-mode js-ts-mode js2-mode js3-mode js2-jsx-mode
+             typescript-mode typescript-ts-mode typescript-react-mode
+             tsx-ts-mode)
             . prettier)
-           (json-mode . jq)
+           ((json-mode js-json-mode json-ts-mode) . jq)
            ((latex-mode LaTeX-mode TeX-mode TeX-latex-mode)
             . latexindent)
            (perl-mode . perltidy)
            (php-mode . nil)
-           (python-mode . (isort black))
+           ((python-mode python-ts-mode) . (isort black))
            (reason-mode . bsrefmt)
            ((ruby-mode enh-ruby-mode) . rubocop)
-           ((rust-mode rustic-mode) . rustfmt)
+           ((rust-mode rust-ts-mode rustic-mode) . rustfmt)
            (sass-mode . prettier)
-           (sh-mode . shfmt)
+           ((sh-mode bash-ts-mode) . shfmt)
            (terraform-mode . terraform)
            (tuareg-mode . ocamlformat)
-           (yaml-mode . prettier)))
+           ((yaml-mode yaml-ts-mode) . prettier)))
         "Mode list to formatter/s configuration."))
    #+end_src
 
@@ -17339,43 +17341,81 @@
    :PROPERTIES:
    :header-args+: :tangle (package-yes! tree-sitter)
    :END:
-   TODO: Finish [[https://ubolonton.github.io/emacs-tree-sitter/syntax-highlighting/customization/][guide]].
 
    #+BEGIN_SRC emacs-lisp
-     (use-package tree-sitter
-       :straight (tree-sitter :branch "master")
-       :delight (tree-sitter-mode " T")
-       :hook ((emacs-startup . global-tree-sitter-mode)
-              (tree-sitter-mode . tree-sitter-hl-mode))
+     (use-package treesit
+       ;; TODO: T in mode-line when using tree-sitter
+       ;; :delight (tree-sitter-mode " T")
        :custom
-       (js2-highlight-level 0))
-   #+END_SRC
+       (treesit-font-lock-level 4)
+       (js2-highlight-level 0 "Prevent syntax highlighting conflict between tree-sitter and `js2-mode'.")
 
-   Tree sitter itself provides the backbone for tree-sitter parsing but it doesn't
-   setup or associate languages to parsers because eventually it's expected for
-   language modes to set this up themselves.
-   For now the *tree-sitter-langs* package provides language associations.
-
-   #+BEGIN_SRC emacs-lisp
-     (use-package tree-sitter-langs
-       :straight (tree-sitter-langs :branch "master")
-       :after tree-sitter
-       :demand t
        :config
-       (push '(typescript-react-mode . typescript)
-             tree-sitter-major-mode-language-alist)
-       (push '(web-mode . html)
-             tree-sitter-major-mode-language-alist))
+       (unless (treesit-available-p)
+         (error "Emacs was not built with tree-sitter support"))
+
+       :init
+       (setq
+        major-mode-remap-alist
+        (append
+         '(
+           ;; Builtin Mode Aliases
+           (c++-mode . c++-ts-mode)
+           (c-mode  . c-ts-mode)
+           (csharp-mode . csharp-ts-mode)
+           (css-mode . css-ts-mode)
+           (java-mode . java-ts-mode)
+           (js-json-mode . json-ts-mode)
+           (js-mode . js-ts-mode)
+           (python-mode . python-ts-mode)
+           (sh-mode . bash-ts-mode)
+           (shell-script-mode . bash-ts-mode)
+
+           ;; External Mode Aliases
+           (cmake-mode . cmake-ts-mode)
+           (dockerfile-mode . dockerfile-ts-mode)
+           (go-dot-mod-mode . go-mod-ts-mode)
+           (go-mode . go-ts-mode)
+           (js2-mode . js-ts-mode)
+           (json-mode . json-ts-mode)
+           (jsonc-mode . json-ts-mode)
+           (rust-mode . rust-ts-mode)
+           ;; (rustic-mode . rust-ts-mode)
+           (toml-mode . toml-ts-mode)
+           (typescript-mode . typescript-ts-mode)
+           (typescript-react-mode . tsx-ts-mode)
+           (yaml-mode . yaml-ts-mode)
+           )
+         major-mode-remap-alist)))
    #+END_SRC
+
+*** tree-sitter-module
+    Tree-sitter by itself does not do anything. It requires a tree-sitter parser as a
+    library that can parse the syntax tree of the associated language. Casouri has
+    thankfully created a helper repo that can build a series of parsers for different
+    languages. Here we install it and build all the parsers.
+
+    #+begin_src emacs-lisp
+      (use-package tree-sitter-module
+        :straight (tree-sitter-module
+                   :type git :host github
+                   :repo "casouri/tree-sitter-module"
+                   :pre-build (("./batch.sh"))
+                   :files ("dist/*.so" "dist/*.dll" "dist/*.dylib"))
+        :init
+        ;; Search for tree-sitter modules in this packages build directory.
+        (with-eval-after-load 'treesit
+          (add-to-list 'treesit-extra-load-path
+                       (straight--build-dir "tree-sitter-module"))))
+    #+end_src
 
 *** evil-textobj-tree-sitter
-    #+begin_src emacs-lisp
+    This module has been disabled until [[https://github.com/meain/evil-textobj-tree-sitter/issues/76][meain/evil-textobj-tree-sitter#76]] has been
+    resolved.
+
+    #+begin_src emacs-lisp :tangle no
       (use-package evil-textobj-tree-sitter
-        :straight (evil-textobj-tree-sitter
-                   :type git
-                   :host github
-                   :repo "meain/evil-textobj-tree-sitter"
-                   :files (:defaults "queries"))
+        :straight t
         :after (evil tree-sitter)
         :demand t
         :config
@@ -17875,12 +17915,13 @@
 
        :preface
        (push '(dockerfile-mode . 2) +indent-config)
+       (push '(dockerfile-ts-mode . 2) +indent-config)
 
        (use-package sh-script
          :commands 'sh-backslash-region)
 
        :leader
-       (:mode 'dockerfile-mode
+       (:mode '(dockerfile-mode dockerfile-ts-mode)
         "\\" 'sh-backslash-region))
    #+end_src
 
@@ -18222,7 +18263,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package python
        :straight (python :type built-in)
-       :hook (python-mode . +flylint)
+       :hook ((python-mode python-ts-mode) . +flylint)
        :custom
        (python-indent-guess-indent-offset-verbose nil
         "Disable annoying notification when indent guess fails")
@@ -18231,12 +18272,12 @@
        (setq python-prettify-symbols-alist nil)
 
        :config
-       (modify-syntax! '((?_ . "w")) python-mode-syntax-table)
+       (modify-syntax! '((?_ . "w")) python-base-mode-syntax-table)
 
        (evil-set-initial-state 'inferior-python-mode 'emacs)
        (add-to-list 'python-shell-completion-native-disabled-interpreters "python3")
 
-       (configure-presym! 'python-mode
+       (configure-presym! '(python-mode python-ts-mode)
          "lambda" ?λ)
 
        (defun python-shell-calculate-command ()
@@ -18260,12 +18301,12 @@
        ;;                (memq this-command python-indent-trigger-commands))))
 
        (general-define-key
-        :keymaps 'python-mode-map
+        :keymaps 'python-base-mode-map
         :states 'insert
         "TAB" 'indent-for-tab-command)
 
        :lazy-leader
-       (:mode 'python-mode
+       (:mode '(python-mode python-ts-mode)
         "R" 'python-shell-switch-to-shell
         "m" 'python-mark-defun
         "v" 'python-check
@@ -18304,7 +18345,7 @@
         "ep" 'python-shell-send-string)
 
        :general
-       (:keymaps 'python-mode-map
+       (:keymaps 'python-base-mode-map
         "<C-backspace>" nil))
    #+END_SRC
 
@@ -18322,7 +18363,7 @@
       (use-package pyimport
         :straight t
         :leader
-        (:mode 'python-mode
+        (:mode '(python-mode python-ts-mode)
          "i"  '(:ignore t :wk "imports")
          "ii" 'pytimport-remove-unused
          "iu" 'pyimport-insert-missing))
@@ -18334,7 +18375,8 @@
     #+BEGIN_SRC emacs-lisp
       (use-package pip-requirements
         :straight t
-        :mode ("^requirements\\.txt$" . pip-requirements-mode))
+        :mode ((rx bol "requirements" (zero-or-more any) ".txt" eol) .
+               pip-requirements-mode))
     #+END_SRC
 
 ** ruby
@@ -18741,8 +18783,7 @@
 ** JSON
    #+begin_src emacs-lisp
      (use-package js
-       :mode ((rx ".json" eol) . js-json-mode)
-       :hook (js-json-mode . +flylint))
+       :hook ((js-json-mode json-ts-mode) . +flylint))
    #+end_src
 
 *** vscode-json-languageserver                                          :lsp:
@@ -18856,23 +18897,26 @@
    #+BEGIN_SRC emacs-lisp
      (use-package yaml-mode
        :straight t
-       :hook (yaml-mode . +flylint)
+       :hook ((yaml-mode yaml-ts-mode) . +flylint)
        :init
        (push '(yaml-mode . 2) +indent-config)
+       (push '(yaml-ts-mode . 2) +indent-config)
 
        :config
-       (modify-syntax! '((?_ . "w")
-                         (?- . "w"))
-         yaml-mode-syntax-table)
+       (let ((syntax-changes '((?_ . "w")
+                               (?- . "w"))))
+         (modify-syntax! syntax-changes yaml-mode-syntax-table)
+         (modify-syntax! syntax-changes yaml-ts-mode-syntax-table))
 
        :lazy-leader
-       (:mode 'yaml-mode
+       (:mode '(yaml-mode yaml-ts-mode)
         "n" 'yaml-narrow-to-block-literal
         "f" 'yaml-fill-paragraph
         "v" 'yaml-mode-version)
 
        :general
-       (:keymaps 'yaml-mode-map
+       (:keymaps '(yaml-mode-map
+                   yaml-ts-mode-map)
         :states 'insert
         "<tab>" 'yaml-indent-line))
    #+END_SRC
@@ -18949,9 +18993,10 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package sh-script
-        :hook (sh-mode . +flylint)
+        :hook ((sh-mode bash-ts-mode) . +flylint)
         :preface
         (push '(sh-mode . 2) +indent-config)
+        (push '(bash-ts-mode . 2) +indent-config)
 
         :init
         (advice-add 'sh-set-shell :around 'inhibit-messages-wrapper!)
@@ -18962,7 +19007,7 @@
           sh-mode-syntax-table)
 
         :lazy-leader
-        (:mode 'sh-mode
+        (:mode '(sh-mode bash-ts-mode)
          ":" 'sh-set-shell
          ;; "0" 'sh-beginning-of-command
          ;; "$" 'sh-end-of-command
@@ -19431,18 +19476,8 @@
    #+BEGIN_SRC emacs-lisp
      (use-package cmake-mode
        :straight t
-       :mode (rx (or "CMakeLists.txt" ".cmake")))
+       :mode (rx (or (and bol "CMakeLists.txt" eol) ".cmake")))
    #+END_SRC
-
-*** company-cmake                                                       :comp:
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! cmake company) :tangle no
-      (use-package company-cmake
-        :straight (company-cmake :host github :repo "purcell/company-cmake")
-        :after cmake
-        :init
-        (set-company-backend! 'cmake-mode
-          'company-cmake))
-    #+END_SRC
 
 ** c/cpp
    :PROPERTIES:
@@ -19460,21 +19495,24 @@
        ;; (c-toggle-comment-style +1)                            ; WARN never do this, it breaks commenting in weird places.
 
        :init
-       (push '((c-mode c++-mode)
+       (push '((c-mode c-ts-mode c++-mode c++-ts-mode)
                (?\; . after))
              electric-layout-mode-rules+)
 
        :config
-       (dolist (tbl (list c-mode-syntax-table
-                          c++-mode-syntax-table))
-         (modify-syntax! '((?_ . "w")) tbl))
+       (let ((syntax-changes '((?_ . "w"))))
+         (modify-syntax! syntax-changes c-mode-syntax-table)
+         (modify-syntax! syntax-changes c++-mode-syntax-table)
+         (with-eval-after-load 'c-ts-mode
+           (modify-syntax! syntax-changes c-ts-mode-syntax-table)
+           (modify-syntax! syntax-changes c-ts-mode-syntax-table)))
 
        :config
-       (+find-sibling-rules 'c-mode
+       (+find-sibling-rules '(c-mode c-ts-mode)
          (rx (group (+ (not "/"))) ".c") "\\1.h"
          (rx (group (+ (not "/"))) ".h") "\\1.c")
 
-       (+find-sibling-rules 'c++-mode
+       (+find-sibling-rules '(c++-mode c++-ts-mode)
          ;; NOTE: Some C++ projects use .h even when they contain C++ code.
          (rx (group (+ (not "/"))) ".cpp") '("\\1.h" "\\1.hh" "\\1.hpp")
          (rx (group (+ (not "/"))) ".cc")  '("\\1.h" "\\1.hh" "\\1.hpp")
@@ -19484,7 +19522,7 @@
          (rx (group (+ (not "/"))) ".hh")  '("\\1.cc" "\\1.cpp"))
 
        :leader
-       (:mode '(java-mode c-mode cc-mode)
+       (:mode '(java-mode c-mode c-ts-mode c++-mode c++-ts-mode)
         "S" 'c-set-style
         "D" 'c-display-defun-name
         "m" 'c-mark-function
@@ -19659,115 +19697,39 @@
    # NOTE no on the fly syntax checking? make sure eslint is installed no warning
    # or error will be issued if it isn't :(
 
-*** javascript-mode
-    I just use this as a drop in replacement for json-mode :)
 
-    #+BEGIN_SRC emacs-lisp :tangle yes
-      (push '(js-mode . 2) +indent-config)
+   #+BEGIN_SRC emacs-lisp :tangle yes
+     (use-package js
+       :hook ((js-mode . electric-layout-local-mode)
+              (js-mode . +flylint)
+              (js-ts-mode . electric-layout-local-mode)
+              (js-ts-mode . +flylint))
+       :init
+       (push '(js-mode . 2) +indent-config)
+       (push '(js-ts-mode . 2) +indent-config)
 
-      (push '((js2-mode js-mode typescript-mode)
-              (?{ . after)
-              (?} . before))
-            electric-layout-mode-rules+)
-    #+END_SRC
-
-*** js2-mode
-    the true javascript package for emacs.
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package js2-mode
-        :straight t
-        :mode (rx ".js" eol)
-        :hook ((js2-mode . electric-layout-local-mode)
-               (js2-mode . +flylint))
-        :commands (js-jsdoc-return+)
-
-        :config
-        (setq js2-mode-show-parse-errors      nil
-              js2-mode-show-strict-warnings   nil
-              js2-strict-missing-semi-warning nil)
-
-        (defun js-jsdoc-return+ (&optional arg)
-          (interactive "p")
-          (barf-if-buffer-read-only) ;; can't continue adding to readonly buffer.
-          (setq arg (or arg 1)) ;; insert one line when arg hasn't been given.
-
-          (let (inserted)
-            (when (in-comment-p)
-              (let* ((current-line (buffer-substring-no-properties
-                                    (line-beginning-position)
-                                    (line-end-position)))
-                     (start-regexp (rx bol (zero-or-more blank) "/**"))
-                     (continue-regexp (rx bol (one-or-more blank) "*"))
-                     start-p)
-                (when (or (string-match-p continue-regexp current-line)
-                          (setq start-p    (string-match-p start-regexp    current-line)))
-                  (setq inserted t)
-                  (let ((start-column (line-beginning-column)))
-                    (when start-p (cl-incf start-column)) ;; one char past start column
-                    (dotimes (_ arg)
-                      ;; (goto-char (line-end-position))
-                      (newline)
-                      (insert (make-string start-column ? ) "* ")
-                      (save-excursion
-                        (forward-line -1)
-                        (whitespace-cleanup-region (line-beginning-position) (line-end-position))))))))
-            (unless inserted
-              (dotimes (_ arg)
-                (indent-new-comment-line)))))
-
-        :lazy-leader
-        (:mode 'js2-mode
-         "i"  '(:ignore t :wk "insert")
-         "h"  '(:ignore t :wk "help")
-         "gg" 'js2-jump-to-definition
-
-         ;; toggle hide-show
-         "H"  '(:ignore t :wk "hide/show")
-         "HH" 'js2-mode-show-all
-         "Hw" 'js2-mode-toggle-warnings-and-errors
-         "He" 'js2-mode-toggle-element
-         "Hc" 'js2-mode-toggle-hide-comments
-         "Hf" 'js2-mode-toggle-hide-functions
-
-         ;; hide
-         "Hh" '(:ignore t :wk "hide")
-         "Hhw" 'js2-mode-hide-warnings-and-errors
-         "Hhe" 'js2-mode-hide-element
-         "Hhc" 'js2-mode-show-comments
-         "Hhf" 'js2-mode-hide-functions
-
-         ;; show
-         "Hs" '(:ignore t :wk "show")
-         "Hsw" 'js2-mode-display-warnings-and-errors
-         "Hse" 'js2-mode-show-element
-         "Hsc" 'js2-mode-hide-comments
-         "Hsf" 'js2-mode-show-functions)
-
-        :general
-        (:keymaps 'js2-mode-map
-         [remap indent-new-comment-line] 'js-jsdoc-return+)
-        (:keymaps '(js-mode-map js2-mode-map)
-         :states  'insert
-         ;; properly formets javadocs
-         "<return>" 'newline
-         "RET"      'newline))
-    #+END_SRC
+       (push '((js2-mode js-mode typescript-mode)
+               (?{ . after)
+               (?} . before))
+             electric-layout-mode-rules+))
+   #+END_SRC
 
 *** typescript-language-server                                          :lsp:
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! javascript :lsp)
-      (push (cons 'js2-mode
+      (push (cons 'js-mode
                   (defun javascript-enable-lsp-in-projects+ ()
                     (when (project-has-file-p "package.json" "yarn.lock")
                       :local)))
             +lsp-maybe-connect)
+      (push (cons 'js-ts-mode #'javascript-enable-lsp-in-projects+) +lsp-maybe-connect)
 
-      (add-hook 'js2-mode-hook +lsp-command)
+      (add-hook 'js-mode-hook +lsp-command)
+      (add-hook 'js-ts-mode-hook +lsp-command)
     #+END_SRC
 
     #+begin_src emacs-lisp :tangle (package-yes! javascript eglot)
       (with-eval-after-load 'eglot
-        (push (cons '(js-mode typescript-mode)
+        (push (cons '(js-mode js-ts-mode typescript-mode typescript-ts-mode)
                     (eglot-create-local-command+ node
                         '(("package-lock.json" "npx")
                           ("yarn.lock" "yarn" "run"))
@@ -19786,49 +19748,11 @@
 
         :lazy-leader
         (:mode 'js2-mode
-          "i@" 'js-doc-insert-tag
-          "i)" 'js-doc-insert-function-doc                                            ; only works from within method
-          "i(" 'js-doc-insert-function-doc-snippet
-          "if" 'js-doc-insert-file-doc
-          "h@" 'js-doc-describe-tag))
-    #+END_SRC
-
-*** js2-refactor
-    #+BEGIN_SRC emacs-lisp
-      ;; most of this doesn't seem to work very well...
-      ;; so I'm only using a few functions with simple features.
-      (use-package js2-refactor
-        :straight t
-        :diminish
-        :hook (js2-mode . js2-refactor-mode)
-        :config
-        (defun js2r-exit-visual-mode-after-func-call (&rest _)
-          (when (evil-visual-state-p)
-            (evil-exit-visual-state)))
-
-        (advice-add 'js2r-extract-method   :after #'js2r-exit-visual-mode-after-func-call)
-        (advice-add 'js2r-extract-function :after #'js2r-exit-visual-mode-after-func-call)
-
-        :lazy-leader
-        (:mode 'js2-mode
-         "[" 'js2r-expand-node-at-point
-         "]" 'js2r-contract-node-at-point
-
-         ;; doesn't work unless executed from within a function
-         "e"  '(:ignore t :wk "extract")
-         "ef" 'js2r-extract-function
-         "em" 'js2r-extract-method
-         "ev" 'js2r-extract-var
-         "el" 'js2r-extract-let
-         "ec" 'js2r-extract-const
-
-         "l" 'js2r-log-this
-         "L" 'js2r-debug-this
-
-         "v" 'js2r-var-to-this
-
-         "s" 'js2r-forward-slurp
-         "b" 'js2r-forward-barf))
+         "i@" 'js-doc-insert-tag
+         "i)" 'js-doc-insert-function-doc                                            ; only works from within method
+         "i(" 'js-doc-insert-function-doc-snippet
+         "if" 'js-doc-insert-file-doc
+         "h@" 'js-doc-describe-tag))
     #+END_SRC
 
 ** typescript
@@ -19841,13 +19765,10 @@
    #+BEGIN_SRC emacs-lisp
      (use-package typescript-mode
        :straight t
-       :hook (typescript-mode . +flylint)
+       :hook ((typescript-mode typescript-ts-mode) . +flylint)
        :init
        (push '(typescript-mode . 2) +indent-config)
-
-       :general
-       (:keymaps 'typescript-mode-map
-        [remap indent-new-comment-line] 'js-jsdoc-return+))
+       (push '(typescript-ts-mode . 2) +indent-config))
    #+END_SRC
 
 *** typescript-react
@@ -19855,13 +19776,19 @@
       (use-package typescript-mode
         :straight t
         :mode ("\\.tsx" . typescript-react-mode)
-        :hook ((typescript-react-mode . emmet-mode)
+        :hook ((tsx-ts-mode . emmet-mode)
+               (typescript-react-mode . emmet-mode)
+               (tsx-ts-mode . +flylint)
                (typescript-react-mode . +flylint))
         :init
+        (push '(typescript-ts-mode . 2) +indent-config)
         (push '(typescript-react-mode . 2) +indent-config)
 
         (with-eval-after-load 'emmet-mode
-          (push 'typescript-react-mode emmet-jsx-major-modes))
+          (push 'typescript-react-mode emmet-jsx-major-modes)
+          (push 'tsx-ts-mode emmet-jsx-major-modes))
+
+        (put 'tsx-ts-mode 'eglot-language-id "typescriptreact")
 
         :commands (typescript-react-mode)
         :config
@@ -19884,9 +19811,9 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package css-mode
-       :hook (css-mode . +flylint)
+       :hook ((css-mode css-ts-mode) . +flylint)
        :lazy-leader
-       (:mode '(less-css-mode css-mode)
+       (:mode '(less-css-mode css-mode css-ts-mode)
         "?" 'css-lookup-symbol
         "b" 'web-beautify-css)
 
@@ -19909,13 +19836,14 @@
     Requires ~npm install --global vscode-css-languageserver-bin~.
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! css :lsp)
-      (add-hook 'css-mode-hook  +lsp-command)
+      (add-hook 'css-mode-hook +lsp-command)
+      (add-hook 'css-ts-mode-hook +lsp-command)
       (add-hook 'scss-mode-hook +lsp-command)
     #+END_SRC
 
     #+begin_src emacs-lisp :tangle (package-yes! css eglot)
       (with-eval-after-load 'eglot
-        (push '((css-mode scss-mode)
+        (push '((css-mode css-ts-mode scss-mode)
                 "css-languageserver" "--stdio")
               eglot-server-programs))
     #+end_src
@@ -20111,12 +20039,13 @@
    #+BEGIN_SRC emacs-lisp
      (use-package go-mode
        :straight t
-       :hook (go-mode . indent-tabs-mode)
+       :hook ((go-mode go-ts-mode) . indent-tabs-mode)
        :init
        (push '(go-mode . 4) +indent-config)
+       (push '(go-ts-mode . 4) +indent-config)
 
        :lazy-leader
-       (:mode 'go-mode
+       (:mode '(go-mode go-ts-mode)
         ;; requires: go get github.com/rogpeppe/godef
         "h" '(:ignore t :wk "help/guru")
         "hh" 'godoc-at-point
@@ -20153,7 +20082,7 @@
         :hook (go-guru-output-mode . go-guru-preserve-compilation-window+)
 
         :lazy-leader
-        (:mode 'go-mode
+        (:mode '(go-mode go-ts-mode)
          "hd" 'go-guru-describe
          "hi" 'go-guru-implements
          "hc" 'go-guru-peers
@@ -20177,7 +20106,7 @@
       (use-package go-impl
         :straight t
         :leader
-        (:mode 'go-mode
+        (:mode '(go-mode go-ts-mode)
          "ii" 'go-impl))
     #+end_src
 
@@ -22792,11 +22721,6 @@
 
    #+begin_src emacs-lisp
      (use-package cperl-mode
-       :mode (rx "." (or (and "p" (or "l" "m") (optional "x"))
-                         (and "P" (or "L" "M") (optional "X")))
-                 eol)
-       :interpreter "perl"
-       :interpreter "perl5"
        :hook ((perl-mode cperl-mode) . +flylint)
        :custom
        (cperl-highlight-variables-indiscriminately t)
@@ -22805,6 +22729,10 @@
        (cperl-indent-level 4 "4 spaces is the standard indentation")
        (cperl-close-paren-offset -4 "Indent the closing paren back four spaces")
        (cperl-continued-statement-offset 4 "If a statement continues indent it to four spaces")
+
+       :preface
+       (add-to-list 'major-mode-remap-alist
+                    '(perl-mode . cperl-mode))
 
        :config
        ;; Don't highlight arrays and hashes in comments, from [[https://github.com/syl20bnr/spacemacs/blob/63056ecb50f93808781b97feab1c3225d35c7aa1/layers/%2Blang/perl5/packages.el#L65][here]].
