@@ -10669,30 +10669,26 @@
                               (nick (and server (eglot--project-nickname server)))
                               (pending (and server (hash-table-count
                                                     (jsonrpc--request-continuations server))))
-                              (`(,_id ,doing ,done-p ,detail) (and server (eglot--spinner server)))
                               (last-error (and server (jsonrpc-last-error server)))
                               (face (cond (last-error 'compilation-mode-line-fail)
-                                          ((and doing (not done-p)) nil)
-                                          ((and pending (cl-plusp pending)) 'compilation-mode-line-run)
+                                          ((and pending (cl-plusp pending))
+                                           'compilation-mode-line-run)
                                           (nick nil)
                                           (t 'compilation-mode-line-run))))
                    (propertize (all-the-icons-pad+ (+icon nerd-fa "rocket" :face face))
                                'help-echo (cond
                                            (last-error
                                             (format "EGLOT\nAn error occured: %s
-             mouse-3: Clear this status" (plist-get last-error :message)))
-                                           ((and doing (not done-p))
-                                            (format "EGLOT\n%s%s" doing
-                                                    (if detail (format "%s" detail) "")))
+       mouse-3: Clear this status" (plist-get last-error :message)))
                                            ((and pending (cl-plusp pending))
                                             (format "EGLOT\n%d outstanding requests" pending))
                                            (nick (format "EGLOT Connected (%s/%s)
-             C-mouse-1: Go to server errors
-             mouse-1: Go to server events
-             mouse-2: Quit server
-             mouse-3: Reconnect to server" nick (eglot--major-modes server)))
+       C-mouse-1: Go to server errors
+       mouse-1: Go to server events
+       mouse-2: Quit server
+       mouse-3: Reconnect to server" nick (eglot--major-modes server)))
                                            (t "EGLOT Disconnected
-             mouse-1: Start server"))
+       mouse-1: Start server"))
                                'mouse-face 'mode-line-highlight
                                'local-map (let ((map (make-sparse-keymap)))
                                             (cond (last-error
