@@ -109,6 +109,7 @@
          ;; auto-highlight-symbol                                          ; Automatically highlight the symbol at point
          browser-edit                                                      ; Interface emacs with [[https://www.chromium.org/][chromium]]
          company                                                           ; Dynamic completion previews through popup dialogs
+         ;; corfu                                                          ; Company alternative aiming to be a little more generic
          ;; command-log-mode                                               ; Echo commands as you enter them
          dashboard                                                         ; A feature full emacs dashboard
          ;; deft                                                           ; Note management system based on multiple org files
@@ -369,7 +370,7 @@
          ; event
          (field :text "f" :icon "application-braces-outline" :face aoh-blue-int)
          (file :text "f" :icon "file-document-outline" :face aoh-very-light-grey)
-         (folder :text "d" :icon "folder" :face dired-directory)
+         (folder :text "d" :icon "folder" :face font-lock-function-name-face)
          (interface :text "i" :icon "application-brackets-outline" :face font-lock-type-face)
          (keyword :text "k" :icon "key-variant" :face font-lock-keyword-face)
          ; macro
@@ -393,6 +394,9 @@
          (variable :text "v" :icon "variable" :face font-lock-variable-name-face)
          (t :text "•" :icon "crosshairs-question" :face shadow))
        "Icon associations for completion-kinds in completion popups.")
+
+     (defvar +completion-popup-show-documentation-popup nil
+       "Whether to show a documentation popup alongside the completion popup.")
    #+END_SRC
 
 ** require
@@ -3989,6 +3993,13 @@
         (prescient-persist-mode +1))                                                  ; persist statistics between emacs sessions
     #+END_SRC
 
+*** cape
+    #+begin_src emacs-lisp
+      (use-package cape
+        :straight t
+        :commands (cape-super-capf
+                   cape-company-to-capf))
+    #+end_src
 ** hydra
    #+BEGIN_SRC emacs-lisp
      (use-package hydra
@@ -5034,12 +5045,11 @@
      (use-package company
        :straight t
        :defer 2
-       ;; :hook (company-mode . company-tng-mode)
+       :config (global-company-mode +1)
        :delight
        company-mode
        global-company-mode
        :custom
-       ;; show the completion tooltip without any delay.
        (company-tooltip-idle-delay nil
         "Show the completion tooltip without any delay.")
        (company-idle-delay +auto-complete-delay)
@@ -5069,8 +5079,6 @@
        (advice-add 'company-show-doc-buffer :around 'display-buffer-no-select-window-advice)
 
        :config
-       (global-company-mode +1)
-
        (defun company-complete-next-char+ (&optional count)
          "insert the next COUNT characters from the current candidate."
          (interactive "p")
@@ -5203,6 +5211,39 @@
                             append backends)
                    (nreverse backends)))))
 
+      (defun company-cape--get-backend-wrapper (backend)
+        (when-let ((it (intern (concat "cape-company/" (symbol-name backend) "+"))))
+          (unless (functionp it)
+            (defalias it (cape-company-to-capf backend)))
+          it))
+
+      (defun company-cape-capfs--flatten-backends+ (backends)
+        "Flatten a list of combined company-backends into a CAPF list."
+        ;; TODO: Consider company--multi-backend-adapter over this.
+        ;; WARN: Doesn't respect company keyword parameters.
+        (cl-loop for backend in backends
+                 unless (keywordp backend)
+                   if (eq backend 'company-capf)
+                     append (delq t completion-at-point-functions)
+                   else
+                     collect (company-cape--get-backend-wrapper backend)))
+
+      (defun company-cape-capfs+ (backends)
+        "Convert a series of company-backends into a cape-wrapped CAPF."
+        (cl-loop for backend in backends
+                 with backend-capfs = nil ;; Combined company-backends sublist.
+                 ;; Default CAPF. Combine all the current CAPFs into a super CAPF.
+                 if (eq backend 'company-capf)
+                   collect (apply #'cape-super-capf (delq t completion-at-point-functions))
+                 ;; Backend is a standalone Company backend so convert it back.
+                 else if (symbolp backend)
+                   collect (company-cape--get-backend-wrapper backend)
+                 ;; Is a list of sub CAPF. Combine them together.
+                 else
+                   do (setq backend-capfs (company-cape-capfs--flatten-backends+ backend))
+                   and when backend-capfs
+                     collect (apply #'cape-super-capf backend-capfs)))
+
       (defsubst temp-buffer-p+ (buf)
         (equal (substring (buffer-name buf) 0 1) " "))
 
@@ -5216,9 +5257,13 @@
                       (when (called-interactively-p 'interactive)
                         (user-error "Current buffer isn't the kind we set `company-backends' in."))
                     (progn
-                      (setq-local company-backends (company-backends+))
-                      (when (called-interactively-p 'interactive)
-                        (message "Set company backends to %s" company-backends))))))
+                      (let ((backends (company-backends+)))
+                        (setq-local company-backends backends)
+                        (when (package! corfu)
+                          (setq-local completion-at-point-functions
+                                      (company-cape-capfs+ backends)))
+                        (when (called-interactively-p 'interactive)
+                          (message "Set company backends to %s" backends)))))))
     #+END_SRC
 
 *** company-quickhelp
@@ -5248,6 +5293,192 @@
         :after prescient
         :hook (company-mode . company-prescient-mode))
     #+END_SRC
+
+** corfu                                                               :comp:
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! corfu)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package corfu
+       :straight (corfu :files (:defaults
+                                "extensions/corfu-info.el"
+                                "extensions/corfu-echo.el"
+                                "extensions/corfu-quick.el"))
+       :defer 2
+       :demand t
+       :config (global-corfu-mode +1)
+       :hook ((corfu-mode . corfu-echo-mode))
+       :custom
+       (corfu-cycle t "Cycle back to first completion from last.")
+       (corfu-auto t "Show completion popup after delay.")
+       (corfu-auto-delay +auto-complete-delay "Interval before popup is shown.")
+       (corfu-preselect nil "Select first candidate but don't insert it.")
+       (corfu-excluded-modes '(eshell-mode)
+        "Prevent `corfu-mode' through `global-corfu-mode' for these modes.")
+
+       :init
+       ;; Corfu should take precedence over company.
+       (advice-add 'global-company-mode :override #'ignore)
+
+       :init
+       (with-eval-after-load 'savehist
+         (add-to-list 'savehist-additional-variables 'corfu-history))
+
+       :init
+       (advice-add 'corfu--setup :after 'evil-normalize-keymaps)
+       (advice-add 'corfu--teardown :after 'evil-normalize-keymaps)
+
+       :init
+       (advice-add 'corfu-info-location      :around 'display-buffer-no-select-window-advice)
+       (advice-add 'corfu-info-documentation :around 'display-buffer-no-select-window-advice)
+
+       :commands (corfu-quit-and-escape-evil-state+)
+       :config
+       (defun corfu-quit-and-escape-evil-state+ ()
+         (interactive)
+         (call-interactively 'corfu-quit)
+         (evil-normal-state))
+
+       :commands (corfu-move-to-minibuffer+)
+       :config
+       (defun corfu-move-to-minibuffer+ ()
+         (interactive)
+         (completion-at-point)
+         (let ((completion-extra-properties corfu--extra)
+               completion-cycle-threshold completion-cycling)
+           (apply (if (package! :consult)
+                      #'consult-completion-in-region
+                    #'completion-in-region)
+                  completion-in-region--data)))
+
+       :general
+       (:states '(insert emacs)
+        "M-SPC" 'completion-at-point
+        "C-:" 'corfu-move-to-minibuffer+)
+       (:keymaps 'corfu-map
+        :states '(insert emacs)
+        "<escape>" 'corfu-quit-and-escape-evil-state+
+
+        "C-n" 'ignore
+        "C-p" 'ignore
+        "C-j" 'next-line
+        "C-k" 'previous-line
+        "M-j" 'next-line
+        "K-k" 'previous-line
+
+        "C-d" 'scroll-up-command
+        "C-u" 'scroll-down-command
+
+        "C-:" 'corfu-move-to-minibuffer+
+        "C-h" 'corfu-info-documentation
+        "C-l" 'corfu-info-location
+
+        [tab] 'corfu-insert
+        "TAB" 'corfu-insert
+
+        "RET" 'corfu-complete
+        [C-i] 'corfu-complete
+
+        "C-o" 'corfu-last
+        "M-o" 'corfu-first
+
+        "C-/" 'corfu-quick-complete
+        "M-/" 'corfu-quick-insert))
+   #+end_src
+
+*** corfu-doc
+    #+begin_src emacs-lisp
+      (use-package corfu-doc
+        :straight t
+        :init
+        (when +completion-popup-show-documentation-popup
+          (add-hook 'global-corfu-mode-hook #'corfu-doc-mode))
+
+        :general
+        (:keymaps 'corfu-map
+         :states '(insert emacs)
+         "C-n" 'corfu-doc-scroll-up
+         "C-p" 'corfu-doc-scroll-down))
+    #+end_src
+
+*** corfu-terminal
+    Support corfu in the Emacs terminal.
+
+    #+begin_src emacs-lisp
+      (use-package popon
+        :straight
+        (popon
+         :type git
+         :repo "https://codeberg.org/akib/emacs-popon.git")
+        :unless (display-graphic-p))
+
+      (use-package corfu-terminal
+        :straight
+        (corfu-terminal
+         :type git
+         :repo "https://codeberg.org/akib/emacs-corfu-terminal.git")
+        :unless (display-graphic-p)
+        :hook (corfu-mode . corfu-terminal-mode))
+
+      (use-package corfu-doc-terminal
+        :straight (corfu-doc-terminal
+                   :type git
+                   :repo "https://codeberg.org/akib/emacs-corfu-doc-terminal.git")
+        :unless (display-graphic-p)
+        :hook (corfu-doc-mode . corfu-doc-terminal-mode))
+    #+end_src
+
+*** corfu-prescient
+    #+begin_src emacs-lisp :tangle (package-yes! corfu prescient)
+      (use-package corfu-prescient
+        :straight t
+        :after prescient
+        :hook (corfu-mode . corfu-prescient-mode)
+        :custom
+        (corfu-prescient-override-sorting t
+         "Stop gap to prevent super-capes messing up sorting.")
+        (corfu-prescient-enable-filtering nil
+         "Suppress the prescient completion style."))
+    #+end_src
+
+*** kind-icon
+    #+begin_src emacs-lisp
+      (use-package kind-icon
+        :straight t
+        :custom
+        (kind-icon-default-face 'corfu-default)
+        (kind-icon-blend-background t)
+        (corfu-echo-delay 0.01 "Always show docstrings when available.")
+        (kind-icon-mapping
+         (eval-when-compile
+           (cl-loop
+            for (kind . plist) in +completion-popup-kind-icons
+            with text = nil do (setq text (plist-get plist :text))
+            with icon = nil do (setq icon (plist-get plist :icon))
+            with face = nil do (setq face (plist-get plist :face))
+            collect `(,kind
+                      ,@(when text (list text))
+                      ,@(when icon (list :icon icon))
+                      ,@(when face (list :face face))))))
+        :config
+        (setq
+         kind-icon--unknown
+         (propertize " ? " 'face `(:inherit (error ,kind-icon-default-face bold))))
+
+        :after corfu
+        :commands kind-icon-margin-formatter
+        :init
+        (add-to-list 'corfu-margin-formatters #'kind-icon-margin-formatter)
+
+        :init
+        (advice-add #'kind-icon--rgb-blend :override
+                    (defun kind-icon--company-blend+ (rgb1 rgb2 frac)
+                      "Apply the blend function used by company with kind-icons as well."
+                      ;; TODO: Use 2 instead of 10 for the active corfu item. Will require
+                      ;; changes in upstream corfu to and kind-icons :/.
+                      (apply #'color-rgb-to-hex (nth 0 (color-gradient rgb2 rgb1 10))))))
+    #+end_src
 
 ** all-the-icons
    provides some fonts for rendering graphical icons within emacs; alongside a set
@@ -23439,13 +23670,14 @@
        `(frog-menu-border ((,cls (:background ,white :foreground ,white))))
        `(frog-menu-posframe-background-face ((,cls (:background ,very-dark-grey))))
 
-      ;;; company - intellisense
+      ;;; company, corfu - intellisense
        `(company-tooltip-mouse ((,cls (:foreground ,turquoise-int))))
        `(company-template-field ((,cls (:foreground ,turquoise-int))))
 
        ;; scrollbar
        `(company-tooltip-scrollbar-track ((,cls (:background ,line-highlight-bg :foreground ,very-light-grey))))
        `(company-tooltip-scrollbar-thumb ((,cls (:background ,red               :foreground ,dark-grey))))
+       `(corfu-bar                       ((,cls (:background ,red               :foreground ,dark-grey))))
 
        `(company-preview ((,cls (:foreground ,blue-int :weight bold :inherit hl-line))))
        `(company-preview-common ((,cls (:inherit company-preview))))
@@ -23453,11 +23685,14 @@
 
        ;; NOTE tooltip is the drop down menu which shows up when multiple results exist
        `(company-tooltip ((,cls (:background ,black-dim :inherit tooltip))))
+       `(corfu-default ((,cls (:background ,black-dim :inherit tooltip))))
+       `(corfu-completions-common-part+ ((,cls (:foreground ,red :inherit (company-tooltip bold)))))
        `(company-tooltip-common ((,cls (:foreground ,red :inherit (company-tooltip bold)))))
        `(company-tooltip-search ((,cls (:foreground ,blue-int :inherit company-tooltip))))
        `(company-tooltip-search-common ((,cls (:inherit company-tooltip-search))))
 
        `(company-tooltip-selection ((,cls (:background ,dark-grey :inherit company-tooltip))))
+       `(corfu-current ((,cls (:background ,dark-grey :inherit corfu-default))))
        `(company-tooltip-common-selection ((,cls (:background ,dark-grey :inherit company-tooltip-common))))
        `(company-tooltip-search-selection ((,cls (:background ,dark-grey :inherit (company-tooltip-search)))))
 
@@ -23467,6 +23702,7 @@
        ;; NOTE annotations are extra information in the tooltip
        `(company-tooltip-annotation ((,cls (:weight bold :foreground ,grey))))
        `(company-tooltip-annotation-selection ((,cls (:inherit company-tooltip-annotation))))
+       `(corfu-annotations ((,cls (:weight bold :foreground ,grey))))
 
        `(popup ((,cls (:inherit popup-face))))
 
@@ -23521,6 +23757,7 @@
        `(consult-async-failed ((,cls (:inherit compilation-error))))
        `(consult-narrow-indicator ((,cls (:foreground ,blue :weight bold))))
        `(consult-preview-match ((,cls (:foreground ,blue-int :weight bold))))
+       `(consult-highlight-match ((,cls (:foreground ,red-int :weight bold))))
 
       ;;; orderless
        ;; Match face were taken from ivys default match faces.
@@ -23890,5 +24127,5 @@
 #  LocalWords:  NyaaLiveActionAll NyaaLiveAction NyaaAnimeAll NyaaAnime CppReference
 #  LocalWords:  microsoft github godoc SchoolsColors StackOverflow GoogleMaps cmake
 #  LocalWords:  GoogleImages separedit csharp impl gopls analyzer plsense glsl mml
-#  LocalWords:  languageserver roslyn recentf verilog toc cpp vundo javascript
-#  LocalWords:  crontab
+#  LocalWords:  languageserver roslyn recentf verilog toc cpp vundo javascript corfu
+#  LocalWords:  crontab doc
