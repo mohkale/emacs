@@ -16541,7 +16541,9 @@
        (defun notmuch-show-and-copy-remote+ ()
          (interactive)
          (if-let ((url (notmuch-remote+)))
-             (kill-new url)
+             (progn
+               (kill-new url)
+               (message "%s" url))
            (user-error "Failed to resolve remote for current buffer")))
 
        (defun notmuch-open-remote+ ()
@@ -16780,7 +16782,7 @@
            (define-key map "s"
              (defun notmuch-tag-set-spam+ ()
                (interactive)
-               (notmuch-tag+ '("+spam" "-inbox" "-unread"))))
+               (notmuch-tag+ '("+spam" "-inbox" "-flagged" "-unread"))))
 
            (define-key map "f"
              (defun notmuch-tag-set-flagged+ ()
@@ -16791,6 +16793,11 @@
              (defun notmuch-tag-remove-from-inbox+ ()
                (interactive)
                (notmuch-tag+ '("-inbox" "-unread"))))
+
+           (define-key map "r"
+             (defun notmuch-tag-read+ ()
+               (interactive)
+               (notmuch-tag+ '("-unread"))))
 
            map)
          "Keymap containing commands to act upon emails.")

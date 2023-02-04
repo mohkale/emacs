@@ -2088,21 +2088,24 @@
      # name: script
      # key: sc
      # --
-     def main(args, vargs, parser):
-         pass
+     """${1:Module docstring.}"""
+     import sys
+     import argparse
+
+
+     def _parse_args() -> argparse.Namespace:
+         parser = argparse.ArgumentParser()
+         return parser.parse_args()
+
+
+     def main() -> bool:
+         args = _parse_args()
+         $0
+         return True
 
 
      if __name__ == '__main__':
-         import argparse
-
-         parser = argparse.ArgumentParser()
-
-         $0
-
-         args  = parser.parse_args()
-         vargs = vars(args)
-
-         main(args, vargs, parser)
+         sys.exit(0 if main() else 1)
    #+END_SRC
 
 ** self
