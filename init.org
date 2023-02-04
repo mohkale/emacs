@@ -10996,6 +10996,19 @@
             (concat " " msg))))
     #+END_SRC
 
+*** tree-sitter
+    #+begin_src emacs-lisp
+      (defvar-local +mode-line-tree-sitter-active-p nil)
+
+      (defun +mode-line-update-tree-sitter-active-p (&rest _)
+        (setq +mode-line-tree-sitter-active-p
+              (when (s-contains-p "-ts-" (symbol-name major-mode))
+                " T")))
+
+      (when (treesit-available-p)
+        (add-hook 'after-change-major-mode-hook #'+mode-line-update-tree-sitter-active-p))
+    #+end_src
+
 *** visual-selection
     #+BEGIN_SRC emacs-lisp
       (defvar +mode-line-show-word-count nil)
@@ -11107,6 +11120,8 @@
       (defvar mode-line-right+
         '((:eval +mode-line-vc-text)
           (:eval (+mode-line-status-icons))
+          (:propertize ("" +mode-line-tree-sitter-active-p)
+           face +mode-line-buffer-minor-mode)
           (:propertize ("" minor-mode-alist)
            face +mode-line-buffer-minor-mode
            mouse-face mode-line-highlight
@@ -17577,52 +17592,112 @@
    :header-args+: :tangle (package-yes! tree-sitter)
    :END:
 
-   #+BEGIN_SRC emacs-lisp
-     (use-package treesit
-       ;; TODO: T in mode-line when using tree-sitter
-       ;; :delight (tree-sitter-mode " T")
-       :custom
-       (treesit-font-lock-level 4)
-       (js2-highlight-level 0 "Prevent syntax highlighting conflict between tree-sitter and `js2-mode'.")
+   #+begin_src emacs-lisp :tangle yes
+     (defvar +tree-sitter-mode-remap
+       '(
+         ;; Builtin Mode Aliases
+         (c++-mode . c++-ts-mode)
+         (c-mode  . c-ts-mode)
+         (csharp-mode . csharp-ts-mode)
+         (css-mode . css-ts-mode)
+         (java-mode . java-ts-mode)
+         (js-json-mode . json-ts-mode)
+         (js-mode . js-ts-mode)
+         (mhtml-mode . html-ts-mode)
+         (python-mode . python-ts-mode)
+         (sh-mode . bash-ts-mode)
+         (shell-script-mode . bash-ts-mode)
 
-       :config
-       (unless (treesit-available-p)
-         (error "Emacs was not built with tree-sitter support"))
+         ;; External Mode Aliases
+         (cmake-mode . cmake-ts-mode)
+         (dockerfile-mode . dockerfile-ts-mode)
+         (go-dot-mod-mode . go-mod-ts-mode)
+         (go-mode . go-ts-mode)
+         (js2-mode . js-ts-mode)
+         (json-mode . json-ts-mode)
+         (jsonc-mode . json-ts-mode)
+         (rust-mode . rust-ts-mode)
+         ;; (rustic-mode . rust-ts-mode)
+         (toml-mode . toml-ts-mode)
+         (typescript-mode . typescript-ts-mode)
+         (typescript-react-mode . tsx-ts-mode)
+         (yaml-mode . yaml-ts-mode)))
+   #+end_src
 
-       :init
-       (setq
-        major-mode-remap-alist
-        (append
-         '(
-           ;; Builtin Mode Aliases
-           (c++-mode . c++-ts-mode)
-           (c-mode  . c-ts-mode)
-           (csharp-mode . csharp-ts-mode)
-           (css-mode . css-ts-mode)
-           (java-mode . java-ts-mode)
-           (js-json-mode . json-ts-mode)
-           (js-mode . js-ts-mode)
-           (python-mode . python-ts-mode)
-           (sh-mode . bash-ts-mode)
-           (shell-script-mode . bash-ts-mode)
+*** treesit
+    #+BEGIN_SRC emacs-lisp
+      (use-package treesit
+        :custom
+        (treesit-font-lock-level 3)
+        (js2-highlight-level 0
+         "Prevent syntax highlighting conflict between tree-sitter and `js2-mode'.")
 
-           ;; External Mode Aliases
-           (cmake-mode . cmake-ts-mode)
-           (dockerfile-mode . dockerfile-ts-mode)
-           (go-dot-mod-mode . go-mod-ts-mode)
-           (go-mode . go-ts-mode)
-           (js2-mode . js-ts-mode)
-           (json-mode . json-ts-mode)
-           (jsonc-mode . json-ts-mode)
-           (rust-mode . rust-ts-mode)
-           ;; (rustic-mode . rust-ts-mode)
-           (toml-mode . toml-ts-mode)
-           (typescript-mode . typescript-ts-mode)
-           (typescript-react-mode . tsx-ts-mode)
-           (yaml-mode . yaml-ts-mode)
-           )
-         major-mode-remap-alist)))
-   #+END_SRC
+        :config
+        (unless (treesit-available-p)
+          (error "Emacs was not built with tree-sitter support")))
+    #+END_SRC
+
+*** treesit-compat
+    Compatibility between tree-sitter modes and the built-in Emacs modes.
+
+    #+begin_src emacs-lisp :tangle no
+      (use-package treesit-auto
+        :straight t
+        :demand t
+        :custom
+        (treesit-auto-install nil
+          "Use treesit-auto to automatically use treesitter modes, but don't install grammers.")
+        (treesit-auto-fallback-alist
+         (cl-loop for (regular . ts) in +tree-sitter-mode-remap collect (cons ts regular)))
+
+        :config
+        (global-treesit-auto-mode))
+    #+end_src
+
+    Workaround to treesit-auto until upstream issues are resolved.
+
+    #+begin_src emacs-lisp
+      (setq major-mode-remap-alist
+            (append +tree-sitter-mode-remap
+                    major-mode-remap-alist))
+    #+end_src
+
+    Eglot integration for various tree-sitter modes.
+
+    #+begin_src emacs-lisp :tangle (package-yes! eglot tree-sitter)
+      (with-eval-after-load 'eglot
+        (dolist (it eglot-server-programs)
+          (when-let* ((mode (car it))
+                      (new-modes
+                       (cond
+                        ((symbolp mode)
+                         (when-let ((ts-variant (alist-get mode +tree-sitter-mode-remap)))
+                           (list mode ts-variant)))
+                        ((consp mode)
+                         (when-let ((ts-variants
+                                     (cl-loop
+                                      for sub-mode in mode
+                                      with ts-variant = nil
+                                      do (setq ts-variant
+                                               (alist-get sub-mode +tree-sitter-mode-remap))
+                                      when ts-variant collect ts-variant)))
+                           (append mode ts-variants))))))
+            (setcar it new-modes))))
+    #+end_src
+
+    Fix consult-imenu doesn't respect narrowing configuration with tree-sitter modes.
+
+    #+begin_src emacs-lisp :tangle (package-yes! :consult tree-sitter)
+      (with-eval-after-load 'consult-imenu
+        (setq-default
+         consult-imenu-config
+         (cl-loop for (mode . config) in (default-value 'consult-imenu-config)
+                  with mapped-mode = nil
+                  do (setq mapped-mode (alist-get mode +tree-sitter-mode-remap))
+                  collect (cons mode config)
+                  when mapped-mode
+                    collect (cons mapped-mode config))))
+    #+end_src
 
 *** tree-sitter-module
     Tree-sitter by itself does not do anything. It requires a tree-sitter parser as a
@@ -17637,11 +17712,11 @@
                    :repo "casouri/tree-sitter-module"
                    :pre-build (("./batch.sh"))
                    :files ("dist/*.so" "dist/*.dll" "dist/*.dylib"))
+        :after treesit
         :init
         ;; Search for tree-sitter modules in this packages build directory.
-        (with-eval-after-load 'treesit
-          (add-to-list 'treesit-extra-load-path
-                       (straight--build-dir "tree-sitter-module"))))
+        (add-to-list 'treesit-extra-load-path
+                     (straight--build-dir "tree-sitter-module")))
     #+end_src
 
 *** evil-textobj-tree-sitter
@@ -19726,6 +19801,7 @@
        (c-default-style '((java-mode . "linux")
                           (awk-mode . "awk")
                           (other . "k&r")))
+       (c-ts-mode-indent-style 'k&r)
 
        ;; (c-toggle-comment-style +1)                            ; WARN never do this, it breaks commenting in weird places.
 
