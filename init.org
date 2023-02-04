@@ -131,7 +131,7 @@
          ;; piper                                                          ; Interactive shell pipelines with emacs
          rainbow-mode                                                      ; Automatically color/highlight css color names
          skeletor                                                          ; Project skeleton generator package
-         undo-tree                                                         ; Undo system based on vim with tree like visualiser
+         ;; undo-tree                                                      ; Undo system based on vim with tree like visualiser
          ;; rake                                                           ; Run rake tasks
          ;; vi-tilde-fringe                                                ; Show tildes at the end of the buffer
          ;; vlc-rc                                                         ; Control [[https://www.videolan.org/vlc/index.en-GB.html][VLC]] from emacs
@@ -3885,6 +3885,7 @@
         (completion-styles '(orderless basic))
         (completion-category-overrides
          '((file (styles basic-remote+ orderless partial-completion))))
+        (orderless-affix-dispatch-alist nil)
 
         :preface
         (defun orderless-double-space-escapes+ (string)
@@ -3923,7 +3924,7 @@
           :docstring "Match literally if leading equals."
           :string "="
           :prefix t
-          :style 'orderless-flex)
+          :style 'orderless-literal)
 
         (defun-orderless-dispatcher without-if-bang
           :docstring "Exclude literal when leading punctuation-mark."
@@ -3933,7 +3934,7 @@
 
         ;; Allows you to [[http://endlessparentheses.com/new-in-emacs-25-1-easily-search-non-ascii-characters.html][search]] unicode characters with ascii queries.
         (defun-orderless-dispatcher fold-if-percent
-          :docstring "Exclude literal when leading punctuation-mark."
+          :docstring "Do smart unicode search with percent."
           :string "%"
           :prefix t
           :style 'char-fold-to-regexp)
@@ -4000,6 +4001,7 @@
         :commands (cape-super-capf
                    cape-company-to-capf))
     #+end_src
+
 ** hydra
    #+BEGIN_SRC emacs-lisp
      (use-package hydra
@@ -5175,7 +5177,7 @@
           (lisp-interaction-mode (:separate company-capf company-files company-yasnippet company-abbrev ;; company-ispell
                                   ))
           (prog-mode (company-capf company-files company-yasnippet))
-          (conf-mode company-capf company-files company-abbrev-code company-yasnippet))
+          (conf-mode company-capf company-files company-abbrev company-yasnippet))
         "An alist matching modes to company backends. The backends for any mode is
       built from this.")
 
@@ -5750,7 +5752,7 @@
        :commands +xopen-file
        :general
        (:keymaps 'embark-file-map
-        [remap consult-file-externally] '+xopen-file)
+        [remap embark-open-externally] '+xopen-file)
 
        :leader ("fo" '+xopen-url)
        :config
@@ -6179,6 +6181,7 @@
      (use-package page-break-lines
        :straight t
        :hook ((org-mode                    . page-break-lines-mode)
+              (dashboard-mode              . page-break-lines-mode)
               (help-mode                   . page-break-lines-mode)
               (outline-mode                . page-break-lines-mode)
               (emacs-lisp-compilation-mode . page-break-lines-mode)
@@ -6602,6 +6605,13 @@
        :hook (prog-mode . rainbow-delimiters-mode)
        :commands rainbow-delimiters-mode)
    #+END_SRC
+
+** sqlite-builtin
+   #+begin_src emacs-lisp
+     (use-package emacsql-sqlite-builtin
+       :straight t
+       :when (sqlite-available-p))
+   #+end_src
 
 ** undo-tree
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! undo-tree)
@@ -12931,11 +12941,12 @@
 *** consult
     #+BEGIN_SRC emacs-lisp
       (defvar consult-manual-preview-key
-        (list [3 C-i]               ; C-c C-i
-              [27 105]              ; M-i (variant)
-              (kbd "M-i")
-              )
-        "Manual key to trigger `consult--read' previews.")
+        (list "C-c <C-i>" "M-i")
+        "Manual keys to trigger `consult--read' previews.")
+
+      ;; For some reason my first manual-preview-key isn't valid.
+      (advice-add #'key-valid-p :before-until
+                  (lambda (keys) (string-equal keys "C-c <C-i>")))
 
       (use-package consult
         :straight t
@@ -12959,8 +12970,8 @@
         (consult-fontify-max-size 100000)
         (register-preview-function #'consult-register-preview)
         (consult-async-refresh-delay 0.05)
-        (consult-narrow-key (kbd "M-SPC"))
-        (consult-widen-key (kbd "S-SPC"))
+        (consult-narrow-key "M-SPC")
+        (consult-widen-key "S-SPC")
         (xref-show-xrefs-function #'consult-xref)
         (xref-show-definitions-function #'consult-xref)
         :init
@@ -13026,8 +13037,9 @@
                                      "Types"
                                      "Variables"))
            (perl-mode :toplevel "Functions"
-                      :types ((?v "Variables" font-lock-variable-name-face)
-                              (?f "Functions" font-lock-function-name-face)))
+                      :types ,(consult-imenu-gen-types+
+                               "Variables"
+                               "Functions"))
            (verilog-mode :toplevel "Modules"
                          :types ,(consult-imenu-gen-types+
                                   "Modules"
@@ -13040,7 +13052,7 @@
            ;; Both c-mode and c++-mode have almost identical imenu functions.
            ,@(let ((conf `(:toplevel "Function"
                            :types ,(consult-imenu-gen-types+
-                                    "Function" "Class"))))
+                                    "Function" "Class" "Variable"))))
                `((c-mode ,@conf)
                  (c++-mode ,@conf)))))
 
@@ -13083,11 +13095,13 @@
          . consult-imenu-setup-lsp+)
 
         :init
-        ;; Fix consult cookie suffixes with some commands make $ (EOL) matching fail.
+        ;; Fix consult cookie/tofu suffixes with some commands make $ (EOL) matching fail.
         (defun consult-fix-dollar+ (args)
           (if (string-suffix-p "$" (car args))
-              (list (concat (substring (car args) 0 -1)
-                            (rx (zero-or-more (any "\x100000-\x10FFFD")) eol)))
+              (list (format "%s[%c-%c]*$"
+                            (substring (car args) 0 -1)
+                            consult--tofu-char
+                            (+ consult--tofu-char consult--tofu-range -1)))
             args))
         (advice-add #'orderless-regexp :filter-args #'consult-fix-dollar+)
         (advice-add #'prescient-regexp-regexp :filter-args #'consult-fix-dollar+)
@@ -13247,7 +13261,6 @@
          scratch-buffer+
          :state #'consult--buffer-state)
 
-
         :leader
         (:mode '(selectrum-mode
                  vertico-mode)
@@ -13292,8 +13305,8 @@
          [remap imenu] 'consult-imenu
          [remap imenu-anywhere] 'consult-imenu-multi
          [remap switch-to-buffer] 'consult-buffer
-         [remap multi-occur] 'consult-multi-occur
-         [remap apropros-command] 'consult-apropos
+         [remap multi-occur] 'consult-line-multi
+         [remap apropros-command] 'describe-symbol
          [remap bookmark-jump] 'consult-bookmark
          [remap goto-line] 'consult-goto-line
          [remap isearch-forward] 'consult-line
@@ -13304,6 +13317,8 @@
          ;; [remap flush-lines] 'consult-flush-lines
          [remap man] 'consult-man
          [remap woman] 'consult-man
+         [remap info] 'consult-info
+         [remap info-display-manual] 'consult-info
          "C-M-y" 'consult-yank-pop
          "C-s" 'consult-line)
         (:keymaps 'projectile-mode-map
@@ -13458,11 +13473,12 @@
                                      :repo "mohkale/consult-yasnippet")
         :config
         (with-eval-after-load 'embark
-          (embark-define-keymap embark-yasnippet-completion-actions
-            "Embark actions for `consult-yasnippet' and derivatives."
-            ("d" consult-yasnippet-visit-snippet-file)                                  ; NOTE: Binding differs from `ivy-yasnippet' which uses "v".
-            ("g" consult-yasnippet-visit-snippet-file)                                  ; NOTE: Binding differs from `ivy-yasnippet' which uses "v".
-            )
+          ;; Embark actions for `consult-yasnippet' and derivatives.
+          (general-define-key
+           :keymaps 'embark-yasnippet-completion-actions
+           "d" 'consult-yasnippet-visit-snippet-file                                  ; NOTE: Binding differs from `ivy-yasnippet' which uses "v".
+           "g" 'consult-yasnippet-visit-snippet-file                                  ; NOTE: Binding differs from `ivy-yasnippet' which uses "v".
+           )
 
           (push '(yasnippet . embark-yasnippet-completion-actions)
                 embark-keymap-alist))
@@ -13509,6 +13525,27 @@
       (require 'embark)
       (require 'marginalia)
     #+END_SRC
+
+**** consult-line-literal
+     #+begin_src emacs-lisp :tangle (package-yes! :consult)
+       (autoload 'consult-line-literal+ "+consult-custom.el" nil t)
+       (evil-set-command-property 'consult-line-literal+ :jump t)
+
+       (general-define-key "C-M-s" 'consult-line-literal+)
+     #+end_src
+
+     #+begin_src emacs-lisp
+       (defun consult-line-literal+ ()
+         (interactive)
+         (let ((completion-styles
+                (if (member 'orderless completion-styles)
+                    '(orderless)
+                  '(substring)))
+               (orderless-matching-styles '(orderless-literal))
+               (completion-category-defaults nil)
+               (completion-category-overrides nil))
+           (consult-line)))
+     #+end_src
 
 **** consult-evil-jumps
      Adapted from [[*counsel-evil-jumps][counsel-evil-jumps]].
@@ -13761,11 +13798,12 @@
      #+END_SRC
 
      #+BEGIN_SRC emacs-lisp
-       (embark-define-keymap embark-org-capture-completion-actions+
-         "Embark bindings for org-capture completion candidates."
-         ("t" consult-org-capture-goto-target+)
-         ("l" org-capture-goto-last-stored+)
-         ("i" consult-org-capture-insert-template+))
+       ;; Embark bindings for org-capture completion candidates.
+       (general-define-key
+        :keymaps 'embark-org-capture-completion-actions+
+        "t" 'consult-org-capture-goto-target+
+        "l" 'org-capture-goto-last-stored+
+        "i" 'consult-org-capture-insert-template+)
 
        (add-to-list 'embark-keymap-alist '(org-capture . embark-org-capture-completion-actions+))
      #+END_SRC
@@ -13821,11 +13859,12 @@
      #+end_src
 
      #+begin_src emacs-lisp
-       (embark-define-keymap embark-ebdb-completion-actions+
-         "Embark bindings for ebdb."
-         ("g" consult-org-capture-goto-target+)
-         ("c" consult-ebdb-mail+)
-         ("i" consult-ebdb-cite-records+))
+       ;; Embark bindings for ebdb.
+       (general-define-key
+        :keymaps 'embark-ebdb-completion-actions+
+        "g" 'consult-org-capture-goto-target+
+        "c" 'consult-ebdb-mail+
+        "i" 'consult-ebdb-cite-records+)
 
        (add-to-list 'embark-keymap-alist '(ebdb . embark-ebdb-completion-actions+))
      #+end_src
@@ -13905,9 +13944,9 @@
                      (lambda (input)
                        (pcase-let ((`(,arg . ,opts) (consult--command-split input)))
                          (unless (string-blank-p arg)
-                           (list :command `("ls-exec" ,arg ,@opts)
-                                 :highlight (cdr (consult--default-regexp-compiler
-                                                  input 'basic completion-ignore-case)))))))
+                           (list `("ls-exec" ,arg ,@opts)
+                                 (cdr (consult--default-regexp-compiler
+                                       input 'basic completion-ignore-case)))))))
                  :prompt "Find executable: "
                  :category 'file
                  :require-match t
@@ -13966,8 +14005,8 @@
                  (let ((builder (lambda (input)
                                   (pcase-let* ((`(,arg . ,opts) (consult--command-split input)))
                                     (unless (string-blank-p arg)
-                                      (list :command `("ls-fsmaps" "-er" ,arg ,@opts)
-                                            :highlight (cdr (consult--default-regexp-compiler
+                                      (list `("ls-fsmaps" "-er" ,arg ,@opts)
+                                            (cdr (consult--default-regexp-compiler
                                                              input 'basic completion-ignore-case))))))))
                    (consult--read
                     (consult--async-command builder
@@ -14027,9 +14066,9 @@
            (let ((builder (lambda (input)
                             (pcase-let* ((`(,arg . ,opts) (consult--command-split input)))
                               (unless (string-blank-p arg)
-                                (list :command `("ls-bookmarks" ,arg ,@opts)
-                                      :highlight (cdr (consult--default-regexp-compiler
-                                                       input 'basic completion-ignore-case))))))))
+                                (list `("ls-bookmarks" ,arg ,@opts)
+                                      (cdr (consult--default-regexp-compiler
+                                            input 'basic completion-ignore-case))))))))
              (consult--read
               (consult--async-command builder
                 (+dot-open-bookmark-format-lines builder))
@@ -14624,54 +14663,30 @@
         (defvar dashboard-prefer-text-banners+ nil
           "When true we use text banners even on GUI frames.")
 
-        ;; Determine the appropriate banner to display on the dashboard.
         :config
-        (defun dashboard-select-random-banner+ (&optional arg)
-          "Toggle another banner to be used on the dashboard."
-          (setq dashboard-startup-banner
-                (if (and (not dashboard-prefer-text-banners+) (display-graphic-p))
-                    'official
-                  ;; You can create more banners using [[https://lachlanarthur.github.io/Braille-ASCII-Art/][this]] site.
-                  (seq-random-elt
-                   (or (let ((files (ignore-errors
-                                      (file-expand-wildcards
-                                       (join-path (xdg-config-home) "banners" "*")))))
-                         (if (stringp dashboard-startup-banner)
-                             (cl-remove dashboard-startup-banner files :test #'string-equal)
-                           files))
-                       '(1 2 3))))))
+        ;; I maintain a list of banners in my dotfiles that contain plain-text banners
+        ;; with embedded ansi escape sequences for color. This was originally written
+        ;; for my shell, but also works great as a cover for my emacs dashboard.
 
-        ;; Basically had to rewrite this from scratch because extension
-        ;; may be omitted when using a me-style banner instead of the
-        ;; expected kinds.
-        (advice-add #'dashboard-insert-banner :override
-                    (defun dashboard-insert-banner+ ()
-                      (goto-char (point-max))
-                      (let ((banner (dashboard-choose-banner))
-                            (buffer-read-only nil))
-                        (when banner
-                          (or
-                           (when-let ((ext (file-name-extension banner)))
-                             (when (image-type-available-p (intern ext))
-                               (dashboard-insert-image-banner banner)
-                               t))
-                           (dashboard-insert-ascii-banner-centered banner))
-                          (dashboard-insert-navigator)
-                          (dashboard-insert-init-info)))))
+        (defun dashboard-random-banner+ (&optional arg)
+          "Toggle another banner to be used on the dashboard."
+          (if (and (not dashboard-prefer-text-banners+) (display-graphic-p))
+              'official
+            ;; You can create more banners using [[https://lachlanarthur.github.io/Braille-ASCII-Art/][this]] site.
+            (seq-random-elt
+             (or (let ((files (ignore-errors
+                                (file-expand-wildcards
+                                 (join-path (xdg-config-home) "banners" "*")))))
+                   (if (stringp dashboard-startup-banner)
+                       (cl-remove dashboard-startup-banner files :test #'string-equal)
+                     files))
+                 '(1 2 3)))))
 
         ;; Ensure a random banner is chosen every time we reload the dashboard and initially.
         (advice-add 'dashboard-refresh-buffer :before
                     (lambda (&rest _)
-                      (dashboard-select-random-banner+)))
-        (dashboard-select-random-banner+)
-
-        :config
-        (advice-add #'dashboard-choose-banner :before-until
-                    (defun dashboard-choose-banner+ ()
-                      "Support custom text-based banners."
-                      (when (and (stringp dashboard-startup-banner)
-                                 (file-exists-p dashboard-startup-banner))
-                        dashboard-startup-banner)))
+                      (setq dashboard-startup-banner (dashboard-random-banner+))))
+        (setq dashboard-startup-banner (dashboard-random-banner+))
 
         (defun dashboard-read-banner+ (path)
           "Load a banner from my ~/.config/banners directory."
@@ -14693,24 +14708,30 @@
                                          (line-beginning-position))
                                        (point-max)))))))
 
-        (advice-add #'dashboard-insert-ascii-banner-centered :before-until
-                    (defun dashboard-insert-ascii-banner-centered+ (path)
-                      (unless (string-suffix-p ".txt" path)
-                        (when-let (banner (dashboard-read-banner+ path))
-                          (insert
-                           (let ((width  (car (car banner)))
-                                 (height (cdr (car banner)))
-                                 (content (cdr banner)))
-                             (with-temp-buffer
-                               (insert content)
-                               (goto-char (point-min))
-                               (let* ((margin (max 0 (floor (/ (- dashboard-banner-length width) 2))))
-                                      (padding (make-string margin ?\ )))
-                                 (while (not (eobp))
-                                   (insert padding)
-                                   (forward-line 1)))
-                               (buffer-string)))))
-                        t)))
+        (defun dashboard-insert-ascii-banner-centered+ (path)
+          (unless (string-suffix-p ".txt" path)
+            (when-let (banner (dashboard-read-banner+ path))
+              (insert "\n")
+              (let* ((start (point))
+                     (width  (car (car banner)))
+                     (height (cdr (car banner)))
+                     (content (cdr banner))
+                     (prefix `(space . (:align-to (- center ,(/ width 2))))))
+                (insert content)
+                (add-text-properties
+                 start (point) `(line-prefix ,prefix wrap-prefix ,prefix)))))
+            t)
+
+        (advice-add #'dashboard-insert-banner :before-until
+                    (defun dashboard-insert-banner+ ()
+                      (when (and (stringp dashboard-startup-banner)
+                                 (not (string-suffix-p ".txt" dashboard-startup-banner)))
+                        (prog1 t
+                          (goto-char (point-max))
+                          (let ((buffer-read-only nil))
+                            (dashboard-insert-ascii-banner-centered+ dashboard-startup-banner)
+                            (dashboard-insert-navigator)
+                            (dashboard-insert-init-info))))))
 
         :config
         ;; For some reason, the font-lock rules for the dashboard don't seem to
@@ -22647,11 +22668,6 @@
      *Note*: protocol installation requires some manual setup, see [[https://www.orgroam.com/manual/Installation-_00281_0029.html#Installation-_00281_0029][here]].
 
      #+BEGIN_SRC emacs-lisp
-       (use-package emacsql-sqlite-builtin
-         :straight t
-         :custom
-         (org-roam-database-connector 'sqlite-builtin))
-
        (use-package org-roam
          :straight t
          :hook ((org-roam-file-setup . flyspell-mode))
@@ -22664,6 +22680,10 @@
          (org-roam-prefer-id-links t)
          (org-roam-completion-system 'default)
          (org-id-link-to-org-use-id 'use-existing)
+
+         :init
+         (when (sqlite-available-p)
+           (setq org-roam-database-connector 'sqlite-builtin))
 
          :config
          (setq org-roam-db-location (join-path org-roam-directory "org-roam.db"))
