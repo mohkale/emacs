@@ -17650,10 +17650,30 @@
           (error "Emacs was not built with tree-sitter support")))
     #+END_SRC
 
+*** tree-sitter-module
+    Tree-sitter by itself does not do anything. It requires a tree-sitter parser as a
+    library that can parse the syntax tree of the associated language. Casouri has
+    thankfully created a helper repo that can build a series of parsers for different
+    languages. Here we install it and build all the parsers.
+
+    #+begin_src emacs-lisp
+      (use-package tree-sitter-module
+        :straight (tree-sitter-module
+                   :type git :host github
+                   :repo "casouri/tree-sitter-module"
+                   :pre-build (("./batch.sh"))
+                   :files ("dist/*.so" "dist/*.dll" "dist/*.dylib"))
+        :after treesit
+        :init
+        ;; Search for tree-sitter modules in this packages build directory.
+        (add-to-list 'treesit-extra-load-path
+                     (straight--build-dir "tree-sitter-module")))
+    #+end_src
+
 *** treesit-compat
     Compatibility between tree-sitter modes and the built-in Emacs modes.
 
-    #+begin_src emacs-lisp :tangle no
+    #+begin_src emacs-lisp
       (use-package treesit-auto
         :straight t
         :demand t
@@ -17665,14 +17685,6 @@
 
         :config
         (global-treesit-auto-mode))
-    #+end_src
-
-    Workaround to treesit-auto until upstream issues are resolved.
-
-    #+begin_src emacs-lisp
-      (setq major-mode-remap-alist
-            (append +tree-sitter-mode-remap
-                    major-mode-remap-alist))
     #+end_src
 
     Eglot integration for various tree-sitter modes.
@@ -17712,24 +17724,27 @@
                     collect (cons mapped-mode config))))
     #+end_src
 
-*** tree-sitter-module
-    Tree-sitter by itself does not do anything. It requires a tree-sitter parser as a
-    library that can parse the syntax tree of the associated language. Casouri has
-    thankfully created a helper repo that can build a series of parsers for different
-    languages. Here we install it and build all the parsers.
+    Make abbreviations inherit abbrevs for the non-tree-sitter modes.
 
     #+begin_src emacs-lisp
-      (use-package tree-sitter-module
-        :straight (tree-sitter-module
-                   :type git :host github
-                   :repo "casouri/tree-sitter-module"
-                   :pre-build (("./batch.sh"))
-                   :files ("dist/*.so" "dist/*.dll" "dist/*.dylib"))
-        :after treesit
-        :init
-        ;; Search for tree-sitter modules in this packages build directory.
-        (add-to-list 'treesit-extra-load-path
-                     (straight--build-dir "tree-sitter-module")))
+      (with-eval-after-load 'abbrev
+        (cl-loop
+         for (mode . ts-mode) in +tree-sitter-mode-remap
+         with    mode-abbrev-table = nil
+         with ts-mode-abbrev-table = nil
+         do (setq    mode-abbrev-table (intern (concat (symbol-name    mode) "-abbrev-table")))
+         do (setq ts-mode-abbrev-table (intern (concat (symbol-name ts-mode) "-abbrev-table")))
+
+         with mode-abbrev-table-value = nil
+         do (setq mode-abbrev-table-value
+                  (progn
+                    (unless (boundp mode-abbrev-table)
+                      (define-abbrev-table mode-abbrev-table nil))
+                    (symbol-value mode-abbrev-table)))
+
+         do (define-abbrev-table ts-mode-abbrev-table nil
+              (format "Automatic abbrev-table for `%s' deriving from `%s'" ts-mode mode-abbrev-table)
+              :parents (list mode-abbrev-table-value))))
     #+end_src
 
 *** evil-textobj-tree-sitter
