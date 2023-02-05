@@ -1787,7 +1787,7 @@
        "C-<tab>"         'next-buffer
        "C-S-<tab>"       'previous-buffer
        "C-<iso-lefttab>" 'previous-buffer
-       "RET"             'newline
+       "RET"             'newline-and-indent
        "<C-M-return>"    'comment-indent-new-line
        "<C-backspace>"   'evil-delete-backward-word
        "M-DEL"           'delete-forward-char
@@ -17748,6 +17748,16 @@
          do (define-abbrev-table ts-mode-abbrev-table nil
               (format "Automatic abbrev-table for `%s' deriving from `%s'" ts-mode mode-abbrev-table)
               :parents (list mode-abbrev-table-value))))
+    #+end_src
+
+    Indentation adjustment for several modes. For some reason running
+    =newline-and-indent= with =RET= in some modes just breaks indentation for the line
+    following the newline.
+
+    #+begin_src emacs-lisp
+      (general-define-key :keymaps 'java-ts-mode-map "RET" 'newline)
+      (general-define-key :keymaps 'rust-ts-mode-map "RET" 'newline)
+      (general-define-key :keymaps 'csharp-ts-mode-map "RET" 'newline)
     #+end_src
 
 *** evil-textobj-tree-sitter
