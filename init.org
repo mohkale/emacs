@@ -3908,12 +3908,25 @@
           (declare (indent defun))
           `(defun ,name (pattern _index _total)
              ,docstring
-             (when (,(if prefix #'string-prefix-p #'string-suffix-p) ,string pattern)
-               (if (string-equal pattern ,string)
-                   (cons 'orderless-literal pattern)
-                 (cons ,style
-                       (substring pattern
-                                  ,@(if prefix '(1) '(0 -1))))))))
+             (if (string-equal pattern ,string)
+                 ;; In the case where the input is the prefix/suffix then match
+                 ;; it exactly until you expand it.
+                 (cons 'orderless-literal pattern)
+               ;; Otherwise check the prefix or suffix for string.
+               (let ((matched-p)
+                     (checking-both (eq ,prefix 'both)))
+                 (when (and (or checking-both ,prefix)
+                            (string-prefix-p ,string pattern))
+                   (setq matched-p t
+                         pattern (substring pattern 1)))
+                 (when (and (not matched-p)
+                            (or checking-both ,(not prefix))
+                            (string-suffix-p ,string pattern))
+                   (setq matched-p t
+                         pattern (substring pattern 0 -1)))
+
+                 (when matched-p
+                   (cons ,style pattern))))))
 
         (defun-orderless-dispatcher flex-if-twiddle
           :docstring "Glob when trailing tilde."
@@ -3923,7 +3936,7 @@
         (defun-orderless-dispatcher literal-if-equals
           :docstring "Match literally if leading equals."
           :string "="
-          :prefix t
+          :prefix 'both
           :style 'orderless-literal)
 
         (defun-orderless-dispatcher without-if-bang
