@@ -8197,11 +8197,11 @@
                git-commit-mode
                lisp-interaction-mode
                TeX-mode LaTeX-mode
-               go-mode
-               python-mode
-               csharp-mode
-               js-mode js2-mode js-jsx-mode typescript-react-mode typescript-mode
-               c-mode c++-mode)
+               go-mode go-ts-mode
+               python-mode python-ts-mode
+               csharp-mode csharp-ts-mode
+               js-mode js2-mode js-jsx-mode typescript-react-mode typescript-mode typescript-ts-mode tsx-mode
+               c-mode c-ts-mode c++-mode c++-ts-mode)
                . abbrev-mode)
        :custom
        (abbrev-file-name (etc! "abbrev.el"))
@@ -17608,9 +17608,12 @@
    #+begin_src emacs-lisp :tangle yes
      (defvar +tree-sitter-mode-remap
        '(
+         ;; Must occur first for treesit-auto to remap from this to c-ts-mode.
+         (c-or-c++-mode . c-ts-mode)
+
          ;; Builtin Mode Aliases
          (c++-mode . c++-ts-mode)
-         (c-mode  . c-ts-mode)
+         (c-mode . c-ts-mode)
          (csharp-mode . csharp-ts-mode)
          (css-mode . css-ts-mode)
          (java-mode . java-ts-mode)
