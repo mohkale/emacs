@@ -19258,11 +19258,13 @@
        (push '(yaml-mode . 2) +indent-config)
        (push '(yaml-ts-mode . 2) +indent-config)
 
-       :config
+       :init
        (let ((syntax-changes '((?_ . "w")
                                (?- . "w"))))
-         (modify-syntax! syntax-changes yaml-mode-syntax-table)
-         (modify-syntax! syntax-changes yaml-ts-mode-syntax-table))
+         (with-eval-after-load 'yaml-mode
+           (modify-syntax! syntax-changes yaml-mode-syntax-table))
+         (with-eval-after-load 'yaml-ts-mode
+           (modify-syntax! syntax-changes yaml-ts-mode-syntax-table)))
 
        :lazy-leader
        (:mode '(yaml-mode yaml-ts-mode)
@@ -19861,13 +19863,13 @@
                (?\; . after))
              electric-layout-mode-rules+)
 
-       :config
+       :init
        (let ((syntax-changes '((?_ . "w"))))
-         (modify-syntax! syntax-changes c-mode-syntax-table)
-         (modify-syntax! syntax-changes c++-mode-syntax-table)
+         (with-eval-after-load 'cc-mode
+           (modify-syntax! syntax-changes c-mode-syntax-table)
+           (modify-syntax! syntax-changes c++-mode-syntax-table))
          (with-eval-after-load 'c-ts-mode
-           (modify-syntax! syntax-changes c-ts-mode-syntax-table)
-           (modify-syntax! syntax-changes c-ts-mode-syntax-table)))
+           (modify-syntax! syntax-changes c-ts-mode--syntax-table)))
 
        :config
        (+find-sibling-rules '(c-mode c-ts-mode)
@@ -20531,8 +20533,12 @@
                        (with-current-buffer (process-buffer (funcall func cmd args))
                          (setq-local compilation-was-open-p+ compilation-was-visible)))))
 
-       :config
-       (modify-syntax! '((?_ . "w")) rust-mode-syntax-table)
+       :init
+       (let ((syntax-changes '((?_ . "w"))))
+         (with-eval-after-load 'rust-mode
+           (modify-syntax! syntax-changes rust-mode-syntax-table))
+         (with-eval-after-load 'rust-ts-mode
+           (modify-syntax! syntax-changes rust-ts-mode--syntax-table)))
 
        :lazy-leader
        (:mode 'rustic-mode
