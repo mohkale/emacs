@@ -6376,14 +6376,29 @@
          [remap consult-org-capture+] 'project-org-capture+))
     #+end_src
 
-*** projector
+*** projection
     #+begin_src emacs-lisp
-      (use-package projector
-        :straight (projector :host github :repo "mohkale/projector"
-                             :files (:defaults "src/*.el"))
-        :hook (after-init . global-projector-hook-mode)
+      (use-package compile-multi
+        :straight '(compile-multi :host github
+                                  :repo "mohkale/compile-multi")
+        :leader ("cm" 'compile-multi)
         :custom
-        (projector-cmake-configure-options
+        (compile-multi-default-directory #'project-current-root+)
+
+        :config
+        (defun byte-compile-this-file+ ()
+          (byte-compile-file (buffer-file-name)))
+
+        (push `(emacs-lisp-mode
+                ("emacs:bytecompile" . ,#'byte-compile-this-file+))
+              compile-multi-config))
+
+      (use-package projection
+        :straight (projection :host github :repo "mohkale/projection"
+                             :files (:defaults "src/*.el"))
+        :hook (after-init . global-projection-hook-mode)
+        :custom
+        (projection-cmake-configure-options
          (delq
           nil
           (list
@@ -6392,22 +6407,37 @@
            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")))
 
         :init
-        (defvaralias 'projector-cmake-build-directory '+cmake-build-directory)
+        (defvaralias 'projection-cmake-build-directory '+cmake-build-directory)
         (with-eval-after-load 'project
-          (require 'projector))
+          (require 'projection))
 
         :general
-        ([remap project-compile] 'projector-build-project)
+        ([remap project-compile] 'projection-build-project
+         [remap compile-multi] 'projection-multi-compile)
 
         :leader
+        ;; Bindings copied from `projection-map'.
         (:prefix "p"
-         "C" 'projector-configure-project
-         "t" 'projector-test-project
-         "p" 'projector-run-project
-
-         "RET" 'projector-project-command
-         "DEL" 'projector-reset-project-cache
-         ))
+         ;; `projection-core'
+         "I" 'projection-show-project-info
+         "DEL" 'projection-reset-project-cache
+         ;; `projection-find'
+         "TAB" 'projection-find-other-file
+         "o"   'projection-find-other-file
+         ;; `projection-hook'
+         "h" 'projection-hook
+         "H" 'projection-hook-clear
+         ;; `projection-ibuffer'
+         "m" 'projection-ibuffer
+         ;; `projection-commands'.
+         "c" 'projection-build-project
+         "g" 'projection-configure-project
+         "t" 'projection-test-project
+         "p" 'projection-run-project
+         "k" 'projection-package-project
+         "i" 'projection-install-project
+         ;; `projection-multi'
+         "RET" 'projection-multi-compile))
     #+end_src
 
 ** projectile
@@ -6514,19 +6544,20 @@
         [remap project-kill-buffers] 'projectile-kill-buffers
         [remap project-query-replace-regexp] 'projectile-replace-regexp
 
-        [remap projector-configure-project] 'projectile-configure-project
-        [remap projector-build-project] 'projectile-compile-project
-        [remap projector-test-project] 'projectile-test-project
-        [remap projector-run-project] 'projectile-run-project
-        [remap projector-package-project] 'projectile-package-project
-        [remap projector-install-project] 'projectile-install-project
+        [remap projection-configure-project] 'projectile-configure-project
+        [remap projection-build-project] 'projectile-compile-project
+        [remap projection-test-project] 'projectile-test-project
+        [remap projection-run-project] 'projectile-run-project
+        [remap projection-package-project] 'projectile-package-project
+        [remap projection-install-project] 'projectile-install-project
 
-        [remap projector-reset-project-cache] 'projectile-invalidate-cache
+        [remap projection-find-other-file] 'projectile-find-other-file
+        [remap projection-reset-project-cache] 'projectile-invalidate-cache
+        [remap projection-ibuffer] 'projectile-ibuffer
         )
 
        :leader
        (:prefix "p"
-        "TAB" 'projectile-find-other-file
         "RET" 'projectile-toggle-between-implementation-and-test
 
         "so" 'projectile-multi-occur
@@ -6534,16 +6565,10 @@
         ;; "d" 'projectile-find-dir
         "r" 'projectile-recentf
         "F" 'projectile-find-file-in-known-projects                                  ; find-file across all known projects.
-        "m" 'projectile-ibuffer                                                      ; Open an ibuffer session with all open project buffers.
 
         "[" 'projectile-previous-project-buffer
         "]" 'projectile-next-project-buffer
         "v" 'projectile-run-term
-
-        "g" '(:ignore t :wk "tags")
-        "gr" 'projectile-regenerate-tags
-        "gg" 'projectile-find-tag
-        "st" 'projectile-find-tag
         ))
    #+END_SRC
 
@@ -14429,26 +14454,6 @@
      (use-package command-log-mode
        :straight t)
    #+END_SRC
-
-** compile-multi
-   #+begin_src emacs-lisp
-     (use-package compile-multi
-       :straight '(compile-multi :host github
-                                 :repo "mohkale/compile-multi")
-       :leader ("cm" 'compile-multi)
-       :custom
-       (compile-multi-default-directory #'project-current-root+)
-       (compile-multi-cmake-command
-        (concat "cmake --build " (shell-quote-argument +cmake-build-directory)))
-
-       :config
-       (defun byte-compile-this-file+ ()
-         (byte-compile-file (buffer-file-name)))
-
-       (push `(emacs-lisp-mode
-               ("emacs:bytecompile" . ,#'byte-compile-this-file+))
-             compile-multi-config))
-   #+end_src
 
 ** dashboard
 *** footer
