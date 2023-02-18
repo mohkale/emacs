@@ -1787,7 +1787,7 @@
        "C-<tab>"         'next-buffer
        "C-S-<tab>"       'previous-buffer
        "C-<iso-lefttab>" 'previous-buffer
-       "RET"             'newline-and-indent
+       "RET"             'newline
        "<C-M-return>"    'comment-indent-new-line
        "<C-backspace>"   'evil-delete-backward-word
        "M-DEL"           'delete-forward-char
@@ -17653,6 +17653,9 @@
         (js2-highlight-level 0
          "Prevent syntax highlighting conflict between tree-sitter and `js2-mode'.")
 
+        :init
+        (advice-add 'treesit-explore-mode :around 'display-buffer-no-select-window-advice)
+
         :config
         (unless (treesit-available-p)
           (error "Emacs was not built with tree-sitter support")))
@@ -17755,14 +17758,10 @@
               :parents (list mode-abbrev-table-value))))
     #+end_src
 
-    Indentation adjustment for several modes. For some reason running
-    =newline-and-indent= with =RET= in some modes just breaks indentation for the line
-    following the newline.
-
-    #+begin_src emacs-lisp
-      (general-define-key :keymaps 'java-ts-mode-map "RET" 'newline)
-      (general-define-key :keymaps 'rust-ts-mode-map "RET" 'newline)
-      (general-define-key :keymaps 'csharp-ts-mode-map "RET" 'newline)
+*** combobulate
+    #+begin_src emacs-lisp :tangle no
+      (use-package combobulate
+        :straight (combobulate :host github :repo "mickeynp/combobulate"))
     #+end_src
 
 *** evil-textobj-tree-sitter
@@ -19854,7 +19853,7 @@
        (c-default-style '((java-mode . "linux")
                           (awk-mode . "awk")
                           (other . "k&r")))
-       (c-ts-mode-indent-style 'k&r)
+       (c-ts-mode-indent-style 'bsd)
 
        ;; (c-toggle-comment-style +1)                            ; WARN never do this, it breaks commenting in weird places.
 
