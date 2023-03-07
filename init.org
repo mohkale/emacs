@@ -16483,7 +16483,8 @@
        (notmuch-search-line-faces
         '(("unread" . notmuch-search-unread-face)
           ("H" . notmuch-search-H-face+)
-          ("flagged" . notmuch-search-flagged-face)))
+          ("flagged" . notmuch-search-flagged-face)
+          ("reminder" . notmuch-search-flagged-face)))
        (notmuch-show-all-tags-list t)
        (notmuch-draft-folder "local/Drafts")
 
@@ -16560,7 +16561,7 @@
                                        (if (bound-and-true-p notmuch-tree-mode)
                                            "--output=messages"
                                          "--output=threads")
-                                       (if (bound-and-true-p notmuch-search-exclude)
+                                       (if (bound-and-true-p notmuch-search-hide-excluded)
                                            "--exclude=true"
                                          "--exclude=false")
                                        notmuch-search-query-string)))
