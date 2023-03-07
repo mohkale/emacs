@@ -6244,6 +6244,7 @@
      (use-package project
        :custom
        (project-list-file (state! "projects.el"))
+       (project-switch-commands #'project-find-file)
 
        :init
        (defun project-current-root+ (&optional dir)
@@ -9814,7 +9815,7 @@
     #+END_SRC
 
 *** ibuffer-projectile
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer ibuffer-projectile)
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer projectile ibuffer-projectile)
       (use-package ibuffer-projectile
         :straight t
         :after ibuffer
@@ -14618,6 +14619,10 @@
         (dashboard-banner-logo-title "Welcome to Emacs!")
         (dashboard-items '((recents  . 5)
                            (projects . 15)))
+        (dashboard-projects-backend
+         (if (package! projectile)
+             'projectile
+           'project-el))
         (dashboard-center-content nil)
         (dashboard-set-navigator  t)
         (dashboard-set-init-info  t)
