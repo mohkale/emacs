@@ -15033,8 +15033,7 @@
        :hook (eglot-connect . eglot-signal-didChangeConfiguration)
        :commands (eglot-ensure-maybe+
                   eglot-mode-server-p+
-                  eglot-mode-server-all-p+
-                  eglot-create-local-command+)
+                  eglot-mode-server-all-p+)
        :custom
        (eglot-autoreconnect nil)
        (eglot-extend-to-xref t)
@@ -15044,22 +15043,25 @@
 
        :init
        (setq-default eglot-workspace-configuration
-                     '((:pyls
-                        (plugins
-                         (pydocstyle (enabled . t))
-                         (pylint (enabled . t))
-                         (pyls_mypy
-                          (enabled . t)
-                          ;; Fixes mypy import complaints (see [[https://github.com/tomv564/pyls-mypy/issues/36][pyls-mypy#36]])
-                          (live-mode . :json-false))
-                         (jedi_completion
-                          (fuzzy . t)
-                          (follow_builtin_imports . :json-false))))
-                       (:pylsp
+                     '((:pylsp
                         (configurationSources . ["pycodestyle"])
                         (plugins
+                         ;; Completion
+                         (jedi_completion (fuzzy . t))
+                         ;; Formatters
+                         (black
+                          (enabled . t)
+                          ;; Better performance but will require server restarts on config changes.
+                          (cache_config . t))
+                         ;; Linters
                          (pydocstyle (enabled . t))
-                         (pylint (enabled . t))))
+                         (pylint (enabled . nil))
+                         (pylsp_mypy
+                          ;; Only calculate on file-saves (the alternative is too performance heavy)
+                          (live_mode . :json-false)
+                          ;; Use the mypy daemon to speed up type-checking.
+                          (dmypy . t))
+                         (ruff (enabled . t))))
                        (:omnisharp
                         (path . "")
                         (useModernNet . t)
@@ -15111,24 +15113,6 @@
 
        (defun eglot-mode-server-all-p+ (mode)
          (eglot-server-exists-p+ mode t))
-
-       (defmacro eglot-create-local-command+ (name conf &rest cmd)
-         "Generate a function from CONF that checks for a project-local language \
-     server to run with eglot.
-     CONF is an alist matching file-names to executables which can take care of
-     setting up the PATH configuration (or if necessary installation) needed to
-     run CMD. When no entry in CONF is found relative to the current project root
-     we return CMD as is, otherwise we preppend the cdr of CONF entry that does
-     exist."
-         (declare (indent 2))
-         `(defun ,(intern (concat "eglot-local-server-" (symbol-name name) "+")) (&optional _interactive)
-            (append
-             (when-let ((default-directory (project-current-root+)))
-               (cl-loop for (file . cmds) in ,conf
-                        when (and (file-exists-p file)
-                                  (executable-find (car cmds) t))
-                          return cmds))
-             (list ,@cmd))))
 
        :leader
        (:prefix leader-server-leader-prefix
@@ -18782,15 +18766,6 @@
       (add-hook 'ruby-mode-hook +lsp-command)
     #+END_SRC
 
-    #+begin_src emacs-lisp :tangle (package-yes! ruby eglot)
-      (with-eval-after-load 'eglot
-        (push (cons '(enh-ruby-mode ruby-mode)
-                    (eglot-create-local-command+ ruby
-                        '(("Gemfile.lock" "bundle" "exec"))
-                      "solargraph" "socket" "--port" :autoport))
-              eglot-server-programs))
-    #+end_src
-
 *** inferior-ruby
     #+BEGIN_SRC emacs-lisp
       (use-package inf-ruby
@@ -19928,12 +19903,6 @@
       (add-hook 'csharp-mode-hook +lsp-command)
     #+end_src
 
-    #+begin_src emacs-lisp :tangle (package-yes! csharp eglot)
-      (with-eval-after-load 'eglot
-        (push `(csharp-mode . ("omnisharp" "-lsp"))
-              eglot-server-programs))
-    #+end_src
-
 ** kotlin
    :PROPERTIES:
    :header-args+: :tangle (package-yes! kotlin)
@@ -20093,16 +20062,6 @@
       (add-hook 'js-mode-hook +lsp-command)
       (add-hook 'js-ts-mode-hook +lsp-command)
     #+END_SRC
-
-    #+begin_src emacs-lisp :tangle (package-yes! javascript eglot)
-      (with-eval-after-load 'eglot
-        (push (cons '(js-mode js-ts-mode typescript-mode typescript-ts-mode)
-                    (eglot-create-local-command+ node
-                        '(("package-lock.json" "npx")
-                          ("yarn.lock" "yarn" "run"))
-                      "typescript-language-server" "--stdio"))
-              eglot-server-programs))
-    #+end_src
 
 *** js-doc
     #+BEGIN_SRC emacs-lisp
