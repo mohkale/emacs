@@ -3508,13 +3508,16 @@
     #+begin_src emacs-lisp
       (defun find-temp-file+ (path)
         (interactive
-         (list (let ((default-directory
-                       (concat (xdg--dir-home "XDG_TEMP_DIR" "~/.local/temp") "/")))
-                 (concat default-directory
-                         (read-file-name
-                          "Make temp file: "
-                          default-directory
-                          (format-time-string "%Y%m%d.%H%M%S"))))))
+         (list (let* ((default-basename (format-time-string "%Y%m%d.%H%M%S"))
+                      (default-directory
+                        (concat (xdg--dir-home "XDG_TEMP_DIR" "~/.local/temp") "/")))
+                 (expand-file-name
+                  (read-file-name
+                   "Make temp file: "
+                   default-directory
+                   nil
+                   nil
+                   default-basename)))))
         (when-let ((dir (file-name-directory path)))
           (unless (string-empty-p dir)
             (mkdir dir t)))
