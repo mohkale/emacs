@@ -226,6 +226,7 @@
          sh-script
          sql
          ssh-config
+         toml
          ;; vimlang
          ;; verilog
          xml
@@ -1339,10 +1340,10 @@
             (define-key xterm-function-map "\e[27;5u"  (kbd "C-ESC"))
 
             ;; define xterm codes for ctrl+shift alphabet keys
-            (cl-loop for (i . char) in (-zip (number-sequence 65 90)
-                                             (append (number-sequence 97 105)
-                                                     '(107 106)                               ; for some reason, J & K are switched
-                                                     (number-sequence 108 122)))
+            (cl-loop for (i . char) in (-zip-pair (number-sequence 65 90)
+                                                  (append (number-sequence 97 105)
+                                                          '(107 106)                  ; for some reason, J & K are switched
+                                                          (number-sequence 108 122)))
                      do (define-key xterm-function-map
                           (concat "\e[" (number-to-string i) ";2u")
                           (kbd (concat "C-S-" (string char))))
@@ -6237,6 +6238,24 @@
         "xrpx" 'rxt-pcre-to-rx))
    #+END_SRC
 
+** compile-multi
+   #+begin_src emacs-lisp
+     (use-package compile-multi
+       :straight '(compile-multi :host github
+                                 :repo "mohkale/compile-multi")
+       :leader ("cm" 'compile-multi)
+       :custom
+       (compile-multi-default-directory #'project-current-root+)
+
+       :config
+       (defun byte-compile-this-file+ ()
+         (byte-compile-file (buffer-file-name)))
+
+       (push `(emacs-lisp-mode
+               ("emacs:bytecompile" . ,#'byte-compile-this-file+))
+             compile-multi-config))
+   #+end_src
+
 ** project
    The [[info:emacs#Projects][built in]] project management library.
 
@@ -6382,21 +6401,6 @@
 
 *** projection
     #+begin_src emacs-lisp
-      (use-package compile-multi
-        :straight '(compile-multi :host github
-                                  :repo "mohkale/compile-multi")
-        :leader ("cm" 'compile-multi)
-        :custom
-        (compile-multi-default-directory #'project-current-root+)
-
-        :config
-        (defun byte-compile-this-file+ ()
-          (byte-compile-file (buffer-file-name)))
-
-        (push `(emacs-lisp-mode
-                ("emacs:bytecompile" . ,#'byte-compile-this-file+))
-              compile-multi-config))
-
       (use-package projection
         :straight (projection :host github :repo "mohkale/projection"
                              :files (:defaults "src/*.el"))
@@ -8000,12 +8004,12 @@
        :straight (comint :type built-in)
        :hook ((comint-mode . (lambda ()
                                (setq-local evil-emacs-state-cursor 'bar))))
+       :custom
+       (comint-prompt-read-only t)
+
        :config
        (push 'comint-mode +whitespace-exempt-modes)
-       (evil-set-initial-state 'comint-mode 'emacs)
-
-       (setq comint-mode-map (make-sparse-keymap) ;; reset all
-             comint-prompt-read-only t))
+       (evil-set-initial-state 'comint-mode 'emacs))
     #+END_SRC
 
     I've moved comint commands and binding declarations into a separate file, because
@@ -9272,14 +9276,6 @@
        (ispell-alternate-dictionary (etc! "ispell" "english-words.txt"))
 
        :config
-       (defun ispell--prevent-absolute-path (func &rest args)
-         (cl-letf (((symbol-function 'expand-file-name)
-                    (lambda (fp) fp)))
-           (apply func args)))
-
-       (advice-add 'ispell-internal-change-dictionary :around #'ispell--prevent-absolute-path)
-       (advice-add 'flyspell-large-region             :around #'ispell--prevent-absolute-path)
-
        (add-hook 'kill-emacs-hook
                  (defun ispell-save-pdict-on-quit+ ()
                    (ispell-pdict-save t))))
@@ -13111,7 +13107,9 @@
                            :types ,(consult-imenu-gen-types+
                                     "Function" "Class" "Variable"))))
                `((c-mode ,@conf)
-                 (c++-mode ,@conf)))))
+                 (c++-mode ,@conf)))
+           (toml-ts-mode :types ((?h "Header" font-lock-variable-name-face)
+                                 (?a "Array" font-lock-variable-name-face)))))
 
         :init
         ;; Override the types for the current major-mode with types.
@@ -13560,12 +13558,12 @@
         :hook (marginalia-mode . all-the-icons-completion-marginalia-setup)
 
         :init
-        (advice-add #'all-the-icons-completion-get-icon :before-until
-                    (lambda (cand cat)
-                      (when (eq cat 'project)
-                        (all-the-icons-completion-get-file-icon cand))))
         (advice-add 'all-the-icons-completion-get-icon :filter-return
-                    #'all-the-icons-pad-on-tty-advice+))
+                    #'all-the-icons-pad-on-tty-advice+)
+
+        :config
+        (cl-defmethod all-the-icons-completion-get-icon (cand (_cat (eql project)))
+          (all-the-icons-completion-get-file-icon cand)))
     #+end_src
 
 *** consult-extensions
@@ -14629,6 +14627,7 @@
         (show-week-agenda-p       t)
         (dashboard-show-shortcuts t)
         (dashboard-page-separator "\n\f\n")
+        (dashboard-display-icons-p +icons-available)
 
         :preface
         (push 'dashboard-mode +whitespace-exempt-modes)
@@ -14731,6 +14730,7 @@
 
         (defun dashboard-read-banner+ (path)
           "Load a banner from my ~/.config/banners directory."
+          (require 'ansi-color)
           (with-temp-buffer
             (insert-file-contents path)
             (save-excursion
@@ -16478,7 +16478,7 @@
           ("flagged" . notmuch-search-flagged-face)
           ("reminder" . notmuch-search-flagged-face)))
        (notmuch-show-all-tags-list t)
-       (notmuch-draft-folder "local/Drafts")
+       (notmuch-draft-folder (join-path "local" (system-name) "drafts"))
 
        :preface
        (defface notmuch-search-H-face+ '((t (:foreground "#FF6EB4")))
@@ -17749,6 +17749,19 @@
          do (define-abbrev-table ts-mode-abbrev-table nil
               (format "Automatic abbrev-table for `%s' deriving from `%s'" ts-mode mode-abbrev-table)
               :parents (list mode-abbrev-table-value))))
+    #+end_src
+
+    Add all-the-icons variants for new-tree-sitter modes.
+
+    #+begin_src emacs-lisp
+      (with-eval-after-load 'all-the-icons
+        (cl-loop
+         for (mode . ts-mode) in +tree-sitter-mode-remap
+         with mode-config = nil
+         do (setq mode-config (alist-get mode all-the-icons-mode-icon-alist))
+         when (and mode-config
+                   (not (alist-get ts-mode all-the-icons-mode-icon-alist)))
+           do (push (cons ts-mode mode-config) all-the-icons-mode-icon-alist)))
     #+end_src
 
 *** combobulate
@@ -19122,7 +19135,13 @@
 ** JSON
    #+begin_src emacs-lisp
      (use-package js
-       :hook ((js-json-mode json-ts-mode) . +flylint))
+       :hook ((js-json-mode json-ts-mode) . +flylint)
+       :init
+       (with-eval-after-load 'org-src
+         (push `("json" . ,(if (package! tree-sitter)
+                               'json-ts-mode
+                             'js-json-mode))
+               org-src-lang-modes)))
    #+end_src
 
 *** vscode-json-languageserver                                          :lsp:
@@ -20561,8 +20580,8 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package tex-mode
-       :hook ((latex-mode . display-line-numbers-mode)
-              (latex-mode . +flylint))
+       :hook (((latex-mode LaTeX-mode) . display-line-numbers-mode)
+              ((latex-mode LaTeX-mode) . +flylint))
        :custom
        (TeX-electric-math '("\\( " . " \\)"))
        (TeX-auto-save  t)
@@ -20572,8 +20591,6 @@
        (TeX-auto-private (list (etc! "auctex" "styles")))
 
        :preface
-       (defvaralias 'LaTeX-mode-hook 'latex-mode-hook)
-
        (defvar latex-modes+ '(latex-mode tex-mode)
          "list of tex related modes. used for leader and pretty symbols.")
 
@@ -20631,9 +20648,9 @@
     #+BEGIN_SRC emacs-lisp
       (use-package tex-site
         :straight auctex
-        :hook ((latex-mode . TeX-fold-mode)
-               (latex-mode . TeX-source-correlate-mode)                               ; Lets your PDF-viewer open lines in emacs and the TeX-view command jump to lines in your viewer.
-               (latex-mode . TeX-PDF-mode))
+        :hook (((latex-mode LaTeX-mode) . TeX-fold-mode)
+               ((latex-mode LaTeX-mode) . TeX-source-correlate-mode)                               ; Lets your PDF-viewer open lines in emacs and the TeX-view command jump to lines in your viewer.
+               ((latex-mode LaTeX-mode) . TeX-PDF-mode))
         :config
       ;;; Command to insert a math symbol at point
         (defun latex-insert-math+ ()
@@ -22355,7 +22372,7 @@
         :custom
         (orglink-activate-in-modes
          '(hledger-mode text-mode prog-mode conf-mode))
-        (orglink-match-anywhere t)
+        (orglink-match-anywhere nil)
 
         :init
         (with-eval-after-load 'org
@@ -22367,17 +22384,7 @@
           (with-current-buffer buf
             (when (and (not (bound-and-true-p orglink--mode))
                        (not (derived-mode-p 'org-mode)))
-              (turn-on-orglink-mode-if-desired))))
-
-        :preface
-        (defun orglink-enable-only-in-comments+ ()
-          (setq-local orglink-match-anywhere nil))
-
-        :hook
-        (((sh-mode
-           python-mode
-           dockerfile-mode) .
-          orglink-enable-only-in-comments+)))
+              (turn-on-orglink-mode-if-desired)))))
     #+END_SRC
 
 **** pdftools
@@ -23253,6 +23260,20 @@
                   do (setcar entry (substring key 1 (1- (length key))))))
    #+end_src
 
+** toml
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! toml)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package conf-mode)
+   #+end_src
+
+   #+begin_src emacs-lisp :tangle (package-yes! toml tree-sitter)
+     (use-package toml-ts-mode
+       :mode (rx ".toml" eol))
+   #+end_src
+
 * Script
   :PROPERTIES:
   :header-args+: :shebang "#!/usr/bin/env emacs-script\n;; -*- mode: emacs-lisp; lexical-binding: t -*-"
@@ -23608,10 +23629,12 @@
        `(font-lock-doc-face ((t (:foreground ,blue))))
        `(font-lock-type-face ((,cls (:foreground ,red-256))))
        `(font-lock-variable-name-face ((,cls (:foreground ,yellow-int-256))))
-       `(font-lock-warning-face ((,cls (:background ,yellow-int
-                                        :foreground ,very-dark-grey
-                                        :distant-foreground ,yellow-int
-                                        :underline nil :inherit bold))))
+       `(font-lock-warning-face ((,gui (:underline (:style wave :color ,red)))
+                                 ;; (,cls (:background ,yellow-int
+                                 ;;        :foreground ,very-dark-grey
+                                 ;;        :distant-foreground ,yellow-int
+                                 ;;        :underline nil :inherit bold))
+                                 (,cls (:underline (:style wave :color ,yellow)))))
 
       ;;; Tree sitter
        ;; An alternative to `font-lock-mode' with considerably more diverse highlighting.
@@ -24255,4 +24278,4 @@
 #  LocalWords:  microsoft github godoc SchoolsColors StackOverflow GoogleMaps cmake
 #  LocalWords:  GoogleImages separedit csharp impl gopls analyzer plsense glsl mml
 #  LocalWords:  languageserver roslyn recentf verilog toc cpp vundo javascript corfu
-#  LocalWords:  crontab doc
+#  LocalWords:  crontab doc toml
