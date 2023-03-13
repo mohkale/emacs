@@ -8613,7 +8613,7 @@
         (all-the-icons-dired-monochrome nil)
 
         :init
-        (advice-add 'all-the-icons-dired--icon :around #'all-the-icons-pad-families-on-tty-advice+))
+        (advice-add 'all-the-icons-dired--icon :filter-return #'all-the-icons-pad-on-tty-advice+))
     #+END_SRC
 
 *** dired-omit
@@ -14627,7 +14627,6 @@
         (show-week-agenda-p       t)
         (dashboard-show-shortcuts t)
         (dashboard-page-separator "\n\f\n")
-        (dashboard-display-icons-p +icons-available)
 
         :preface
         (push 'dashboard-mode +whitespace-exempt-modes)
@@ -14784,6 +14783,7 @@
                         (dashboard-refresh-buffer)))))
 
         :custom
+        (dashboard-display-icons-p +icons-available)
         (dashboard-set-file-icons +icons-available)
         (dashboard-set-heading-icons +icons-available)
         (dashboard-heading-icons '((recents   . "file-text")
@@ -14792,15 +14792,14 @@
                                    (projects  . "briefcase")
                                    (registers . "database")))
         :config
-        ;; (advice-add 'dashboard-insert-startupify-lists :around 'all-the-icons-pad-families-on-tty-advice+)
+        (advice-add #'dashboard-insert-startupify-lists :around 'all-the-icons-pad-families-on-tty-advice+)
         (when +icons-prefer-nerd-font
           (advice-add #'dashboard-insert-heading :around
                       (defun dashboard-insert-heading-use-nerd-fonts+ (func &rest args)
                         (cl-letf (((symbol-function 'all-the-icons-octicon)
-                                   (lambda (&rest icon-args)
-                                     (all-the-icons-pad-on-tty-advice+
-                                      (apply #'all-the-icons-nerd-oct icon-args)))))
+                                   #'all-the-icons-nerd-oct))
                           (apply func args)))))
+        (setq dashboard-footer-icon (all-the-icons-pad-on-tty-advice+ dashboard-footer-icon))
 
         :general
         (:keymaps 'dashboard-mode-map
