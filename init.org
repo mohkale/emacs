@@ -6436,7 +6436,8 @@
          "h" 'projection-hook
          "H" 'projection-hook-clear
          ;; `projection-ibuffer'
-         "m" 'projection-ibuffer
+         "m" 'ibuffer-projection-current-project
+         "M" 'ibuffer-projection-toggle-filter-groups
          ;; `projection-commands'.
          "c" 'projection-build-project
          "g" 'projection-configure-project
@@ -6563,7 +6564,7 @@
 
         [remap projection-find-other-file] 'projectile-find-other-file
         [remap projection-reset-project-cache] 'projectile-invalidate-cache
-        [remap projection-ibuffer] 'projectile-ibuffer
+        [remap projection-ibuffer-current-project] 'projectile-ibuffer
         [remap projection-recentf] 'projectile-recentf
         )
 
@@ -7905,7 +7906,7 @@
     #+BEGIN_SRC emacs-lisp
       (defvar compilation-auto-kill-predicate+
         (defun compilation-auto-kill-predicate+ ()
-          "Skip killing the compilation window if in not in a side-window."
+          "Skip killing the compilation window if not in a side-window."
           (window-at-side-p (get-buffer-window)))
         "Predicate ran just before killing a compilation buffer.0")
 
@@ -17752,19 +17753,6 @@
               :parents (list mode-abbrev-table-value))))
     #+end_src
 
-    Add all-the-icons variants for new-tree-sitter modes.
-
-    #+begin_src emacs-lisp
-      (with-eval-after-load 'all-the-icons
-        (cl-loop
-         for (mode . ts-mode) in +tree-sitter-mode-remap
-         with mode-config = nil
-         do (setq mode-config (alist-get mode all-the-icons-mode-icon-alist))
-         when (and mode-config
-                   (not (alist-get ts-mode all-the-icons-mode-icon-alist)))
-           do (push (cons ts-mode mode-config) all-the-icons-mode-icon-alist)))
-    #+end_src
-
 *** combobulate
     #+begin_src emacs-lisp :tangle no
       (use-package combobulate
@@ -18629,6 +18617,7 @@
        :custom
        (python-indent-guess-indent-offset-verbose nil
         "Disable annoying notification when indent guess fails")
+       (python-indent-def-block-scale 1)
 
        :init
        (setq python-prettify-symbols-alist nil)
