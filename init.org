@@ -779,7 +779,7 @@
      (dotemacs-initialise-path! share (join-path (xdg-data-home)  "emacs"))
      (dotemacs-initialise-path! cache (join-path (xdg-cache-home) "emacs"))
      (dotemacs-initialise-path! state (join-path (xdg-state-home) "emacs"))
-     (dotemacs-initialise-path! lisp  (cache! "site-lisp"))
+     (dotemacs-initialise-path! lisp  "site-lisp")
    #+END_SRC
 
    Now let's set the default paths for a bunch of emacs builtins, see [[https://github.com/emacscollective/no-littering/blob/master/no-littering.el][no-littering.el]].
@@ -3078,13 +3078,9 @@
    #+END_SRC
 
 ** library
-   #+BEGIN_SRC emacs-lisp
-     (add-to-list 'load-path (lisp! "lib"))
-   #+END_SRC
-
 *** lib-misc
     :PROPERTIES:
-    :header-args+: :tangle (lisp! "lib/+lib-misc.el")
+    :header-args+: :tangle (lisp! "+lib-misc.el")
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle yes
@@ -3221,7 +3217,7 @@
 
 *** lib-text
     :PROPERTIES:
-    :header-args+: :tangle (lisp! "lib/+lib-text.el")
+    :header-args+: :tangle (lisp! "+lib-text.el")
     :END:
 
     Manipulate chunks of text.
@@ -3387,7 +3383,7 @@
 
 *** lib-text-query
     :PROPERTIES:
-    :header-args+: :tangle (lisp! "lib/+lib-text-query.el")
+    :header-args+: :tangle (lisp! "+lib-text-query.el")
     :END:
 
     #+BEGIN_SRC emacs-lisp :tangle yes
@@ -3460,7 +3456,7 @@
 
 *** lib-buffer
     :PROPERTIES:
-    :header-args+: :tangle (lisp! "lib/+lib-buffer-control.el")
+    :header-args+: :tangle (lisp! "+lib-buffer-control.el")
     :END:
 
      #+BEGIN_SRC emacs-lisp :tangle yes
@@ -3704,7 +3700,7 @@
 
 *** lib-unpackaged
     :PROPERTIES:
-    :header-args+: :tangle (lisp! "lib/+lib-unpackaged.el")
+    :header-args+: :tangle (lisp! "+lib-unpackaged.el")
     :END:
 
     Many useful functions sourced from [[https://github.com/alphapapa/unpackaged.el/blob/master/unpackaged.el][unpackaged.el]].
@@ -4086,7 +4082,7 @@
      Hydra for managing and interacting with windows.
 
      #+BEGIN_SRC emacs-lisp
-       (autoload 'winman-hydra/body (lisp! "hydras" "winman-hydra.el") nil t)
+       (autoload 'winman-hydra/body (lisp! "+winman-hydra.el") nil t)
 
        (general-define-key
         :keymaps 'emacs-window-map
@@ -4098,7 +4094,7 @@
 
      TODO: Support left-right to winner-undo.
 
-     #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/winman-hydra.el")
+     #+BEGIN_SRC emacs-lisp :tangle (lisp! "+winman-hydra.el")
        (require 'evil)
        (require 'windmove)
        (require 'winner)
@@ -4172,12 +4168,12 @@
          ("q" nil "quit" :exit t)
          ("<escape>" nil "quit" :exit t)) ;; prevent evil-escape
 
-       (provide 'winman-hydra)
+       (provide '+winman-hydra)
      #+END_SRC
 
 **** indent
      #+BEGIN_SRC emacs-lisp
-       (autoload 'indent-hydra/body (lisp! "hydras" "indent-hydra.el") nil t)
+       (autoload 'indent-hydra/body (lisp! "+indent-hydra.el") nil t)
 
        (general-define-key
         "C-x TAB" 'indent-hydra/body)
@@ -4186,7 +4182,7 @@
          (concat leader-hydra-leader-prefix " TAB") '(indent-hydra/body :wk "indent-hydra"))
      #+END_SRC
 
-     #+BEGIN_SRC emacs-lisp :tangle (lisp! "hydras/indent-hydra.el")
+     #+BEGIN_SRC emacs-lisp :tangle (lisp! "+indent-hydra.el")
        (defmacro indent-hydra--keep-visual-state-active (&rest body)
          "when body is invoked with evil-visual, restore the state after body"
          `(let ((visual-active (evil-visual-state-p)))
@@ -4290,7 +4286,7 @@
          ">" 'indent-hydra/lambda-L
          "<" 'indent-hydra/lambda-H)
 
-       (provide 'indent-hydra)
+       (provide '+indent-hydra)
      #+END_SRC
 
 ** evil
@@ -5930,7 +5926,7 @@
 
 *** eyebrowse-hydra
     #+BEGIN_SRC emacs-lisp
-      (autoload 'eyebrowse-hydra/body (lisp! "hydras" "eyebrowse-hydra.el") nil t)
+      (autoload 'eyebrowse-hydra/body (lisp! "+eyebrowse-hydra.el") nil t)
 
       (general-define-key
        :keymaps 'emacs-window-map
@@ -5938,7 +5934,7 @@
         "C-w" '(eyebrowse-hydra/body :wk "eyebrowse-hydra"))
     #+END_SRC
 
-    #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "hydras/eyebrowse-hydra.el") eyebrowse)
+    #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "+eyebrowse-hydra.el") eyebrowse)
       (require 'eyebrowse)
 
       (defvar eyebrowse-hydra/verbose-p nil
@@ -6060,7 +6056,7 @@
                                               eyebrowse-hydra/complete-command-docstring))
                                     eyebrowse-hydra/heads))))
 
-      (provide 'eyebrowse-hydra)
+      (provide '+eyebrowse-hydra)
     #+END_SRC
 
 ** gitlink
