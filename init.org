@@ -183,6 +183,10 @@
          ;; ycmd                                                           ; A language-server for most languages. written in python.
          ;; tree-sitter                                                    ; Incremental parsing of your source code asynchronously.
 
+     ;;; Spell checkers
+         flyspell                                                          ; Emacs builtin spell checker library.
+         ;; jinx                                                           ; A modern JIT spell checker built atop libenchant.
+
      ;;; Languages
          ;; assembly
          bibtex
@@ -9217,6 +9221,9 @@
     #+END_SRC
 
 ** flyspell
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! flyspell)
+   :END:
    On the fly spell checker. Spawns an Aspell sub-process and passes any words you write
    to it; any misspellings or unknown words will be highlighted to indicate they're misspelled.
 
@@ -9271,8 +9278,8 @@
    #+BEGIN_SRC emacs-lisp
      (use-package ispell
        :custom
-       (ispell-personal-dictionary (etc! "ispell/spellings.txt"))
-       (ispell-alternate-dictionary (etc! "ispell" "english-words.txt"))
+       (ispell-personal-dictionary (join-path (xdg-config-home) "enchant" "en_GB.dic"))
+       (ispell-alternate-dictionary (join-path (xdg-config-home) "ispell" "english-words.txt"))
 
        :config
        (add-hook 'kill-emacs-hook
@@ -15565,6 +15572,25 @@
         :hook (flycheck-mode . flycheck-pos-tip-mode)
         :commands flycheck-pos-tip-mode)
     #+END_SRC
+
+** jinx
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! jinx)
+   :END:
+
+   #+begin_src emacs-lisp
+     (use-package jinx
+       :straight t
+       :delight (jinx-mode " Jinx")
+       :defer 2
+       :config (global-jinx-mode +1)
+       :lazy-leader
+       (:mode 'jinx-mode
+        :minor t
+        :prefix leader-minor-mode-leader-prefix
+        leader-minor-mode-leader-prefix 'jinx-correct
+        "l" 'jinx-languages))
+   #+end_src
 
 ** ggtags
    Tags are the classic source-code navigation system that predates LSP.
@@ -23787,6 +23813,9 @@
       ;;; flyspell
        `(flyspell-duplicate ((,cls (:foreground ,orange-dim :underline t))))
        `(flyspell-incorrect ((,cls (:foreground ,red-dim :underline t))))
+
+      ;;; jinx
+       `(jinx-misspelled ((,cls (:foreground ,red-dim :underline t))))
 
       ;;; avy
        `(avy-background-face ((,cls (:foreground ,grey))))
