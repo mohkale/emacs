@@ -112,7 +112,6 @@
          ;; corfu                                                          ; Company alternative aiming to be a little more generic
          ;; command-log-mode                                               ; Echo commands as you enter them
          dashboard                                                         ; A feature full emacs dashboard
-         ;; deft                                                           ; Note management system based on multiple org files
          ;; ebdb                                                           ; A contact management database for emacs
          ;; ebuku                                                          ; Interface to the, ebuku, bookmark manager
          engine-mode                                                       ; Run a search on a given search engine and view in browser
@@ -14833,66 +14832,6 @@
          "e" (dashboard-defun-shortcut-function+ #'dashboard-jump-to-registers)
          "a" (dashboard-defun-shortcut-function+ #'dashboard-jump-to-agenda)))
     #+END_SRC
-
-** deft
-   Note taking management solution for emacs.
-
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! deft)
-     (use-package deft
-       :straight t
-       :leader
-       ("od" 'deft)
-
-       :config
-       (setq deft-directory +notes-home)
-       (push 'deft-mode +whitespace-exempt-modes)
-
-       (advice-add 'deft-open-file :around 'display-buffer-no-select-window-advice)
-
-       (defun deft-find-file-other-window+ ()
-         "preview file at point in another window and then select it."
-         (interactive)
-         (let ((file (deft-filename-at-point)))
-           (when file
-             (deft-open-file file t t))))
-
-       ;; unbind most of the deft insert bindings.
-       (cl-loop for i from ?\s to 256
-                do (define-key deft-mode-map (vector i) nil)
-                do (define-key deft-mode-map (vector 'insert-state i) 'deft-filter-increment))
-
-       (leader-set-keys-for-major-mode 'deft-mode
-         "n" 'deft-new-file
-         "a" 'deft-archive-file
-         "d" 'deft-delete-file
-         "f" 'deft-find-file
-         "i" 'deft-toggle-incremental-search
-         "r" 'deft-rename-file
-         "s" 'deft-toggle-sort-method
-         "l" 'deft-filter)
-
-       :general
-       (:keymaps 'deft-mode-map
-        [remap revert-buffer] 'deft-refresh)
-       (:states 'motion
-        :keymaps 'deft-mode-map
-        "o" 'deft-find-file-other-window+
-        "gj" 'widget-forward
-        "gk" 'widget-backward
-
-        "i" 'evil-insert-state
-        "a" 'evil-insert-state
-        "p" 'deft-filter-yank
-        "P" 'deft-filter-yank)
-       (:states 'insert
-        :keymaps 'deft-mode-map
-        [escape] 'evil-change-to-initial-state
-        "C-w" 'deft-filter-decrement-word)
-       (:states '(insert motion)
-        :keymaps 'deft-mode-map
-        "M-DEL" 'deft-filter-clear
-        "M-RET" 'deft-open-file-other-window))
-   #+END_SRC
 
 ** ebuku
    emacs interface to the [[https://github.com/jarun/buku][buku]] bookmark manager.
