@@ -101,12 +101,13 @@
        '(;; apheleia                                                       ; Automatic buffer formatting after save.
          abbrev                                                            ; Enable automatic in text substitutions
          magit                                                             ; It's git... but magical  ,
-         forge                                                             ; Helpers for remote forges (used with magit)
+         ;; forge                                                          ; Helpers for remote forges (used with magit)
          link-hint                                                         ; Jump to links in the current buffer through an avy interface
          ;; adaptive-wrap                                                  ; Visually wrap long lines. doesn't alter what you write.
          anzu                                                              ; Show the number of search results incrementally
          ;; beacon                                                         ; Highlight sudden jumps (changes in point) using a beacon
          ;; auto-highlight-symbol                                          ; Automatically highlight the symbol at point
+         browse-at-remote                                                  ; Interface emacs with [[https://www.chromium.org/][chromium]]
          browser-edit                                                      ; Interface emacs with [[https://www.chromium.org/][chromium]]
          company                                                           ; Dynamic completion previews through popup dialogs
          ;; corfu                                                          ; Company alternative aiming to be a little more generic
@@ -14286,7 +14287,7 @@
 
 ** browse-at-remote
    :PROPERTIES:
-   :header-args+: :tangle (package-no! magit forge)
+   :header-args+: :tangle (package-yes! browse-at-remote)
    :END:
    Open files in a repository in their configured remote (github/gitlab/etc.).
 
@@ -16159,7 +16160,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package forge
         :straight t
-        :leader ("go" 'forge-browse-dwim)
+        ;; :leader ("go" 'forge-browse-dwim)
         :custom
         (forge-database-file (state! "forge.db"))
 
