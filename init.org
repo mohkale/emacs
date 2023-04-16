@@ -119,7 +119,6 @@
          eyebrowse                                                         ; Provides switchable window configurations
          ;; flycheck                                                       ; A better buffer linter and error-checker package
          ;; hide-comnt                                                     ; Minor mode to disable rendering of comments
-         ;; neotree                                                        ; Tree like directory viewer for emacs
          ;; notmuch                                                        ; Mail client and manager
          imenu                                                             ; Interactively jump to points of interest in this buffer
          ;; indent-guide                                                   ; Show guides for leading indents
@@ -16212,88 +16211,6 @@
          ;; "ESC"      'transient-quit-one
          "<escape>" 'transient-quit-one))
     #+END_SRC
-
-** neotree
-   :PROPERTIES:
-   :header-args+: :tangle (package-yes! neotree)
-   :END:
-
-   #+begin_src emacs-lisp
-     (use-package neotree
-       :straight t
-       :leader
-       ("t RET" 'neotree-toggle)
-
-       :init
-       (push '(neotree-mode . 1) +indent-config)
-
-       :custom
-       (neo-display-action
-        '((display-buffer-reuse-window
-           display-buffer-in-side-window)
-          (side . left)
-          (body-function . nil)
-          (window-parameters (mode-line-format . none)))
-        "Remove the mode-line format and prevent auto-selection.")
-
-       :custom
-       (neo-theme 'dev-icons
-        "Make neotree use nerd-fonts for a better rendering experience.")
-       :config
-       (defun neo-buffer--insert-fold-symbol+ (name &optional node-name)
-         (when (eq neo-theme 'dev-icons)
-           (cl-destructuring-bind (chevron . icon)
-               (cl-case name
-                 (open
-                  (cons (+icon nerd-mdi "chevron-down")
-                        (+icon-for dir (directory-file-name node-name))))
-                 (close
-                  (cons (all-the-icons-nerd-mdi "chevron-right")
-                        (+icon-for dir (directory-file-name node-name))))
-                 (t ; leaf
-                  (cons nil (+icon-for file node-name))))
-             (setq icon (all-the-icons-pad-on-tty-advice+ icon))
-             (insert
-              (if chevron
-                  (format "\t%s\t%s\t" chevron icon)
-                (format "\t\t\t%s\t" icon))))
-           t))
-
-       (advice-add #'neo-buffer--insert-fold-symbol :before-until
-                   #'neo-buffer--insert-fold-symbol+)
-
-       :lazy-leader
-       (:mode 'neotree-mode
-        "a" 'neotree-stretch-toggle
-        "." 'neotree-hidden-file-toggle
-        "o" 'notree-open-file-in-system-application
-        "h" 'neotree-collapse-all
-        "c" 'neotree-change-root
-        "x" 'neotree-delete-node
-        "t" 'neotree-create-node
-        "p" 'neotree-copy-node
-        "r" 'neotree-rename-node)
-
-       :preface (setq neotree-mode-map (make-sparse-keymap))
-       :general
-       (:keymaps 'neotree-mode-map
-        :states 'motion
-        [remap evil-next-line] 'neotree-next-line
-        [remap evil-previous-line] 'neotree-previous-line
-        [remap revert-buffer] 'neotree-refresh
-        [remap quit-window] 'neotree-hide
-        "M-RET" 'neotree-quick-look
-        "gh" 'neotree-select-up-node
-        "gl" 'neotree-select-down-node                                               ; goto last node in current directory tree.
-        "gk" 'neotree-select-previous-sibling-node
-        "gj" 'neotree-select-next-sibling-node)
-       :config
-       (general-define-key
-        :keymaps 'neotree-mode-map
-        :states 'motion
-        "TAB" (neotree-make-executor :dir-fn  'neo-open-dir)
-        [remap evil-ret] (neotree-make-executor :file-fn 'neo-open-file :dir-fn  'neo-open-dir)))
-   #+end_src
 
 ** notmuch
    :PROPERTIES:
