@@ -136,8 +136,7 @@
          git-gutter                                                        ; Show version control information in the window fringe.
 
      ;;; Completion frameworks
-         ;; selectrum                                                      ; An clean completion-framework designed to be more consistent and predictable
-         vertico                                                           ; A more-minimalist selectrum alternative aiming to be completing-read compatible
+         vertico                                                           ; A minimalist completing-read compatible completion ui
 
      ;;; Completion Assistants
          prescient                                                         ; Sorting/Filtering based on frequency and proximity.
@@ -457,7 +456,6 @@
                           res))
                    ((eq pkg :consult)
                     (push `(or (member (quote consult) +modules)
-                               ,(package-build-cond+ 'selectrum)
                                ,(package-build-cond+ 'vertico))
                           res))
                    ((keywordp pkg)
@@ -9985,9 +9983,7 @@
        :init
        (defun minibuffer-input+ ()
          "Get the input to the last minibuffer prompt."
-         (cond ((package! selectrum)
-                selectrum--last-input)
-               ((package! vertico)
+         (cond ((package! vertico)
                 (car vertico--input))
                (t (buffer-substring-no-properties
                    (line-beginning-position)
@@ -10213,8 +10209,7 @@
     candidate face (configured by each completion framework) and any faces for the
     query matches. This is actually pretty great for themes that use strong colors
     that may not contrast on each other very well. However this doesn't translate
-    well to selectrum or orderless which simply append a new face to the existing
-    face spec.
+    well to  orderless which simply append a new face to the existing face spec.
 
     The following code block makes the current candidate face *override* the existing
     faces of the candidate and then overrides any query faces such as orderless or
@@ -10231,12 +10226,7 @@
                                            orderless-match-face-3
                                            completions-common-part
                                            completions-first-difference
-                                           consult-highlight-match
-                                           ;; For some reason `consult' async commands and some regular
-                                           ;; commands such as `completion-in-region' don't use orderless
-                                           ;; highlighting.
-                                           selectrum-prescient-primary-highlight
-                                           selectrum-prescient-secondary-highlight)
+                                           consult-highlight-match)
         "The faces that should remain on top of the current candidate face.
       Set to nil to disable face overriding.")
 
@@ -12602,102 +12592,6 @@
 * Extensions
   Optional [[*Packages][packages]] that users can opt to configure from the ~+modules~ variable.
 
-** selectrum
-   :PROPERTIES:
-   :header-args+: :tangle (package-yes! selectrum)
-   :ID:       7cacf59f-957b-47f1-8bb6-f36a10af3aec
-   :END:
-
-   #+BEGIN_SRC emacs-lisp
-     (use-package selectrum
-       :straight t
-       :hook (after-init . selectrum-mode)
-       :custom
-       (selectrum-max-window-height 15)
-       (selectrum-count-style 'current/matches)
-       (selectrum-files-select-input-dirs t)
-
-       :init
-       (defvaralias 'selectrum-completion-in-region-styles 'completion-styles)
-
-       :config
-     ;;; Sorting configuration and workarounds
-       (setq selectrum-preprocess-candidates-function
-             (defun selectrum-preprocess+ (cands)
-               (when selectrum-should-sort
-                 (when-let ((sort-func (or (+completion-category-sort-func
-                                            (+completion-metadata))
-                                           (when (bound-and-true-p selectrum-prescient-mode)
-                                             #'selectrum-prescient--preprocess)
-                                           #'selectrum-default-candidate-preprocess-function)))
-                   (setq cands (funcall sort-func cands))))
-               cands))
-
-     ;;; Update highlighting for certain completions
-       (defun selectrum-completion-highlight+ (input cands)
-         (when-let ((hl-func (+completion-category-hl-func
-                              (+completion-metadata input))))
-           (setq cands (mapcar hl-func cands)))
-         cands)
-
-       (setq selectrum-highlight-candidates-function
-             (defun selectrum-highlight+ (input cands)
-               (cl-reduce (lambda (cands func)
-                            (funcall func input cands))
-                          `(,#'selectrum-completion-highlight+
-                            ,@(cond ((member 'orderless completion-styles)
-                                     (list #'orderless-highlight-matches))
-                                    ((bound-and-true-p selectrum-prescient-mode)
-                                     (list #'selectrum-prescient--highlight))
-                                    (t
-                                     (list #'selectrum-candidates-identity))))
-                          :initial-value cands)))
-
-       (advice-add 'selectrum--selection-highlight :before-until
-                   ;; Use `selectrum-current-candidate' but keep match highlighting.
-                   ;; This is a workaround until [[https://github.com/raxod502/selectrum/issues/353][#353]] gets resolved.
-                   (apply-partially #'minibuffer-override-face+
-                                    'selectrum-current-candidate))
-
-       :leader
-       ("RET" 'selectrum-repeat)
-
-       :general
-       (:keymaps 'minibuffer-local-map
-        "C-r" 'selectrum-select-from-history
-        "C-s" 'selectrum-select-from-history)
-       (:keymaps 'selectrum-minibuffer-map
-        "C-j" 'next-line
-        "C-q" 'selectrum-quick-select
-        "M-q" 'selectrum-quick-insert
-        [remap minibuffer-beginning-of-buffer] 'selectrum-goto-beginning
-        [remap minibuffer-scroll-down-command] 'selectrum-previous-page
-        [remap minibuffer-forward-char-or-exit+]
-        (defun selectrum-forward-char-or-exit+ ()
-          (interactive)
-          (call-interactively (if (eolp)
-                                  'selectrum-select-current-candidate
-                                'forward-char)))
-        [remap next-matching-history-element] 'selectrum-select-from-history
-        "C-i" 'selectrum-insert-current-candidate
-        "<S-return>" 'selectrum-submit-exact-input))
-   #+END_SRC
-
-*** selectrum-prescient
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! selectrum prescient)
-      (use-package selectrum-prescient
-        :after prescient
-        :straight t
-        :hook ((selectrum-mode . selectrum-prescient-mode))
-        :custom
-        (selectrum-prescient-enable-filtering nil)
-        :init
-        (add-hook 'selectrum-prescient-mode-hook
-                  (defun selectrum-prescient-reset-conf+ ()
-                    (setq selectrum-preprocess-candidates-function #'selectrum-preprocess+
-                          selectrum-highlight-candidates-function #'selectrum-highlight+))))
-    #+END_SRC
-
 ** vertico
    :PROPERTIES:
    :header-args+: :tangle (package-yes! vertico)
@@ -12809,8 +12703,7 @@
     #+BEGIN_SRC emacs-lisp
       (use-package marginalia
         :straight t
-        :hook ((selectrum-mode . marginalia-mode)
-               (vertico-mode . marginalia-mode))
+        :hook (vertico-mode . marginalia-mode)
         :custom
         (marginalia-align 'right)
         (marginalia-align-offset -1)
@@ -12820,13 +12713,6 @@
          "A" 'marginalia-cycle)
         (:keymaps 'minibuffer-local-map
          "C-c TAB" 'marginalia-cycle)
-
-        :config
-        (when (package! selectrum)
-          (advice-add #'marginalia-cycle :after
-                      (lambda ()
-                        (when (bound-and-true-p selectrum-mode)
-                          (selectrum-exhibit)))))
 
         :config
         (setq marginalia-command-categories
@@ -12930,8 +12816,7 @@
         (:keymaps '(global-map
                     org-mode-map)
          "C-c C-l" 'embark-live)
-        (:keymaps '(selectrum-minibuffer-map
-                    vertico-map)
+        (:keymaps 'vertico-map
          "<C-return>" 'embark-act
          "M-RET" 'embark-act-noexit
          "C-c C-o" 'embark-collect
@@ -13322,8 +13207,7 @@
          :state #'consult--buffer-state)
 
         :leader
-        (:mode '(selectrum-mode
-                 vertico-mode)
+        (:mode 'vertico-mode
          :minor t
          "aa" 'consult-minor-mode-menu
          "ee" 'consult-compile-error
@@ -14159,8 +14043,7 @@
           (setq affe-regexp-function #'orderless-pattern-compiler
                 affe-highlight-function #'orderless-highlight-matches))
         :leader
-        (:mode '(selectrum-mode
-                 vertico-mode)
+        (:mode 'vertico-mode
          :minor t
          "fsF" 'affe-find
          "fsr" 'affe-grep))
