@@ -133,7 +133,6 @@
          ;; vlc-rc                                                         ; Control [[https://www.videolan.org/vlc/index.en-GB.html][VLC]] from emacs
          ;; tab-bar                                                        ; Enable browser like tabs showing buffer information
          vimish-fold                                                       ; Fold regions of code just like vim.
-         ;; ztree                                                          ; Directory tree viewer, think NERDTree
          git-gutter                                                        ; Show version control information in the window fringe.
 
      ;;; Completion frameworks
@@ -18069,34 +18068,6 @@
         :after (flycheck ycmd)
         :hook (ycmd-mode . flycheck-ycmd-setup))
     #+END_SRC
-
-** ztree
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! ztree)
-     (use-package ztree
-       :straight t
-       :config
-       (evil-set-initial-state 'ztree-mode 'motion)
-
-       :lazy-leader
-       (:mode 'ztree-mode
-        "TAB" 'ztree-jump-side
-        "n"   'ztree-dir-widen-to-parent
-        "w"   'ztree-dir-narrow-to-dir
-        "h"   'ztree-dir-toggle-show-filtered-files)
-
-       :general
-       (:states  'motion
-        :keymaps 'ztree-mode-map
-        "gr"    'ztree-refresh-buffer
-        "j"     'ztree-next-line
-        "k"     'ztree-previous-line
-        "gh"    'ztree-move-up-in-tree
-        "gl"    'ztree-next-line
-        "RET"   'ztree-dir-open-dired-at-point
-        "TAB"   'ztree-perform-action
-        "M-TAB" 'ztree-perform-soft-action
-        "DEL"   'ztree-move-up-in-tree))
-   #+END_SRC
 
 * Languages
   [[*Extensions][Extensions]] providing tailored support for specific programming languages or tools.
