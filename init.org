@@ -128,7 +128,6 @@
          ;; olivetti                                                       ; A nice writing environment for emacs
          ;; pdf-tools                                                      ; Use emacs as quick and dirty pdf viewer
          projectile                                                        ; Extended project management library for emacs
-         ;; piper                                                          ; Interactive shell pipelines with emacs
          rainbow-mode                                                      ; Automatically color/highlight css color names
          skeletor                                                          ; Project skeleton generator package
          ;; undo-tree                                                      ; Undo system based on vim with tree like visualiser
@@ -17448,23 +17447,6 @@
 
       (provide '+pdf-tools-commands)
     #+END_SRC
-
-** piper
-   #+BEGIN_SRC emacs-lisp :tangle (package-yes! piper)
-     (use-package piper
-       :straight (emacs-piper :host gitlab :repo "howardabrams/emacs-piper")
-       :commands (piper-ui)
-       :leader
-       (:prefix "|"
-        ""    '(:ignore t :wk "piper")
-        "RET" 'piper-ui
-        "|"   'piper
-        "o"   'piper-other
-        "@"   'piper-remote)
-
-       :config
-       (defalias 'piper-ui #'piper-user-interface))
-   #+END_SRC
 
 ** rake
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! rake)
