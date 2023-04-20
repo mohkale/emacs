@@ -6,7 +6,7 @@
  ("all-the-icons-nerd-fonts" . "37ef9cb316bf3013975f3ebdbdf6364777e967bd")
  ("all-the-icons.el" . "d922aff57ac8308d3ed067f9151cc76d342855f2")
  ("anzu" . "5abb37455ea44fa401d5f4c1bdc58adb2448db67")
- ("apheleia" . "ad728cfa769a8266811cf0282b4440721d4167c5")
+ ("apheleia" . "e9e595f003605a7e366776c7a1715dc7093e29d5")
  ("auctex" . "2559248316b24fa5e8e7656f3894e4f71d18fc01")
  ("auto-activating-snippets" . "ddc2b7a58a2234477006af348b30e970f73bc2c1")
  ("auto-yasnippet" . "6a9e406d0d7f9dfd6dff7647f358cb05a0b1637e")

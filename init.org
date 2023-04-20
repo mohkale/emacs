@@ -14068,172 +14068,26 @@
        (apheleia-hide-log-buffers t)
        (apheleia-remote-algorithm 'remote)
 
-       :preface
-       (defun apheleia-indent+ (tab-flag indent-flag indent-var)
-         (cond
-          (indent-tabs-mode tab-flag)
-          (indent-var
-           (when-let ((indent (and (boundp indent-var)
-                                   (symbol-value indent-var))))
-             (list indent-flag (number-to-string indent))))))
+       :config
+       (setf (alist-get 'json-mode apheleia-mode-alist) 'jq)
+       (setf (alist-get 'js-json-mode apheleia-mode-alist) 'jq)
+       (setf (alist-get 'json-ts-mode apheleia-mode-alist) 'jq)
 
-       (defun apheleia-fill-column+ (fill-flag)
-         (when-let ((wrap (bound-and-true-p fill-column)))
-           (list fill-flag (number-to-string wrap))))
+       (setf (alist-get 'cabal-fmt apheleia-formatters) '("cabal-fmt"))
+       (setf (alist-get 'haskell-mode apheleia-mode-alist) 'cabal-fmt)
 
-       (defun apheleia-locate-file+ (file-flag file-name)
-         (when-let ((file (locate-dominating-file default-directory file-name)))
-           (list file-flag file)))
+       (setf (alist-get 'dotnet apheleia-formatters) '("dotnet" "format"))
+       (setf (alist-get 'csharp-mode apheleia-mode-alist) 'dotnet)
+       (setf (alist-get 'csharp-ts-mode apheleia-mode-alist) 'dotnet)
 
-       (defun apheleia-extension-p+ (&rest exts)
-         (when-let ((name (or buffer-file-name
-                              (apheleia--safe-buffer-name)))
-                    (ext (file-name-extension name)))
-           (cl-find-if (apply-partially #'string-equal ext)
-                       exts)))
+       (setf (alist-get 'python-mode apheleia-mode-alist) '(isort black))
+       (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(isort black))
 
-       (defun apheleia-mode-ext-assoc+ ()
-         (cl-case major-mode
-           (c-mode ".c")
-           (c++-mode ".cpp")
-           (glsl-mode ".glsl")
-           (java-mode ".java")))
+       (setf (alist-get 'ruby-mode apheleia-mode-alist) 'rubocop)
+       (setf (alist-get 'enh-ruby-mode apheleia-mode-alist) 'rubocop)
 
-       (defun apheleia-buffer-file-name+ ()
-         (when-let ((name (buffer-file-name)))
-           (let ((remote (file-remote-p name)))
-             (if remote
-                 (substring name (length remote))
-               name))))
-
-       :custom
-       (apheleia-formatters
-        `((asmfmt "asmfmt")
-          (astyle "astyle" (apheleia-locate-file+ "--options" ".astylerc"))
-          (atsfmt "atsfmt")
-          (black "black" "--quiet" (when (apheleia-extension-p+ "pyi") "--pyi") "-")
-          (brittany "brittany")
-          (bsrefmt "bsrefmt")
-          (buildifier "buildifier")
-          (cabal-fmt "cabal-fmt")
-          (clang-format "clang-format"
-                        "--assume-filename" (or (apheleia-buffer-file-name+)
-                                                (apheleia-mode-ext-assoc+))
-                        ;; This should ideally be set in a .clang-format file
-                        ;; but since I'm more inclined to use editorconfig it
-                        ;; shouldn't really matter.
-                        (when-let ((indent (bound-and-true-p c-basic-offset)))
-                          (list "--style" (format "{IndentWidth: %d}" indent))))
-          (cmake-format "cmake-format" "-")
-          (crystal-tool "crystal" "tool" "format" "-")
-          (dotnet "dotnet" "format")
-          (gawk "gawk" "-f" "-" "--pretty-print=-")
-          (gofmt "gofmt")
-          (goimports "goimports")
-          (google-java-format "google-java-format" "-")
-          (html-tidy "tidy"
-                     "--quiet" "yes" "-indent" "auto" "--vertical-space" "yes"
-                     "--tidy-mark" "no"
-                     (when (derived-mode-p 'nxml-mode)
-                       "-xml")
-                     (apheleia-indent+
-                      (list "--indent-with-tabs" "yes")
-                      "--indent-spaces"
-                      (cond
-                       ((derived-mode-p 'nxml-mode)
-                        'nxml-child-indent)
-                       ((derived-mode-p 'web-mode)
-                        'web-mode-indent-style)))
-                     (apheleia-fill-column+ "-wrap"))
-          (isort "isort" "--stdout" "-")
-          (jq "jq" "."
-              (apheleia-indent+ "--tab" "--indent" 'js-indent-level))
-          (latexindent "latexindent")
-          (mix-format "mix" "format" "-")
-          (ocamlformat "ocamlformat" "-" "--name" filepath)
-          (perltidy "perltidy" "--quiet" "--standard-error-output")
-          (prettier npx
-                    "prettier"
-                    "--stdin-filepath" filepath
-                    (apheleia-indent+
-                     "--use-tabs" "--tab-width"
-                     (cl-case major-mode
-                       ('js-mode 'js-indent-level)
-                       ('js2-mode 'js2-basic-offset)
-                       ('(js-jsx-mode typescript-react-mode)
-                        'js-indent-level))))
-          (rubocop "rubocop" "--stdin" filepath "--auto-correct"
-                   "--stderr" "--format" "quiet" "--fail-level" "fatal")
-          (rufo "rufo" "--filename" filepath)
-          (rustfmt "rustfmt" "--unstable-features" "--skip-children"
-                   "--quiet" "--emit" "stdout")
-          (shfmt "shfmt"
-                 "-filename" filepath
-                 "-ln" (cl-case sh-shell
-                         ((zsh bash) "bash")
-                         (t "posix"))
-                 "-i" (number-to-string
-                       (cond
-                        (indent-tabs-mode 0)
-                        (t sh-basic-offset)))
-                 "-")
-          (beautysh "beautysh"
-                    (when-let ((indent (bound-and-true-p sh-basic-offset)))
-                      (list "--indent-size" (number-to-string indent)))
-                    (when indent-tabs-mode "--tab")
-                    "-")
-          (terraform "terraform" "fmt" "-"))
-        "Formatter command generation configuration.")
-
-       :preface
-       (defun apheleia-unpack-mode-alist+ (conf)
-         (cl-loop
-         for (mode . formatter) in conf
-         ;; Unpack keys mode-lists into individual entries.
-         if (consp mode)
-           append (cl-loop for mode in mode
-                           collect (cons mode formatter))
-         else
-           collect (cons mode formatter)))
-
-       :custom
-       ;; When in doubt, see [[https://github.com/rishirdua/awesome-code-formatters][awesome-code-formatters]] and [[https://github.com/lassik/emacs-format-all-the-code][emacs-format-all-the-code]].
-       (apheleia-mode-alist
-        (apheleia-unpack-mode-alist+
-         `(((asm-mode nasm-mode) . asmfmt)
-           (ats-mode . atsfmt)
-           (awk-mode . gawk)
-           (bazel-mode . buildifier)
-           ((cc-mode c-mode c-ts-mode c++-mode c++-ts-mode) . clang-format)
-           (haskell-cabal-mode . cabal-fmt)
-           ((cmake-mode cmake-ts-mode) . cmake-format)
-           (crystal-mode . crystal-tool)
-           ((csharp-mode csharp-ts-mode) . dotnet)
-           ((css-mode css-ts-mode) . prettier)
-           (elixir-mode . mix-format)
-           ((go-mode go-ts-mode) . goimports)
-           (haskell-mode . brittany)
-           ((html-mode web-mode nxml-mode) . apheleia-mode-alist)
-           ((java-mode java-ts-mode) . google-java-format)
-           ((js-mode js-ts-mode js2-mode js3-mode js2-jsx-mode
-             typescript-mode typescript-ts-mode typescript-react-mode
-             tsx-ts-mode)
-            . prettier)
-           ((json-mode js-json-mode json-ts-mode) . jq)
-           ((latex-mode LaTeX-mode TeX-mode TeX-latex-mode)
-            . latexindent)
-           (perl-mode . perltidy)
-           (php-mode . nil)
-           ((python-mode python-ts-mode) . (isort black))
-           (reason-mode . bsrefmt)
-           ((ruby-mode enh-ruby-mode) . rubocop)
-           ((rust-mode rust-ts-mode rustic-mode) . rustfmt)
-           (sass-mode . prettier)
-           ((sh-mode bash-ts-mode) . shfmt)
-           (terraform-mode . terraform)
-           (tuareg-mode . ocamlformat)
-           ((yaml-mode yaml-ts-mode) . prettier)))
-        "Mode list to formatter/s configuration."))
+       (setf (alist-get 'sh-mode apheleia-mode-alist)
+             (alist-get 'bash-ts-mode apheleia-mode-alist)))
    #+end_src
 
 ** adaptive-wrap
