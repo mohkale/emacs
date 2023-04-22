@@ -17245,32 +17245,18 @@
           (error "Emacs was not built with tree-sitter support")))
     #+END_SRC
 
-*** tree-sitter-module
-    Tree-sitter by itself does not do anything. It requires a tree-sitter parser as a
-    library that can parse the syntax tree of the associated language. Casouri has
-    thankfully created a helper repo that can build a series of parsers for different
-    languages. Here we install it and build all the parsers.
-
-    #+begin_src emacs-lisp
-      (use-package tree-sitter-module
-        :straight (tree-sitter-module
-                   :type git :host github
-                   :repo "casouri/tree-sitter-module"
-                   :pre-build (("./batch.sh"))
-                   :files ("dist/*.so" "dist/*.dll" "dist/*.dylib"))
-        :after treesit
-        :init
-        ;; Search for tree-sitter modules in this packages build directory.
-        (add-to-list 'treesit-extra-load-path
-                     (straight--build-dir "tree-sitter-module")))
-    #+end_src
-
 *** treesit-compat
     Compatibility between tree-sitter modes and the built-in Emacs modes.
 
     #+begin_src emacs-lisp
       (use-package treesit-auto
-        :straight t
+        :straight (treesit-auto
+                   ;; Install all tree-sitter grammars.
+                   :post-build ((require 'treesit-auto)
+                                (let ((treesit-auto-install t)
+                                      (treesit-language-source-alist
+                                       (treesit-auto--build-treesit-source-alist)))
+                                  (treesit-auto-install-all))))
         :demand t
         :custom
         (treesit-auto-install nil
