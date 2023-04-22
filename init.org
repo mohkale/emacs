@@ -5646,7 +5646,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (use-package nerd-fonts
-        :straight (nerd-fonts :host github :repo "mohkale/nerd-fonts.el")
+        :straight (nerd-fonts :host github :repo "twlz0ne/nerd-fonts.el")
         :when +icons-prefer-nerd-font)
 
       (use-package all-the-icons-nerd-fonts
@@ -6236,8 +6236,7 @@
 ** compile-multi
    #+begin_src emacs-lisp
      (use-package compile-multi
-       :straight '(compile-multi :host github
-                                 :repo "mohkale/compile-multi")
+       :straight t
        :leader ("cm" 'compile-multi)
        :custom
        (compile-multi-default-directory #'project-current-root+)
@@ -6398,7 +6397,7 @@
     #+begin_src emacs-lisp
       (use-package projection
         :straight (projection :host github :repo "mohkale/projection"
-                             :files (:defaults "src/*.el"))
+                              :files (:defaults "src/*.el"))
         :hook (after-init . global-projection-hook-mode)
         :custom
         (projection-cmake-configure-options
@@ -6660,8 +6659,7 @@
 ** undo-tree
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! undo-tree)
      (use-package undo-tree
-       :straight (undo-tree :fork (:host gitlab
-                                   :repo "tsc25/undo-tree"))
+       :straight t
        :diminish
        :custom
        (evil-undo-system 'undo-tree)
@@ -12499,7 +12497,7 @@
 ** vline
    #+BEGIN_SRC emacs-lisp
      (use-package vline
-       :straight (vline :host github :repo "emacsmirror/vline")
+       :straight t
        :leader
        ("tv" 'vline-mode))
    #+END_SRC
@@ -12599,9 +12597,7 @@
 
    #+begin_src emacs-lisp
      (use-package vertico
-       ;; TODO: Wait until you can install extensions through MELPA.
        :straight (vertico :repo "minad/vertico"
-                          :branch "main"
                           :files (:defaults
                                   "extensions/vertico-quick.el"
                                   "extensions/vertico-repeat.el"))
@@ -12757,10 +12753,13 @@
         ;;         (window-parameters (mode-line-format . none)))
         ;;       display-buffer-alist)
 
-        (defun embark-act-noexit ()
+        (defun embark-act-noexit+ ()
           (interactive)
-          (let ((embark-quit-after-action))
-            (call-interactively #'embark-act)))
+          (let ((current-window (selected-window))
+                (embark-quit-after-action nil))
+            (call-interactively #'embark-act)
+            (when current-window
+              (select-window current-window))))
 
         (defun embark-collect-delete+ ()
           (interactive)
@@ -12811,14 +12810,15 @@
          "+" 'embark-find-mkdir+)
 
         :general
-        (:states '(normal visual)
+        (:states '(normal visual motion)
+         "RET" 'embark-act
          "<C-return>" 'embark-act)
         (:keymaps '(global-map
                     org-mode-map)
          "C-c C-l" 'embark-live)
         (:keymaps 'vertico-map
          "<C-return>" 'embark-act
-         "M-RET" 'embark-act-noexit
+         "M-RET" 'embark-act-noexit+
          "C-c C-o" 'embark-collect
          "C-c C-l" 'embark-live
          "C-c C-e" 'embark-export
@@ -12831,9 +12831,6 @@
          "<" 'tabulated-list-narrow-current-column
          ">" 'tabulated-list-widen-current-column
          "x" 'embark-collect-delete+
-         "m" 'embark-collect-mark
-         "u" 'embark-collect-unmark
-         "U" 'embark-collect-unmark-all
          "gj" 'forward-button
          "gk" 'backward-button
          "<C-return>" 'embark-act)
@@ -13184,7 +13181,7 @@
         (evil-set-command-property 'consult-flymake :jump t)
 
         (consult-customize
-         consult-ripgrep org-roam-rg
+         consult-ripgrep org-roam-rg+
          consult-ripgrep-no-project+
          consult-grep-no-project+
          xref-find-references
@@ -13205,6 +13202,11 @@
          :initial (concat "/*/")
          scratch-buffer+
          :state #'consult--buffer-state)
+
+        :config
+        ;; Always follow symlinks with `consult-ripgrep'.
+        (unless (string-match-p (rx bow "--follow" eow) consult-ripgrep-args)
+          (setq consult-ripgrep-args (concat consult-ripgrep-args " --follow")))
 
         :leader
         (:mode 'vertico-mode
@@ -13337,8 +13339,7 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! :consult eglot)
       (use-package consult-eglot
-        :straight (consult-eglot :host github
-                                 :repo "mohkale/consult-eglot")
+        :straight t
         :init
         (evil-set-command-property 'consult-eglot :jump t)
 
@@ -13413,8 +13414,7 @@
 *** consult-yasnippet
     #+begin_src emacs-lisp :tangle (package-yes! :consult)
       (use-package consult-yasnippet
-        :straight (consult-yasnippet :host github
-                                     :repo "mohkale/consult-yasnippet")
+        :straight t
         :config
         (with-eval-after-load 'embark
           ;; Embark actions for `consult-yasnippet' and derivatives.
@@ -16601,6 +16601,14 @@
                     (delete-region (point) (point-max)))))
     #+end_src
 
+*** ol-notmuch
+    #+begin_src emacs-lisp :tangle (package-yes! org notmuch)
+      (use-package ol-notmuch
+        :straight t
+        :demand t
+        :after ol)
+    #+end_src
+
 ** ebdb
    :PROPERTIES:
    :header-args+: :tangle (package-yes! ebdb)
@@ -17031,13 +17039,13 @@
       (provide '+pdf-tools-commands)
     #+END_SRC
 
-** secret-mode
+** redacted
    Provides a mode to obfuscate the text in a buffer in a way that's still legible for
    screenshots.
 
    #+begin_src emacs-lisp :tangle no
-     (use-package secret-mode
-       :straight (secret-mode :host github :repo "bkaestner/secret-mode.el"))
+     (use-package redacted
+       :straight t)
    #+end_src
 
 ** skeletor
@@ -19446,8 +19454,7 @@
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! c (not tree-sitter))
       (use-package modern-cpp-font-lock
         :diminish modern-c++-font-lock-mode
-        :straight (modern-cpp-font-lock
-                   :repo "ludwigpacifici/modern-cpp-font-lock")
+        :straight t
         :hook (c++-mode . modern-c++-font-lock-mode))
     #+END_SRC
 
@@ -21357,18 +21364,7 @@
                  (ignore-errors (funcall eldoc value)))
                value))))
 
-        (advice-add 'org-eldoc-documentation-function :before-until #'org-eldoc-get-link+)
-
-      ;;; org-man
-        (require 'ol-man)
-        (setq org-man-command +man-command))
-
-      ;;; org-notmuch
-      (when (package! notmuch)
-        (use-package ol-notmuch
-          :straight t
-          :demand t
-          :after (org notmuch)))
+        (advice-add 'org-eldoc-documentation-function :before-until #'org-eldoc-get-link+))
     #+END_SRC
 
 *** org-capture
@@ -21378,12 +21374,11 @@
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! org)
       (use-package doct
-        :straight (doct :github github :repo "progfolio/doct")
+        :straight t
         :after org-capture
-        :commands (doct)
         :demand t
-        :init
-        (setq doct-default-entry-type 'entry))
+        :custom
+        (doct-default-entry-type 'entry))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! org)
@@ -21450,7 +21445,7 @@
       (require 'org)
     #+end_src
 
-    Here's a helper method to jump directly to an org-heading or creat it if it
+    Here's a helper method to jump directly to an org-heading or create it if it
     doesn't exist.
 
     #+BEGIN_SRC emacs-lisp
@@ -21493,8 +21488,7 @@
           (buffer-substring (point-min) (point-max))))
     #+END_SRC
 
-    Here's the capture templates I use exclusively for projects/repos (through
-    projectile). See [[*projectile][projectile]] and [[*counsel-projectile][counsel-projectile]].
+    Here's the capture templates I use exclusively for projects/repos.
 
     #+BEGIN_SRC emacs-lisp
       (setq
@@ -21930,7 +21924,7 @@
               (turn-on-orglink-mode-if-desired)))))
     #+END_SRC
 
-**** pdftools
+**** ol-pdftools
      Adapted from [[https://github.com/fuxialexander/org-pdftools][org-pdftools]] this adds a link type to org mode which lets you link
      to and open PDFs. I've removed all the pdftools specific stuff so this is just a
      generic configuration section for pdf related actions in org mode.
@@ -21987,7 +21981,7 @@
                                   :export   #'+org-pdf-export))
      #+END_SRC
 
-**** pdfbib
+**** ol-pdfbib
      A variant of the previous ~pdftools~ link which works using bibtex keys instead of
      PDF file paths.
 
@@ -22070,7 +22064,7 @@
                                                         t)))))))))
      #+END_SRC
 
-**** org-ref
+**** ol-ref
      Add an eldoc handler for [[*org-ref][org-ref]] that can properly render all org-ref elements,
      this was mostly adapted from ~org-ref-link-message~ which used to use a custom
      timer and messages to do this.
@@ -22130,7 +22124,8 @@
          (org-link-set-parameters "bibliography" :eldoc #'org-ref-eldoc-bibliography+))
      #+END_SRC
 
-**** org-id
+     And a variant for the "id" link type.
+
      #+BEGIN_SRC emacs-lisp
        (defun org-eldoc-id+ (path)
          (gethash path org-id-locations path))
@@ -22138,6 +22133,15 @@
        (with-eval-after-load 'org-ref
          (org-link-set-parameters "id" :eldoc #'org-eldoc-id+))
      #+END_SRC
+
+**** ol-man
+     #+begin_src emacs-lisp
+       (use-package ol-man
+         :straight org-contrib
+         :after ol
+         :demand t
+         :custom (org-man-command +man-command))
+     #+end_src
 
 *** org-export
     Here we put configurations for various emacs org export backends including latex.
@@ -22241,7 +22245,7 @@
 
      #+BEGIN_SRC emacs-lisp
        (use-package org-superstar
-         :straight (org-superstar-mode :host github :repo "integral-dw/org-superstar-mode")
+         :straight t
          :hook (org-mode . org-superstar-mode)
          :custom
          (org-superstar-todo-bullet-alist
@@ -22299,7 +22303,7 @@
 
      #+BEGIN_SRC emacs-lisp :tangle (package-yes! org company)
        (use-package company-org-block
-         :straight (company-org-block :host github :repo "xenodium/company-org-block")
+         :straight t
          :after org
          :demand t
          :custom
@@ -22321,7 +22325,7 @@
        (use-package org-roam
          :straight t
          :hook ((org-roam-file-setup . flyspell-mode))
-         :commands org-roam-rg
+         :commands org-roam-rg+
          :preface
          (setq org-roam-v2-ack t)
          (defvaralias 'org-roam-capture-function '+org-capture-function)
@@ -22341,18 +22345,13 @@
 
          (require 'org-roam-protocol)
 
-         (defun org-roam-rg ()
+         (defun org-roam-rg+ ()
            "Run a rg session in your org roam directory."
            (interactive)
            (cond ((package! :consult)
                   (require 'consult)
                   (consult-ripgrep org-roam-directory))
                  (t (message "No rg package found"))))
-
-         :config
-         ;; Fix compatibility with v1 when moving to v2... eventually this won't be
-         ;; needed :-).
-         (setq org-id-extra-files (directory-files org-roam-directory nil "\\.org$"))
 
          :custom
          (org-roam-node-display-template "${title} ${tags:0}")
@@ -22428,7 +22427,7 @@
           "oT" 'org-roam-tag-remove
           "or" 'org-roam-buffer-toggle
           "oR" 'org-roam-buffer-render
-          "os" 'org-roam-rg)
+          "os" 'org-roam-rg+)
 
          :general
          (:keymaps '(org-roam-node-map
@@ -22445,7 +22444,7 @@
         (use-package websocket :straight t)
 
         (use-package org-roam-ui
-          :straight (org-roam-ui :host github :repo "org-roam/org-roam-ui" :files ("*.el" "out"))
+          :straight t
           :config
           (require 'org-roam)
 
@@ -22521,7 +22520,7 @@
      headings with a trailing ~<-- :TOC: -->~ comment) and then rebuilding them whenever
      the file is saved.
 
-     #+BEGIN_SRC emacs-lisp
+     #+BEGIN_SRC emacs-lisp :tangle (package-yes! (or markdown org))
        (use-package toc-org
          :straight t
          :hook (;; (org-mode . toc-org-mode)
