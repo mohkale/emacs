@@ -13188,7 +13188,7 @@
          consult-recent-file
          consult--source-recent-file
          consult--source-project-file+
-         +dot-goto-fsmap
+         +dot-goto-fs-aliases
          :preview-key consult-manual-preview-key
          consult-recent-file
          :sort nil
@@ -13197,7 +13197,7 @@
          consult-find
          consult-find-no-project+
          +dot-goto-executable
-         +dot-goto-fsmap
+         +dot-goto-fs-aliases
          +dot-open-bookmark
          :initial (concat "/*/")
          scratch-buffer+
@@ -13759,13 +13759,13 @@
 
      #+BEGIN_SRC emacs-lisp :tangle (package-yes! :consult)
        (use-package +consult-dotfiles
-         :commands (+dot-goto-fsmap
+         :commands (+dot-goto-fs-aliases
                     +dot-goto-executable
                     +dot-open-bookmark)
          :leader
          ("fd" '(:ignore t :wk "dotfiles")
-          "fda" '+dot-goto-fsmap
-          "fdf" '+dot-goto-fsmap
+          "fda" '+dot-goto-fs-aliases
+          "fdf" '+dot-goto-fs-aliases
           "fdx" '+dot-goto-executable
           "fdb" '+dot-open-bookmark))
      #+END_SRC
@@ -13793,12 +13793,12 @@
      #+END_SRC
 
      #+BEGIN_SRC emacs-lisp
-       (defvar +dot-goto-fsmap-narrow '((?f . "File")
-                                        (?d . "Directory")
-                                        (?s . "Symlink")
-                                        (?u . "Unknown")))
+       (defvar +dot-goto-fs-aliases-narrow '((?f . "File")
+                                             (?d . "Directory")
+                                             (?s . "Symlink")
+                                             (?u . "Unknown")))
 
-       (defun +dot-goto-fsmap-format-lines (async builder)
+       (defun +dot-goto-fs-aliases-format-lines (async builder)
          (let ((highlight))
            (lambda (action)
              (cond ((stringp action)
@@ -13833,35 +13833,35 @@
                       (funcall async (nreverse result))))
                    (t (funcall async action))))))
 
-       (defvar +dot-goto-fsmap-history nil)
+       (defvar +dot-goto-fs-aliases-history nil)
 
-       (defun +dot-goto-fsmap (file)
+       (defun +dot-goto-fs-aliases (file)
          "List file system maps (using [[https://github.com/mohkale/dotfiles/blob/c534c70befdfcae7abaad3f0a6777392f63db6c5/bin/ls-fsmaps][here]]) and find one in emacs."
          (interactive
           (list (car
                  (let ((builder (lambda (input)
                                   (pcase-let* ((`(,arg . ,opts) (consult--command-split input)))
                                     (unless (string-blank-p arg)
-                                      (list `("ls-fsmaps" "-er" ,arg ,@opts)
+                                      (list `("ls-fs-shortcuts" "-b" "fs-alias" "-er" ,arg ,@opts)
                                             (cdr (consult--default-regexp-compiler
                                                              input 'basic completion-ignore-case))))))))
                    (consult--read
                     (consult--async-command builder
-                      (+dot-goto-fsmap-format-lines builder))
+                      (+dot-goto-fs-aliases-format-lines builder))
                     :prompt "File system map: "
                     :lookup #'consult--lookup-cdr
                     :require-match t
                     :group
-                    (consult--type-group +dot-goto-fsmap-narrow)
+                    (consult--type-group +dot-goto-fs-aliases-narrow)
                     :narrow
-                    ;; (consult--type-narrow +dot-goto-fsmap-narrow)
-                    (let* ((narrow (consult--type-narrow +dot-goto-fsmap-narrow))
+                    ;; (consult--type-narrow +dot-goto-fs-aliases-narrow)
+                    (let* ((narrow (consult--type-narrow +dot-goto-fs-aliases-narrow))
                            (pred (plist-pop! narrow :predicate)))
                       `(:predicate
                         ,(lambda (cand)
                            (funcall pred (car cand)))
                         ,@narrow))
-                    :history '(:input +dot-goto-fsmap-history)
+                    :history '(:input +dot-goto-fs-aliases-history)
                     :initial (consult--async-split-initial "*"))))))
          (find-file file))
      #+END_SRC
