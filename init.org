@@ -13366,38 +13366,6 @@
                       (mapcar #'string-trim x))))
     #+end_src
 
-*** consult-bibtex
-    A native emacs variant for ivy-bibtex.
-
-    KLUDGE: First I need to make sure the proper version of bibtex-completion is installed.
-    #+begin_src emacs-lisp
-      (use-package bibtex-completion
-        :straight (bibtex-completion :host github :repo "mohkale/helm-bibtex"))
-    #+end_src
-
-    #+begin_src emacs-lisp
-      (use-package consult-bibtex
-        :straight (consult-bibtex :host github :repo "mohkale/consult-bibtex")
-        :init
-        (autoload 'consult-bibtex--read-entry "consult-bibtex" nil nil)
-        (autoload 'consult-bibtex--candidates "consult-bibtex" nil nil)
-
-        (with-eval-after-load 'embark
-          (add-to-list 'embark-keymap-alist '(bibtex-completion . consult-bibtex-embark-map)))
-
-        :commands (consult-bibtex-insert-pdftools-link+)
-        :custom
-        (consult-bibtex-default-action #'consult-bibtex-insert-pdftools-link+)
-        :config
-        (consult-bibtex-embark-action consult-bibtex-insert-pdftools-link+ bibtex-insert-pdfbib-link+)
-        (define-key consult-bibtex-embark-map "p" #'consult-bibtex-insert-pdftools-link+)
-
-        :leader
-        ("ob" 'consult-bibtex)
-        (:mode 'org-mode
-         "[" 'consult-bibtex))
-    #+end_src
-
 *** consult-company                                                    :comp:
     :PROPERTIES:
     :header-args+: :tangle (package-yes! :consult company)
@@ -13556,81 +13524,6 @@
             :history '(:input consult--line-history)
             :add-history (thing-at-point 'symbol)
             :state (consult--grep-state))))
-     #+END_SRC
-
-**** consult-org-ref
-     #+begin_src emacs-lisp :tangle (package-yes! :consult)
-       (autoload 'org-ref-consult-insert-cite-link "+org-ref-consult-cite.el" nil t)
-       (autoload 'org-ref-consult-insert-label-link "+org-ref-consult-cite.el" nil t)
-       (autoload 'org-ref-consult-insert-ref-link "+org-ref-consult-cite.el" nil t)
-
-       (with-eval-after-load 'org-ref
-         (require '+org-ref-consult-cite))
-     #+end_src
-
-     #+BEGIN_SRC emacs-lisp :tangle (package-str! (lisp! "+org-ref-consult-cite.el") :consult)
-       (setq org-ref-completion-library '+org-ref-consult-cite)
-
-       (setq
-        org-ref-insert-link-function 'org-ref-insert-link
-        org-ref-insert-cite-function 'org-ref-consult-insert-cite-link
-        org-ref-insert-label-function 'org-ref-consult-insert-label-link
-        org-ref-insert-ref-function 'org-ref-consult-insert-ref-link
-        org-ref-cite-onclick-function (lambda (_)
-                                        (org-ref-citation-hydra/body)))
-
-       (defun org-ref-use-consult-bibtex+ (type &optional arg)
-         (concat type ":" (consult-bibtex--read-entry)))
-
-       (dolist (type org-ref-cite-types)
-         (advice-add (intern (format "org-%s-complete-link" type)) :override
-                     (apply-partially #'org-ref-use-consult-bibtex+ type)))
-
-       (defun org-ref-consult-insert-cite-link (&optional arg)
-         "consult function for interacting with bibtex.
-       Uses `org-ref-find-bibliography' for bibtex sources, unless a
-       prefix ARG is used, which uses `org-ref-default-bibliography'."
-         (interactive "P")
-         (let ((files (if arg
-                                                  org-ref-default-bibliography
-                                          (org-ref-find-bibliography))))
-           (org-ref-insert-key-at-point
-            ;; TODO: Support multiple keys at once.
-            (list
-             (consult-bibtex--read-entry
-              nil (consult-bibtex--candidates (orhc-bibtex-candidates)))))))
-
-       (defun org-ref-consult-insert-label-link ()
-         "Insert a label with `completing-read'."
-         (interactive)
-         (insert
-          (concat (if (not (looking-back "label:" 6)) "label:" "")
-                        (completing-read "label: " (org-ref-get-labels)))))
-
-       (defun org-ref-consult-insert-ref-link ()
-         "Insert a ref link with `completing-read'.
-       Use a prefix arg to select the ref type."
-         (interactive)
-         (let ((label (completing-read "label: " (org-ref-get-labels) nil t)))
-           (cond
-            ;; from a colon insert
-            ((looking-back ":" 1)
-             (insert label))
-            ;; non-default
-            (current-prefix-arg
-             (insert
-              (completing-read "type: " org-ref-ref-types)
-              ":"
-              label))
-            ;; default
-            (t
-             (insert
-              (or (when (looking-at "$") " ") "")
-              (concat (org-ref-infer-ref-type label)
-                            ":"
-                            label))))))
-
-       (provide '+org-ref-consult-cite)
      #+END_SRC
 
 **** consult-evil-marks
@@ -20510,72 +20403,85 @@
         (setq company-bibtex-bibliography bibtex-files))
     #+END_SRC
 
-*** bibtex-completion
-    #+BEGIN_SRC emacs-lisp
-      (use-package bibtex-completion
-        :straight (bibtex-completion :host github :repo "mohkale/helm-bibtex")
-        :commands (bibtex-insert-pdfbib-link+)
-        :custom
-        (bibtex-completion-library-path (list
-                                         +docs-home
-                                         (join-path +docs-home "unidocs/")))
-        (bibtex-completion-pdf-extension '(".pdf" ".epub" ".pptx" ".doc" ".docx"))
-        (bibtex-completion-pdf-open-function '+xopen-url)
+*** citar
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! bibtex :consult)
+    :END:
+    TODO describe
 
-        :preface
-        (defvaralias 'bibtex-completion-bibliography 'org-cite-global-bibliography)
-
-        :config
-        ;; Something seems to be resetting this so I'm deferring its assignment
-        ;; for now.
-        (setq bibtex-completion-notes-path (join-path +notes-home "bibnotes"))
+    #+begin_src emacs-lisp
+      (use-package citar
+        :straight t
+        :hook ((org-mode . citar-capf-setup)
+               (markdown-mode . citar-capf-setup)
+               (markdown-ts-mode . citar-capf-setup)
+               ((latex-mode LaTeX-mode) . citar-capf-setup))
+        :leader
+        ("ob" 'citar-insert-citation)
+        (:mode 'org-mode
+         "[" 'citar-insert-citation)
 
         :custom
-        (bibtex-completion-additional-search-fields nil)
-        (bibtex-completion-display-formats
-         '((t . "${=has-pdf=:2}${=has-note=:2} ${year:4} ${title:*} ${author:36}")))
+        (citar-library-paths
+         (list +docs-home
+               (join-path +docs-home "unidocs/")))
+        (citar-library-file-extensions
+         '(".pdf" ".epub" ".pptx" ".doc" ".docx"))
+        (citar-notes-paths
+         (ensure-list (join-path +notes-home "bibnotes")))
+
+        :custom
+        (org-cite-insert-processor 'citar)
+        (org-cite-follow-processor 'citar)
+        (org-cite-activate-processor 'citar)
 
         :init
-        (with-eval-after-load 'all-the-icons
-          (setq
-           bibtex-completion-pdf-symbol   (all-the-icons-pad+ (+icon nerd-oct "file-pdf" :face '(:weight normal :inherit)))
-           bibtex-completion-notes-symbol (all-the-icons-pad+ (+icon fileicon "org" :face '(:weight normal :inherit)))))
+        (advice-add #'citar-file-open-external :override #'+xopen-file)
+
+        :preface
+        (defvaralias 'citar-bibliography 'org-cite-global-bibliography)
 
         :config
-        (defun bibtex-completion-format-citation-org-mode-cite+ (keys)
-          "Format cite references for keys in KEYS for `org-mode'."
-          (s-join ", " (--map (format "cite:%s" it) keys)))
+        (with-eval-after-load 'all-the-icons
+          (eval
+           '(progn
+              (setf (citar-indicator-symbol citar-indicator-notes)
+                    (+icon fileicon "org" :face '(:weight normal
+                                                  :inherit font-lock-string-face)))
 
-        (setq bibtex-completion-format-citation-functions
-              '((org-mode      . bibtex-completion-format-citation-org-mode-cite+)
-                (latex-mode    . bibtex-completion-format-citation-cite)
-                (markdown-mode . bibtex-completion-format-citation-pandoc-citeproc)
-                (default       . bibtex-completion-format-citation-default)))
+              (setf (citar-indicator-symbol citar-indicator-links)
+                    (+icon nerd-oct "file-pdf" :face '(:weight normal
+                                                       :inherit font-lock-type-face))))))
 
-        (defun bibtex-insert-pdfbib-link+ (keys)
-          (let* ((region-was-active (region-active-p))
-                 (beg (if region-was-active
-                          (region-beginning)
-                        (point)))
-                 (end (if region-was-active
-                          (region-end)
-                        (point)))
-                 (default-contents (when region-was-active
-                                     (prog1 (buffer-substring beg end)
-                                       (delete-region beg end)))))
-            (condition-case _
-                (dolist (key keys)
-                  (insert
-                   (concat "[[pdfbib:" key "::"
-                           (read-from-minibuffer "Page: " "1") "]["
-                           (read-string "Description: " default-contents nil key)
-                           "]]")))
-              ((error quit)
-               (when default-contents
-                 (delete-region beg (point))
-                 (insert default-contents)
-                 (set-mark beg)))))))
-    #+END_SRC
+        :general
+        (:keymaps 'citar-map
+         "e" nil "g" 'citar-open-entry
+         )
+        (:keymaps 'citar-citation-map
+         "e" nil "g" 'citar-open-entry))
+    #+end_src
+
+    #+begin_src emacs-lisp :tangle (package-yes! org bibtex :consult)
+      (set-company-backend! 'org-mode 'company-capf)
+    #+end_src
+    #+begin_src emacs-lisp :tangle (package-yes! markdown bibtex :consult)
+      (set-company-backend! 'markdown-mode 'company-capf)
+      (set-company-backend! 'markdown-ts-mode 'company-capf)
+    #+end_src
+    #+begin_src emacs-lisp :tangle (package-yes! latex bibtex :consult)
+      (set-company-backend! 'latex-mode 'company-capf)
+      (set-company-backend! 'LaTeX-mode 'company-capf)
+    #+end_src
+
+**** citar-embark
+     #+begin_src emacs-lisp
+       (use-package citar-embark
+         :straight t
+         :after (citar embark)
+         :demand t
+         :config
+         (citar-embark-mode))
+     #+end_src
 
 *** ebib
     biblatex/bibtex database management interface for emacs. TODO read [[https://joostkremers.github.io/ebib/ebib-manual.html][manual]].
@@ -21983,8 +21889,8 @@
          (concat
           "pdfbib:"
           (cond
-           ((package! :consult)
-            (consult-bibtex--read-entry arg))
+           ((featurep 'citar)
+            (citar-select-refs))
            (t (user-error "No bibtex key reader found")))
           ;; I want to be able to omit a page number but read-number doesn't allow that :cry:.
           (let ((page (read-from-minibuffer "Page: " nil nil nil +org-pdf-complete-link-page-history)))
