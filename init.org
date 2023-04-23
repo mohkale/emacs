@@ -12756,11 +12756,9 @@
         (push (cons 'consult-xref #'embark-consult-export-grep)
               embark-exporters-alist)
 
-        ;; (push `(,(rx "*Embark " (or "Live" "Completions" "Collect") "*")
-        ;;         nil
-        ;;         (window-parameters (mode-line-format . none)))
-        ;;       display-buffer-alist)
+        (push '(project embark-file-map) embark-keymap-alist)
 
+        :config
         (defun embark-act-noexit+ ()
           (interactive)
           (let ((current-window (selected-window))
@@ -12768,12 +12766,6 @@
             (call-interactively #'embark-act)
             (when current-window
               (select-window current-window))))
-
-        (defun embark-collect-delete+ ()
-          (interactive)
-          (unless (eq embark-collect-view 'list)
-            (user-error "Can only delete in list view."))
-          (call-interactively #'evil-delete-whole-line))
 
         (add-hook 'embark-collect-mode-hook
                   (defun embark-collect-disable-read-only-mode+ ()
@@ -12788,34 +12780,12 @@
             (mkdir dir t))
           (find-file dir))
 
-        :config
-        (when (package! magit)
-          (defun embark-magit-status+ (file)
-            (interactive "fFile: ")
-            (setq file (file-chase-links file))
-            (if-let ((root (project-current-root+
-                            (or (when (file-directory-p file)
-                                  file)
-                                (file-name-directory file)))))
-                (magit-status root)
-              (user-error "Could not find project root for %s" root)))
-
-          (general-define-key :keymaps 'embark-file-map "g" #'embark-magit-status+)
-
-          (defun embark-magit-library-status+ (lib)
-            (interactive (list (read-library-name)))
-            (embark-magit-status+ (find-library-name lib)))
-
-          (general-define-key :keymaps 'embark-library-map "g" #'embark-magit-library-status+))
-
-        :config
-        (push '(project embark-file-map)
-              embark-keymap-alist)
-
         :general
         (:keymaps 'embark-file-map
          "m" 'embark-find-mkdir+
          "+" 'embark-find-mkdir+)
+
+        ;; Embark core bindings.
 
         :general
         (:states '(normal visual motion)
@@ -12823,38 +12793,66 @@
          "<C-return>" 'embark-act)
         (:keymaps '(global-map
                     org-mode-map)
-         "C-c C-l" 'embark-live)
+         "C-c C-o" 'embark-collect)
+
         (:keymaps 'vertico-map
          "<C-return>" 'embark-act
          "M-RET" 'embark-act-noexit+
          "C-c C-o" 'embark-collect
-         "C-c C-l" 'embark-live
+         ;; This is redundant for Vertico sessions.
+         "C-c C-l" nil ;; "C-c C-l" 'embark-collect
          "C-c C-e" 'embark-export
          "C-c C-b" 'embark-become)
+
+        ;; embark-collect
+
+        :lazy-leader
+        (:mode 'embark-collect-mode
+         "," 'embark-act
+         "s" 'embark-collect-direct-action-minor-mode
+         "a" 'embark-collect-direct-action-minor-mode
+         "e" 'embark-export
+         "n" 'tabulated-list-narrow-current-column
+         "w" 'tabulated-list-widen-current-column)
+
+        :general
         (:keymaps 'embark-collect-mode-map
          :states 'motion
          "a" 'embark-act
-         "u" 'evil-undo
-         "C-r" 'evil-redo
-         "<" 'tabulated-list-narrow-current-column
-         ">" 'tabulated-list-widen-current-column
-         "x" 'embark-collect-delete+
+         "A" 'embark-act-all
          "gj" 'forward-button
          "gk" 'backward-button
-         "<C-return>" 'embark-act)
+         "<C-return>" 'embark-act
+         "<C-M-return>" 'embark-act-all
+
+         "<" 'tabulated-list-narrow-current-column
+         ">" 'tabulated-list-widen-current-column
+
+         [remap evil-forward-paragraph] 'outline-next-heading
+         [remap evil-backward-paragraph] 'outline-previous-heading
+         "u" 'evil-undo
+         "C-r" 'evil-redo
+         "x" 'evil-delete-whole-line)
+
+        ;; Embark category maps
+
         (:keymaps 'embark-general-map
          "w" nil
          "y" 'kill-new)
+
         (:keymaps 'embark-file-map
-         "=" 'vdiff-files
-         "W" nil
-         "Y" 'embark-save-relative-path)
+         "W" nil "Y" 'embark-save-relative-path
+         ;; Swap these keybindings
+         "a" #'info-lookup-symbol "s" #'xref-find-apropos)
+
         (:keymaps 'embark-command-map
          "g" 'embark-find-definition
          "b" 'global-set-key
          "w" 'where-is)
+
         (:keymaps 'embark-become-file+buffer-map
          "t" 'find-temp-file+)
+
         (:keymaps 'embark-face-map
          "I" nil
          "i" nil
@@ -12862,29 +12860,60 @@
          "g" 'embark-find-definition
          "/" 'make-face-italic
          "?" 'make-face-unitalic)
+
         (:keymaps 'embark-variable-map
          "g" 'embark-find-definition)
+
         (:keymaps 'embark-function-map
          "g" 'embark-find-definition)
+
         (:keymaps 'embark-symbol-map
          "g" 'embark-find-definition)
 
-        :lazy-leader
-        (:mode 'embark-collect-mode
-         "," 'embark-act
-         "s" 'embark-collect-direct-action-minor-mode
-         "l" 'embark-collect-toggle-view                                             ; list -> grid -> list
-         "a" 'embark-collect-direct-action-minor-mode
-         "e" 'embark-export
-         "z" 'embark-occur-zebra-minor-mode
-         "n" 'tabulated-list-narrow-current-column
-         "w" 'tabulated-list-widen-current-column))
+        (:keymaps 'embark-buffer-map
+         "k" nil "x" #'kill-buffer
+         "K" nil "X" #'embark-kill-buffer-and-window)
+
+        (:keymaps 'embark-tab-map
+         "k" nil "x" #'tab-bar-close-tab-by-name)
+
+        (:keymaps 'embark-expression-map
+         "k" nil "x" #'kill-region)
+
+        (:keymaps 'embark-region-map
+         ">" nil "." 'embark-encode-map
+         ";" nil "/" 'comment-or-uncomment-region))
 
       (use-package embark-consult
         :straight t
         :after (embark consult)
         :demand t)
     #+END_SRC
+
+**** embark-magit
+     #+begin_src emacs-lisp :tangle (package-yes! :consult magit)
+       (use-package embark
+         :commands (embark-magit-status+
+                    embark-magit-library-status+)
+         :config
+         (defun embark-magit-status+ (file)
+           (interactive "fFile: ")
+           (setq file (file-chase-links file))
+           (if-let ((root (project-current-root+
+                           (or (when (file-directory-p file)
+                                 file)
+                               (file-name-directory file)))))
+               (magit-status root)
+             (user-error "Could not find project root for %s" root)))
+
+         (defun embark-magit-library-status+ (lib)
+           (interactive (list (read-library-name)))
+           (embark-magit-status+ (find-library-name lib)))
+
+         :general
+         (:keymaps 'embark-file-map "g" #'embark-magit-status+)
+         (:keymaps 'embark-library-map "g" #'embark-magit-library-status+))
+     #+end_src
 
 *** consult
     #+BEGIN_SRC emacs-lisp
@@ -17352,6 +17381,11 @@
         "tw" 'vdiff-toggle-whitespace)
 
        :general
+       (:keymaps 'embark-file-map
+        [remap ediff-files] 'vdiff-files)
+       (:keymaps 'embark-buffer-map
+        [remap ediff-buffers] 'vdiff-buffers)
+
        (:keymaps '(vdiff-mode-map
                    vdiff-3way-mode-map)
         [remap quit-window] 'vdiff-quit)
