@@ -2978,61 +2978,6 @@
      (setq lisp-indent-function #'+emacs-lisp-indent-function)
    #+END_SRC
 
-** yank-indent-adjust
-   adjust indentation of yanked text in some modes... because doing so manually is a
-   pain :tongue:. Initially sourced from, the venerable, [[https://github.com/magnars/.emacs.d/blob/master/defuns/editing-defuns.el#L99-L124][magnars]].
-
-   #+BEGIN_SRC emacs-lisp
-     (defvar yank-indent-modes '(prog-mode
-                                 sgml-mode
-                                 js2-mode)
-       "Modes in which to automatically indent regions that are yanked (or yank-popped).")
-   #+END_SRC
-
-   #+BEGIN_SRC emacs-lisp
-     (defvar yank-advised-indent-threshold 1000
-       "Threshold (# chars) over which indentation does not automatically occur.")
-
-     (defun yank-advised-indent-function (beg end)
-       "Do indentation, as long as the region isn't too large."
-       (if (<= (- end beg) yank-advised-indent-threshold)
-           (indent-region beg end nil)))
-
-     (defmacro with-auto-indent-satisfied (prefix-var &rest body)
-       `(when (and (not ,prefix-var)
-                   (--any? (derived-mode-p it) yank-indent-modes))
-          ,@body))
-     (put 'with-auto-indent-satisfied 'lisp-indent-function 'defun)
-
-     (defun yank--auto-indent (&optional arg)
-       "if mode is in `yank-indent-modes' indent yanked text
-     doesn't do anything if a prefix arg is given."
-       (with-auto-indent-satisfied arg
-         (let ((transient-mark-mode nil))
-           (yank-advised-indent-function
-            (region-beginning) (region-end)))))
-
-     (advice-add 'yank     :after #'yank--auto-indent)
-     (advice-add 'yank-pop :after #'yank--auto-indent)
-
-     (defun yank-unindented ()
-       (interactive)
-       (yank 1))
-
-     (with-eval-after-load 'evil
-       (defun evil-visual-paste--auto-indent (_ &optional register _)
-         ;; not sure what yank handler is for, leave it in, to avoid errors
-         "same as `yank--auto-indent', but for evil visual yank replace."
-         (with-auto-indent-satisfied register
-           (let ((transient-mark-mode nil))
-             (yank-advised-indent-function
-              (region-beginning) (region-end)))))
-
-       (advice-add 'evil-visual-paste :after #'evil-visual-paste--auto-indent)
-       (advice-add 'evil-paste-after  :after #'evil-visual-paste--auto-indent)
-       (advice-add 'evil-paste-before :after #'evil-visual-paste--auto-indent))
-   #+END_SRC
-
 ** fonts-emojis
    #+BEGIN_SRC emacs-lisp
      ;; adapted from [[https://github.com/zonuexe/emoji-fontset.el/blob/master/emoji-fontset.el][emoji-fontset]]
