@@ -10945,6 +10945,59 @@
           (cdr (project-current)))))
     #+END_SRC
 
+*** remote
+    #+begin_src emacs-lisp
+      (defvar-local +mode-line-remote-component nil)
+
+      (defvar +mode-line-remote-component--remap-regexps
+        `(;; For docker-compose the [[https://github.com/docker/compose/blob/7b0ed13209894b5981608f7d9e329a3a58af957d/pkg/compose/convergence.go#L260][default format]] for a container name
+          ;; produced by commands like up is the hyphen separate name of
+          ;; the project, service and a unique number.
+          ;;
+          ;; I find this redundant in most cases, if I wanted the project
+          ;; name in the mode-line I'd include it separately. Here we strip
+          ;; out the extra properties. So foo-bar-1 > bar/1
+          ;;
+          ;; See also [[https://github.com/moby/moby/blob/7b9275c0da707b030e62c96b679a976f31f929d3/daemon/names/names.go#L6][list]] of supported docker image name characters.
+          (,(rx bol
+                (group alnum (* (any alnum "_.-"))) ; project
+                "-"
+                (group (+ (any alnum "_.-"))) ; service
+                "-"
+                (group (one-or-more digit)) ; number
+                eol)
+           . "\2_\3")
+          ;; When using docker-compose run a new container is started with
+          ;; a [[https://github.com/docker/compose/blob/7b0ed13209894b5981608f7d9e329a3a58af957d/pkg/compose/run.go#L65][name of the form]] PACKAGE-SERVICE-RUN-SLUG. This is 100% way
+          ;; too long, and often runs over the length of my mode-line.
+          ;; For now I just reduce it to the service name for convenience. So
+          ;; projection-dev-run-7300cd0752b4 becomes just dev.
+          (,(rx bol
+                (group alnum (* (any alnum "_.-"))) ; project
+                "-"
+                (group (+ (any alnum "_.-"))) ; service
+                "-run-"
+                (group (+ alnum))             ; 12 character slug
+                eol)
+           . "\\2"))
+        "Remote host re-mappings for `+mode-line-update-remote-component'.")
+
+      (defun +mode-line-update-remote-component (&rest _)
+        "Update file remote component in the `mode-line'."
+        (when-let ((host (file-remote-p default-directory 'host)))
+          (save-match-data
+            (seq-find
+             (lambda (remap)
+               (when (string-match (car remap) host)
+                 (setq host (replace-match (cdr remap) nil nil host))
+                 t))
+             +mode-line-remote-component--remap-regexps))
+
+          (setq +mode-line-remote-component host)))
+
+      (add-hook 'after-change-major-mode-hook #'+mode-line-update-remote-component)
+    #+end_src
+
 *** segments
     This section groups functions from the previous sections into standalone
     functions so the mode-line is nicer to read.
@@ -11080,9 +11133,8 @@
                     +mode-line-buffer-file-icon))
             " "))
           (:eval (+mode-line-buffer-name))
-          (default-directory
-           (:propertize (:eval (when-let ((host (file-remote-p default-directory 'host)))
-                                 (concat "@" host)))
+          (+mode-line-remote-component
+           (:propertize ("@" +mode-line-remote-component)
             face +mode-line-host-face))
           (mode-line-process
            (:propertize (" " mode-line-process)
