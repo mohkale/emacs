@@ -12599,9 +12599,14 @@
      (use-package vertico
        :straight (vertico :repo "minad/vertico"
                           :files (:defaults
+                                  "extensions/vertico-grid.el"
+                                  "extensions/vertico-mouse.el"
+                                  "extensions/vertico-multiform.el"
                                   "extensions/vertico-quick.el"
                                   "extensions/vertico-repeat.el"))
        :hook ((after-init . vertico-mode)
+              (vertico-mode . vertico-mouse-mode)
+              (vertico-mode . vertico-multiform-mode)
               (minibuffer-setup . cursor-intangible-mode))
        :custom
        (vertico-count 15)
@@ -12609,6 +12614,9 @@
        (vertico-scroll-margin 0)
        (minibuffer-prompt-properties
         '(read-only t cursor-intangible t face minibuffer-prompt))
+       (vertico-multiform-categories
+        '((jinx grid (vertico-grid-annotate . 25)))
+        "Adjust vertico display based on completion session.")
 
        :hook (minibuffer-setup . vertico-repeat-save)
 
