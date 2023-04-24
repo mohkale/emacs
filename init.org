@@ -15177,10 +15177,33 @@
      (use-package jinx
        :straight t
        :delight (jinx-mode " Jinx")
-       :defer 2
-       :config (global-jinx-mode +1)
+       :hook
+       (org-mode . jinx-mode)
+       (markdown-mode . jinx-mode)
+       (git-commit-mode . jinx-mode)
+
+       :custom
+       (jinx-languages "en_GB en_US"
+        ;; I write in British English... but am a developer so a use a lot of American
+        ;; English in code as well.
+        "Set preferred language list for jinx.")
+
+       :config
+       ;; The builtin logging library uses camel-case :/.
+       (push 'python-mode jinx-camel-modes)
+       (push 'python-ts-mode jinx-camel-modes)
+
+       :config
+       ;; For `magit-commit-mode'.
+       (setf (alist-get 'text-mode jinx-exclude-faces)
+             '(git-commit-comment-file
+               git-commit-comment-heading
+               git-commit-comment-branch-local
+               git-commit-comment-branch-remote))
+
        :general
-       ([remap ispell-word] 'jinx-correct)
+       (:keymaps 'jinx-mode-map
+        [remap ispell-word] 'jinx-correct)
 
        :lazy-leader
        (:mode 'jinx-mode
