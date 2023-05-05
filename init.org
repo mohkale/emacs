@@ -12271,7 +12271,9 @@
      (use-package tramp
        :custom
        (tramp-default-method "sshx")
-       (tramp-verbose 1)
+
+       :config
+       (setq tramp-verbose 1) ;; Doesn't work with :custom.
 
        :config
        ;; google cloud integration... curtesy of:
@@ -12288,7 +12290,14 @@
                                        ("-o" "UserKnownHostsFile=/dev/null")
                                        ("-o" "StrictHostKeyChecking=no")))
           (tramp-default-port         22))
-        tramp-methods))
+        tramp-methods)
+
+       :leader
+       (:prefix "f2"
+        "" '(:ignore t :wk "remote")
+        "c" 'tramp-cleanup-this-connection
+        "x" 'tramp-cleanup-all-connections
+        "b" 'tramp-cleanup-all-buffers))
    #+END_SRC
 
 ** vc-mode
