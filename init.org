@@ -582,6 +582,23 @@
         'toggle))
    #+end_src
 
+   Choose my preferred spell-checker.
+
+   #+begin_src emacs-lisp
+     (defun +flyspell ()
+       "Enable my preferred spell checking package."
+       (interactive)
+       (let* ((interactive-p (called-interactively-p 'interactive))
+              (caller (if interactive-p #'funcall-interactively #'funcall)))
+         (cond
+          ((package! jinx)
+           (funcall caller 'jinx-mode))
+          ((package! flyspell)
+           (funcall caller 'jinx-mode))
+          (interactive-p
+           (message "No spell checking package is enabled.")))))
+   #+end_src
+
    I manage mail configurations from the ~+mail-conf~ variable. Here I define some
    helper methods to make accessing the configuration data in it much simpler.
 
@@ -1566,11 +1583,12 @@
        (leader-set-keys
          "tm" '(:ignore t :wk "mode")
          "tmz" 'zone
-         "tml" 'emacs-lisp-mode
+         "tm(" 'emacs-lisp-mode
          "tmL" 'lisp-interaction-mode
          "tmc" 'c++-mode
          "tmC" 'c-mode
-         "tmf" 'flyspell-mode
+         "tmf" '+flyspell
+         "tml" '+flylint
          "tmF" 'follow-mode
          "tmt" 'text-mode
          "tmp" 'python-mode
@@ -1581,8 +1599,7 @@
          "tmx" 'hexl-mode
          "tm?" 'toggle-rot13-mode
          "tmv" 'visual-line-mode
-         "tmD" 'decipher
-         "tmF" 'flyspell-prog-mode)
+         "tmD" 'decipher)
 
        (leader-set-keys
          "n" '(:ignore t :wk "narrrow/numbers")
@@ -9168,7 +9185,6 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package flyspell
-       :hook (git-commit-mode . flyspell-mode)
        :delight (flyspell-mode " Fly")
        :init
        (evil-ex-define-cmd "spell" #'flyspell-buffer)
@@ -9188,9 +9204,6 @@
          (("TAB" flyspell-auto-correct-word "cycle-suggestion")
           ("c" flyspell-correct-wrapper "correct")
           ("p" flyspell-correct-at-point "fix-at-point"))))
-
-       :config
-       (add-hook 'org-mode-hook 'flyspell-mode)
 
        :lazy-leader
        (:mode 'flyspell-mode
@@ -15178,10 +15191,6 @@
      (use-package jinx
        :straight t
        :delight (jinx-mode " Jinx")
-       :hook
-       (org-mode . jinx-mode)
-       (markdown-mode . jinx-mode)
-       (git-commit-mode . jinx-mode)
 
        :custom
        (jinx-languages "en_GB en_US"
@@ -15193,6 +15202,13 @@
        ;; The builtin logging library uses camel-case :/.
        (push 'python-mode jinx-camel-modes)
        (push 'python-ts-mode jinx-camel-modes)
+       ;; C++ commonly adopts camel case for types.
+       (push 'c-mode jinx-camel-modes)
+       (push 'c-ts-mode jinx-camel-modes)
+       (push 'c++-mode jinx-camel-modes)
+       (push 'c++-ts-mode jinx-camel-modes)
+       ;; Used for git commits, which can reference camel-cased code.
+       (push 'text-mode jinx-camel-modes)
 
        :config
        ;; For `magit-commit-mode'.
@@ -15201,6 +15217,10 @@
                git-commit-comment-heading
                git-commit-comment-branch-local
                git-commit-comment-branch-remote))
+
+       :config
+       (setf (alist-get 'hledger-mode jinx-exclude-faces)
+             '(font-lock-variable-name-face))
 
        :general
        (:keymaps 'jinx-mode-map
@@ -16029,7 +16049,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package notmuch
        :straight t
-       :hook (notmuch-message-mode . flyspell-mode)
+       :hook (notmuch-message-mode . +flyspell)
        :commands (notmuch-toggle-tag+)
        :custom
        (notmuch-search-oldest-first nil)
@@ -18375,7 +18395,8 @@
    #+begin_src emacs-lisp :tangle no
      (use-package ledger-mode
        :straight t
-       :mode ("\.journal$" . ledger-mode)
+       :mode ((rx ".journal" eol) . ledger-mode)
+       :hook (ledger-mode . +flyspell)
        :custom
        ;; Required to use hledger instead of ledger itself.
        (ledger-mode-should-check-version nil)
@@ -18397,7 +18418,8 @@
    #+begin_src emacs-lisp
      (use-package hledger-mode
        :straight t
-       :mode ("\.journal$" . hledger-mode)
+       :mode ((rx ".journal" eol) . hledger-mode)
+       :hook (hledger-mode . +flyspell)
        :custom
        (hledger-jfile (or (getenv "LEDGER_FILE")
                           (join-path (xdg-documents-dir) "ledger" "main.journal")))
@@ -19106,7 +19128,8 @@
         :straight t
         :hook ((markdown-mode . display-line-numbers-mode)
                (markdown-mode . auto-fill-mode)
-               (markdown-mode . +flylint))
+               (markdown-mode . +flylint)
+               (markdown-mode . +flyspell))
         :custom
         (markdown-indent-on-enter 'indent-and-new-item)
         (markdown-fontify-code-blocks-natively t)
@@ -20076,7 +20099,7 @@
    #+BEGIN_SRC emacs-lisp
      (use-package git-modes
        :straight t
-       )
+       :hook (git-commit-mode . +flyspell))
    #+END_SRC
 
 ** latex
@@ -20753,7 +20776,8 @@
      (use-package org
        :straight t
        :hook ((org-mode . display-line-numbers-mode)
-              (org-mode . auto-fill-mode))
+              (org-mode . auto-fill-mode)
+              (org-mode . +flyspell))
        :custom
        (org-clock-idle-time 15)
        (org-fontify-done-headline nil)
@@ -21479,7 +21503,6 @@
                ;; With support for word-checking and other writing helpers.
                (:group "Default"
                 :type entry
-                :hook ,#'flyspell-mode
                 ;; :file ,org-default-notes-file
                 :prepend t
                 :empty-lines 0
@@ -22294,7 +22317,7 @@
      #+BEGIN_SRC emacs-lisp
        (use-package org-roam
          :straight t
-         :hook ((org-roam-file-setup . flyspell-mode))
+         :hook ((org-roam-file-setup . +flyspell))
          :commands org-roam-rg+
          :preface
          (setq org-roam-v2-ack t)
