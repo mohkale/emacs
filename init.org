@@ -359,13 +359,15 @@
        "Interval before which a completion popup should show up.")
 
      (defvar +completion-popup-kind-icons
-       '((array :text "a" :icon "code-brackets" :face font-lock-type-face)
+       '(;; LSP types.
+         (array :text "a" :icon "code-brackets" :face font-lock-type-face)
          (boolean :text "b" :icon "circle-half-full" :face font-lock-builtin-face)
          (class :text "c" :icon "view-grid-plus-outline" :face font-lock-type-face)
          (color :text "#" :icon "palette" :face aoh-blue-int)
          (constant :text "c" :icon "lock-remove-outline" :face font-lock-constant-face)
          ; constructor
          (enummember :text "e" :icon "format-list-checks" :face aoh-blue-int)
+         (enum-member :text "e" :icon "format-list-checks" :face aoh-blue-int)
          (enum :text "e" :icon "format-list-bulleted-square" :face aoh-turquoise-int)
          ; event
          (field :text "f" :icon "application-braces-outline" :face aoh-blue-int)
@@ -389,9 +391,16 @@
          (struct :text "%" :icon "code-braces" :face aoh-orange)
          (text :text "w" :icon "script-text-outline" :face shadow)
          ; typeparameter
+         ; type-parameter
          ; unit
          (value :text "v" :icon "plus-circle-outline" :face font-lock-builtin-face)
          (variable :text "v" :icon "variable" :face font-lock-variable-name-face)
+
+         ;; Non-LSP extensions
+         (message-address :text "@" :icon "mail" :face font-lock-string-face)
+         (ledger-account :text "$" :icon "money" :face font-lock-variable-name-face)
+
+         ;; Default
          (t :text "•" :icon "crosshairs-question" :face shadow))
        "Icon associations for completion-kinds in completion popups.")
 
@@ -16080,6 +16089,12 @@
        :init
        (set-company-backend! 'notmuch-message-mode 'notmuch-company)
 
+       :init
+       (advice-add #'notmuch-company :before-until
+                   (defun notmuch-company--set-company-kind+ (command &rest _args)
+                     (when (eq command 'kind)
+                       'message-address)))
+
        :config
        (evil-set-initial-state 'notmuch-show-mode 'motion)
        (evil-set-initial-state 'notmuch-search-mode 'motion)
@@ -16726,6 +16741,12 @@
 
         :config
         (setq company-backends (remove 'company-ebdb company-backends))
+
+        :init
+        (advice-add #'company-ebdb :before-until
+                    (defun company-ebdb--set-company-kind+ (command &rest _args)
+                      (when (eq command 'kind)
+                        'message-address)))
 
         :custom (company-ebdb-pop-up nil "Prefer `company-doc-buffer'.")
         :config
@@ -18417,6 +18438,11 @@
 
        :init
        (evil-set-initial-state 'hledger-mode 'normal)
+       :init
+       (advice-add #'hledger-company :before-until
+                   (defun hledger-company--set-company-kind+ (command &rest _args)
+                     (when (eq command 'kind)
+                       'ledger-account)))
 
        :config
        (modify-syntax! '((?- . "w")
@@ -18612,7 +18638,13 @@
         :after  web-mode
         :config
         (set-company-backend! 'web-mode
-          'company-web-html))
+          'company-web-html)
+
+        :init
+        (advice-add #'company-web-html :before-until
+                    (defun company-web-html--set-company-kind+ (command &rest _args)
+                      (when (eq command 'kind)
+                        'text))))
     #+END_SRC
 
 *** web-beautify
