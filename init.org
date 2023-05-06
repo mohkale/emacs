@@ -6368,8 +6368,9 @@
 *** projection
     #+begin_src emacs-lisp
       (use-package projection
-        :straight (projection :host github :repo "mohkale/projection"
-                              :files (:defaults "src/*.el"))
+        :straight (projection
+                   :host github :repo "mohkale/projection"
+                   :files (:defaults "src/*.el"))
         :hook (after-init . global-projection-hook-mode)
         :custom
         (projection-cmake-configure-options
@@ -6386,8 +6387,7 @@
           (require 'projection))
 
         :general
-        ([remap project-compile] 'projection-build-project
-         [remap compile-multi] 'projection-multi-compile)
+        ([remap project-compile] 'projection-build-project)
 
         :leader
         ;; Bindings copied from `projection-map'.
@@ -6411,11 +6411,23 @@
          "p" 'projection-run-project
          "k" 'projection-package-project
          "i" 'projection-install-project
-         ;; `projection-multi'
-         "RET" 'projection-multi-compile
          ;; `projection-recentf'
          "r" 'projection-recentf))
     #+end_src
+
+**** projection-multi
+     #+begin_src emacs-lisp
+       (use-package projection-multi
+         :straight (projection-multi
+                    :host github :repo "mohkale/projection"
+                    :files ("src/projection-multi/*.el"))
+         :general
+         ([remap compile-multi] 'projection-multi-compile)
+
+         :leader
+         (:prefix "p"
+          "RET" 'projection-multi-compile))
+     #+end_src
 
 ** projectile
    :PROPERTIES:
@@ -10949,7 +10961,7 @@
                                                   (t (define-key map [mode-line mouse-1]
                                                        #'eglot)))
                                             map))))))
-       (add-hook 'eglot--managed-mode-hook #'+mode-line--update-eglot)
+       (add-hook 'eglot-managed-mode-hook #'+mode-line--update-eglot)
        (add-hook 'eglot-connect-hook #'+mode-line--update-eglot)
      #+END_SRC
 
@@ -13098,7 +13110,7 @@
            "String"))
 
         :hook
-        ((eglot--managed-mode
+        ((eglot-managed-mode
           lsp-mode)
          . consult-imenu-setup-lsp+)
 
@@ -14754,6 +14766,7 @@
        :leader
        (:prefix leader-server-leader-prefix
         "l" 'eglot
+        "p" 'eglot-list-connections
         "e" 'eglot-events-buffer
         "x" 'eglot-shutdown)
 
@@ -15217,9 +15230,6 @@
         "Set preferred language list for jinx.")
 
        :config
-       ;; The builtin logging library uses camel-case :/.
-       (push 'python-mode jinx-camel-modes)
-       (push 'python-ts-mode jinx-camel-modes)
        ;; C++ commonly adopts camel case for types.
        (push 'c-mode jinx-camel-modes)
        (push 'c-ts-mode jinx-camel-modes)
@@ -15249,7 +15259,9 @@
         :minor t
         :prefix leader-minor-mode-leader-prefix
         leader-minor-mode-leader-prefix 'jinx-correct
-        "l" 'jinx-languages))
+        "l" 'jinx-languages
+        "n" 'jinx-next
+        "p" 'jinx-previous))
    #+end_src
 
 ** ggtags
