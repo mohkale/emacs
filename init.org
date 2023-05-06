@@ -18396,33 +18396,10 @@
        :straight t)
    #+END_SRC
 
-** ledger
+** hledger
    :PROPERTIES:
    :header-args+: :tangle (package-yes! ledger)
    :END:
-
-   #+begin_src emacs-lisp :tangle no
-     (use-package ledger-mode
-       :straight t
-       :mode ((rx ".journal" eol) . ledger-mode)
-       :hook (ledger-mode . +flyspell)
-       :custom
-       ;; Required to use hledger instead of ledger itself.
-       (ledger-mode-should-check-version nil)
-       (ledger-report-links-in-register nil)
-       (ledger-binary-path "hledger")
-       (ledger-highlight-xact-under-point nil)
-       (ledger-source-directory (join-path (xdg-documents-dir) "ledger"))
-       (ledger-reconcile-default-commodity "")
-
-       :init
-       (evil-set-initial-state 'ledger-mode 'normal)
-
-       :config
-       (modify-syntax! '((?- . "w")
-                         (?+ . "w"))
-         ledger-mode-syntax-table))
-   #+end_src
 
    #+begin_src emacs-lisp
      (use-package hledger-mode
