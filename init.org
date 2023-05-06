@@ -366,6 +366,7 @@
          (constant :text "c" :icon "lock-remove-outline" :face font-lock-constant-face)
          ; constructor
          (enummember :text "e" :icon "format-list-checks" :face aoh-blue-int)
+         (enum-member :text "e" :icon "format-list-checks" :face aoh-blue-int)
          (enum :text "e" :icon "format-list-bulleted-square" :face aoh-turquoise-int)
          ; event
          (field :text "f" :icon "application-braces-outline" :face aoh-blue-int)
@@ -389,9 +390,15 @@
          (struct :text "%" :icon "code-braces" :face aoh-orange)
          (text :text "w" :icon "script-text-outline" :face shadow)
          ; typeparameter
+         ; type-parameter
          ; unit
          (value :text "v" :icon "plus-circle-outline" :face font-lock-builtin-face)
          (variable :text "v" :icon "variable" :face font-lock-variable-name-face)
+
+         ;; Non-LSP extensions
+         (message-address :text "@" :icon "mail" :face font-lock-string-face)
+         (ledger-account :text "$" :icon "money" :face font-lock-variable-name-face)
+
          (t :text "•" :icon "crosshairs-question" :face shadow))
        "Icon associations for completion-kinds in completion popups.")
 
@@ -458,6 +465,9 @@
                    ((eq pkg :consult)
                     (push `(or (member (quote consult) +modules)
                                ,(package-build-cond+ 'vertico))
+                          res))
+                   ((eq pkg :capf)
+                    (push `(not (member (quote company) +modules))
                           res))
                    ((keywordp pkg)
                     (warn "`package!' got unknown keyword argument %s" pkg)
@@ -3970,11 +3980,63 @@
     #+END_SRC
 
 *** cape
+    A fantastic completion wrapping library that lets you bind company backends into
+    completion-at-point-functions and otherwise super-power your in buffer completion
+    facilities.
+
     #+begin_src emacs-lisp
       (use-package cape
         :straight t
         :commands (cape-super-capf
                    cape-company-to-capf))
+    #+end_src
+
+    TODO Describe set completion helper.
+
+    #+begin_src emacs-lisp :tangle no
+      (defvar +completion-backends
+        nil)
+
+      (defun set-completion-backend! (mode &rest specs)
+        (cl-loop
+         for spec in specs
+         with backend = :capf
+         with depth = nil
+         with capf-backends = nil
+         with company-backends = nil
+         if (member spec '(:capf :company))
+           ;; collect if candidates from previous backend exist.
+           do (setq backend spec)
+         else if (or (numberp spec)
+                     (not spec))
+           do (setq depth spec)
+         else
+           do (add-to-list (cl-case backend
+                             (:capf 'capf-backends)
+                             (:company 'company-backends))
+                           (cons depth spec))
+           ;; (setf (alist-get backend
+           ;;                  (alist-get mode +completion-backends))
+           ;;       (append
+           ;;        (alist-get backend
+           ;;                   (alist-get mode +completion-backends)))
+           ;;       )
+
+         ;; finally save everythign and generate cape variants for capf.
+           finally return company-backends
+         )
+        ;; (add-hook (intern (concat (symbol-name mode) "-hook"))
+        ;;           #'+set-completion-backends-for-buffer)
+        )
+
+      (set-completion-backend! 'haskell-mode :company #'company-capf #'company-css)
+
+      (cl-defmethod +set-completion-backends-for-buffer (&context (corfu-mode (eql t)))
+        )
+
+      (cl-defmethod +set-completion-backends-for-buffer (&context (company-mode (eql t)))
+        (make-local-variable 'company-backends)
+        )
     #+end_src
 
 ** hydra
@@ -5143,7 +5205,7 @@
 *** company-set-backends
     A helper for configuring ~company-backends~ adapted from [[https://github.com/hlissner/doom-emacs/blob/ce65645fb87ed1b24fb1a46a33f77cf1dcc1c0d5/modules/completion/company/autoload.el#L1][doom]].
 
-    #+BEGIN_SRC emacs-lisp
+    #+BEGIN_SRC emacs-lisp :tangle yes
       (setq-default company-backends '(company-capf))
 
       (defvar company-backend-alist+
@@ -5224,23 +5286,23 @@
       (defsubst temp-buffer-p+ (buf)
         (equal (substring (buffer-name buf) 0 1) " "))
 
-      (add-hook 'after-change-major-mode-hook
-                (defun company-setup-backends+ ()
-                  "Set `company-backends' for the current buffer."
-                  (interactive)
-                  (if (or (memq major-mode '(fundamental-mode special-mode))
-                          buffer-read-only
-                          (temp-buffer-p+ (or (buffer-base-buffer) (current-buffer))))
-                      (when (called-interactively-p 'interactive)
-                        (user-error "Current buffer isn't the kind we set `company-backends' in."))
-                    (progn
-                      (let ((backends (company-backends+)))
-                        (setq-local company-backends backends)
-                        (when (package! corfu)
-                          (setq-local completion-at-point-functions
-                                      (company-cape-capfs+ backends)))
-                        (when (called-interactively-p 'interactive)
-                          (message "Set company backends to %s" backends)))))))
+      ;; (add-hook 'after-change-major-mode-hook
+      ;;           (defun company-setup-backends+ ()
+      ;;             "Set `company-backends' for the current buffer."
+      ;;             (interactive)
+      ;;             (if (or (memq major-mode '(fundamental-mode special-mode))
+      ;;                     buffer-read-only
+      ;;                     (temp-buffer-p+ (or (buffer-base-buffer) (current-buffer))))
+      ;;                 (when (called-interactively-p 'interactive)
+      ;;                   (user-error "Current buffer isn't the kind we set `company-backends' in."))
+      ;;               (progn
+      ;;                 (let ((backends (company-backends+)))
+      ;;                   (setq-local company-backends backends)
+      ;;                   ;; (when (package! corfu)
+      ;;                   ;;   (setq-local completion-at-point-functions
+      ;;                   ;;               (company-cape-capfs+ backends)))
+      ;;                   (when (called-interactively-p 'interactive)
+      ;;                     (message "Set company backends to %s" backends)))))))
     #+END_SRC
 
 *** company-quickhelp
@@ -5295,10 +5357,6 @@
         "Prevent `corfu-mode' through `global-corfu-mode' for these modes.")
 
        :init
-       ;; Corfu should take precedence over company.
-       (advice-add 'global-company-mode :override #'ignore)
-
-       :init
        (with-eval-after-load 'savehist
          (add-to-list 'savehist-additional-variables 'corfu-history))
 
@@ -5349,13 +5407,14 @@
 
         "C-:" 'corfu-move-to-minibuffer+
         "C-h" 'corfu-info-documentation
-        "C-l" 'corfu-info-location
+        "C-p" 'corfu-info-location
 
         [tab] 'corfu-insert
         "TAB" 'corfu-insert
 
         "RET" 'corfu-complete
         [C-i] 'corfu-complete
+        "C-l" 'corfu-complete
 
         "C-o" 'corfu-last
         "M-o" 'corfu-first
@@ -5446,15 +5505,7 @@
         :after corfu
         :commands kind-icon-margin-formatter
         :init
-        (add-to-list 'corfu-margin-formatters #'kind-icon-margin-formatter)
-
-        :init
-        (advice-add #'kind-icon--rgb-blend :override
-                    (defun kind-icon--company-blend+ (rgb1 rgb2 frac)
-                      "Apply the blend function used by company with kind-icons as well."
-                      ;; TODO: Use 2 instead of 10 for the active corfu item. Will require
-                      ;; changes in upstream corfu to and kind-icons :/.
-                      (apply #'color-rgb-to-hex (nth 0 (color-gradient rgb2 rgb1 10))))))
+        (add-to-list 'corfu-margin-formatters #'kind-icon-margin-formatter))
     #+end_src
 
 ** all-the-icons
@@ -5862,17 +5913,40 @@
    #+END_SRC
 
 *** company-emojify                                                     :comp:
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! company company-emoji)
+    :PROPERTIES:
+    :header-args+: :tangle (package-yes! company-emoji)
+    :END:
+
+    #+BEGIN_SRC emacs-lisp
       (use-package company-emoji
         :straight t
         :after emojify
-        :init
-        (set-company-backend! 'text-mode 'company-emoji)
-
         :custom
         (company-emoji-insert-unicode nil
          "Never insert emojis as their unicode symbols."))
+
+      (use-package cape
+        :autoload cape-company-emoji
+        :config
+        (defalias 'cape-company-emoji
+          (cape-company-to-capf #'company-emoji)
+          "Cape capf adapter for `company-emoji'."))
     #+END_SRC
+
+    #+begin_src emacs-lisp :tangle (package-yes! :capf company-emoji)
+      (defun +capf-setup-company-emoji ()
+        (add-hook 'completion-at-point-functions #'cape-company-emoji nil 'local))
+    #+end_src
+    #+begin_src emacs-lisp :tangle (package-yes! company company-emoji)
+      (defun +capf-setup-company-emoji ()
+        (make-local-variable 'company-backends)
+        (add-hook 'company-backends #'company-emoji nil 'local))
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (add-hook 'text-mode-hook #'+capf-setup-company-emoji)
+      (add-hook 'emojify-mode-hook #'+capf-setup-company-emoji)
+    #+end_src
 
 ** eyebrowse
    :PROPERTIES:
@@ -16077,9 +16151,6 @@
        (defface notmuch-search-H-face+ '((t (:foreground "#FF6EB4")))
          "Face for lines tagged H in the `notmuch-search-mode' buffer.")
 
-       :init
-       (set-company-backend! 'notmuch-message-mode 'notmuch-company)
-
        :config
        (evil-set-initial-state 'notmuch-show-mode 'motion)
        (evil-set-initial-state 'notmuch-search-mode 'motion)
@@ -16506,6 +16577,38 @@
        )
    #+END_SRC
 
+*** notmuch-company                                                    :comp:
+    #+begin_src emacs-lisp
+      (use-package notmuch
+        :autoload notmuch-company
+        :config
+        (advice-add #'notmuch-company :before-until
+                    (defun notmuch-company--set-company-kind+ (command &rest _args)
+                      (when (eq command 'kind)
+                        'message-address))))
+
+      (use-package cape
+        :autoload cape-notmuch-company
+        :config
+        (defalias 'cape-notmuch-company
+          (cape-company-to-capf #'notmuch-company)
+          "Cape capf adapter for `notmuch-company'."))
+    #+end_src
+
+    #+begin_src emacs-lisp :tangle (package-yes! :capf notmuch)
+      (defun +capf-setup-notmuch-company ()
+        (add-hook 'completion-at-point-functions #'cape-notmuch-company nil 'local))
+    #+end_src
+    #+begin_src emacs-lisp :tangle (package-yes! company notmuch)
+      (defun +capf-setup-notmuch-company ()
+        (make-local-variable 'company-backends)
+        (add-hook 'company-backends #'notmuch-company nil 'local))
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (add-hook 'notmuch-message-mode-hook #'+capf-setup-notmuch-company)
+    #+end_src
+
 *** gnus-alias
     The [[https://notmuchmail.org/emacstips/#index16h2][recommended]] way to manage and interact with multiple accounts from notmuch.
 
@@ -16720,12 +16823,15 @@
     #+begin_src emacs-lisp
       (use-package company-ebdb
         :straight t
-        :init
-        (set-company-backend! 'notmuch-message-mode
-          '(company-ebdb notmuch-company))
+        :config
+        ;; Do not add to company-backends by default.
+        (setq company-backends (remove 'company-ebdb company-backends))
 
         :config
-        (setq company-backends (remove 'company-ebdb company-backends))
+        (advice-add #'company-ebdb :before-until
+                    (defun company-ebdb--set-company-kind+ (command &rest _args)
+                      (when (eq command 'kind)
+                        'message-address)))
 
         :custom (company-ebdb-pop-up nil "Prefer `company-doc-buffer'.")
         :config
@@ -16738,6 +16844,27 @@
                             (save-window-excursion
                               (ebdb-display-records recs)
                               (window-buffer))))))))
+
+      (use-package cape
+        :autoload cape-company-ebdb
+        :config
+        (defalias 'cape-company-ebdb
+          (cape-company-to-capf #'company-ebdb)
+          "Cape capf adapter for `company-ebdb'."))
+    #+end_src
+
+    #+begin_src emacs-lisp :tangle (package-yes! :capf ebdb)
+      (defun +capf-setup-company-ebdb ()
+        (add-hook 'completion-at-point-functions #'cape-company-ebdb nil 'local))
+    #+end_src
+    #+begin_src emacs-lisp :tangle (package-yes! company ebdb)
+      (defun +capf-setup-company-ebdb ()
+        (make-local-variable 'company-backends)
+        (add-hook 'company-backends #'company-ebdb nil 'local))
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (add-hook 'notmuch-message-mode-hook #'+capf-setup-company-ebdb)
     #+end_src
 
 ** olivetti
@@ -17946,7 +18073,7 @@
              display-buffer-alist)
 
        (defun restclient ()
-         "Create a new buffer in restclient mode"
+         "Create a new buffer in restclient mode."
          (interactive)
          (let ((buffer (new-scratch-buffer+ "*restclient*")))
            (with-current-buffer buffer
@@ -17975,14 +18102,31 @@
    #+END_SRC
 
 *** company-restclient                                                  :comp:
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! restclient company)
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! restclient)
       (use-package company-restclient
-        :straight t
-        :after restclient
-        :init
-        (set-company-backend! 'restclient-mode
-          'company-restclient))
+        :straight t)
+
+      (use-package cape
+        :autoload cape-company-restclient
+        :config
+        (defalias 'cape-company-restclient
+          (cape-company-to-capf #'company-restclient)
+          "Cape capf adapter for `company-restclient'."))
     #+END_SRC
+
+    #+begin_src emacs-lisp :tangle (package-yes! :capf restclient)
+      (defun +capf-setup-company-restclient ()
+        (add-hook 'completion-at-point-functions #'cape-company-restclient nil 'local))
+    #+end_src
+    #+begin_src emacs-lisp :tangle (package-yes! company restclient)
+      (defun +capf-setup-company-restclient ()
+        (make-local-variable 'company-backends)
+        (add-hook 'company-backends #'company-restclient nil 'local))
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (add-hook 'restclient-mode-hook #'+capf-setup-company-restclient)
+    #+end_src
 
 *** org-babel-restclient
     #+BEGIN_SRC emacs-lisp
@@ -18445,7 +18589,6 @@
        (modify-syntax! '((?- . "w")
                          (?+ . "w"))
          hledger-mode-syntax-table)
-       (set-company-backend! 'hledger-mode 'hledger-company)
 
        (defun hledger-pulse-momentary-current-entry-no-args+ (&rest _)
          (hledger-pulse-momentary-current-entry))
@@ -18471,6 +18614,40 @@
         "gj" 'hledger-next-or-new-entry
         "gk" 'hledger-backward-entry))
    #+end_src
+
+*** hledger-company                                                    :comp:
+    #+begin_src emacs-lisp
+      (use-package hledger-mode
+        :config
+        (use-package company :straight t :demand t)
+
+        :config
+        (advice-add #'hledger-company :before-until
+                    (defun hledger-company--set-company-kind+ (command &rest _args)
+                      (when (eq command 'kind)
+                        'ledger-account))))
+
+      (use-package cape
+        :autoload cape-hledger-company
+        :config
+        (defalias 'cape-hledger-company
+          (cape-company-to-capf #'hledger-company)
+          "Cape capf adapter for `hledger-company'."))
+    #+end_src
+
+    #+begin_src emacs-lisp :tangle (package-yes! :capf ledger)
+      (defun +capf-setup-hledger-company ()
+        (add-hook 'completion-at-point-functions #'cape-hledger-company nil 'local))
+    #+end_src
+    #+begin_src emacs-lisp :tangle (package-yes! company ledger)
+      (defun +capf-setup-hledger-company ()
+        (make-local-variable 'company-backends)
+        (add-hook 'company-backends #'hledger-company nil 'local))
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (add-hook 'hledger-mode-hook #'+capf-setup-hledger-company)
+    #+end_src
 
 *** flycheck-hledger
     #+begin_src emacs-lisp :tangle (package-yes! ledger flycheck)
@@ -18629,14 +18806,36 @@
     #+END_SRC
 
 *** company-web                                                         :comp:
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! html company)
+    #+BEGIN_SRC emacs-lisp
       (use-package company-web
         :straight t
-        :after  web-mode
         :config
-        (set-company-backend! 'web-mode
-          'company-web-html))
+        (advice-add #'company-web-html :before-until
+                    (defun company-web-html--set-company-kind+ (command &rest _args)
+                      (when (eq command 'kind)
+                        'text))))
+
+      (use-package cape
+        :autoload cape-company-web-html
+        :config
+        (defalias 'cape-company-web-html
+          (cape-company-to-capf #'company-web-html)
+          "Cape capf adapter for `company-web-html'."))
     #+END_SRC
+
+    #+begin_src emacs-lisp :tangle (package-yes! :capf html)
+      (defun +capf-setup-company-web-html ()
+        (add-hook 'completion-at-point-functions #'cape-company-web-html nil 'local))
+    #+end_src
+    #+begin_src emacs-lisp :tangle (package-yes! company html)
+      (defun +capf-setup-company-web-html ()
+        (make-local-variable 'company-backends)
+        (add-hook 'company-backends #'company-web-html nil 'local))
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (add-hook 'web-mode-hook #'+capf-setup-company-web-html)
+    #+end_src
 
 *** web-beautify
     #+BEGIN_SRC emacs-lisp
@@ -18864,13 +19063,34 @@
    #+END_SRC
 
 *** company-glsl                                                       :comp:
+    In buffer glsl completion. Requires the OpenGL [[https://www.khronos.org/opengles/sdk/tools/Reference-Compiler/][reference compiler]].
+
     #+begin_src emacs-lisp
       (use-package company-glsl
-        :straight t
-        ;; Requires the openGL [[https://www.khronos.org/opengles/sdk/tools/Reference-Compiler/][reference compiler]].
-        :when (executable-find "glslangValidator")
-        :init
-        (set-company-backend! 'glsl-mode 'company-glsl))
+        :straight t)
+
+      (use-package cape
+        :autoload cape-company-glsl
+        :config
+        (defalias 'cape-company-glsl
+          (cape-company-to-capf #'company-glsl)
+          "Cape capf adapter for `company-glsl'."))
+    #+end_src
+
+    #+begin_src emacs-lisp :tangle (package-yes! :capf glsl)
+      (defun +capf-setup-company-glsl ()
+        (when (executable-find "glslangValidator")
+          (add-hook 'completion-at-point-functions #'cape-company-glsl nil 'local)))
+    #+end_src
+    #+begin_src emacs-lisp :tangle (package-yes! company glsl)
+      (defun +capf-setup-company-glsl ()
+        (when (executable-find "glslangValidator")
+          (make-local-variable 'company-backends)
+          (add-hook 'company-backends #'company-glsl nil 'local)))
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (add-hook 'glsl-mode-hook #'+capf-setup-company-glsl)
     #+end_src
 
 ** shell-script
@@ -18934,14 +19154,44 @@
     #+END_SRC
 
 *** company-shell                                                       :comp:
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! sh-script company)
+    #+BEGIN_SRC emacs-lisp :tangle (package-yes! sh-script)
       (use-package company-shell
-        :straight t
-        :after  sh-mode
+        :straight t)
+
+      (use-package cape
+        :autoload (cape-company-shell
+                   cape-company-shell-env)
         :config
-        (set-company-backend! 'sh-mode
-          'company-shell 'company-shell-env))
+        (defalias 'cape-company-shell
+          (cape-company-to-capf #'company-shell)
+          "Cape capf adapter for `company-shell'.")
+
+        (defalias 'cape-company-shell-env
+          (cape-company-to-capf #'company-shell-env)
+          "Cape capf adapter for `company-shell-env'."))
     #+END_SRC
+
+    #+begin_src emacs-lisp :tangle (package-yes! :capf sh-script)
+      (defun +capf-setup-company-shell ()
+        (add-hook 'completion-at-point-functions #'cape-company-shell nil 'local))
+
+      (defun +capf-setup-company-shell-env ()
+        (add-hook 'completion-at-point-functions #'cape-company-shell-env nil 'local))
+    #+end_src
+    #+begin_src emacs-lisp :tangle (package-yes! company sh-script)
+      (defun +capf-setup-company-shell ()
+        (make-local-variable 'company-backends)
+        (add-hook 'company-backends #'company-shell nil 'local))
+
+      (defun +capf-setup-company-shell-env ()
+        (make-local-variable 'company-backends)
+        (add-hook 'company-backends #'company-shell-env nil 'local))
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (add-hook 'sh-mode-hook #'+capf-setup-company-shell)
+      (add-hook 'sh-mode-hook #'+capf-setup-company-shell-env)
+    #+end_src
 
 ** ssh
    :PROPERTIES:
