@@ -14687,7 +14687,8 @@
        (eglot-autoreconnect nil)
        (eglot-extend-to-xref t)
        (eglot-stay-out-of '(company))                                                ; I'll set my backends myself, thank you.
-       (eglot-ignored-server-capabilites '(:documentHighlightProvider))              ; Prevent eglot highlighting the symbol at point
+       (eglot-ignored-server-capabilites '(:documentHighlightProvider)
+        "Suppress some language server features.")
        (eglot-confirm-server-initiated-edits nil)
 
        :init
@@ -14763,6 +14764,13 @@
        (defun eglot-mode-server-all-p+ (mode)
          (eglot-server-exists-p+ mode t))
 
+       :autoload eglot-turn-off-inlay-hints-mode+
+       :preface
+       (defun eglot-turn-off-inlay-hints-mode+ ()
+         "Turn off `eglot-inlay-hints-mode'."
+         (eglot-inlay-hints-mode -1))
+       :hook (eglot-managed-mode . eglot-turn-off-inlay-hints-mode+)
+
        :leader
        (:prefix leader-server-leader-prefix
         "l" 'eglot
@@ -14788,6 +14796,7 @@
         "f" 'eglot-format
         "F" 'eglot-format-buffer
         "o" 'eglot-reconnect
+        "i" 'eglot-inlay-hints-mode
         "t" 'eglot-eldoc-toggle-order+
 
         "g" '(:ignore t :wk "goto")
