@@ -5472,7 +5472,9 @@
 
    #+BEGIN_SRC emacs-lisp
      (use-package all-the-icons
-       :straight t
+       :straight (all-the-icons :fork (:host github
+                                       :repo "mohkale/all-the-icons.el")
+                                :branch "feat/customize-all")
        :commands (all-the-icons-insert-all
                   all-the-icons-insert-all-icons)
        :leader ("ii" 'all-the-icons-insert)
@@ -5573,22 +5575,58 @@
              (t (error "Don't know how to fetch an icon for %s" for)))))
 
        :config
-       (push '(rustic-mode all-the-icons-alltheicon "rust") all-the-icons-mode-icon-alist)
-       (push '(web-mode    all-the-icons-faicon     "html5") all-the-icons-mode-icon-alist)
-       (push `(,(rx bol (or "pyproject.toml" "poetry.lock" "scrapy.cfg")) all-the-icons-alltheicon "python")
-             all-the-icons-regexp-icon-alist)
-       (push `(,(rx ".editorconfig") all-the-icons-fileicon "editorconfig" :face all-the-icons-yellow)
-             all-the-icons-regexp-icon-alist)
-       (push `(Man-mode all-the-icons-faicon "book")
-             all-the-icons-mode-icon-alist)
-       (push `(woman-mode all-the-icons-faicon "book")
-             all-the-icons-mode-icon-alist)
-       (push `(process-menu-mode all-the-icons-faicon "linux")
-             all-the-icons-mode-icon-alist)
+       (setq
+        ;; Major mode
+        all-the-icons-mode-icon-alist
+        (append
+         `((rustic-mode all-the-icons-alltheicon "rust")
+           (web-mode all-the-icons-faicon "html5")
+           (Man-mode all-the-icons-faicon "book")
+           (woman-mode all-the-icons-faicon "book")
+           (process-menu-mode all-the-icons-faicon "linux")
+           (notmuch-search-mode all-the-icons-material "email")
+           (notmuch-hello-mode all-the-icons-material "email")
+           (notmuch-tree-mode all-the-icons-material "email")
+           (notmuch-show-mode all-the-icons-material "email")
+           (notmuch-messages-mode all-the-icons-material "email")
+           (messages-buffer-mode all-the-icons-material "message"))
+         all-the-icons-mode-icon-alist)
+
+        ;; Directory regular expressions
+        all-the-icons-dir-icon-alist
+        (append
+         `((,(rx ".github") all-the-icons-faicon "github"))
+         all-the-icons-dir-icon-alist)
+
+        ;; File regular expressions
+        all-the-icons-regexp-icon-alist
+        (append
+         `((,(rx bol (or "pyproject.toml" "poetry.lock" "scrapy.cfg"))
+            all-the-icons-alltheicon "python")
+           (,(rx ".editorconfig")
+            all-the-icons-fileicon "editorconfig" :face all-the-icons-yellow)
+           (,(rx bol (or ".gitignore" ".gitattributes" ".gitmodules") eol)
+            all-the-icons-faicon "git" :face all-the-icons-red)
+           ;; (,(rx (or "LICENSE" (and ".license" eol)))
+           ;;  all-the-icons-nerd-fa "drivers-license" :face all-the-icons-lorange)
+           (,(rx "Thorfile") all-the-icons-octicon "ruby" :face all-the-icons-lred)
+           (,(rx "." eol) all-the-icons-octicon "file-directory" :height 1.0 :v-adjust -0.1)
+           (,(rx bol (or "news" "NEWS") (optional "." (+ num))) all-the-icons-faicon "newspaper-o")
+           (,(rx bol "*Flymake diagnostics for " (one-or-more any) "*" eol)
+            all-the-icons-material "error")
+           (,(rx ".journal" eol) all-the-icons-faicon "book"))
+         all-the-icons-regexp-icon-alist)
+
+        ;; File extension regular expressions
+        all-the-icons-extension-icon-alist
+        (append
+         `((,(rx "thor") all-the-icons-octicon "ruby" :face all-the-icons-lred))
+         all-the-icons-extension-icon-alist))
 
        (setf (car (assoc "^Makefile$" all-the-icons-regexp-icon-alist))
              (rx bol (or (any "M" "m")) "akefile" eol))
 
+       :config
        (defun all-the-icons-insert-all ()
          (interactive)
          (cl-loop for family in all-the-icons-font-families
@@ -5617,10 +5655,6 @@
     various all-the-icon fonts.
 
     #+BEGIN_SRC emacs-lisp
-      (use-package nerd-fonts
-        :straight (nerd-fonts :host github :repo "twlz0ne/nerd-fonts.el")
-        :when +icons-prefer-nerd-font)
-
       (use-package all-the-icons-nerd-fonts
         :straight (all-the-icons-nerd-fonts :host github :repo "mohkale/all-the-icons-nerd-fonts")
         :when +icons-prefer-nerd-font
@@ -5632,73 +5666,12 @@
              +icons-prefer-nerd-font
            "Symbols Nerd Font"))
 
-        :preface
-        (defvaralias 'all-the-icons-nerd-fonts-convert-families '+icon-nerd-to-all-the-icons)
+        :config
+        (setf (alist-get 'notmuch-show-mode all-the-icons-mode-icon-alist)
+              '(all-the-icons-nerd-md "email-open"))
 
         :config
-        (all-the-icons-nerd-fonts-prefer)
-
-        :config
-        (setf (cdr (assoc "\\.git" all-the-icons-dir-icon-alist))
-              '(all-the-icons-nerd-custom "folder-git" :height 1.0)
-              (cdr (assoc "download" all-the-icons-dir-icon-alist))
-              '(all-the-icons-nerd-mdi "folder-download" :height 1.0))
-
-        (setq all-the-icons-mode-icon-alist
-              (append
-               `((notmuch-search-mode all-the-icons-nerd-mdi "email" :height 1.0)
-                 (notmuch-hello-mode all-the-icons-nerd-mdi "email" :height 1.0)
-                 (notmuch-tree-mode all-the-icons-nerd-mdi "email" :height 1.0)
-                 (notmuch-show-mode all-the-icons-nerd-mdi "email-open" :height 1.0)
-                 (notmuch-messages-mode all-the-icons-nerd-mdi "email" :height 1.0))
-               all-the-icons-mode-icon-alist))
-
-        (push `(messages-buffer-mode all-the-icons-nerd-mdi "message-text" :height 1.0)
-              all-the-icons-mode-icon-alist)
-        (push `(,(rx ".github") all-the-icons-nerd-custom "folder-github" :height 1.0)
-              all-the-icons-dir-icon-alist)
-        (push `(,(rx bol (or ".gitignore" ".gitattributes" ".gitmodules") eol)
-                all-the-icons-nerd-mdi "git" :face all-the-icons-red)
-              all-the-icons-regexp-icon-alist)
-        (push `(,(rx (or "LICENSE" (and ".license" eol)))
-                all-the-icons-nerd-fa "drivers-license" :face all-the-icons-lorange)
-              all-the-icons-regexp-icon-alist)
-        (push `(,(rx "Thorfile") all-the-icons-nerd-oct "ruby" :face all-the-icons-lred)
-              all-the-icons-regexp-icon-alist)
-        (push `(,(rx "thor") all-the-icons-nerd-oct "ruby" :face all-the-icons-lred)
-              all-the-icons-extension-icon-alist)
-        (push `(,(rx "." eol) all-the-icons-nerd-oct "file-directory" :height 1.0 :v-adjust -0.1)
-              all-the-icons-regexp-icon-alist)
-        (push `(,(rx bol (or "news" "NEWS") (optional "." (+ num))) all-the-icons-nerd-mdi "newspaper")
-              all-the-icons-regexp-icon-alist)
-        (push `(,(rx bol "*Flymake diagnostics for " (one-or-more any) "*" eol)
-                all-the-icons-nerd-mdi "buffer")
-              all-the-icons-regexp-icon-alist)
-        (push `(,(rx ".journal" eol)
-                all-the-icons-nerd-fa "book")
-              all-the-icons-regexp-icon-alist)
-
-        ;; Sadly this can't be configured, we just have to override it.
-        (advice-add
-         #'all-the-icons-icon-for-dir
-         :override
-         (defun all-the-icons-icon-for-dir+ (dir &rest arg-overrides)
-           (let* ((dirname (file-name-base (directory-file-name dir)))
-                  (path (expand-file-name dir))
-                  (icon (all-the-icons-match-to-alist dirname all-the-icons-dir-icon-alist))
-                  (args (cdr icon)))
-             (when arg-overrides (setq args (append `(,(car args)) arg-overrides (cdr args))))
-             (cond
-              ((file-remote-p path)
-               (apply #'all-the-icons-octicon "terminal" (cdr args)))
-              ((file-symlink-p path)
-               (apply #'all-the-icons-nerd-oct "file-symlink-directory" (cdr args)))
-              ((all-the-icons-dir-is-submodule path)
-               (apply #'all-the-icons-nerd-oct "file-submodule" (cdr args)))
-              ((file-exists-p (format "%s/.git" path))
-               (apply #'all-the-icons-nerd-oct "repo" (cdr args)))
-              (t (apply (car icon) args))))))
-        )
+        (all-the-icons-nerd-fonts-prefer))
     #+END_SRC
 
 ** avy
@@ -14340,6 +14313,7 @@
         (show-week-agenda-p       t)
         (dashboard-show-shortcuts t)
         (dashboard-page-separator "\n\f\n")
+        (dashboard-icon-type 'all-the-icons)
 
         :preface
         (push 'dashboard-mode +whitespace-exempt-modes)
@@ -14499,7 +14473,7 @@
         (dashboard-display-icons-p +icons-available)
         (dashboard-set-file-icons +icons-available)
         (dashboard-set-heading-icons +icons-available)
-        (dashboard-heading-icons '((recents   . "file-text")
+        (dashboard-heading-icons '((recents   . "file")
                                    (bookmarks . "bookmark")
                                    (agenda    . "calendar")
                                    (projects  . "briefcase")
@@ -20589,7 +20563,7 @@
                                                   :inherit font-lock-string-face)))
 
               (setf (citar-indicator-symbol citar-indicator-links)
-                    (+icon nerd-oct "file-pdf" :face '(:weight normal
+                    (+icon nerd-cod "file-pdf" :face '(:weight normal
                                                        :inherit font-lock-type-face))))))
 
         :general
