@@ -18783,10 +18783,11 @@
    :header-args+: :tangle (package-yes! yaml)
    :END:
 
-   #+BEGIN_SRC emacs-lisp
-     (use-package yaml-mode
-       :straight t
-       :hook ((yaml-mode yaml-ts-mode) . +flylint)
+   #+begin_src emacs-lisp
+     (use-package yaml-ts-mode
+       :hook ((yaml-mode . +flylint)
+              (yaml-ts-mode . +flylint))
+       :mode ((rx ".y" (optional "a") "ml" eol) . yaml-mode)
        :init
        (push '(yaml-mode . 2) +indent-config)
        (push '(yaml-ts-mode . 2) +indent-config)
@@ -18799,18 +18800,22 @@
          (with-eval-after-load 'yaml-ts-mode
            (modify-syntax! syntax-changes yaml-ts-mode--syntax-table)))
 
-       :lazy-leader
-       (:mode '(yaml-mode yaml-ts-mode)
-        "n" 'yaml-narrow-to-block-literal
-        "f" 'yaml-fill-paragraph
-        "v" 'yaml-mode-version)
-
        :general
        (:keymaps '(yaml-mode-map
                    yaml-ts-mode-map)
         :states 'insert
         "<tab>" 'yaml-indent-line))
-   #+END_SRC
+   #+end_src
+
+   #+begin_src emacs-lisp :tangle (package-yes! yaml (not tree-sitter))
+     (use-package yaml-mode
+       :straight t
+       :lazy-leader
+       (:mode 'yaml-mode
+        "n" 'yaml-narrow-to-block-literal
+        "f" 'yaml-fill-paragraph
+        "v" 'yaml-mode-version))
+   #+end_src
 
 ** csv
    :PROPERTIES:
