@@ -10971,12 +10971,12 @@
           ;; See also [[https://github.com/moby/moby/blob/7b9275c0da707b030e62c96b679a976f31f929d3/daemon/names/names.go#L6][list]] of supported docker image name characters.
           (,(rx bol
                 (group alnum (* (any alnum "_.-"))) ; project
-                "-"
+                (any "-_")
                 (group (+ (any alnum "_.-"))) ; service
-                "-"
+                (any "-_")
                 (group (one-or-more digit)) ; number
                 eol)
-           . "\2_\3")
+           . "\\2_\\3")
           ;; When using docker-compose run a new container is started with
           ;; a [[https://github.com/docker/compose/blob/7b0ed13209894b5981608f7d9e329a3a58af957d/pkg/compose/run.go#L65][name of the form]] PACKAGE-SERVICE-RUN-SLUG. This is 100% way
           ;; too long, and often runs over the length of my mode-line.
@@ -10984,9 +10984,11 @@
           ;; projection-dev-run-7300cd0752b4 becomes just dev.
           (,(rx bol
                 (group alnum (* (any alnum "_.-"))) ; project
-                "-"
+                (any "-_")
                 (group (+ (any alnum "_.-"))) ; service
-                "-run-"
+                (any "-_")
+                "run"
+                (any "-_")
                 (group (+ alnum))             ; 12 character slug
                 eol)
            . "\\2"))
