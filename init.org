@@ -978,10 +978,14 @@
            use-package-always-defer t
            ; straight-recipes-gnu-elpa-use-mirror nil
            ; straight-recipes-emacsmirror-use-mirror nil
+           straight-recipes-gnu-elpa-use-mirror nil
            straight-allow-recipe-inheritance t
            straight-disable-native-compile nil
            straight-process-buffer " *straight*"
-           straight-check-for-modifications '(check-on-save find-when-checking))
+           straight-check-for-modifications '(check-on-save find-when-checking)
+           straight-recipe-overrides '((nil
+                                        ;; Ignore stale [[https://github.com/flymake/emacs-flymake][flymake/emacs-flymake]] repo.
+                                        (flymake :type built-in))))
    #+END_SRC
 
    For my config I'll be using [[https://github.com/raxod502/straight.el][straight]], the modern package manager for emacs.
@@ -5609,8 +5613,6 @@
             all-the-icons-fileicon "editorconfig" :face all-the-icons-yellow)
            (,(rx bol (or ".gitignore" ".gitattributes" ".gitmodules") eol)
             all-the-icons-faicon "git" :face all-the-icons-red)
-           ;; (,(rx (or "LICENSE" (and ".license" eol)))
-           ;;  all-the-icons-nerd-fa "drivers-license" :face all-the-icons-lorange)
            (,(rx "Thorfile") all-the-icons-octicon "ruby" :face all-the-icons-lred)
            (,(rx "." eol) all-the-icons-octicon "file-directory" :height 1.0 :v-adjust -0.1)
            (,(rx bol (or "news" "NEWS") (optional "." (+ num))) all-the-icons-faicon "newspaper-o")
@@ -14660,7 +14662,7 @@
        (eglot-autoreconnect nil)
        (eglot-extend-to-xref t)
        (eglot-stay-out-of '(company))                                                ; I'll set my backends myself, thank you.
-       (eglot-ignored-server-capabilites '(:documentHighlightProvider)
+       (eglot-ignored-server-capabilities '(:documentHighlightProvider)
         "Suppress some language server features.")
        (eglot-confirm-server-initiated-edits nil)
 
@@ -19372,12 +19374,20 @@
    #+BEGIN_SRC emacs-lisp :tangle (package-yes! cmake (not tree-sitter))
      (use-package cmake-mode
        :straight t
-       :mode (rx (or (and "CMakeLists.txt" eol) ".cmake")))
+       :mode (rx (or (and "CMakeLists.txt" eol) ".cmake"))
+       :config
+       (modify-syntax! '((?_ . "w")
+                         (?- . "w"))
+         cmake-mode-syntax-table))
    #+END_SRC
 
    #+begin_src emacs-lisp :tangle (package-yes! tree-sitter)
      (use-package cmake-ts-mode
-       :mode (rx (or (and "CMakeLists.txt" eol) ".cmake")))
+       :mode (rx (or (and "CMakeLists.txt" eol) ".cmake"))
+       :config
+       (modify-syntax! '((?_ . "w")
+                         (?- . "w"))
+         cmake-ts-mode--syntax-table))
    #+end_src
 
 ** c/cpp
