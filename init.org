@@ -1368,6 +1368,8 @@
             (define-key xterm-function-map "\e[105;7u" (kbd "C-M-i"))
             (define-key xterm-function-map "\e[27;3u"  (kbd "M-ESC"))
             (define-key xterm-function-map "\e[27;5u"  (kbd "C-ESC"))
+            (define-key xterm-function-map "\e[123;4u" (kbd "M-{"))
+            (define-key xterm-function-map "\e[125;4u" (kbd "M-}"))
 
             ;; define xterm codes for ctrl+shift alphabet keys
             (cl-loop for (i . char) in (-zip-pair (number-sequence 65 90)
@@ -2514,37 +2516,6 @@
                                           `(plist-pop! ,list ,prop ,default))))
           ,@body))
      (put 'plist-bind! 'lisp-indent-function 'defun)
-   #+END_SRC
-
-** host
-   Remember my host configuration across systems.
-
-   #+BEGIN_SRC emacs-lisp
-     (autoload #'host! "+host" nil t)
-   #+END_SRC
-
-   #+BEGIN_SRC emacs-lisp :tangle (lisp! "+host.el")
-     (defconst +hosts-alist
-       (let ((hosts-file (etc! "hosts")))
-         (if (file-exists-p hosts-file)
-             (with-temp-buffer
-               (insert-file-contents hosts-file)
-               (read (current-buffer)))
-           (warn "hosts config file not found: %s" hosts-file)))
-       "list of devices I own.")
-
-     (defun host! (id)
-       "Check if current host matches ID
-     if ID is a string it's matched against the currents hosts
-     hostname. otherwise id is looked for in `+hosts-alist'
-     and then compared against. "
-       (unless (stringp id)
-         (setq id (cdr (assoc id +hosts-alist))))
-
-       (when id
-         (string-equal id (system-name))))
-
-     (provide '+host)
    #+END_SRC
 
 ** find-emacs
@@ -9739,20 +9710,6 @@
          "("      'ibuffer-filters-to-filter-group))
     #+END_SRC
 
-*** ibuffer-vc
-    #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer ibuffer-vc)
-      (use-package ibuffer-vc
-        :straight t
-        :after ibuffer
-        :config
-        (defalias 'ibuffer-vc #'ibuffer-vc-set-filter-groups-by-vc-root)
-
-        :general
-        (:keymaps 'ibuffer-mode-map
-         "sv" 'ibuffer-vc
-         ")"  'ibuffer-vc))
-    #+END_SRC
-
 *** ibuffer-tramp
     #+BEGIN_SRC emacs-lisp :tangle (package-yes! ibuffer ibuffer-tramp)
       (use-package ibuffer-tramp
@@ -14700,26 +14657,6 @@
        ;; Remove eglot from `mode-line-misc-info'.
        (setf (alist-get 'eglot--managed-mode mode-line-misc-info nil t) nil)
 
-       (defun eglot-eldoc-toggle-order+ ()
-         "Toggle the precedence of flymake notifications in eldoc."
-         (interactive)
-         (unless (bound-and-true-p eglot--managed-mode)
-           (user-error "Must be called from an `eglot' managed buffer"))
-         (let* ((pos (cl-position #'flymake-eldoc-function eldoc-documentation-functions)))
-           (setq eldoc-documentation-functions
-                 (if (eq pos 0)
-                     (append (cdr eldoc-documentation-functions) (list #'flymake-eldoc-function))
-                   (append (list #'flymake-eldoc-function)
-                           (if (zerop pos)
-                               (cdr eldoc-documentation-functions)
-                             (let ((last (nthcdr (1- pos) eldoc-documentation-functions)))
-                               (setcdr last (cddr last))
-                               eldoc-documentation-functions)))))
-           (message "Message priority: %s"
-                    (if (eq pos 0)
-                        (propertize "Documentation" 'face 'compilation-info)
-                      (propertize "Errors" 'face 'compilation-error)))))
-
        (defun eglot-server-exists-p+ (mode &optional all-workspaces)
          "Assert whether a server exists in the current workspace for MODE.
      When ALL-WORKSPACES is true we instead check for a server running in any
@@ -14771,13 +14708,15 @@
         "f" 'eglot-format
         "F" 'eglot-format-buffer
         "o" 'eglot-reconnect
-        "i" 'eglot-inlay-hints-mode
-        "t" 'eglot-eldoc-toggle-order+
 
         "g" '(:ignore t :wk "goto")
         "gg" 'eglot-find-implementation
         "gG" 'eglot-find-typeDefinition
         "gd" 'eglot-find-declaration
+
+        "t" 'eglot-find-typeDefinition
+        "i" 'eglot-find-implementation
+        "d" 'eglot-find-declaration
 
         "w"  '(:ignore t :wk "workspace")
         "ws" 'eglot-show-workspace-configuration
