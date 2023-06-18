@@ -7737,7 +7737,8 @@
     #+BEGIN_SRC emacs-lisp
       (use-package compile
         :straight t
-        :hook (next-error . recenter)
+        :hook ((next-error . recenter)
+               (compilation-filter . ansi-color-compilation-filter))
         :commands (display-compilation-buffer
                    +set-compilation-bindings)
         :custom
@@ -7760,15 +7761,6 @@
           (interactive)
           (when-let ((buf (next-error-find-buffer)))
             (delete-windows-on buf)))
-
-        (defun compilation-colorize+ ()
-          "Colorize from `compilation-filter-start' to `point'.
-      Taken from [[https://emacs.stackexchange.com/a/38531][here]]."
-          (require 'ansi-color)
-          (let ((inhibit-read-only t))
-            (ansi-color-apply-on-region
-             compilation-filter-start (point))))
-        (add-hook 'compilation-filter-hook #'compilation-colorize+)
 
         (defun display-compilation-buffer ()
           (interactive)
