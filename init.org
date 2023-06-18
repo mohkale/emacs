@@ -13149,7 +13149,28 @@
                                       :as #'buffer-name)))
           "Dired buffer candidate source for `consult-buffer'.")
 
-        (push #'consult--source-dired+ consult-buffer-sources)
+        (push 'consult--source-dired+ consult-buffer-sources)
+
+        :config
+        (defvar consult--source-remote+
+          `(:name     "Remote"
+            :narrow   ?r
+            :hidden   t
+            :category buffer
+            :face     consult-buffer
+            :state    ,#'consult--buffer-state
+            :items
+            ,(lambda ()
+               (consult--buffer-query :sort 'visibility
+                                      :as #'buffer-name
+                                      :predicate (lambda (buffer)
+                                                   (with-current-buffer buffer
+                                                     (file-remote-p
+                                                      (or (buffer-file-name)
+                                                          default-directory)))))))
+          "Remote buffer candidate source for `consult-buffer'.")
+
+        (push 'consult--source-remote+ consult-buffer-sources)
 
         :config
         ;; Make `consult-project-buffer' more like [[https://github.com/Qkessler/consult-project-extra][consult-project-extra]].
