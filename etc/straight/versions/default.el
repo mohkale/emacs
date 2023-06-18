@@ -153,7 +153,7 @@
  ("popup-el" . "71cede0588c10526f88dd0375bce776ec2eed05e")
  ("prescient.el" . "822481e722502081deedbe6b1a9776eda0ca7bfe")
  ("project" . "33511939473551b5cfa42de9a12d606b3d60a2cf")
- ("projection" . "d2af6e04ba0369be55f66346523dcde1f4410bf0")
+ ("projection" . "e62aff4eb4a348e5f759ff972576d7c21c92f396")
  ("pyimport" . "c006a5fd0e5c9e297aa2ad71b2f02f463286b5e3")
  ("queue" . "f986fb68e75bdae951efb9e11a3012ab6bd408ee")
  ("rainbow-delimiters" . "a32b39bdfe6c61c322c37226d66e1b6d4f107ed0")
