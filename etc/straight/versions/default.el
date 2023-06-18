@@ -26,7 +26,7 @@
  ("company-shell" . "5f959a63a6e66eb0cbdac3168cad523a62cc2ccd")
  ("company-web" . "863fb84b81ed283474e50330cd8d27b1ca0d74f1")
  ("compat" . "e3b9f66b6d60d5f1da91218fa95cc3a4dca30cfb")
- ("compile-multi" . "fafadb6722299797a1de3de93cf7439d17b4d13b")
+ ("compile-multi" . "0625042d50dd629c62af8cdc5457fa9d7179468e")
  ("consult" . "7c7658ba7b1389fba1eff9dbc8962409f99343b7")
  ("consult-company" . "24559103a77210c0178b95a842ad13b555be3d43")
  ("consult-eglot" . "db9d41c9812a5a8a7b9a22fa7f3c314e37584d41")
