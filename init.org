@@ -2164,48 +2164,36 @@
             display-buffer-alist)
     #+END_SRC
 
-    The warnings buffer is a special case. When emacs is starting up you don't want
-    it to get selected (switched to) because after emacs starts it'll place the
-    ~initial-buffer-choice~ into the currently selected window in which case you'll
-    just get a split view of your initial buffer and no warnings.
+    The warnings buffer is... annoying. Emacs can spawn warnings at any time for any
+    reason. Most often in my case when it starts native compiling things in the
+    background after I trigger a keybinding or load a file with a major mode that
+    needs to be re-compiled. This buffer I do want to take control, but if it does so
+    while in a minibuffer session or something else it just forces an indirection
+    while editing. Even outside of this case you don't want to keep suppressing
+    warnings as you're working because they keep coming. For now I do 2 things:
+
+    1. Disable the buffer display. You wanna see it, select it.
+    2. Advise =display-warning= to display a message on display warning calls.
 
     #+begin_src emacs-lisp
-      (let ((pattern (rx "*Warnings*")))
-        (push `(,pattern
-                ,(car display-buffer-fallback-action)
-                (body-function . nil)
-                ,@(cdr display-buffer-fallback-action))
-              display-buffer-alist)
+      (push `(,(rx "*Warnings*")
+              (,(lambda (&rest _) t)))
+            display-buffer-alist)
 
-        (defun display-buffer-skip-focus-when-minibuffer+ (func-sym)
-          (lambda (&rest args)
-            (apply
-             (if (active-minibuffer-window)
-                 func-sym
-               (intern (concat (symbol-name func-sym) "-and-focus")))
-             args)))
+      (advice-add #'display-warning
+                  :after
+                  (defun display-warning--message-after-display+
+                      (type message &optional level buffer-name)
+                    (unless level
+                      (setq level :warning))
+                    (when-let ((new (cdr (assq level warning-level-aliases))))
+                      (setq level new))
 
-        (add-hook 'emacs-startup-hook
-                  (defun display-buffer-remove-warnings-handler+ ()
-                    ;; A variant of `display-buffer-fallback-action' that only selects
-                    ;; when the warnings window is not already visible. Makes it a whole
-                    ;; lot less annoying.
-                    (setf (cdr (assoc pattern display-buffer-alist))
-                          `((display-buffer--maybe-same-window
-                             display-buffer-reuse-window
-                             ;; Also skip selection when in the minibuffer (So annoying :-P).
-                             ,(display-buffer-skip-focus-when-minibuffer+
-                               #'display-buffer--maybe-pop-up-frame-or-window)
-                             ,(display-buffer-skip-focus-when-minibuffer+
-                               #'display-buffer-in-previous-window)
-                             ,(display-buffer-skip-focus-when-minibuffer+
-                               #'display-buffer-use-some-window)
-                             ,(display-buffer-skip-focus-when-minibuffer+
-                               #'display-buffer-pop-up-frame))
-                            (reusable-frames . t)
-                            (side . right)
-                            (window-width . 0.5)
-                            (body-function . nil))))))
+                    (unless (or (not (or after-init-time noninteractive (daemonp)))
+                                (< (warning-numeric-level level)
+                                   (warning-numeric-level warning-minimum-log-level))
+                                (warning-suppress-p type warning-suppress-log-types))
+                      (message "Warning (%s): %s" type message))))
     #+end_src
 
 *** uniarg
