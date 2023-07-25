@@ -6174,7 +6174,7 @@
 *** consult-compile-multi
     #+begin_src emacs-lisp :tangle (package-yes! :consult)
       (use-package consult-compile-multi
-        :straight (consult-compile-multi :host github :repo "mohkale/compile-multi" :files ("extensions/consult-compile-multi/*.el"))
+        :straight t
         :after compile-multi
         :demand t
         :config (consult-compile-multi-mode))
@@ -6183,7 +6183,7 @@
 *** compile-multi-all-the-icons
     #+begin_src emacs-lisp
       (use-package compile-multi-all-the-icons
-        :straight (compile-multi-all-the-icons :host github :repo "mohkale/compile-multi" :files ("extensions/compile-multi-all-the-icons/*.el"))
+        :straight t
         :after all-the-icons-completion
         :after compile-multi
         :demand t
@@ -8590,7 +8590,6 @@
                                            ".gradle"
                                            ".sass-cache"
                                            ".jekyll-cache"
-                                           "eln-cache"
                                            "Pipfile"
                                            "CMakeFiles"
                                            "CMakeCache"
@@ -13000,7 +12999,13 @@
         ;; Changing this variable probably won't show any changes until the
         ;; cache is invalidated.
         (consult-imenu-config
-         `((emacs-lisp-mode :toplevel "Functions"
+         `((magit-mode :types ((?z "Stashes" font-lock-variable-name-face)
+                               (?c "Recent commits" font-lock-doc-face)
+                               (?t "TODOs" font-lock-type-face)
+                               (?s "Staged changes" font-lock-keyword-face)
+                               (?u "Unstaged changes" font-lock-number-face)
+                               (?U "Untracked files" shadow)))
+           (emacs-lisp-mode :toplevel "Functions"
                             :types ,(consult-imenu-gen-types+
                                      "Functions"
                                      "Macros"
@@ -18785,16 +18790,18 @@
          (with-eval-after-load 'yaml-mode
            (modify-syntax! syntax-changes yaml-mode-syntax-table))
          (with-eval-after-load 'yaml-ts-mode
-           (modify-syntax! syntax-changes yaml-ts-mode--syntax-table))))
+           (modify-syntax! syntax-changes yaml-ts-mode--syntax-table)))
+
+       :general
+       (:keymaps '(yaml-mode-map
+                   yaml-ts-mode-map)
+        :states 'insert
+        "<tab>" 'yaml-indent-line))
    #+end_src
 
    #+begin_src emacs-lisp :tangle (package-yes! yaml (not tree-sitter))
      (use-package yaml-mode
        :straight t
-       :general
-       (:keymaps 'yaml-mode-map
-        :states 'insert
-        "<tab>" 'yaml-indent-line)
        :lazy-leader
        (:mode 'yaml-mode
         "n" 'yaml-narrow-to-block-literal
