@@ -7769,6 +7769,19 @@
         (compilation-scroll-output 'first-error)
 
         :config
+        ;; Setup a GNU matcher variant for ctest -V invocations.
+        (setf
+         (alist-get 'gnu+ctest compilation-error-regexp-alist-alist)
+         (let* ((gnu (alist-get 'gnu compilation-error-regexp-alist-alist))
+                (new-regex (seq-copy gnu)))
+           (setcar new-regex (concat (rx bol (? (+ digit) ": "))
+                                     (string-remove-prefix (rx bol) (car new-regex))))
+           new-regex))
+
+        (when-let ((entry (member 'gnu compilation-error-regexp-alist)))
+          (setcar entry 'gnu+ctest))
+
+        :config
         (evil-set-command-property 'next-error :jump t)
         (evil-set-command-property 'previous-error :jump t)
 
