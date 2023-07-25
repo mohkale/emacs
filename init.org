@@ -232,8 +232,7 @@
          yaml
          ;; yarn
          )
-       "Packages I want setup on startup.
-     Set to true to auto install everything.")
+       "Packages I want setup on startup.")
    #+END_SRC
 
 ** options
@@ -486,31 +485,19 @@
      with a conditional operator as described above.
      The resulting pkg queries will be parsed and compiled into a conditional
      that asserts them."
-       `(or (eq +modules t)
-            ,(package-build-cond+ pkgs)))
+       (package-build-cond+ pkgs))
 
      (defmacro package-yes! (&rest pkgs)
        "Return yes or no depending on `package!'."
-       `(if (or
-             (eq +modules t)
-             (package! ,@pkgs))
-            "yes"
-          "no"))
+       `(if (package! ,@pkgs) "yes" "no"))
 
      (defmacro package-no! (&rest pkgs)
        "Wrap `not' around `package-yes!'."
-       `(if (or (eq +modules t)
-                (package! ,@pkgs))
-            "no"
-          "yes"))
+       `(if (package! ,@pkgs) "no" "yes"))
 
      (defmacro package-str! (str &rest pkgs)
        "Return STR or no depending on `package!'."
-       `(if (or
-             (eq +modules t)
-             (package! ,@pkgs))
-            ,str
-          "no"))
+       `(if (package! ,@pkgs) ,str "no"))
 
      nil
    #+END_SRC
