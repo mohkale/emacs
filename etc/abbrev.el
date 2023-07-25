@@ -1,14 +1,15 @@
 ;;-*-coding: utf-8;-*-
-(define-abbrev-table 'c++-mode-abbrev-table
+(define-abbrev-table 'c++-base-mode-abbrev-table
   '(
     ("ns" "namespace" nil :count 1)
+    ("us" "using" nil :count 1)
    ))
 
-(define-abbrev-table 'c-mode-abbrev-table
+(define-abbrev-table 'c-base-mode-abbrev-table
   '(
     ("en" "enum" nil :count 0)
     ("st" "struct" nil :count 0)
-   ))
+    ))
 
 (define-abbrev-table 'csharp-mode-abbrev-table
   '(
@@ -17,7 +18,7 @@
     ("pb" "public" nil :count 2)
     ("pv" "private" nil :count 1)
     ("us" "using" nil :count 2)
-   ))
+    ))
 
 (define-abbrev-table 'text-mode-abbrev-table
   '(

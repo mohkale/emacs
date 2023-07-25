@@ -8199,8 +8199,15 @@
          (with-eval-after-load 'auctex
            (abbrev-table-put latex-mode-abbrev-table :parents text-parents)))
 
+       ;; C++ and C have a common base table defined instead of using the mode directly.
+       ;; This is because [[elisp:(find-library "cc-mode.el")]] adds some special hooks to
+       ;; the builtin abbrevs and these aren't compatible with tree-sitter mode which
+       ;; I've setup to inherit from these base modes.
+       (abbrev-table-put c++-base-mode-abbrev-table :parents (list c-base-mode-abbrev-table))
        (with-eval-after-load 'cc-mode
-         (abbrev-table-put c++-mode-abbrev-table :parents (list c-mode-abbrev-table)))
+         (abbrev-table-put c++-mode-abbrev-table :parents (list c++-base-mode-abbrev-table
+                                                                c-mode-abbrev-table))
+         (abbrev-table-put c-mode-abbrev-table :parents (list c-base-mode-abbrev-table)))
 
        (with-eval-after-load 'js2-mode
          (abbrev-table-put js2-mode-abbrev-table :parents (list js-mode-abbrev-table)))
@@ -17294,6 +17301,11 @@
          with ts-mode-abbrev-table = nil
          do (setq    mode-abbrev-table (intern (concat (symbol-name    mode) "-abbrev-table")))
          do (setq ts-mode-abbrev-table (intern (concat (symbol-name ts-mode) "-abbrev-table")))
+         do (cond
+             ((eq mode-abbrev-table 'c-mode-abbrev-table)
+              (setq mode-abbrev-table 'c-base-mode-abbrev-table))
+             ((eq mode-abbrev-table 'c++-mode-abbrev-table)
+              (setq mode-abbrev-table 'c++-base-mode-abbrev-table)))
 
          with mode-abbrev-table-value = nil
          do (setq mode-abbrev-table-value
