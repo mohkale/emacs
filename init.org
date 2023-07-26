@@ -20040,13 +20040,25 @@
      (use-package rustic
        :straight t
        :custom
-       (rustic-format-trigget 'on-save)
+       (rustic-format-trigger nil)
        (rustic-lsp-client nil)
        (rustic-lsp-server 'rust-analyzer)
 
-       :commands (rustic-compile
-                  rustic-cargo-test
-                  rustic-cargo-run)
+       :config
+       ;; For some reason :custom did not work :cry:.
+       (setq rustic-test-buffer-name          "*rustic-compilation*"
+             rustic-run-buffer-name           "*rustic-compilation*"
+             rustic-clippy-buffer-name        "*rustic-compilation*"
+             rustic-expand-buffer-name        "*rustic-compilation*"
+             rustic-format-buffer-name        "*rustfmt*"
+             rustic-install-buffer-name       "*rustic-compilation*"
+             rustic-rustfix-buffer-name       "*rustic-compilation*"
+             rustic-popup-help-buffer-name    "*rustic-compilation*"
+             rustic-spellcheck-buffer-name    "*rustic-compilation*"
+             rustic-run-comint-buffer-name    "*rustic-compilation*"
+             rustic-compilation-buffer-name   "*rustic-compilation*"
+             rustic-cargo-oudated-buffer-name "*rustic-compilation*")
+
        :init
        (with-eval-after-load 'projectile
          (projectile-update-project-type 'rust-cargo
@@ -20054,14 +20066,6 @@
                                          :compile #'rustic-compile
                                          :test    #'rustic-cargo-test
                                          :run     #'rustic-cargo-run))
-
-       ;; Support `compile-multi'.
-       (with-eval-after-load 'compile-multi
-         (push `((file-exists-p "Cargo.toml")
-                 ("rust:build" . ,#'rustic-compile)
-                 ("rust:test" . ,#'rustic-cargo-test)
-                 ("rust:run" . ,#'rustic-cargo-run))
-               compile-multi-config))
 
        :init
        (push 'rustic-popup-mode +whitespace-exempt-modes)
@@ -20085,6 +20089,11 @@
            (modify-syntax! syntax-changes rust-mode-syntax-table))
          (with-eval-after-load 'rust-ts-mode
            (modify-syntax! syntax-changes rust-ts-mode--syntax-table)))
+
+       :general
+       (:keymaps '(rustic-mode-map
+                   rustic-compilation-mode-map)
+        [remap recompile] #'rustic-recompile)
 
        :lazy-leader
        (:mode 'rustic-mode
@@ -23806,7 +23815,9 @@
             ("XXX+"        . ,orange)
             ("\\?\\?\\?+"  . ,orange)))
         `(ansi-color-names-vector
-          '(,dark-grey ,red ,green ,yellow ,blue ,purple ,turquoise ,white)))
+          '(,dark-grey ,red ,green ,yellow ,blue ,purple ,turquoise ,white))
+        `(rustic-ansi-faces
+          [,dark-grey ,red ,green ,yellow ,blue ,purple ,turquoise ,white]))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp
