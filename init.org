@@ -7893,6 +7893,7 @@
 
       (defun compilation-safely-close-window+ (buffer)
         (when (and buffer
+                   (buffer-live-p buffer)
                    (not (get-buffer-process buffer)))
           ;; don't skip if new compilation began before window
           ;; from previous compilation has been killed.
