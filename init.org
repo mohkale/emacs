@@ -17333,6 +17333,20 @@
               :parents (list mode-abbrev-table-value))))
     #+end_src
 
+    #+begin_src emacs-lisp
+      (with-eval-after-load 'org-src
+        (cl-loop
+         for (old-mode . new-mode) in +tree-sitter-mode-remap
+         with old-mode-without-suffix = nil
+         do (setq old-mode-without-suffix (intern (string-remove-suffix "-mode" (symbol-name old-mode))))
+         with new-mode-without-suffix = nil
+         do (setq new-mode-without-suffix (intern (string-remove-suffix "-mode" (symbol-name new-mode))))
+         do
+         (dolist (src-mapping org-src-lang-modes)
+           (when (eq (cdr src-mapping) old-mode-without-suffix)
+             (setf (cdr src-mapping) new-mode-without-suffix)))))
+    #+end_src
+
 *** combobulate
     #+begin_src emacs-lisp :tangle no
       (use-package combobulate
@@ -18670,15 +18684,24 @@
    #+END_SRC
 
 ** JSON
-   #+begin_src emacs-lisp
-     (use-package js
-       :hook ((js-json-mode json-ts-mode) . +flylint)
+   :PROPERTIES:
+   :header-args+: :tangle (package-yes! json)
+   :END:
+
+   #+begin_src emacs-lisp :tangle (package-yes! json tree-sitter)
+     (use-package json-ts-mode
+       :hook (json-ts-mode . +flylint)
        :init
        (with-eval-after-load 'org-src
-         (push `("json" . ,(if (package! tree-sitter)
-                               'json-ts-mode
-                             'js-json-mode))
-               org-src-lang-modes)))
+         (push '("json" . json-ts) org-src-lang-modes)))
+   #+end_src
+
+   #+begin_src emacs-lisp :tangle (package-yes! json (not tree-sitter))
+     (use-package js
+       :hook (js-json-mode . +flylint)
+       :init
+       (with-eval-after-load 'org-src
+         (push '("json" . js-json) org-src-lang-modes)))
    #+end_src
 
 *** vscode-json-languageserver                                          :lsp:
@@ -18790,37 +18813,44 @@
    :END:
 
    #+begin_src emacs-lisp
+     (push '(yaml-mode . 2) +indent-config)
+     (push '(yaml-ts-mode . 2) +indent-config)
+
+     (defvar yaml-mode--common-syntax-changes+
+       '((?_ . "w")
+         (?- . "w")))
+   #+end_src
+
+   #+begin_src emacs-lisp :tangle (package-yes! yaml tree-sitter)
      (use-package yaml-ts-mode
-       :hook ((yaml-mode . +flylint)
-              (yaml-ts-mode . +flylint))
-       :mode ((rx ".y" (optional "a") "ml" eol) . yaml-mode)
+       :hook (yaml-ts-mode . +flylint)
+       :mode ((rx ".y" (optional "a") "ml" eol) . yaml-ts-mode)
        :init
-       (push '(yaml-mode . 2) +indent-config)
-       (push '(yaml-ts-mode . 2) +indent-config)
+       (with-eval-after-load 'org-src
+         (push '("yaml" . yaml-ts) org-src-lang-modes))
 
-       :init
-       (let ((syntax-changes '((?_ . "w")
-                               (?- . "w"))))
-         (with-eval-after-load 'yaml-mode
-           (modify-syntax! syntax-changes yaml-mode-syntax-table))
-         (with-eval-after-load 'yaml-ts-mode
-           (modify-syntax! syntax-changes yaml-ts-mode--syntax-table)))
-
-       :general
-       (:keymaps '(yaml-mode-map
-                   yaml-ts-mode-map)
-        :states 'insert
-        "<tab>" 'yaml-indent-line))
+       :config
+       (modify-syntax! yaml-mode--common-syntax-changes+ yaml-ts-mode--syntax-table))
    #+end_src
 
    #+begin_src emacs-lisp :tangle (package-yes! yaml (not tree-sitter))
      (use-package yaml-mode
        :straight t
+       :hook (yaml-mode . +flylint)
+       :mode ((rx ".y" (optional "a") "ml" eol) . yaml-mode)
+       :config
+       (modify-syntax! yaml-mode--common-syntax-changes+ yaml-mode-syntax-table)
+
        :lazy-leader
        (:mode 'yaml-mode
         "n" 'yaml-narrow-to-block-literal
         "f" 'yaml-fill-paragraph
-        "v" 'yaml-mode-version))
+        "v" 'yaml-mode-version)
+
+       :general
+       (:keymaps 'yaml-mode-map
+        :states 'insert
+        "<tab>" 'yaml-indent-line))
    #+end_src
 
 ** csv
