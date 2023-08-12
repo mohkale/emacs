@@ -20606,6 +20606,9 @@
         (org-cite-follow-processor 'citar)
         (org-cite-activate-processor 'citar)
 
+        :config
+        (setq citar--multiple-setup '("<C-i>" . "RET"))
+
         :init
         (advice-add #'citar-file-open-external :override #'+xopen-file)
 
@@ -20613,16 +20616,20 @@
         (defvaralias 'citar-bibliography 'org-cite-global-bibliography)
 
         :config
-        (with-eval-after-load 'all-the-icons
-          (eval
-           '(progn
-              (setf (citar-indicator-symbol citar-indicator-notes)
-                    (+icon fileicon "org" :face '(:weight normal
-                                                  :inherit font-lock-string-face)))
+        (set-slot-value citar-indicator-notes 'symbol
+                        (+icon fileicon "org" :face '(:weight normal :inherit font-lock-string-face)))
 
-              (setf (citar-indicator-symbol citar-indicator-links)
-                    (+icon nerd-cod "file-pdf" :face '(:weight normal
-                                                       :inherit font-lock-type-face))))))
+        (set-slot-value citar-indicator-links 'symbol
+                        (+icon nerd-fa "file-pdf-o" :face '(:weight normal :inherit font-lock-type-face)))
+
+        ;; Add default citation inserter which just inserts citation keys.
+        :autoload (citar--insert-citatation-as-keys+)
+        :config
+        (defun citar--insert-citatation-as-keys+ (keys &rest _)
+          (citar--insert-keys-comma-space-separated keys))
+
+        (push '(insert-citation . citar--insert-citatation-as-keys+)
+              (alist-get t citar-major-mode-functions))
 
         :general
         (:keymaps 'citar-map
@@ -20885,7 +20892,7 @@
                  (defun org-disable-electric-balance+ ()
                    (setq electric-pair-preserve-balance t)))
 
-       :config
+       :preface
        (setq org-cite-global-bibliography
              (when (file-exists-p +bib-home)
                (directory-files +bib-home t ".bib")))
@@ -21547,7 +21554,7 @@
 
     #+BEGIN_SRC emacs-lisp
       (defun org-get-link+ ()
-        "get the stringified result of `org-store-link'"
+        "Get the stringified result of `org-store-link'"
         (with-temp-buffer
           (org-insert-link-global)
           (buffer-substring (point-min) (point-max))))
@@ -21574,7 +21581,6 @@
                ;; With support for word-checking and other writing helpers.
                (:group "Default"
                 :type entry
-                ;; :file ,org-default-notes-file
                 :prepend t
                 :empty-lines 0
                 :children
@@ -21597,14 +21603,7 @@
                               :keys "d"
                               :prepend  nil
                               :function ,(org-capture-create-goto-heading-command "* Itinerary")
-                              :template ("* %{todo-state} %?"))
-                             ("Job Application"
-                              :keys "j"
-                              :function ,(org-capture-create-goto-heading-command "* Job Search [/]")
-                              :template ("* TODO [#%^{Priority|A|B|C}] %(org-get-link+) - %^{Company}"
-                                         "  DEADLINE: %^{deadline}t"
-                                         "%^{LOCATION}p%^{DURATION}p"
-                                         "  %?"))))
+                              :template ("* %{todo-state} %?"))))
                  ("Work"
                   :keys "w"
                   :type plain
@@ -21629,7 +21628,8 @@
                   :keys "n"
                   :type plain
                   :file (lambda ()
-                          (format-time-string (join-path +notes-home "%Y%m%d%H%M%S.org")))
+                          (format-time-string
+                           (join-path +notes-home "%Y%m%d%H%M%S.org")))
                   :title-format "%^{Title}"
                   :template ("#+title: %{title-format}"
                              "#+stamp: %U"
@@ -21802,11 +21802,26 @@
 
     #+begin_src emacs-lisp
       ;;; `org-find-file'
-      (defun org-find-file--generate-candidate (file)
+      (defun org-find-file--generate-candidate+ (file)
         (let ((relative (file-relative-name file +notes-home)))
           (if (string-prefix-p ".." relative)
-              (cons file file)
-            (cons relative file))))
+              file
+            relative)))
+
+      (defun org-find-file-candidates+ ()
+        (mapcar
+         #'org-find-file--generate-candidate+
+         (thread-first
+           (cl-remove-if
+            (apply-partially #'string-match-p
+                             (rx (or (regexp +find-file-ignore-regexp)
+                                     (and (eval f--path-separator)
+                                          (or (and "brain" (eval f--path-separator))
+                                              (and "archived" (eval f--path-separator)))))))
+            (append (file-expand-wildcards (join-path +notes-home "*.org"))
+                    (file-expand-wildcards (join-path +notes-home "**/*.org"))
+                    org-agenda-files))
+           (cl-remove-duplicates :test #'equal :from-end t))))
 
       (defun org-find-file (&optional arg initial-input)
         "Find an org file.
@@ -21817,31 +21832,19 @@
         (interactive "P")
         (if (not arg)
             (find-file org-default-notes-file)
-          (let ((cands (mapcar #'org-find-file--generate-candidate
-                               (cl-remove-duplicates
-                                (cl-remove-if
-                                 (apply-partially #'string-match-p
-                                                  (rx (or (regexp +find-file-ignore-regexp)
-                                                          (and (eval f--path-separator)
-                                                               "brain"
-                                                               (eval f--path-separator)))))
-                                 (append (file-expand-wildcards (join-path +notes-home "*.org"))
-                                         (file-expand-wildcards (join-path +notes-home "**/*.org"))
-                                         org-agenda-files))
-                                :test (lambda (x y) (or (null y) (equal x y)))
-                                :from-end t))))
+          (let ((default-directory +notes-home)
+                (org-files (org-find-file-candidates+)))
             (cond
              ((package! :consult)
               (find-file
-               (consult--read cands
+               (consult--read org-files
                               :prompt "Find file: "
                               :require-match t
                               :category 'file
-                              :state (consult--file-preview)
-                              :lookup #'consult--lookup-cdr)))
-             (t (find-file
-                 (alist-get (completing-read "Find file: " cands nil t initial-input)
-                            nil nil #'string-equal)))))))
+                              :state (consult--file-preview))))
+             (t
+              (find-file
+               (completing-read "Find file: " org-files nil t initial-input)))))))
     #+end_src
 
     Toggle the ability to automatically compile the current org file to a pdf
@@ -22420,7 +22423,7 @@
          :custom
          (org-roam-node-display-template "${title} ${tags:0}")
          (org-roam-node-annotation-function #'org-roam-annotate-tag+)
-         :commands (org-roam-annotate-tag+)
+         :autoload (org-roam-annotate-tag+)
          :config
          (defun org-roam-annotate-tag+ (node)
            (let ((tags (mapconcat
@@ -22432,7 +22435,7 @@
              (unless (string-empty-p tags)
                (concat
                 " "
-                (propertize " " 'display `(space :align-to (- right ,(+ 1 (length tags)))))
+                (propertize " " 'display `(space :align-to (- right 1 ,(length tags))))
                 (propertize tags 'face 'completions-annotations)))))
 
          :commands (org-roam-create-new-img+)
@@ -22467,7 +22470,7 @@
              (message "Opening new figure in inkscape.")
              (start-process "inkscape" nil "inkscape" copy)))
 
-         :commands org-roam-node-formatter+
+         :autoload org-roam-node-formatter+
          :custom (org-roam-node-formatter #'org-roam-node-formatter+)
          :config
          ;; If an anagram (all uppercase) keep as is, otherwise downcase.
