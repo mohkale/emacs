@@ -7478,11 +7478,11 @@
        (bookmark-default-file (etc! "bookmarks.el"))
 
        :config
-       ;; prioritise recently used bookmarks over just the default list.
-       (defadvice bookmark-jump (after bookmark-jump activate)
-         (let ((latest (bookmark-get-bookmark bookmark)))
-           (setq bookmark-alist (delq latest bookmark-alist))
-           (push latest bookmark-alist))))
+       (advice-add 'bookmark-jump :after
+                   (defun bookmark-jump-prioritise-recent-bookmarks+ (bookmark &optional _display-func)
+                     (let ((latest (bookmark-get-bookmark bookmark)))
+                       (setq bookmark-alist (delq latest bookmark-alist))
+                       (push latest bookmark-alist)))))
    #+END_SRC
 
 ** buffer-menu
