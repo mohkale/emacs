@@ -12972,8 +12972,8 @@
 
             ("Array"                                   ?A font-lock-variable-name-face)
             ("Boolean"                                 ?B font-lock-variable-name-face)
-            ("Enum Member"                             ?E font-lock-variable-name-face)
-            ("Enum Member"                             ?B font-lock-variable-name-face)
+            ("EnumMember"                              ?E font-lock-variable-name-face)
+            ("EnumMember"                              ?B font-lock-variable-name-face)
             ("Number"                                  ?N font-lock-variable-name-face)
             ("Object"                                  ?O font-lock-variable-name-face)
             ("String"                                  ?S font-lock-variable-name-face)
@@ -13055,26 +13055,27 @@
 
         (defun consult-imenu-setup-lsp+ ()
           (consult-imenu-override-types+
-           "Class"
-           "Struct"
-           "Interface"
-           "Module"
-           "Function"
-           "Enum"
-           "Namespace"
-           "Package"
-           "Type Parameter"
-           "Variable"
            "Array"
            "Boolean"
+           "Class"
            "Constant"
-           "Enum Member"
+           "Constructor"
+           "EnumMember"
+           "Enum"
            "Field"
+           "Function"
+           "Interface"
            "Method"
+           "Module"
+           "Namespace"
            "Number"
            "Object"
+           "Package"
            "Property"
-           "String"))
+           "String"
+           "Struct"
+           "Type Parameter"
+           "Variable"))
 
         :hook
         ((eglot-managed-mode
@@ -14743,6 +14744,37 @@
          "Turn off `eglot-inlay-hints-mode'."
          (eglot-inlay-hints-mode -1))
        :hook (eglot-managed-mode . eglot-turn-off-inlay-hints-mode+)
+
+       :autoload eglot--imenu-DocumentSymbol+
+       :preface (advice-add 'eglot--imenu-DocumentSymbol :override #'eglot--imenu-DocumentSymbol+)
+       :config
+       (defun eglot--imenu-DocumentSymbol+ (res)
+         "Compute `imenu--index-alist' for RES vector of DocumentSymbol."
+         (cl-labels ((flatmap (function sequence)
+                      (let ((result nil))
+                        (dolist (it (apply #'append (mapcar function sequence)))
+                          (if-let ((existing-group (alist-get (car it) result)))
+                              (setcdr existing-group (append (cdr existing-group) (cdr it)))
+                            (push (cons (car it) (cdr it)) result)))
+                        (nreverse result)))
+                     (map-parent-group-prefix (name item)
+                       (cons (car item) (list (append (list name) (cdr item)))))
+                     (dfs (&key name children range kind &allow-other-keys)
+                       (let ((reg (eglot--range-region range)))
+                         (if (seq-empty-p children)
+                             `((,kind (,name . ,(car reg))))
+                           (let ((result
+                                  (mapcar (apply-partially #'map-parent-group-prefix name)
+                                          (flatmap (lambda (c) (apply #'dfs c)) children)))
+                                 (parent-entry `((,name . ,(car reg)))))
+                             (if-let ((existing-group (alist-get kind result)))
+                                 (setcdr existing-group (append parent-entry (cdr existing-group)))
+                               (push (cons kind parent-entry) result))
+                             result))))
+                     (map-kind-names (item)
+                       (cons (alist-get (car item) eglot--symbol-kind-names "Unknown")
+                             (cdr item))))
+           (mapcar #'map-kind-names (flatmap (lambda (c) (apply #'dfs c)) res))))
 
        :leader
        (:prefix leader-server-leader-prefix
