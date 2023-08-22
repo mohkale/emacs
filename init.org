@@ -6180,6 +6180,16 @@
             (all-the-icons-nerd-fonts-prefer '(compile-multi-all-the-icons-alist)))))
     #+end_src
 
+*** compile-multi-embark
+    #+begin_src emacs-lisp
+      (use-package compile-multi-embark
+        :straight (compile-multi-embark :host github :repo "mohkale/compile-multi" :files ("extensions/compile-multi-embark/*.el"))
+        :after embark
+        :after compile-multi
+        :demand t
+        :config (compile-multi-embark-mode))
+    #+end_src
+
 ** project
    The [[info:emacs#Projects][built in]] project management library.
 
@@ -6391,6 +6401,16 @@
          :leader
          (:prefix "p"
           "RET" 'projection-multi-compile))
+     #+end_src
+
+**** projection-multi-embark
+     #+begin_src emacs-lisp
+       (use-package projection-multi-embark
+         :straight (projection-multi-embark :host github :repo "mohkale/projection" :files ("src/projection-multi-embark/*.el"))
+         :after embark
+         :after projection-multi
+         :demand t
+         :config (projection-multi-embark-setup-command-map))
      #+end_src
 
 ** projectile
