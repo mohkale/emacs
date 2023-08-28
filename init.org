@@ -2193,7 +2193,8 @@
                                 (< (warning-numeric-level level)
                                    (warning-numeric-level warning-minimum-log-level))
                                 (warning-suppress-p type warning-suppress-log-types))
-                      (message "Warning (%s): %s" type message))))
+                      (let ((message-log-max nil))
+                        (message "Warning (%s): %s" type message)))))
     #+end_src
 
 *** uniarg
@@ -6154,7 +6155,9 @@
          (byte-compile-file (buffer-file-name)))
 
        (push `(emacs-lisp-mode
-               ("emacs:bytecompile" . ,#'byte-compile-this-file+))
+               ("emacs:bytecompile" . ,#'byte-compile-this-file+)
+               ("emacs:package-lint" . ,#'package-lint-current-buffer)
+               ("emacs:checkdoc" . ,#'checkdoc))
              compile-multi-config))
    #+end_src
 
@@ -8496,8 +8499,7 @@
          "C-u" 'dired-evil-scroll-up+
          "C-h" 'dired-goto-min-subdir
          "C-j" 'dired-next-subdir
-         "C-k" 'dired-prev-subdir
-         "C-l" 'dired-goto-max-subdir)
+         "C-k" 'dired-prev-subdir)
         (:keymaps 'dired-mode-map
          "#" nil "$" nil "%" nil "*" nil "." nil ":" nil "?" nil "~" nil "<" nil
          "=" nil ">" nil "a" nil "A" nil "B" nil "c" nil "C-M-d" nil "C-M-n" nil
@@ -13578,7 +13580,7 @@
      #+end_src
 
 **** consult-evil-jumps
-     Adapted from [[*counsel-evil-jumps][counsel-evil-jumps]].
+     Adapted from [[https://github.com/emacs-evil/evil-collection/blob/1ad283f5b7ac9320ac3d41bccfc71a52f714563a/modes/consult/evil-collection-consult.el#L106][evil-collection]].
 
      #+begin_src emacs-lisp :tangle (package-yes! :consult)
        (autoload 'consult-evil-jumps+ "+consult-custom.el" nil t)
@@ -13589,59 +13591,15 @@
      #+end_src
 
      #+BEGIN_SRC emacs-lisp
-       (defvar consult--evil-jumps-history+ nil)
-
-       (defun consult--evil-jumps-candidates+ (arg)
-         (-filter
-          (lambda (a)
-            (or (not arg)
-                (string-equal (cadr a) (smart-buffer-file-name))))
-          (cl-remove-duplicates
-           (evil--jumps-savehist-sync)
-           :test (lambda (a b)
-                   (and
-                    (equal (car a) (car b))
-                    (string-equal (car (cdr a))
-                                  (car (cdr b))))))))
-
-       (cl-defun consult--evil-jumps-format+ (open (point file))
-         (with-current-buffer (funcall open file)
-           (save-restriction
-             (save-excursion
-               (widen)
-               (ignore-errors
-                 (goto-char point))
-               (let* ((line (line-number-at-pos point consult-line-numbers-widen))
-                      (beg (line-beginning-position))
-                      (end (line-end-position))
-                      (cand (concat
-                             (concat (propertize file 'face 'consult-file) ":"
-                                     (propertize (number-to-string line) 'face 'consult-location)
-                                     ":")
-                             (consult--region-with-cursor beg end (point-marker)))))
-                 (put-text-property 0 1 'consult--grep-file file cand)
-                 cand)))))
-
-       (defun consult-evil-jumps+ (&optional arg)
-         "Jump to an evil-mode jump.
-       When ARG is given only jump to marks in the current buffer."
-         (interactive "P")
-         (let* ((open (consult--temporary-files))
-                (cands (consult--with-increased-gc
-                        (mapcar (apply-partially #'consult--evil-jumps-format+ open)
-                                (consult--evil-jumps-candidates+ arg)))))
-           (funcall open nil) ;; Clear temporarily opened files, `consult--grep-state' will reopen them.
-           (consult--read
-            cands
-            :prompt "Evil jump: "
-            :lookup #'consult--lookup-member
-            :category 'consult-location
-            :sort nil
-            :require-match t
-            :group #'consult--grep-group
-            :history '(:input consult--line-history)
-            :add-history (thing-at-point 'symbol)
-            :state (consult--grep-state))))
+       (defun consult-evil-jumps+ ()
+         "Jump to a position in the evil jump list."
+         (interactive)
+         (consult-global-mark
+          (delq nil (mapcar (lambda (jump)
+                              (let ((mark (car jump)))
+                                (when (markerp mark)
+                                  mark)))
+                            (ring-elements (evil--jumps-get-window-jump-list))))))
      #+END_SRC
 
 **** consult-evil-marks
@@ -13667,27 +13625,21 @@
                          (markerp data))
                   collect (cons (consult-register-format (cons char data)) data)))
 
-       (defun consult-evil-marks+ (&optional marker bol)
-         "Jump to an evil-mark in the current buffer."
-         (interactive
-          (list
-           (if-let ((marks (consult--with-increased-gc (consult--evil-marks-candidates+))))
-               (consult--read
-                marks
-                :prompt "Evil mark: "
-                :category 'consult-location
-                :sort nil
-                :require-match t
-                :lookup #'consult--lookup-cdr
-                :history t ;; disable history
-                :add-history (thing-at-point 'symbol)
-                :state (consult--jump-preview))
-             (user-error "No evil-marks active in the current buffer"))
-           (when current-prefix-arg
-             (prefix-numeric-value current-prefix-arg))))
-         (goto-char marker)
-         (when bol
-           (goto-char (line-beginning-position))))
+       (defun consult-evil-marks+ ()
+         "Jump to a local or glboal evil-mark."
+         (interactive)
+         (if-let ((marks (consult--with-increased-gc (consult--evil-marks-candidates+))))
+             (consult--read
+              marks
+              :prompt "Evil mark: "
+              :category 'consult-location
+              :sort nil
+              :require-match t
+              :lookup #'consult--lookup-cdr
+              :history t ;; disable history
+              :add-history (thing-at-point 'symbol)
+              :state (consult--jump-state))
+           (user-error "No active evil-marks")))
      #+END_SRC
 
 **** consult-org-capture
