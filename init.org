@@ -6344,13 +6344,12 @@
                    :files (:defaults "src/*.el"))
         :hook (after-init . global-projection-hook-mode)
         :custom
+        (projection-cmake-target-backend 'code-model)
         (projection-cmake-configure-options
-         (delq
-          nil
-          (list
-           (when (executable-find "ninja")
-             "-GNinja")
-           "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")))
+         `(,@(when (executable-find "ninja")
+               (list "-GNinja"))
+           "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+           "-DCMAKE_COLOR_DIAGNOSTICS=ON"))
 
         :init
         (defvaralias 'projection-cmake-build-directory '+cmake-build-directory)
@@ -6378,12 +6377,12 @@
          "m" 'ibuffer-projection-current-project
          "M" 'ibuffer-projection-toggle-filter-groups
          ;; `projection-commands'.
-         "c" 'projection-build-project
-         "g" 'projection-configure-project
-         "t" 'projection-test-project
-         "p" 'projection-run-project
-         "k" 'projection-package-project
-         "i" 'projection-install-project
+         "c" 'projection-commands-build-project
+         "g" 'projection-commands-configure-project
+         "t" 'projection-commands-test-project
+         "p" 'projection-commands-run-project
+         "k" 'projection-commands-package-project
+         "i" 'projection-commands-install-project
          ;; `projection-recentf'
          "r" 'projection-recentf
          ;; Misc extra commands
@@ -6520,12 +6519,12 @@
         [remap project-kill-buffers] 'projectile-kill-buffers
         [remap project-query-replace-regexp] 'projectile-replace-regexp
 
-        [remap projection-configure-project] 'projectile-configure-project
-        [remap projection-build-project] 'projectile-compile-project
-        [remap projection-test-project] 'projectile-test-project
-        [remap projection-run-project] 'projectile-run-project
-        [remap projection-package-project] 'projectile-package-project
-        [remap projection-install-project] 'projectile-install-project
+        [remap projection-commands-configure-project] 'projectile-configure-project
+        [remap projection-commands-build-project] 'projectile-compile-project
+        [remap projection-commands-test-project] 'projectile-test-project
+        [remap projection-commands-run-project] 'projectile-run-project
+        [remap projection-commands-package-project] 'projectile-package-project
+        [remap projection-commands-install-project] 'projectile-install-project
 
         [remap projection-find-other-file] 'projectile-find-other-file
         [remap projection-reset-project-cache] 'projectile-invalidate-cache
