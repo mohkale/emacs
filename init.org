@@ -18736,6 +18736,32 @@ Welcome to my personal Emacs configuration 😎.
       (provide '+pkg-yasnippet)
     #+end_src
 
+** Tempel
+   #+begin_src emacs-lisp :tangle no
+     (use-package tempel
+       :straight t
+       :defer load-me-now-duration
+       :custom
+       (tempel-path (list (etc! "tempel" "templates")))
+       :leader
+       ("isn" 'tempel-insert)
+
+       :general
+       (:states 'insert
+        [C-i] 'tempel-expand
+        "M-i" 'tempel-expand)
+       (:keymaps 'tempel-map
+        :states 'insert
+        ;; "<override-state>" 'all
+        "C-n" 'tempel-next
+        "TAB" 'tempel-next
+        "<tab>" 'tempel-next
+        "C-p" 'tempel-previous
+        "<backtab>" 'tempel-previous
+        "<C-return>" 'tempel-done
+        [remap backward-kill-sentence] 'tempel-kill))
+   #+end_src
+
 ** Abbrev                                                  :builtin:optional:
    :PROPERTIES:
    :header-args+: :tangle (package-lisp! +pkg-abbrev abbrev)
