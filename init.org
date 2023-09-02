@@ -15780,7 +15780,6 @@
        (add-hook 'magit-submodule-list-mode-hook 'evil-normalize-keymaps)
 
        ;; Set initial states
-       (evil-set-initial-state 'git-rebase-mode 'motion)
        (evil-set-initial-state 'magit-mode 'motion)
        (evil-set-initial-state 'magit-cherry-mode 'motion)
        (evil-set-initial-state 'magit-diff-mode 'motion)
@@ -15796,10 +15795,6 @@
        (evil-set-initial-state 'magit-blob-mode 'motion)
        (evil-set-initial-state 'magit-gitflow-mode 'motion)
        (evil-set-initial-state 'git-commit-mode 'normal)
-
-       ;; WARN: Haven't included `evil-collection-magit-add-rebase-messages'.
-       (with-eval-after-load 'git-rebase
-         (remove-hook 'git-rebase-mode-hook 'git-rebase-mode-show-keybindings))
 
        ;; Adjust popups
        (transient-suffix-put 'magit-branch   "x" :key "X") ;; magit-branch-reset
@@ -15954,8 +15949,7 @@
                    forge-pullreq-list-mode-map)
         leader-key nil                                                               ; GIVE ME BACK MY LEADER!!!
         "<override-state>" 'all)
-       (:keymaps '(git-rebase-mode-map
-                   magit-gh-pulls-mode-map)
+       (:keymaps 'magit-gh-pulls-mode-map
         leader-key nil                                                               ; GIVE ME BACK MY LEADER!!!
         "<override-state>" 'motion)
        (:keymaps '(magit-mode-map
@@ -15972,21 +15966,6 @@
         "C-k"  'magit-blame-previous-chunk             "p" nil
         "gk"   'magit-blame-previous-chunk             "p" nil
         "K"    'magit-blame-previous-chunk-same-commit "P" nil)
-       ;; git-rebase-mode
-       (:keymaps 'git-rebase-mode-map
-        :states 'motion
-        "p"   'git-rebase-pick
-        "r"   'git-rebase-reword
-        "e"   'git-rebase-edit
-        "s"   'git-rebase-squash
-        "f"   'git-rebase-fixup
-        "x"   'git-rebase-exec
-        "d"   'git-rebase-kill-line
-        "u"   'git-rebase-undo
-        "k"   'evil-previous-line
-        "j"   'evil-next-line
-        "M-k" 'git-rebase-move-line-up
-        "M-j" 'git-rebase-move-line-down)
        (:keymaps '(magit-blame-mode-map
                    magit-blame-read-only-mode-map)
         :states 'normal
@@ -16000,17 +15979,26 @@
     #+BEGIN_SRC emacs-lisp
       (use-package git-rebase
         :config
-        ;; (leader-set-keys-for-major-mode 'git-rebase-mode
-        ;;   "x" 'git-rebase-kill-line
-        ;;   )
+        (evil-set-initial-state 'git-rebase-mode 'motion)
+
+        ;; WARN: Haven't included `evil-collection-magit-add-rebase-messages'.
+        (remove-hook 'git-rebase-mode-hook 'git-rebase-mode-show-keybindings)
 
         :general
-        (:keymaps 'git-rebase-mode-map "SPC" nil)                                     ; reclaim leader key
-        (;; git-rebase-show-or-scroll-up
-         ;; git-rebase-show-or-scroll-down
-         :keymaps 'git-rebase-mode-map
-         :states  'motion
-         "RET" 'git-rebase-show-commit))
+        (:keymaps 'git-rebase-mode-map
+         "<override-state>" 'all
+
+         leader-key nil                                                               ; Reclaim leader key.
+         "p" nil "n" nil                                                              ; Accessible through vim style j, k bindings.
+         "M-n" nil "<C-up>"   'git-rebase-move-line-up                                ; Prefer drag-stuff style bindings.
+         "M-p" nil "<C-down>" 'git-rebase-move-line-down
+
+         "u" 'git-rebase-undo
+         "o" 'git-rebase-update-ref
+         "x" nil "!" 'git-rebase-exec
+         "k" nil "x" 'git-rebase-kill-line "d" 'git-rebase-kill-line
+         "c" nil "p" 'git-rebase-pick
+         "m" nil "e" 'git-rebase-edit))
     #+END_SRC
 
 *** magit-todos
