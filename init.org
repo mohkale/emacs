@@ -9312,13 +9312,27 @@
     #+end_src
 
 ** gud
-   The grand unified debugger interface.
+   The *Grand Unified Debugger* for Emacs.
+
+   An interface for GDB style debuggers.
 
    #+begin_src emacs-lisp
      (use-package gud
-       :straight t
+       :hook (gud-mode . gud-tooltip-mode)
+
+       :custom
+       (gud-gdb-command-name "gdb -i=mi --silent --fullname")
+       (gud-gud-gdb-command-name  "gdb --silent --fullname")
+       (gdb-window-configuration-directory (etc! "gdb/window-configs"))
+       (gdb-default-window-configuration-file nil)
+
        :init
-       (push `(,(rx "*gud")
+       (push `(,(rx bol
+                    (or "*gud-"
+                        "*locals of "
+                        "*input/output of"
+                        "*stack frames of"
+                        "*breakpoints of"))
                (display-buffer-reuse-window
                 display-buffer--maybe-pop-up-frame-or-window
                 display-buffer-in-side-window)
@@ -9327,22 +9341,59 @@
                (body-function . nil))
              display-buffer-alist)
 
+       :init
+       (setq +whitespace-exempt-modes
+             (append
+              (list 'gdb-inferior-io-mode
+                    'gdb-locals-mode
+                    'gdb-breakpoints-mode
+                    'gdb-frames-mode)
+              +whitespace-exempt-modes))
+
+       :config
+       (evil-set-initial-state 'gdb-locals-mode 'motion)
+       (evil-set-initial-state 'gdb-breakpoints-mode 'motion)
+       (evil-set-initial-state 'gdb-frames-mode 'motion)
+
+       :config
+       ;; Prevent gud from selecting the displayed window. NOTE: Breaks `gdb'.
+       ;; (defun gud-dont-select-on-init+ (func &rest args)
+       ;;   (let ((active-buffer (current-buffer)))
+       ;;     (prog1 (apply func args)
+       ;;       (when-let ((window (get-buffer-window active-buffer)))
+       ;;         (select-window window)))))
+
+       ;; (advice-add 'gud-common-init :around #'gud-dont-select-on-init+)
+
        :config
        ;; By default gud starts up in the current directory so completion
-       ;; doesn't support the path to the binary and other useful stuff.
+       ;; doesn't support the path to the binary and other useful stuff that
+       ;; would normally be accessible from the root directory.
        (defun gud-start-in-project-root+ (func &rest args)
-         (let ((default-directory (or (project-current-root+)
-                                      default-directory)))
+         (let ((default-directory
+                 (or (project-current-root+)
+                     default-directory)))
            (apply func args)))
 
-       (dolist (it (list #'gdb #'gud-gdb #'perldb #'jdb #'pdb #'guiler #'dbx #'xdb #'sdb))
+       (dolist (it (list #'gdb #'gud-query-cmdline #'gud-gdb #'perldb #'jdb #'pdb #'guiler #'dbx #'xdb #'sdb))
          (advice-add it :around #'gud-start-in-project-root+))
+
+       :commands gud-quit-session+
+       :config
+       (defun gud-quit-session+ ()
+         (interactive)
+         (if (and gud-comint-buffer
+                  (buffer-live-p gud-comint-buffer))
+             (kill-buffer gud-comint-buffer)
+           (user-error "No GUD session buffer found")))
 
        :leader
        (:prefix "v"
         "" '(:ignore t :wk "debugger")
-        "SPC" 'gud-gdb
-        "M-SPC" 'gdb-many-windows
+        "RET" 'gud-gdb
+        "DEL" 'gud-quit-session+
+        "!" 'gud-basic-call "1" 'gud-basic-call
+        "r" 'gud-run
         "b" 'gud-break
         "B" 'gud-tbreak                                                              ; temporary breakpoint
         "c" 'gud-cont
@@ -9350,13 +9401,21 @@
         "j" 'gud-jump                                                                ; to current line
         "e" 'gud-print                                                               ; eval expression at point
         "g" 'gud-refresh                                                             ; redraw buffers
-        "d" 'gud-remove
+        "x" 'gud-remove
         "s" 'gud-step
         "S" 'gud-next
         "t" 'gud-until                                                               ; continue until current line
         "w" 'gud-watch
-        "<" 'gud-down                                                                ; stack-frames
-        ">" 'gud-up))
+        "]" 'gud-down                                                                ; stack-frames
+        "[" 'gud-up))
+   #+end_src
+
+   #+begin_src emacs-lisp
+     (use-package gdb-mi
+       :commands gdb-many-windows
+       :leader
+       (:prefix "v"
+        "SPC" 'gdb-many-windows))
    #+end_src
 
 ** help
