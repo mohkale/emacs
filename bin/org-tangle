@@ -14,6 +14,9 @@
 (defvar script "org-tangle"
   "Basename of this script.")
 
+(defvar index-file nil
+  "Path to file to save collection of all tangeld files.")
+
 (defun +princ (&rest args)
   "`princ' with a trailing newline, just like `message'."
   (apply #'princ args)
@@ -21,7 +24,7 @@
 
 (cl-defun print-usage (&optional (msg-function #'+princ))
   "Print a usage string for this script."
-  (funcall msg-function (format "Usage: %s [-h] [-e] PATH" script)))
+  (funcall msg-function (format "Usage: %s [-h] [-e] [-i INDEX] PATH" script)))
 
 (cl-defun print-help (&optional (msg-function #'+princ))
   "Print a help string for this script."
@@ -35,7 +38,9 @@
      "  -h, --help\n"
      "    Show this help message and exit.\n"
      "  -e, --expand-includes\n"
-     "    Expand #+INCLUDE properties for each file in PATH.")
+     "    Expand #+INCLUDE properties for each file in PATH.\n"
+     "  -i, --index INDEX\n"
+     "    Save collection of tangled files to INDEX.\n")
     (funcall msg-function (buffer-string))))
 
 (defun +expand-paths (paths)
@@ -76,6 +81,30 @@ If PATH is nil then don't back it up and just run BODY as is."
              (ignore-errors (delete-file backup))))
        (progn ,@body))))
 
+(defmacro with-save-written-files+ (&rest body)
+  (declare (indent defun))
+  `(let ((--written-files-- nil))
+     (cl-labels ((save-to-var () (push (buffer-file-name) --written-files--)))
+       (unwind-protect
+           (progn
+             (add-hook 'org-babel-post-tangle-hook #'save-to-var)
+             (progn ,@body))
+         (remove-hook 'org-babel-post-tangle-hook #'save-to-var)
+         (when index-file
+           (let ((map (make-hash-table :test 'eql))
+                 (--written-files2-- nil))
+             (dolist (it --written-files--)
+               (unless (gethash it map)
+                 (push it --written-files2--)
+                 (puthash it t map)))
+             (setq --written-files2-- (nreverse --written-files2--))
+             (with-temp-buffer
+               (let ((it nil))
+                 (while (setq it (pop --written-files2--))
+                   (insert it (if --written-files2-- "\n" ""))))
+               (make-directory (file-name-directory index-file) 'parents)
+               (write-region (point-min) (point-max) index-file))))))))
+
 (let (paths expand-includes)
   (while argv
     (let ((arg (pop argv)))
@@ -85,6 +114,12 @@ If PATH is nil then don't back it up and just run BODY as is."
          (kill-emacs 0))
         ((or "-e" "--expand-includes")
          (setq expand-includes t))
+        ((or "-i" "--index")
+         (unless argv
+           (message "error: %s: --index requires index file argument" script)
+           (print-usage #'message)
+           (kill-emacs 1))
+         (setq index-file (pop argv)))
         ((guard (string-prefix-p "-" arg))
          (message "error: %s: unknown command line option %s" script arg)
          (print-usage #'message)
@@ -99,8 +134,8 @@ If PATH is nil then don't back it up and just run BODY as is."
   (dolist (file (+expand-paths paths))
     (with-backup+ (when expand-includes
                     file)
-      (let (org-mode-hook org-confirm-babel-evaluate)
-        (with-current-buffer (find-file-noselect file)
-          (when expand-includes
-            (org-export-expand-include-keyword))
-          (org-babel-tangle))))))
+                  (let (org-mode-hook org-confirm-babel-evaluate)
+                    (with-current-buffer (find-file-noselect file)
+                      (when expand-includes
+                        (org-export-expand-include-keyword))
+                      (with-save-written-files+ (org-babel-tangle)))))))
