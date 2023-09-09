@@ -17328,6 +17328,10 @@
         :init
         (advice-add 'treesit-explore-mode :around 'display-buffer-no-select-window-advice)
 
+        :init
+        (setq treesit--install-language-grammar-out-dir-history
+              (list (cache! "tree-sitter" "grammers")))
+
         :config
         (unless (treesit-available-p)
           (error "Emacs was not built with tree-sitter support")))
