@@ -2428,7 +2428,7 @@
   Predicate for whether a buffer-object references a killed buffer or not, see [[https://ftp.gnu.org/old-gnu/Manuals/elisp-manual-20-2.5/html_node/elisp_408.html][here]].
 
   #+begin_src emacs-lisp
-    (defun buffer-killed-p (buffer)
+    (defun buffer-killed-p+ (buffer)
       "Return t if BUFFER is killed."
       (not (buffer-name buffer)))
   #+end_src
@@ -21983,7 +21983,7 @@
 
           ;; while I'm here, let's also remove any killed buffers.
           (setq org-compile-on-save-buffers+
-                (cl-remove-if #'buffer-killed-p org-compile-on-save-buffers+))
+                (cl-remove-if #'buffer-killed-p+ org-compile-on-save-buffers+))
 
           ;; notify the user about what's happened.
           (when (called-interactively-p 'interactive)
