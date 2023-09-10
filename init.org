@@ -15334,6 +15334,11 @@
        (setf (alist-get 'hledger-mode jinx-exclude-faces)
              '(font-lock-variable-name-face))
 
+       :config
+       ;; Exclude emojis and unicode symbols.
+       (push (rx (any (?\U00002600 . ?\U0001ffff)))
+             (alist-get t jinx-exclude-regexps))
+
        :general
        (:keymaps 'jinx-mode-map
         [remap ispell-word] 'jinx-correct)
