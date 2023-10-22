@@ -2549,7 +2549,7 @@
 
      (defun find-file-from-dotemacs ()
        (interactive)
-       (let ((default-directory user-emacs-directory))
+       (let ((default-directory (file-truename user-emacs-directory)))
          (call-interactively 'find-file)))
    #+END_SRC
 
@@ -6373,7 +6373,7 @@
          "1" 'projection-set-primary-project-type
          "2" 'projection-update-extra-project-types
          "I" 'projection-show-project-info
-         "DEL" 'projection-clear-cache
+         "DEL" 'projection-cache-clear
          ;; `projection-find'
          "TAB" 'projection-find-other-file
          "o"   'projection-find-other-file
@@ -17334,8 +17334,9 @@
         (advice-add 'treesit-explore-mode :around 'display-buffer-no-select-window-advice)
 
         :init
-        (setq treesit--install-language-grammar-out-dir-history
-              (list (cache! "tree-sitter" "grammers")))
+        (let ((treesit-grammer-directory (cache! "tree-sitter" "grammers")))
+          (setq treesit--install-language-grammar-out-dir-history (list treesit-grammer-directory)
+                treesit-extra-load-path (list treesit-grammer-directory)))
 
         :config
         (unless (treesit-available-p)
