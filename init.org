@@ -15353,6 +15353,19 @@
         "p" 'jinx-previous))
    #+end_src
 
+*** cape-jinx-completion                                               :comp:
+    #+begin_src emacs-lisp :tangle no
+      (use-package cape-jinx-completion
+        :straight (cape-jinx-completion :repo "https://code.bsdgeek.org/adam/cape-jinx-completion")
+        :hook (jinx-mode . jinx-setup-cape-jinx-completion+)
+        :autoload jinx-setup-cape-jinx-completion+
+        :preface
+        (defun jinx-setup-cape-jinx-completion+ ()
+          (if (bound-and-true-p jinx-mode)
+              (add-hook 'completion-at-point-functions #'cape-jinx-completion nil 'local)
+            (remove-hook 'completion-at-point-functions #'cape-jinx-completion 'local))))
+    #+end_src
+
 ** ggtags
    Tags are the classic source-code navigation system that predates LSP.
 
