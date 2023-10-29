@@ -2614,7 +2614,7 @@ Welcome to my personal Emacs configuration 😎.
    #+begin_src emacs-lisp :tangle yes
      (use-package +setup-show-whitespace
        :autoload set-trailing-whitespace+
-       :hook (after-change-major-mode-hook . set-trailing-whitespace+))
+       :hook (after-change-major-mode . set-trailing-whitespace+))
    #+end_src
 
    Configure displaying of trailing whitespace. Now I personally am not a fan of
@@ -2740,7 +2740,7 @@ Welcome to my personal Emacs configuration 😎.
 
    #+begin_src emacs-lisp :tangle yes
      (use-package +setup-indent
-       :hook (after-change-major-mode-hook . set-indent-offset+)
+       :hook (after-change-major-mode . set-indent-offset+)
        :commands set-indent-offset+
        :leader ("t TAB" 'set-indent-offset+))
    #+end_src
@@ -7749,8 +7749,8 @@ Welcome to my personal Emacs configuration 😎.
 
     #+begin_src emacs-lisp
       (use-package minibuffer
-        :hook ((minibuffer-setup-hook . defer-garbage-collection+)
-               (minibuffer-setup-hook . restore-garbage-collection+))
+        :hook ((minibuffer-setup . defer-garbage-collection+)
+               (minibuffer-setup . restore-garbage-collection+))
 
         :preface
         (defun defer-garbage-collection+ ()
@@ -10602,7 +10602,8 @@ Welcome to my personal Emacs configuration 😎.
            (toml-ts-mode :types ((?h "Header" font-lock-variable-name-face)
                                  (?a "Array" font-lock-variable-name-face))))))
 
-      (use-package consult-imenu
+      (use-package eglot
+        :after consult-imenu
         :autoload consult-imenu-override-types+
         :init
         ;; Override the types for the current major-mode with types. Used for minor-mode
@@ -10614,8 +10615,7 @@ Welcome to my personal Emacs configuration 😎.
           (setq consult-imenu--cache nil))
 
         :autoload consult-imenu-setup-lsp+
-        :hook ((eglot-managed-mode lsp-mode)
-               . consult-imenu-setup-lsp+)
+        :hook ((eglot-managed-mode lsp-mode) . consult-imenu-setup-lsp+)
         :init
         (defun consult-imenu-setup-lsp+ ()
           (consult-imenu-override-types+
@@ -10639,7 +10639,15 @@ Welcome to my personal Emacs configuration 😎.
            "String"
            "Struct"
            "Type Parameter"
-           "Variable")))
+           "Variable"))
+
+        :config
+        ;; Apply to any modes that already had LSP enabled prior to loading `consult-imenu'.
+        (dolist (buffer (buffer-list))
+          (with-current-buffer buffer
+            (when (or (bound-and-true-p eglot--managed-mode)
+                      (bound-and-true-p lsp-mode))
+              (consult-imenu-setup-lsp+)))))
     #+end_src
 
 *** Consult Bufler
