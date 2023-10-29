@@ -2080,8 +2080,7 @@ Welcome to my personal Emacs configuration 😎.
      Useful for certain major modes that seem to reset their syntax-tables
      every time their initialised."
        (declare (indent defun))
-       (let* ((mode (eval mode))
-              (mode-name (symbol-name mode)))
+       (let* ((mode-name (symbol-name mode)))
          `(progn
             (add-hook ',(intern (concat mode-name "-hook"))
                       (defun ,(intern (concat mode-name "-setup-syntax+")) (&optional syntax-table)
