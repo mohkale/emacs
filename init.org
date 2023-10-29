@@ -12933,7 +12933,18 @@ Welcome to my personal Emacs configuration 😎.
         :after (evil treesit)
         :demand t
         :autoload (evil-textobj-tree-sitter--message-not-found
-                   evil-textobj-tree-sitter--range)
+                   evil-textobj-tree-sitter--range
+                   evil-textobj-tree-sitter-goto-textobj)
+
+        :preface
+        (defmacro evil-textobj-tree-sitter-define-motion+ (group &optional previous query)
+          (let ((func-name (intern (concat "evil-textobj-tree-sitter-"
+                                           (if previous "previous" "next")
+                                           "-" group  "+"))))
+            `(evil-define-motion ,func-name (count)
+               (dotimes (_ (or count 1))
+                 (evil-textobj-tree-sitter-goto-textobj ,group ,previous nil ,query)))))
+
 
         :commands (evil-textobj-tree-sitter-function--class.inner
                    evil-textobj-tree-sitter-function--class.outer
@@ -12942,7 +12953,13 @@ Welcome to my personal Emacs configuration 😎.
                    evil-textobj-tree-sitter-function--function.inner
                    evil-textobj-tree-sitter-function--function.outer
                    evil-textobj-tree-sitter-function--parameter.inner
-                   evil-textobj-tree-sitter-function--parameter.outer)
+                   evil-textobj-tree-sitter-function--parameter.outer
+                   evil-textobj-tree-sitter-next-function.outer+
+                   evil-textobj-tree-sitter-next-class.outer+
+                   evil-textobj-tree-sitter-next-parameter.inner+
+                   evil-textobj-tree-sitter-previous-function.outer+
+                   evil-textobj-tree-sitter-previous-class.outer+
+                   evil-textobj-tree-sitter-previous-parameter.inner+)
         :config
         (general-define-key
          :predicate '(treesit-parser-list)
@@ -12960,7 +12977,17 @@ Welcome to my personal Emacs configuration 😎.
          "c" (evil-textobj-tree-sitter-get-textobj "class.inner")
          "f" (evil-textobj-tree-sitter-get-textobj "function.inner")
          "," (evil-textobj-tree-sitter-get-textobj "parameter.inner")
-         [remap evil-inner-arg] #'evil-textobj-tree-sitter-function--parameter.inner))
+         [remap evil-inner-arg] #'evil-textobj-tree-sitter-function--parameter.inner)
+
+        (general-define-key
+         :states '(normal motion)
+         :predicate '(treesit-parser-list)
+         "]f" (evil-textobj-tree-sitter-define-motion+ "function.outer")
+         "]c" (evil-textobj-tree-sitter-define-motion+ "class.outer")
+         "]," (evil-textobj-tree-sitter-define-motion+ "parameter.inner")
+         "[f" (evil-textobj-tree-sitter-define-motion+ "function.outer" 'previous)
+         "[c" (evil-textobj-tree-sitter-define-motion+ "class.outer" 'previous)
+         "[," (evil-textobj-tree-sitter-define-motion+ "parameter.inner" 'previous)))
     #+end_src
 
 *** Appendix
