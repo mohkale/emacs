@@ -392,7 +392,6 @@ Welcome to my personal Emacs configuration 😎.
       ;;; Package Enhancements
           ;; ebib                                                           ; Nice emacs based interface for editing bibtex files
                                                                             ; NOTE: This package requires bibtex to be enabled
-          ;; company-emoji                                                  ; Show emojis in company-completion candidates
           ;; diredfl                                                        ; Make dired /extra/ colorful
           edit-indirect                                                     ; Edit regions of a buffer in another mode.
           evil-tty-cursor                                                   ; Make emacs change terminal cursors based on evil-state.
@@ -667,7 +666,7 @@ Welcome to my personal Emacs configuration 😎.
         (ignore backend mode))
 
       ;; Auto connect configuration.
-      (defun +lsp--should-connect (mode)
+      (defun +lsp--should-connect (&optional mode)
         "Assert whether you should connect to a LSP workspace.
       May decide based on if a server is already running for MODE.
       MODE defaults to `major-mode'."
@@ -696,7 +695,7 @@ Welcome to my personal Emacs configuration 😎.
           (message "No Language server backend is enabled."))))
 
       (defun +lsp-hook ()
-        (when (+lsp-should-connect)
+        (when (+lsp--should-connect)
           (+lsp-command)))
     #+end_src
 
@@ -1897,7 +1896,13 @@ Welcome to my personal Emacs configuration 😎.
                   (list :mode mode :mode-hook mode-hook)
                   (pcase spec
                     ((pred symbolp) (list :capf spec))
-                    ((pred consp) (append (list :capf) spec))
+                    ((pred consp)
+                     (setq spec (append (list :capf) spec))
+                     ;; Re-balance to ensure depth is always above the builtin and global
+                     ;; hooks.
+                     (let ((depth (or (plist-get spec :depth) 0)))
+                       (plist-put spec :depth (- depth 49)))
+                     spec)
                     (_ (use-package-error
                         (concat (symbol-name keyword) " capfs should be either a <symbol> or (<symbol> . <property-plist>)")))))
                  result))
@@ -2070,7 +2075,7 @@ Welcome to my personal Emacs configuration 😎.
        (cl-loop for (char . type) in syntax
                 do (modify-syntax-entry char type syntax-table)))
 
-     (defmacro modify-syntax-hook! (mode syntax)
+     (defmacro modify-syntax-hook! (syntax mode)
        "Helper for `modify-syntax!' which modifes syntax on a hook.
      Useful for certain major modes that seem to reset their syntax-tables
      every time their initialised."
@@ -2133,8 +2138,8 @@ Welcome to my personal Emacs configuration 😎.
                                                            " Unsupported keyword"))))
                           ,modifications ,syntax-table))))))
 
-      (defalias 'use-package-normalize/:modify-syntax-hook+ 'completion--use-package-normalize+)
-      (defalias 'use-package-handler/:modify-syntax-hook+ 'completion--use-package-handler+)
+      (defalias 'use-package-normalize/:modify-syntax-hook+ 'use-package-normalize/:modify-syntax+)
+      (defalias 'use-package-handler/:modify-syntax-hook+ 'use-package-handler/:modify-syntax+)
 
       (let ((tail (nthcdr (cl-position :config use-package-keywords)
                           use-package-keywords)))
@@ -2952,7 +2957,7 @@ Welcome to my personal Emacs configuration 😎.
        (interactive "P")
        (cl-destructuring-bind (file . point)
            (or (unless arg
-                 (let ((conf (etc! "+config.el")))
+                 (let ((conf (etc! "+config-local.el")))
                    (and (file-exists-p conf)
                         (cons conf nil))))
                (save-window-excursion
@@ -5479,9 +5484,14 @@ Welcome to my personal Emacs configuration 😎.
      (use-package cape
        :straight t
        :completion+
-       (prog-mode (cape-keyword :depth 10))
+       (prog-mode (cape-keyword :depth 10)
+                  (cape-file :depth 5))
        (org-mode (cape-elisp-block :depth 10))
+       (text-mode (cape-emoji :depth -15))
+       (lisp-interaction-mode (cape-emoji :depth 15))
        (abbrev-mode cape-abbrev)
+       (org-mode (cape-elisp-block :depth -5)
+                 (cape-file :depth 5))
        ;; (jinx-mode cape-dict)
        ;; (flyspell-mode cape-dict)
        (latex-mode cape-tex)
@@ -5718,22 +5728,6 @@ Welcome to my personal Emacs configuration 😎.
          :states 'motion
          "Y" 'emojify-description-copy-emoji))
     #+end_src
-
-*** Company Emojify
-    :PROPERTIES:
-    :header-args+: :tangle (package-lisp! +pkg-emojify company-emoji)
-    :END:
-
-    #+BEGIN_SRC emacs-lisp
-      (use-package company-emoji
-        :straight t
-        :completion+
-        (text-mode (company-emoji :company t))
-
-        :custom
-        (company-emoji-insert-unicode nil
-         "Never insert emojis as their unicode symbols."))
-    #+END_SRC
 
 *** Appendix
     #+begin_src emacs-lisp
@@ -9726,6 +9720,12 @@ Welcome to my personal Emacs configuration 😎.
         (vertico-scroll-margin 0)
         (minibuffer-prompt-properties
          '(read-only t cursor-intangible t face minibuffer-prompt))
+        (vertico-group-format
+         (concat
+          #("    " 0 4 (face vertico-group-separator))
+          #(" %s " 0 4 (face vertico-group-title))
+          #(" " 0 1 (face vertico-group-separator display (space :align-to (- right 1)))))
+         "Prevent vertico group format from going past the end column on tty displays.")
 
         :autoload vertico-format-candidates+
         :preface (use-package +pkg-minibuffer
@@ -22944,7 +22944,7 @@ Welcome to my personal Emacs configuration 😎.
 
          :autoload company-org-block
          :completion+
-         (org-mode (company-org-block :company t)))
+         (org-mode (company-org-block :company t :depth -10)))
      #+END_SRC
 
 **** Org Appear
