@@ -325,58 +325,61 @@ Welcome to my personal Emacs configuration 😎.
     #+NAME: config-default-modules
     #+BEGIN_SRC emacs-lisp
       (defvar +modules
-        '(;; apheleia                                                       ; Automatic buffer formatting after save.
-          abbrev                                                            ; Enable automatic in text substitutions
-          magit                                                             ; It's git... but magical  ,
-          ;; forge                                                          ; Helpers for remote forges (used with magit)
-          link-hint                                                         ; Jump to links in the current buffer through an avy interface
+        '(abbrev                                                            ; Enable automatic in text substitutions
           ;; adaptive-wrap                                                  ; Visually wrap long lines. doesn't alter what you write.
+          ;; apheleia                                                       ; Automatic buffer formatting after save.
           anzu                                                              ; Show the number of search results incrementally
           ;; beacon                                                         ; Highlight sudden jumps (changes in point) using a beacon
           browse-at-remote                                                  ; Interface emacs with [[https://www.chromium.org/][chromium]]
+          ;; command-log-mode                                               ; Echo commands as you enter them
           company                                                           ; Dynamic completion previews through popup dialogs
           ;; corfu                                                          ; Company alternative aiming to be a little more generic
-          ;; command-log-mode                                               ; Echo commands as you enter them
           dashboard                                                         ; A feature full emacs dashboard
+          diff-hl                                                           ; Show version control information in the window fringe.
           ;; ebdb                                                           ; A contact management database for emacs
+          emmet                                                             ; Enable emmet style shortcuts for html and css modes.
           engine-mode                                                       ; Run a search on a given search engine and view in browser
           ;; eshell                                                         ; A nice lispy shell
           ;; expand-region                                                  ; Expand visual mode by semantic units
           eyebrowse                                                         ; Provides switchable window configurations
           ;; flycheck                                                       ; A better buffer linter and error-checker package
+          ;; forge                                                          ; Helpers for remote forges (used with magit)
           ;; hide-comnt                                                     ; Minor mode to disable rendering of comments
-          ;; notmuch                                                        ; Mail client and manager
           imenu                                                             ; Interactively jump to points of interest in this buffer
+          license-templates                                                 ; LICENSE file snippets courtesy of the public GitHub API
+          link-hint                                                         ; Jump to links in the current buffer through an avy interface
+          magit                                                             ; It's git... but magical  ,
+          ;; notmuch                                                        ; Mail client and manager
           ;; olivetti                                                       ; A nice writing environment for emacs
-          ;; pdf-tools                                                      ; Use emacs as quick and dirty pdf viewer
+          org-roam                                                          ; Org based knowledge base and note taking system
+          orglink                                                           ; Render org links in non `org-mode' buffers.
           ;; projectile                                                     ; Extended project management library for emacs
           rainbow-mode                                                      ; Automatically color/highlight css color names
           skeletor                                                          ; Project skeleton generator package
-          ;; undo-tree                                                      ; Undo system based on vim with tree like visualiser
-          ;; vlc-rc                                                         ; Control [[https://www.videolan.org/vlc/index.en-GB.html][VLC]] from emacs
           ;; tab-bar                                                        ; Enable browser like tabs showing buffer information
+          toc-org                                                           ; Setup automatically updating table-of-contents for org and markdown modes.
+          ;; undo-tree                                                      ; Undo system based on vim with tree like visualiser
           vimish-fold                                                       ; Fold regions of code just like vim.
-          diff-hl                                                           ; Show version control information in the window fringe.
-          emmet                                                             ; TODO: docstring
-          orglink                                                           ; TODO: docstring
-          toc-org                                                           ; TODO: docstring
-          org-roam                                                          ; TODO: docstring
-          mk-mode-line                                                      ; TODO: docstring
-          yasnippet                                                         ; TODO: docstring
-          license-templates                                                 ; TODO: docstring
+          yasnippet                                                         ; Yet-Another-Snippet framework for Emacs
+
+      ;;; Mode lines
+          mk-mode-line                                                      ; My custom mode-line
+
+      ;;; Themes
+          an-old-hope                                                       ; A color scheme from a galaxy far far away...
 
       ;;; Completion frameworks
           vertico                                                           ; A minimalist completing-read compatible completion ui
 
       ;;; Completion Assistants
-          prescient                                                         ; Sorting/Filtering based on frequency and proximity.
-          orderless                                                         ; Blazingly fast completion regexp generator using space separated patterns
           ;; hotfuzz                                                        ; Approximate string matching completion style based on fuzzy finding
+          orderless                                                         ; Blazingly fast completion regexp generator using space separated patterns
+          prescient                                                         ; Sorting/Filtering based on frequency and proximity.
 
       ;;; Buffer Menus
           ;; buffer-menu                                                    ; The (default) builtin buffer menu
-          ibuffer                                                           ; An improved buffer menu
           ;; bufler                                                         ; A butler for your buffers
+          ibuffer                                                           ; An improved buffer menu
 
       ;;; LSP Clients
           eglot                                                             ; A light weight and clean LSP client
@@ -387,22 +390,20 @@ Welcome to my personal Emacs configuration 😎.
           vdiff                                                             ; A diff tool inspired by [[https://github.com/justbur/emacs-vdiff][vimdiff]]
 
       ;;; Package Enhancements
-          ;; diredfl                                                        ; Make dired /extra/ colorful
-          ;; image-dired                                                    ; View images in dired like sessions
-          edit-indirect                                                     ; Edit regions of a buffer in another mode.
-          ;; hydra-posframe                                                 ; Show hydras in a posframe
           ;; ebib                                                           ; Nice emacs based interface for editing bibtex files
                                                                             ; NOTE: This package requires bibtex to be enabled
+          ;; company-emoji                                                  ; Show emojis in company-completion candidates
+          ;; diredfl                                                        ; Make dired /extra/ colorful
+          edit-indirect                                                     ; Edit regions of a buffer in another mode.
+          evil-tty-cursor                                                   ; Make emacs change terminal cursors based on evil-state.
+          ;; hydra-posframe                                                 ; Show hydras in a posframe
           ibuffer-vc                                                        ; Filter ibuffer buffers by version-control repos
           ibuffer-tramp                                                     ; Only show ibuffer buffers in remote tramp sessions
           ibuffer-projectile                                                ; Filter ibuffer buffers by active projects
-          ;; company-emoji                                                  ; Show emojis in company-completion candidates
-          evil-tty-cursor                                                   ; Make emacs change terminal cursors based on evil-state.
-          ;; hindent                                                        ; Intelligent indentation control for haskell
+          ;; image-dired                                                    ; View images in dired like sessions
 
       ;;; language-support
           ;; ggtags                                                         ; GNU Global source code tagging system
-          ;; ycmd                                                           ; A language-server for most languages. written in python.
           ;; tree-sitter                                                    ; Incremental parsing of your source code asynchronously.
 
       ;;; Spell checkers
@@ -4373,7 +4374,8 @@ Welcome to my personal Emacs configuration 😎.
                   evil-set-initial-state
                   evil-visual-rotate
                   evil-visual-select
-                  evil-visual-state-p))
+                  evil-visual-state-p
+                  evil-visual-type))
    #+end_src
 
 *** Evil Commands
@@ -14154,9 +14156,9 @@ Welcome to my personal Emacs configuration 😎.
     but seems to be working for now.
 
     #+BEGIN_SRC emacs-lisp
-      (use-package +pkg-evil
-        :autoload evil-set-initial-state
-        :after magit
+      (require '+pkg-evil)
+
+      (use-package magit
         :config
         (evil-set-initial-state 'magit-submodule-list-mode 'motion)
         (evil-set-initial-state 'magit-repolist-mode 'motion)
@@ -14176,7 +14178,6 @@ Welcome to my personal Emacs configuration 😎.
         (evil-set-initial-state 'magit-gitflow-mode 'motion)
         (evil-set-initial-state 'git-commit-mode 'normal)
 
-        :autoload evil-set-command-property
         :config
         (evil-set-command-property 'magit-section-forward-sibling  :keep-visual t)
         (evil-set-command-property 'magit-section-forward          :keep-visual t)
@@ -14190,10 +14191,9 @@ Welcome to my personal Emacs configuration 😎.
                 magit-submodule-list-mode)
                . evil-normalize-keymaps)
 
-        :autoload evil-visual-type
         :config
         ;; evil-collection-magit-use-y-for-yank
-        (defvar evil-collection-magit-in-visual-pre-command)
+        (defvar evil-collection-magit-in-visual-pre-command+)
         (defun evil-collection-magit--around-visual-pre-command+ (orig-func &rest args)
           (let ((evil-collection-magit-in-visual-pre-command+ t))
             (apply orig-func args)))
@@ -14209,9 +14209,8 @@ Welcome to my personal Emacs configuration 😎.
                                  (derived-mode-p 'magit-mode))
                             ;; shouldn't be necessary, but this will prevent it from failing if an
                             ;; arg is added.
-                            (cdr arglist)))))
+                            (cdr arglist))))
 
-      (use-package magit
         :config
         (general-define-key
          :keymaps 'magit-repolist-mode-map
