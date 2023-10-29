@@ -25164,7 +25164,6 @@ Welcome to my personal Emacs configuration 😎.
 
   #+BEGIN_SRC emacs-lisp
     (add-to-list 'custom-theme-load-path (lisp! "themes"))
-    (load-theme 'an-old-hope t)
   #+END_SRC
 
    Define some extra faces for use in a few different places.
@@ -25180,8 +25179,12 @@ Welcome to my personal Emacs configuration 😎.
 
 ** an-old-hope
    :PROPERTIES:
-   :header-args+: :tangle (lisp! "themes" "an-old-hope-theme.el")
+   :header-args+: :tangle (package-str! (lisp! "themes/an-old-hope-theme.el") an-old-hope)
    :END:
+
+   #+BEGIN_SRC emacs-lisp :tangle (package-yes! an-old-hope)
+     (load-theme 'an-old-hope 'no-confirm)
+   #+END_SRC
 
    #+NAME: an-old-hope-theme-description
    #+BEGIN_EXAMPLE
