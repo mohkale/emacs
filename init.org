@@ -5080,6 +5080,8 @@ Welcome to my personal Emacs configuration 😎.
 
         :general
         ("M-g" 'evil-change-to-initial-state)
+        (:keymaps 'minibuffer-local-map
+         "C-r" 'evil-paste-from-register)
 
         (:states '(motion insert)
          "C-a" 'beginning-of-line
@@ -7718,7 +7720,6 @@ Welcome to my personal Emacs configuration 😎.
         "M-j" 'next-history-element
         "M-k" 'previous-history-element
         "C-s" 'previous-matching-history-element
-        "C-r" 'next-matching-history-element
         "C-a" 'move-beginning-of-line
         "C-e" 'move-end-of-line
         [C-i] "TAB"
@@ -7781,8 +7782,6 @@ Welcome to my personal Emacs configuration 😎.
                               'category)))
                     (or (plist-get d cat)
                         (plist-get d t)))))))
-
-
     #+end_src
 
     When completing file names I'd prefer if kill-word killed base-name.
@@ -10368,9 +10367,7 @@ Welcome to my personal Emacs configuration 😎.
         (:keymaps 'evil-command-line-map
          "C-s" 'consult-history)
         (:keymaps 'minibuffer-local-map
-         ;; TODO: Pick one, leave other for something else.
-         "C-s" 'consult-history
-         "C-r" 'consult-history))
+         "C-s" 'consult-history))
     #+END_SRC
 
 *** Consult Buffer
