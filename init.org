@@ -12921,27 +12921,46 @@ Welcome to my personal Emacs configuration 😎.
         :straight (combobulate :host github :repo "mickeynp/combobulate"))
     #+end_src
 
-*** Tree Sitter Evil Text-Objects                              :wip:disabled:
+*** Tree Sitter Evil Text-Objects                                       :wip:
     This module has been disabled until [[https://github.com/meain/evil-textobj-tree-sitter/issues/76][meain/evil-textobj-tree-sitter#76]] has been
     resolved.
 
-    #+begin_src emacs-lisp :tangle no
+    #+begin_src emacs-lisp
+      (require '+pkg-evil)
+
       (use-package evil-textobj-tree-sitter
         :straight t
-        :after (evil tree-sitter)
+        :after (evil treesit)
         :demand t
+        :autoload (evil-textobj-tree-sitter--message-not-found
+                   evil-textobj-tree-sitter--range)
+
+        :commands (evil-textobj-tree-sitter-function--class.inner
+                   evil-textobj-tree-sitter-function--class.outer
+                   evil-textobj-tree-sitter-function--comment.inner
+                   evil-textobj-tree-sitter-function--comment.outer
+                   evil-textobj-tree-sitter-function--function.inner
+                   evil-textobj-tree-sitter-function--function.outer
+                   evil-textobj-tree-sitter-function--parameter.inner
+                   evil-textobj-tree-sitter-function--parameter.outer)
         :config
         (general-define-key
-         :predicate '(bound-and-true-p tree-sitter-mode)
+         :predicate '(treesit-parser-list)
          :keymaps 'evil-outer-text-objects-map
+         ";" (evil-textobj-tree-sitter-get-textobj "comment.inner")
+         "c" (evil-textobj-tree-sitter-get-textobj "class.outer")
          "f" (evil-textobj-tree-sitter-get-textobj "function.outer")
-         "c" (evil-textobj-tree-sitter-get-textobj "class.outer"))
+         "," (evil-textobj-tree-sitter-get-textobj "parameter.outer")
+         [remap evil-inner-arg] #'evil-textobj-tree-sitter-function--parameter.outer)
 
         (general-define-key
-         :predicate '(bound-and-true-p tree-sitter-mode)
+         :predicate '(treesit-parser-list)
          :keymaps 'evil-inner-text-objects-map
+         ";" (evil-textobj-tree-sitter-get-textobj "comment.outer")
+         "c" (evil-textobj-tree-sitter-get-textobj "class.inner")
          "f" (evil-textobj-tree-sitter-get-textobj "function.inner")
-         "c" (evil-textobj-tree-sitter-get-textobj "class.inner")))
+         "," (evil-textobj-tree-sitter-get-textobj "parameter.inner")
+         [remap evil-inner-arg] #'evil-textobj-tree-sitter-function--parameter.inner))
     #+end_src
 
 *** Appendix
