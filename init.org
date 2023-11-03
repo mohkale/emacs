@@ -2613,7 +2613,7 @@ Welcome to my personal Emacs configuration 😎.
    #+begin_src emacs-lisp :tangle yes
      (use-package +setup-show-whitespace
        :autoload set-trailing-whitespace+
-       :hook (after-change-major-mode . set-trailing-whitespace+))
+       :hook (change-major-mode-after-body . set-trailing-whitespace+))
    #+end_src
 
    Configure displaying of trailing whitespace. Now I personally am not a fan of
@@ -2739,9 +2739,11 @@ Welcome to my personal Emacs configuration 😎.
 
    #+begin_src emacs-lisp :tangle yes
      (use-package +setup-indent
-       :hook (after-change-major-mode . set-indent-offset+)
        :commands set-indent-offset+
        :leader ("t TAB" 'set-indent-offset+))
+
+     (use-package +setup-indent
+       :hook (after-change-major-mode . set-indent-offset+))
    #+end_src
 
    Configure the preferred indentation for buffers. Emacs doesn't really have a nice
@@ -17112,6 +17114,10 @@ Welcome to my personal Emacs configuration 😎.
    :PROPERTIES:
    :header-args+: :tangle (package-lisp! +pkg-orglink orglink)
    :END:
+
+   #+begin_src emacs-lisp :tangle (package-yes! orglink)
+     (require '+pkg-orglink)
+   #+end_src
 
    View org links in non-org buffers as you would in org buffers.
 
