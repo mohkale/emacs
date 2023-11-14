@@ -12158,6 +12158,17 @@ Welcome to my personal Emacs configuration 😎.
            ("reminder" . notmuch-search-flagged-face)))
         (notmuch-show-all-tags-list t)
         (notmuch-draft-folder (join-path+ "local" (system-name) "drafts"))
+        (notmuch-saved-searches
+         `((:name "All Mail" :query "*" :key "a")
+           (:name "Inbox" :query "tag:inbox" :key "i")
+           (:name "Unread" :query "tag:unread" :key "u")
+           (:name "Flagged" :query "tag:flagged" :key "f")
+           (:name "Sent" :query "tag:sent" :key "s")
+           (:name "Drafts" :query "tag:draft" :key "d")
+           ;; Custom additions
+           (:name "Alerts" :query "tag:/^a\\//" :key "l")
+           (:name "Mailing Lists" :query "tag:/^l\\// and not:tag:promotion" :key "m")
+           (:name "Host Reports" :query "tag:/^h\\//" :key "h")))
 
         :autoload notmuch-company
         :completion+ (notmuch-message-mode (notmuch-company :company t))
