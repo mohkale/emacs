@@ -12572,9 +12572,9 @@ Welcome to my personal Emacs configuration 😎.
                 (notmuch-tag+ '("+flagged") nil)))
 
             (define-key map "i"
-              (defun notmuch-tag-remove-from-inbox+ ()
-                (interactive)
-                (notmuch-tag+ '("-inbox" "-unread"))))
+              (defun notmuch-tag-remove-from-inbox+ (only)
+                (interactive "P")
+                (notmuch-tag+ `("-inbox" ,@(unless only (list "-unread"))))))
 
             (define-key map "r"
               (defun notmuch-tag-read+ ()
