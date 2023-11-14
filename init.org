@@ -272,7 +272,8 @@ Welcome to my personal Emacs configuration 😎.
         (concat (state! "x-sessions/session.") session-id)))
 
      (with-no-warnings
-       (defvaralias 'straight-base-dir 'dotemacs-cache-path)
+       ;; Expected to end with a trailing slash and install breaks if omitted.
+       (setq straight-base-dir (concat dotemacs-cache-path "/"))
        (defvaralias 'straight-install-dir 'straight-base-dir))
    #+END_SRC
 
