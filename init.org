@@ -19,6 +19,7 @@ Welcome to my personal Emacs configuration 😎.
   + [ ] Look into Emacs [[https://github.com/Fuco1/smartparens][smartparens-mode]].
   + [ ] Replace PowerShell with [[https://github.com/sch0lars/koopa-mode][Koopa-mode]].
   + [ ] Make =org-roam-rg+= use same customize options as =consult-ripgrep=.
+  + [ ] Setup configurations for =edit-abbrevs-mode=.
 
 * Pre-Initialisation
   This is a hacky indirection. It makes org mode evaluate these code blocks from
@@ -5348,7 +5349,7 @@ Welcome to my personal Emacs configuration 😎.
                                     (file-name-nondirectory (buffer-file-name))
                                     ',args)
                            (apply #'all-the-icons-icon-for-mode major-mode ',args))))
-              ;; TODO: Args aren't used by the following.
+              ;; TODO: Icon formatting args aren't used by the following.
               ((dir+chevron directory+chevron)
                `(all-the-icons-icon-for-dir-with-chevron ,target))
               (t (error "Don't know how to fetch an icon for %s" for)))))
@@ -18591,8 +18592,6 @@ Welcome to my personal Emacs configuration 😎.
         (save-abbrevs 'silently)
         (evil-want-abbrev-expand-on-insert-exit nil)
 
-        ;; TODO: edit-abbrevs-mode
-
         :autoload quietly-read-abbrev-file
         :config (quietly-read-abbrev-file)
 
@@ -25192,7 +25191,7 @@ Welcome to my personal Emacs configuration 😎.
                                              (window-at-side-p nil 'right))
                                         0
                                       1)
-                                   ;; WARN: Requires double evaluation of RHS forms for spacing.
+                                   ;; NOTE: Requires double evaluation of RHS forms for spacing.
                                    ,(string-width (format-mode-line (cons "" right))))))))
     #+END_SRC
 
