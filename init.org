@@ -149,10 +149,10 @@ Welcome to my personal Emacs configuration 😎.
    #+begin_src emacs-lisp :tangle no
      ;; See [[https://www.gnu.org/software/emacs/manual/html_node/efaq-w32/Location-of-init-file.html][location of init file]].
      (require 'subr-x)
+     (require 'xdg)
+
      (when (member system-type '(cygwin ms-dos windows-nt))
        (setenv "HOME" (string-remove-suffix "\\AppData\\Roaming" (getenv "HOME"))))
-
-     (require 'xdg)
 
      (defun xdg-documents-dir+ ()
        "Return the base directory for user specific cache files."
@@ -810,6 +810,10 @@ Welcome to my personal Emacs configuration 😎.
    This section sets up a macro for quickly asserting whether an optional module
    or feature needs to be enabled. This can let you selectively include or exclude
    code-blocks from tangling based on the users Emacs configuration.
+
+   #+begin_src emacs-lisp
+     (require '+core-setup-paths)
+   #+end_src
 
    #+NAME: package-config
    #+begin_src emacs-lisp
