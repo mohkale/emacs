@@ -952,10 +952,20 @@ Welcome to my personal Emacs configuration 😎.
             straight-process-buffer " *straight*"
             straight-check-for-modifications '(check-on-save find-when-checking)
             straight-recipe-overrides '((nil
-                                         (all-the-icons :fork (:host github :repo "mohkale/all-the-icons.el")
-                                                        :branch "feat/customize-all")
-                                         ;; Ignore stale [[https://github.com/flymake/emacs-flymake][flymake/emacs-flymake]] repo.
-                                         (flymake :type built-in))))
+                                         (all-the-icons :fork (:host github :repo "mohkale/all-the-icons.el") :branch "feat/customize-all")
+                                         (all-the-icons-nerd-fonts :host github :repo "mohkale/all-the-icons-nerd-fonts")
+                                         (compile-multi-embark :host github :repo "mohkale/compile-multi" :files ("extensions/compile-multi-embark/*.el"))
+                                         (corfu-doc-terminal :type git :repo "https://codeberg.org/akib/emacs-corfu-doc-terminal.git")
+                                         (corfu-terminal :type git :repo "https://codeberg.org/akib/emacs-corfu-terminal.git")
+                                         (flymake :type built-in) ;; Ignore stale [[https://github.com/flymake/emacs-flymake][flymake/emacs-flymake]] repo.
+                                         (hide-comnt :host github :repo "emacsmirror/hide-comnt")
+                                         (miniedit :host github :repo "emacsorphanage/miniedit")
+                                         (projection :host github :repo "mohkale/projection" :files (:defaults "src/*.el"))
+                                         (projection-multi :host github :repo "mohkale/projection" :files ("src/projection-multi/*.el"))
+                                         (projection-multi-embark :host github :repo "mohkale/projection" :files ("src/projection-multi-embark/*.el"))
+                                         (spaceleader :host github :repo "mohkale/spaceleader")
+                                         (transpose-frame :host github :repo "emacsorphanage/transpose-frame")
+                                         )))
     #+END_SRC
 
     Now by default straight is a self hosting package manager, all of it is contained
@@ -1450,7 +1460,7 @@ Welcome to my personal Emacs configuration 😎.
 
     #+BEGIN_SRC emacs-lisp
       (use-package spaceleader
-        :straight (spaceleader :host github :repo "mohkale/spaceleader")
+        :straight t
         :demand t
         :config
         (require 'spaceleader-use-package)
@@ -5443,7 +5453,7 @@ Welcome to my personal Emacs configuration 😎.
 
     #+begin_src emacs-lisp
       (use-package all-the-icons-nerd-fonts
-        :straight (all-the-icons-nerd-fonts :host github :repo "mohkale/all-the-icons-nerd-fonts")
+        :straight t
         :when +icons-prefer-nerd-font
         :autoload (all-the-icons-nerd-fa
                    all-the-icons-nerd-md
@@ -8970,7 +8980,6 @@ Welcome to my personal Emacs configuration 😎.
 
    #+begin_src emacs-lisp :tangle yes :tangle no
      (use-package visual-line
-       :straight (visual-line :type built-in)
        :delight " Ⓛ")
    #+end_src
 
@@ -13386,7 +13395,7 @@ Welcome to my personal Emacs configuration 😎.
 
    #+BEGIN_SRC emacs-lisp
      (use-package miniedit
-       :straight (miniedit :host github :repo "emacsorphanage/miniedit")
+       :straight t
        :delight (miniedit-mode " MiniEdit")
        :custom
        (miniedit-show-help-p nil)                                                    ; thanks... but no thanks
@@ -14608,7 +14617,7 @@ Welcome to my personal Emacs configuration 😎.
 
    #+BEGIN_SRC emacs-lisp
      (use-package hide-comnt
-       :straight (hide-comnt :host github :repo "emacsmirror/hide-comnt")
+       :straight t
        :leader ("t/" 'hide/show-comments-toggle))
    #+END_SRC
 
@@ -15493,17 +15502,12 @@ Welcome to my personal Emacs configuration 😎.
         :unless (display-graphic-p))
 
       (use-package corfu-terminal
-        :straight
-        (corfu-terminal
-         :type git
-         :repo "https://codeberg.org/akib/emacs-corfu-terminal.git")
+        :straight t
         :unless (display-graphic-p)
         :hook (corfu-mode . corfu-terminal-mode))
 
       (use-package corfu-doc-terminal
-        :straight (corfu-doc-terminal
-                   :type git
-                   :repo "https://codeberg.org/akib/emacs-corfu-doc-terminal.git")
+        :straight t
         :unless (display-graphic-p)
         :hook (corfu-doc-mode . corfu-doc-terminal-mode))
     #+end_src
@@ -16279,7 +16283,7 @@ Welcome to my personal Emacs configuration 😎.
 *** Compile Multi Embark
     #+begin_src emacs-lisp :tangle (package-lisp! +pkg-compile-multi :consult)
       (use-package compile-multi-embark
-        :straight (compile-multi-embark :host github :repo "mohkale/compile-multi" :files ("extensions/compile-multi-embark/*.el"))
+        :straight t
         :after embark
         :after compile-multi
         :demand t
@@ -16369,9 +16373,7 @@ Welcome to my personal Emacs configuration 😎.
 *** Projection
     #+begin_src emacs-lisp
       (use-package projection
-        :straight (projection
-                   :host github :repo "mohkale/projection"
-                   :files (:defaults "src/*.el"))
+        :straight t
         :hook (after-init . global-projection-hook-mode)
         :custom
         (projection-cmake-target-backend 'code-model)
@@ -16428,7 +16430,7 @@ Welcome to my personal Emacs configuration 😎.
 
     #+begin_src emacs-lisp
       (use-package projection-multi
-        :straight (projection-multi :host github :repo "mohkale/projection" :files ("src/projection-multi/*.el"))
+        :straight t
         :general
         ([remap compile-multi] 'projection-multi-compile)
 
@@ -16440,7 +16442,7 @@ Welcome to my personal Emacs configuration 😎.
 **** Projection Multi Embark
      #+begin_src emacs-lisp
        (use-package projection-multi-embark
-         :straight (projection-multi-embark :host github :repo "mohkale/projection" :files ("src/projection-multi-embark/*.el"))
+         :straight t
          :after embark
          :after projection-multi
          :demand t
