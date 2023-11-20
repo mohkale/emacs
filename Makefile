@@ -10,6 +10,7 @@ STRAIGHT_BUILD := $(XDG_CACHE_HOME)/emacs/straight/build
 EMACS_CC_ARGS := \
 	--load $(CWD)/quick-init.el \
 	--eval '(setq load-path (append (file-expand-wildcards "$(STRAIGHT_BUILD)/*") load-path))' \
+	--eval '(setq native-comp-eln-load-path (append (list "$(CWD)/site-lisp/eln-cache") (bound-and-true-p native-comp-eln-load-path)))' \
 	--directory $(CWD)/site-lisp \
 	--eval '(byte-compile-disable-warning (quote lexical))' \
 	--eval '(byte-compile-disable-warning (quote docstrings))'
@@ -75,9 +76,8 @@ bytecompile: $(FILTERED_TANGLE_INDEX)
 	done < "$^"
 
 .PHONY: nativecompile
-nativecompile: bytecompile
-	echo "TODO: nativecompile not yet implemented."
+nativecompile: bytecompile $(FILTERED_TANGLE_INDEX)
 	@set -e; while read -r file; do \
 	    echo "[NCC] $$file"; \
 	    emacs -Q --batch $(EMACS_CC_ARGS) -f batch-native-compile "$$file"; \
-	done < "$^"
+	done < "$(FILTERED_TANGLE_INDEX)"

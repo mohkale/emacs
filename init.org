@@ -57,9 +57,10 @@ Welcome to my personal Emacs configuration 😎.
     in versions after which ~early-init~ is supported, I can put it here with no
     troubles.
 
-    #+BEGIN_SRC emacs-lisp :var cache-dir=(cache! "eln-cache")
-      (setq native-comp-eln-load-path (append (list cache-dir)
-                                              (cdr (bound-and-true-p native-comp-eln-load-path)))
+    #+BEGIN_SRC emacs-lisp :var cache-dir=(cache! "eln-cache") local-cache-dir=(lisp! "eln-cache")
+      (setq native-comp-eln-load-path (append
+                                       (list cache-dir local-cache-dir)
+                                       (cdr (bound-and-true-p native-comp-eln-load-path)))
             native-compile-target-directory cache-dir)
     #+END_SRC
 
