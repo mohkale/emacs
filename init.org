@@ -2745,11 +2745,9 @@ Welcome to my personal Emacs configuration 😎.
 
    #+begin_src emacs-lisp :tangle yes
      (use-package +setup-indent
+       :hook (after-change-major-mode . set-indent-offset+)
        :commands set-indent-offset+
        :leader ("t TAB" 'set-indent-offset+))
-
-     (use-package +setup-indent
-       :hook (after-change-major-mode . set-indent-offset+))
    #+end_src
 
    Configure the preferred indentation for buffers. Emacs doesn't really have a nice
@@ -2792,6 +2790,8 @@ Welcome to my personal Emacs configuration 😎.
    that's bound to come in very useful ヽ(*´з｀*)ﾉ.
 
    #+begin_src emacs-lisp
+     (require '+core-base-packages)
+
      (use-package editorconfig
        :straight t
        :autoload editorconfig-set-indentation
