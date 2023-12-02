@@ -20,6 +20,7 @@ Welcome to my personal Emacs configuration 😎.
   + [ ] Replace PowerShell with [[https://github.com/sch0lars/koopa-mode][Koopa-mode]].
   + [ ] Make =org-roam-rg+= use same customize options as =consult-ripgrep=.
   + [ ] Setup configurations for =edit-abbrevs-mode=.
+  + [ ] Look into [[https://github.com/svaante/dape/tree/master][dape]] for debug-adapter support in Emacs.
 
 * Pre-Initialisation
   This is a hacky indirection. It makes org mode evaluate these code blocks from
@@ -364,6 +365,7 @@ Welcome to my personal Emacs configuration 😎.
           ;; undo-tree                                                      ; Undo system based on vim with tree like visualiser
           vimish-fold                                                       ; Fold regions of code just like vim.
           yasnippet                                                         ; Yet-Another-Snippet framework for Emacs
+          ;; dape                                                           ; Debug adapter interface for Emacs
 
       ;;; Mode lines
           mk-mode-line                                                      ; My custom mode-line
@@ -18730,6 +18732,26 @@ Welcome to my personal Emacs configuration 😎.
      (provide '+pkg-man)
    #+end_src
 
+** Dape                                                                 :wip:
+   :PROPERTIES:
+   :header-args+: :tangle (package-lisp! +pkg-dape dape)
+   :END:
+
+   #+begin_src emacs-lisp :tangle (package-yes! dape)
+     (require '+pkg-dape)
+   #+end_src
+
+   #+begin_src emacs-lisp
+     (use-package dape
+       :straight (dape :type git :host github :repo "svaante/dape")
+       :leader ("lv" 'dape)
+       :custom
+       (dape-adapter-dir (cache! "dape" "adapters")))
+   #+end_src
+
+   #+begin_src emacs-lisp
+     (provide '+pkg-dape)
+   #+end_src
 * Languages
   :PROPERTIES:
   :header-args+: :shebang ";; -*- lexical-binding: t -*-\n(require '+core-base-packages)\n(require '+core-leader)\n(require '+config)\n(require '+core-completion)\n(require '+pkg-evil)\n(eval-when-compile (require '+use-package-setup-indent))\n(eval-when-compile (require '+use-package-show-whitespace))\n(eval-when-compile (require '+use-package-modify-syntax))\n(eval-when-compile (require '+use-package-prettify-symbols))\n(eval-when-compile (require '+pkg-flymake))\n(eval-when-compile (require '+lib-host-environment))\n(require '+pkg-electric)"
@@ -26107,5 +26129,5 @@ Welcome to my personal Emacs configuration 😎.
   This trailing section just defines some file-local variables for this file.
 
 # Local Variables:
-# jinx-local-words: "Anzu Args AucTeX Avy Awk Biblatex Bibtex Bufler Bundler CMake CPerl Caddy Citar Combobulate Comint Contrib Dired Dockerfile Doct Ebib Ediff Eglot Emmet Eshell Fu GGTags GNUs Golang HLedger Hledger Ibuffer Imenu Impl KMacro Keymaps LaTeX Lua Magit Makefile Matchit Miniedit Multiedit Nim Notmuch Omnisharp Orderless Orgit Orglink PLSense PList Pandoc Paredit Pdftools Pre Py Rebase Restclient SMerge Separedit Solargraph Spacemacs TODOs ToC Toml Tooltip Ui VScode Vdiff Verilog Vimish Winman Xopen alist anzu apheleia backends bufler calc comint crontab dired docstring dotfiles eglot el eldoc elisp eln emacs emojify eyebrowse flycheck flyspell frontend gamegrid gitlink gopls gpg gud hl hotfuzz init ipsum lorem lsp matcher minibuffer notmuch olivetti orderless paren plist prettyfy proced ql rc recentf skeletor sudo todo unpackaged url utils uuidgen vdiff vertico vlc vline whitespace winum yasnippet"
+# jinx-local-words: "Anzu Args AucTeX Avy Awk Biblatex Bibtex Bufler Bundler CMake CPerl Caddy Citar Combobulate Comint Contrib Dape Dired Dockerfile Doct Ebib Ediff Eglot Emmet Eshell Fu GGTags GNUs Golang HLedger Hledger Ibuffer Imenu Impl KMacro Keymaps LaTeX Lua Magit Makefile Matchit Miniedit Multiedit Nim Notmuch Omnisharp Orderless Orgit Orglink PLSense PList Pandoc Paredit Pdftools Pre Py Rebase Restclient SMerge Separedit Solargraph Spacemacs TODOs ToC Toml Tooltip Ui VScode Vdiff Verilog Vimish Winman Xopen alist anzu apheleia backends bufler calc comint crontab dired docstring dotfiles eglot el eldoc elisp eln emacs emojify eyebrowse flycheck flyspell frontend gamegrid gitlink gopls gpg gud hl hotfuzz init ipsum lorem lsp matcher minibuffer notmuch olivetti orderless paren plist prettyfy proced ql rc recentf skeletor sudo todo unpackaged url utils uuidgen vdiff vertico vlc vline whitespace winum yasnippet"
 # End:
