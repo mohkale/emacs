@@ -147,7 +147,7 @@
  ("pip-requirements.el" . "216cd1690f80cc965d4ae47b8753fc185f778ff6")
  ("popup-el" . "2868885b2ba64fd469f0aa10a734ceeaf49a1baa")
  ("prescient.el" . "37d356e105fe29d5d3c686dcae2585981299d30b")
- ("projection" . "c0b46b3fa025695856f734702344c12b529dcfc8")
+ ("projection" . "307714f1a21abe24454c48996e0b24bad8565dcd")
  ("pyimport" . "c006a5fd0e5c9e297aa2ad71b2f02f463286b5e3")
  ("queue" . "f986fb68e75bdae951efb9e11a3012ab6bd408ee")
  ("rainbow-mode" . "5c6c4b13695a39671063ecbee6c8629bd53751ec")
