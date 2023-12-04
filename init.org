@@ -2494,22 +2494,21 @@ Welcome to my personal Emacs configuration 😎.
                                nil))
                            windows))
 
-           (let* ((horizontal-layout
-                   (with-selected-window (car windows)
-                     (window-in-direction 'right))))
-             (if horizontal-layout
-                 (split-window
-                  (if (eq side-horizontal 'left)
-                      (car windows)
-                    (cadr windows))
-                  nil
-                  side-vertical)
-               (split-window
-                (if (eq side-vertical 'up)
-                    (car windows)
-                  (cadr windows))
-                nil
-                side-horizontal))))
+           (window--display-buffer
+            buffer
+            (if-let ((horizontal-layout (with-selected-window (car windows)
+                                          (window-in-direction 'right))))
+                (split-window (if (eq side-horizontal 'left)
+                                  (car windows)
+                                (cadr windows))
+                              nil
+                              side-vertical)
+              (split-window (if (eq side-vertical 'up)
+                                (car windows)
+                              (cadr windows))
+                            nil
+                            side-horizontal))
+            'window alist))
           ((eq (length windows) 3)
            ;; Find remaining split location needed to get 4 splits total.
            ;;
@@ -2528,7 +2527,7 @@ Welcome to my personal Emacs configuration 😎.
              (window--display-buffer
               buffer
               (split-window target-window nil side-vertical)
-              'frame alist)))
+              'window alist)))
           ;; In every other case we create a new split window on the side.
           (t
            (funcall #'display-buffer-in-side-window-and-focus+ buffer alist)))))
