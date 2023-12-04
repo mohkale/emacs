@@ -8236,9 +8236,13 @@ Welcome to my personal Emacs configuration 😎.
         (when (and buffer
                    (buffer-live-p buffer)
                    (not (get-buffer-process buffer)))
-          ;; don't skip if new compilation began before window
-          ;; from previous compilation has been killed.
-          (quit-windows-on buffer)))
+          ;; Kill the compilation window and switch back to the active window.
+          (save-selected-window
+            (quit-windows-on buffer))
+          ;; Sometimes killing the compilation buffer while the minibuffer was active
+          ;; causes some artifacts on the display. We rerender to silence them.
+          (when (minibufferp)
+            (redraw-display))))
 
       (defun compilation-cancel-auto-kill-p+ ()
         "Whether to cancel compilation window auto-kill.
