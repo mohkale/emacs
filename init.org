@@ -368,6 +368,9 @@ Welcome to my personal Emacs configuration 😎.
           ;; undo-tree                                                      ; Undo system based on vim with tree like visualiser
           vimish-fold                                                       ; Fold regions of code just like vim.
           yasnippet                                                         ; Yet-Another-Snippet framework for Emacs
+
+      ;;; Debuggers
+          gud                                                               ; Grand unified debugger
           ;; dape                                                           ; Debug adapter interface for Emacs
 
       ;;; Mode lines
@@ -7397,12 +7400,12 @@ Welcome to my personal Emacs configuration 😎.
 
 ** GUD - Grand Unified Debugger                                     :builtin:
    :PROPERTIES:
-   :header-args+: :tangle (lisp! "+pkg-gud.el")
+   :header-args+: :tangle (package-lisp! +pkg-gud gud)
    :END:
 
    The Emacs grand unified debugger interface.
 
-   #+begin_src emacs-lisp :tangle yes
+   #+begin_src emacs-lisp :tangle (package-yes! gud)
      (require '+pkg-gud)
    #+end_src
 
@@ -7420,10 +7423,10 @@ Welcome to my personal Emacs configuration 😎.
        (gdb-default-window-configuration-file nil)
 
        :preface
-       (defalias 'gnu-debugger     #'gdb)
-       (defalias 'gud-gnu-debugger #'gud-gdb)
-       (defalias 'perl-debugger    #'perldb)
-       (defalias 'java-debugger    #'jdb)
+       (defalias 'gnu-debugger+     #'gdb)
+       (defalias 'gud-gnu-debugger+ #'gud-gdb)
+       (defalias 'perl-debugger+    #'perldb)
+       (defalias 'java-debugger+    #'jdb)
 
        :init
        (push `(,(rx bol
@@ -7433,7 +7436,7 @@ Welcome to my personal Emacs configuration 😎.
                         "*stack frames of"
                         "*breakpoints of"))
                (display-buffer-reuse-window
-                display-buffer--maybe-pop-up-frame-or-window
+                ;; display-buffer--maybe-pop-up-frame-or-window
                 display-buffer-in-side-window)
                (side . right)
                (window-width . 0.25)
@@ -7484,25 +7487,26 @@ Welcome to my personal Emacs configuration 😎.
            (user-error "No GUD session buffer found")))
 
        :leader
+       ("v" '(:ignore t :wk "debugger")
+        ;; "vv" 'gud-gdb
+        "vv" 'gdb)
        (:prefix "v"
-        "" '(:ignore t :wk "debugger")
-        "RET" 'gud-gdb
         "DEL" 'gud-quit-session+
         "!" 'gud-basic-call "1" 'gud-basic-call
         "r" 'gud-run
         "b" 'gud-break
-        "t" 'gud-tbreak                                                              ; temporary breakpoint
+        "t" 'gud-tbreak                                                              ; Temporary breakpoint
         "c" 'gud-cont
-        "f" 'gud-finish                                                              ; current function
-        "j" 'gud-jump                                                                ; to current line
-        "e" 'gud-print                                                               ; eval expression at point
-        "g" 'gud-refresh                                                             ; redraw buffers
+        "f" 'gud-finish                                                              ; Current function
+        "j" 'gud-jump                                                                ; To current line
+        "e" 'gud-print                                                               ; Eval expression at point
+        "g" 'gud-refresh                                                             ; Redraw buffers
         "x" 'gud-remove
         "s" 'gud-step
         "n" 'gud-next
-        "u" 'gud-until                                                               ; continue until current line
+        "u" 'gud-until                                                               ; Continue until current line
         "w" 'gud-watch
-        "]" 'gud-down                                                                ; stack-frames
+        "]" 'gud-down                                                                ; Stack-frames
         "[" 'gud-up))
 
      (use-package gdb-mi
@@ -18762,9 +18766,63 @@ Welcome to my personal Emacs configuration 😎.
    #+begin_src emacs-lisp
      (use-package dape
        :straight (dape :type git :host github :repo "svaante/dape")
-       :leader ("lv" 'dape)
        :custom
-       (dape-adapter-dir (cache! "dape" "adapters")))
+       (dape-adapter-dir (cache! "dape" "adapters"))
+       (dape-info-display-buffer-action nil)
+       (dape-repl-display-buffer-action nil)
+       (dape-display-source-buffer-action
+        '((display-buffer-reuse-window
+           display-buffer-same-window)
+          (body-function . nil)))
+
+       :init
+       (push `(,(rx "*dape-info*")
+               (display-buffer-in-side-window)
+               (body-function . nil)
+               (side . left))
+             display-buffer-alist)
+
+       (push `(,(rx "*dape-repl*")
+               (display-buffer-reuse-window
+                display-buffer-in-side-window)
+               (body-function . nil)
+               (side . bottom)
+               (slot . -1))
+             display-buffer-alist)
+
+       :leader
+       ("v" '(:ignore t :wk "debugger")
+        "lv" 'dape
+        "vv" 'dape)
+
+       :lazy-leader
+       (:prefix "v"
+        "DEL" 'dape-quit
+        "b" 'dape-breakpoint-toggle
+        "x" 'dape-breakpoint-remove-all
+        "=" 'dape-breakpoint-expression
+        "l" 'dape-breakpoint-log
+        "r" 'dape-restart
+        "s" 'dape-step-in
+        "k" 'dape-kill                                                               ; Restart debugger session
+        "n" 'dape-next                                                               ; Like step but skip functions
+        "f" 'dape-step-out
+        "c" 'dape-continue
+        "g" 'dape-restart
+        "^" 'dape-select-stack
+        "@" 'dape-select-thread
+        "w" 'dape-watch-dwim
+        "m" 'dape-read-memory))
+
+     (use-package dape
+       :general
+       (:keymaps 'dape-info-mode-map
+        "<override-state>" 'motion
+        "SPC" nil                                                                    ; Give me back my leader
+        "h"   nil
+        "RET" "<return>"
+        [C-i] "<tab>"
+        "TAB" "<tab>"))
    #+end_src
 
    #+begin_src emacs-lisp
