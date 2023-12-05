@@ -1756,6 +1756,7 @@ Welcome to my personal Emacs configuration 😎.
 
    #+begin_src emacs-lisp
      (eval-when-compile (require '+core-base-packages))
+     (require '+core-leader)
    #+end_src
 
    *WARN*: never bind ESC, it *BREAKS EVERYTHING!*.
@@ -1858,6 +1859,8 @@ Welcome to my personal Emacs configuration 😎.
 
    #+BEGIN_SRC emacs-lisp
      (defvar emacs-window-map+ (make-sparse-keymap))
+
+     (leader-set-keys "w" emacs-window-map+)
 
      (general-define-key
       :states '(motion emacs)
