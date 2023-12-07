@@ -16263,14 +16263,16 @@ Welcome to my personal Emacs configuration 😎.
         :config
         (push `(emacs-lisp-mode
                 ("emacs:bytecompile" . ,#'byte-compile-this-file+)
-                ("emacs:package-lint" . 'package-lint-current-buffer)
+                ("emacs:package-lint" . ,#'package-lint-current-buffer)
                 ("emacs:checkdoc" . ,#'checkdoc))
               compile-multi-config)
 
         (push `((and buffer-file-name
                      (derived-mode-p 'markdown-mode)
                      (executable-find "grip" 'remote))
-                ("markdown:grip" "grip" (string-remove-prefix (or (file-remote-p (buffer-file-name)) "") (buffer-file-name))))
+                ("markdown:grip" "grip" (string-remove-prefix
+                                         (or (file-remote-p (buffer-file-name)) "")
+                                         (buffer-file-name))))
               compile-multi-config))
     #+end_src
 
