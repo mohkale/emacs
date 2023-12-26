@@ -18924,11 +18924,6 @@ Welcome to my personal Emacs configuration 😎.
         (bibtex-autokey-titlewords nil)
         (bibtex-field-delimiters 'double-quotes)                                      ; what I can I say, this just makes sense
 
-        :preface
-        (setq bibtex-files
-              (when (file-exists-p +bib-home)
-                (directory-files +bib-home 'full ".bib")))
-
         :init
         (evil-set-initial-state 'bibtex-mode 'normal)
 
@@ -19044,22 +19039,7 @@ Welcome to my personal Emacs configuration 😎.
          "gl" 'bibtex-end-of-entry))
     #+END_SRC
 
-*** Company Bibtex                                                      :comp:
-    #+BEGIN_SRC emacs-lisp
-      (use-package company-bibtex
-        :straight t
-        :autoload company-bibtex
-        :completion+
-        (bibtex-mode (company-bibtex :company t))
-        :init
-        (setq company-bibtex-bibliography bibtex-files))
-    #+END_SRC
-
 *** Citar
-    :PROPERTIES:
-    :header-args+: :tangle (package-lisp! +lang-bibtex bibtex :consult)
-    :END:
-
     #+begin_src emacs-lisp
       (require '+pkg-all-the-icons)
       (require '+pkg-browse-url)
@@ -19083,8 +19063,11 @@ Welcome to my personal Emacs configuration 😎.
          '(".pdf" ".epub" ".pptx" ".doc" ".docx"))
         (citar-notes-paths
          (ensure-list (join-path+ +notes-home "bibnotes")))
-        (citar-bibliography bibtex-files)
 
+        :preface
+        (setq citar-bibliography
+              (when (file-exists-p +bib-home)
+                (mapcar #'file-truename (directory-files +bib-home 'full ".bib"))))
 
         :custom
         (org-cite-insert-processor 'citar)
@@ -19134,6 +19117,17 @@ Welcome to my personal Emacs configuration 😎.
          :config (citar-embark-mode))
      #+end_src
 
+*** Company Bibtex                                                      :comp:
+    #+BEGIN_SRC emacs-lisp
+      (use-package company-bibtex
+        :straight t
+        :autoload company-bibtex
+        :completion+
+        (bibtex-mode (company-bibtex :company t))
+        :init
+        (setq company-bibtex-bibliography citar-bibliography))
+    #+END_SRC
+
 *** Ebib
     :PROPERTIES:
     :header-args+: :tangle (package-lisp! +lang-bibtex bibtex ebib)
@@ -19148,7 +19142,7 @@ Welcome to my personal Emacs configuration 😎.
         (ebib-notes-directory +notes-home)
 
         :custom
-        (ebib-preload-bib-files bibtex-files)
+        (ebib-preload-bib-files citar-bibliography)
         (ebib-keywords (state! "ebib/keywords"))
         (ebib-reading-list-file (join-path+ +notes-home "reading-list.org"))
         :config
@@ -22160,8 +22154,8 @@ Welcome to my personal Emacs configuration 😎.
 
       (use-package org
         :straight t
-        :init
-        (setq org-cite-global-bibliography bibtex-files))
+        :custom
+        (org-cite-global-bibliography citar-bibliography))
     #+end_src
 
 *** Org Agenda
@@ -23141,7 +23135,7 @@ Welcome to my personal Emacs configuration 😎.
          ("ov" 'doi-utils-add-bibtex-entry-from-doi)
 
          :custom
-         (reftex-default-bibliography bibtex-files)
+         (reftex-default-bibliography citar-bibliography)
          (org-ref-bibtex-completion-add-keywords-field nil)
          (org-ref-show-citation-on-enter nil)
          (helm-minibuffer-history-key nil)
