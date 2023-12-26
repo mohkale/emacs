@@ -16263,7 +16263,6 @@ Welcome to my personal Emacs configuration 😎.
         :config
         (push `(emacs-lisp-mode
                 ("emacs:bytecompile" . ,#'byte-compile-this-file+)
-                ("emacs:package-lint" . ,#'package-lint-current-buffer)
                 ("emacs:checkdoc" . ,#'checkdoc))
               compile-multi-config)
 
@@ -19964,6 +19963,20 @@ Welcome to my personal Emacs configuration 😎.
          ;; "M-r"   'paredit-raise-sexp
          ))
     #+END_SRC
+
+*** Package Lint
+    #+begin_src emacs-lisp
+      (use-package package-lint
+        :straight t
+        :commands package-lint-current-buffer)
+
+      (require '+pkg-compile-multi)
+      (use-package compile-multi
+        :config
+        (push `(emacs-lisp-mode
+                ("emacs:package-lint" . ,#'package-lint-current-buffer))
+              compile-multi-config))
+    #+end_src
 
 *** FlyMake Package Lint                                             :linter:
     #+begin_src emacs-lisp
