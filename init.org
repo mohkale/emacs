@@ -21768,7 +21768,7 @@ Welcome to my personal Emacs configuration 😎.
         :commands org-find-file+
         :autoload (org-find-file--generate-candidate+
                    org-find-file--exclude-p+
-                   org-find-file--candidates+)
+                   org-find-file-candidates+)
         :config
         (defun org-find-file--generate-candidate+ (file)
           (let ((relative (file-relative-name file +notes-home)))
@@ -21795,7 +21795,7 @@ Welcome to my personal Emacs configuration 😎.
           (interactive "P")
           (if select
               (if-let ((default-directory (or +notes-home default-directory))
-                       (org-files (org-find-file--candidates+)))
+                       (org-files (org-find-file-candidates+)))
                   (cond
                    ((package! :consult)
                     (declare-function consult--read "consult")
