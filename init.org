@@ -11427,14 +11427,15 @@ Welcome to my personal Emacs configuration 😎.
           "Assert whether a server exists in the current workspace for MODE.
       When ALL-WORKSPACES is true we instead check for a server running in any
       workspace."
-          (seq-find
-           (lambda (server)
-             (-first (apply-partially #'provided-mode-derived-p mode)
-                     (eglot--major-modes server)))
-           (if all-workspaces
-               (-flatten (hash-table-values eglot--servers-by-project))
-             (gethash (or (project-current) `(transient . ,default-directory))
-                      eglot--servers-by-project))))
+          (when (featurep 'eglot)
+            (seq-find
+             (lambda (server)
+               (-first (apply-partially #'provided-mode-derived-p mode)
+                       (eglot--major-modes server)))
+             (if all-workspaces
+                 (-flatten (hash-table-values eglot--servers-by-project))
+               (gethash (or (project-current) `(transient . ,default-directory))
+                        eglot--servers-by-project)))))
 
         (cl-defmethod +lsp--server-running-in-workspace-p ((_backend (eql eglot)) mode)
           (eglot-server-exists-p+ mode))
