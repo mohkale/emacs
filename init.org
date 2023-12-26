@@ -21209,7 +21209,6 @@ Welcome to my personal Emacs configuration 😎.
                      (let ((indent-tabs-mode nil))
                        (apply func args))))
 
-       (advice-add 'makefile-switch-to-browser          :after #'evil-motion-state)
        (advice-add 'makefile-create-up-to-date-overview :after #'evil-motion-state)
 
        :lazy-leader
@@ -21219,7 +21218,6 @@ Welcome to my personal Emacs configuration 😎.
                 makefile-imake-mode
                 makefile-mode
                 makefile-makepp-mode)
-        "b" 'makefile-switch-to-browser
         "o" 'makefile-create-up-to-date-overview
         "p" 'makefile-pickup-everything
         "f" 'makefile-pickup-filenames-as-targets
@@ -21232,21 +21230,7 @@ Welcome to my personal Emacs configuration 😎.
        (:keymaps 'makefile-mode-map
         :states 'motion
         "gj" 'makefile-next-dependency
-        "gk" 'makefile-previous-dependency)
-       (:states  'motion
-        :keymaps 'makefile-browser-map
-        "j" 'makefile-browser-next-line
-        "k" 'makefile-browser-previous-line
-
-        "t"     'makefile-browser-toggle
-        "TAB"   'makefile-browser-toggle
-        "<tab>" 'makefile-browser-toggle
-        "RET"   'makefile-browser-insert-continuation
-
-        "I" 'makefile-browser-insert-selection-and-quit
-        "i" 'makefile-browser-insert-selection
-
-        [remap quit-window] 'makefile-browser-quit))
+        "gk" 'makefile-previous-dependency))
    #+END_SRC
 
    #+begin_src emacs-lisp
