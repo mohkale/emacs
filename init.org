@@ -24255,7 +24255,7 @@ Welcome to my personal Emacs configuration 😎.
     #+begin_src emacs-lisp :tangle (package-lisp! +lang-yaml yaml tree-sitter)
       (use-package yaml-ts-mode
         :hook (yaml-ts-mode . +flylint)
-        :mode ((rx ".y" (optional "a") "ml" eol) . yaml-ts-mode)
+        :mode ((rx (or (and ".y" (optional "a") "ml") ".clang-format") eol) . yaml-ts-mode)
         :indent+ (yaml-ts-mode 2)
         :modify-syntax+
         (yaml-ts-mode--syntax-table
@@ -24270,7 +24270,7 @@ Welcome to my personal Emacs configuration 😎.
       (use-package yaml-mode
         :straight t
         :hook (yaml-mode . +flylint)
-        :mode ((rx ".y" (optional "a") "ml" eol) . yaml-mode)
+        :mode ((rx (or (and ".y" (optional "a") "ml") ".clang-format") eol) . yaml-mode)
         :indent+ (yaml-mode 2)
 
         :modify-syntax+ yaml-syntax-table-modifications+
