@@ -2681,30 +2681,29 @@ Welcome to my personal Emacs configuration 😎.
    #+END_SRC
 
    #+BEGIN_SRC emacs-lisp
-      (defun set-trailing-whitespace--mode-p+ ()
-        "Check the mode of the current buffer, to see whether trailing
-      whitespace should be shown."
-        (not (and +whitespace-exempt-modes
-                  (apply 'derived-mode-p
-                         +whitespace-exempt-modes))))
+     (defun set-trailing-whitespace--mode-p+ ()
+       "Check the mode of the current buffer, to see whether trailing
+     whitespace should be shown."
+       (not (and +whitespace-exempt-modes
+                 (derived-mode-p +whitespace-exempt-modes))))
 
-      (defun set-trailing-whitespace--name-p+ ()
-        "Check the name of the current buffer, to see whether trailing
-      whitespace should be shown."
-        (not
-         (and +whitespace-exempt-buffers
-              (let ((it (buffer-name)))
-                (cl-find-if (lambda (regexp)
-                              (string-match-p regexp it))
-                            +whitespace-exempt-buffers)))))
+     (defun set-trailing-whitespace--name-p+ ()
+       "Check the name of the current buffer, to see whether trailing
+     whitespace should be shown."
+       (not
+        (and +whitespace-exempt-buffers
+             (let ((it (buffer-name)))
+               (cl-find-if (lambda (regexp)
+                             (string-match-p regexp it))
+                           +whitespace-exempt-buffers)))))
 
-      (defun set-trailing-whitespace+ (&rest _)
-        (setq show-trailing-whitespace
-              ;; when both name and mode decide you can show
-              ;; whitespace, then show it. otherwise when at
-              ;; least one says no, then hide it.
-              (and (set-trailing-whitespace--mode-p+)
-                   (set-trailing-whitespace--name-p+))))
+     (defun set-trailing-whitespace+ (&rest _)
+       (setq show-trailing-whitespace
+             ;; when both name and mode decide you can show
+             ;; whitespace, then show it. otherwise when at
+             ;; least one says no, then hide it.
+             (and (set-trailing-whitespace--mode-p+)
+                  (set-trailing-whitespace--name-p+))))
    #+END_SRC
 
    #+begin_src emacs-lisp
@@ -16401,9 +16400,7 @@ Welcome to my personal Emacs configuration 😎.
         :custom
         (projection-cmake-target-backend 'code-model)
         (projection-cmake-configure-options
-         `(,@(when (executable-find "ninja")
-               (list "-GNinja"))
-           "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+         `("-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
            "-DCMAKE_COLOR_DIAGNOSTICS=ON"))
 
         :init
@@ -16422,6 +16419,8 @@ Welcome to my personal Emacs configuration 😎.
          "2" 'projection-update-extra-project-types
          "I" 'projection-show-project-info
          "DEL" 'projection-cache-clear
+         ;; `projection-artifacts'
+         "l" 'projection-artifacts-list
          ;; `projection-find'
          "TAB" 'projection-find-other-file
          "o"   'projection-find-other-file
@@ -18767,71 +18766,147 @@ Welcome to my personal Emacs configuration 😎.
      (require '+pkg-dape)
    #+end_src
 
-   #+begin_src emacs-lisp
-     (use-package dape
-       :straight (dape :type git :host github :repo "svaante/dape")
-       :custom
-       (dape-adapter-dir (cache! "dape" "adapters"))
-       (dape-info-display-buffer-action nil)
-       (dape-repl-display-buffer-action nil)
-       (dape-display-source-buffer-action
-        '((display-buffer-reuse-window
-           display-buffer-same-window)
-          (body-function . nil)))
+*** Dape
+    #+begin_src emacs-lisp
+      (use-package dape
+        :straight (dape :type git :host github :repo "svaante/dape")
+        :hide-whitespace+
+        dape-repl-mode
+        dape-info-parent-mode
+        :custom
+        (dape-adapter-dir (cache! "dape" "adapters"))
+        (dape-display-source-buffer-action
+         '((display-buffer-reuse-window
+            display-buffer-same-window)
+           (body-function . nil)))
 
-       :init
-       (push `(,(rx "*dape-info*")
-               (display-buffer-in-side-window)
-               (body-function . nil)
-               (side . left))
-             display-buffer-alist)
+        :init
+        (advice-add 'dape--display-buffer :override #'display-buffer)
 
-       (push `(,(rx "*dape-repl*")
-               (display-buffer-reuse-window
-                display-buffer-in-side-window)
-               (body-function . nil)
-               (side . bottom)
-               (slot . -1))
-             display-buffer-alist)
+        (let ((side 'right)
+              (repl-side 'bottom))
+          ;; Adapted from `dape--display-buffer'.
+          (push `((derived-mode dape-repl-mode)
+                  (display-buffer-in-side-window)
+                  (body-function . nil)
+                  (side . ,repl-side)
+                  (slot . -1))
+                display-buffer-alist)
 
-       :leader
-       ("v" '(:ignore t :wk "debugger")
-        "lv" 'dape
-        "vv" 'dape)
+          (push `((or (derived-mode dape-info-scope-mode)
+                      (derived-mode dape-info-watch-mode))
+                  (display-buffer-in-side-window)
+                  (body-function . nil)
+                  (side . ,side)
+                  (slot . -1))
+                display-buffer-alist)
 
-       :lazy-leader
-       (:prefix "v"
-        "DEL" 'dape-quit
-        "b" 'dape-breakpoint-toggle
-        "x" 'dape-breakpoint-remove-all
-        "=" 'dape-breakpoint-expression
-        "l" 'dape-breakpoint-log
-        "r" 'dape-restart
-        "s" 'dape-step-in
-        "k" 'dape-kill                                                               ; Restart debugger session
-        "n" 'dape-next                                                               ; Like step but skip functions
-        "f" 'dape-step-out
-        "c" 'dape-continue
-        "g" 'dape-restart
-        "^" 'dape-select-stack
-        "@" 'dape-select-thread
-        "w" 'dape-watch-dwim
-        "m" 'dape-read-memory))
+          (push `((or (derived-mode dape-info-stack-mode)
+                      (derived-mode dape-info-modules-mode)
+                      (derived-mode dape-info-sources-mode))
+                  (display-buffer-in-side-window)
+                  (body-function . nil)
+                  (side . ,side)
+                  (slot . 0))
+                display-buffer-alist)
 
-     (use-package dape
-       :general
-       (:keymaps 'dape-info-mode-map
-        "<override-state>" 'motion
-        "SPC" nil                                                                    ; Give me back my leader
-        "h"   nil
-        "RET" "<return>"
-        [C-i] "<tab>"
-        "TAB" "<tab>"))
-   #+end_src
+          (push `((or (derived-mode dape-info-breakpoints-mode)
+                      (derived-mode dape-info-threads-mode))
+                  (display-buffer-in-side-window)
+                  (body-function . nil)
+                  (side . ,side)
+                  (slot . 1))
+                display-buffer-alist))
 
-   #+begin_src emacs-lisp
-     (provide '+pkg-dape)
-   #+end_src
+        :leader
+        ("v" '(:ignore t :wk "debugger"))
+
+        :lazy-leader
+        (:prefix "v"
+         "DEL" 'dape-quit
+         "b" 'dape-breakpoint-toggle
+         "x" 'dape-breakpoint-remove-all
+         "=" 'dape-breakpoint-expression
+         "l" 'dape-breakpoint-log
+         "r" 'dape-restart
+         "s" 'dape-step-in
+         "k" 'dape-kill                                                               ; Restart debugger session
+         "n" 'dape-next                                                               ; Like step but skip functions
+         "f" 'dape-step-out
+         "c" 'dape-continue
+         "g" 'dape-restart
+         "^" 'dape-select-stack
+         "@" 'dape-select-thread
+         "w" 'dape-watch-dwim
+         "m" 'dape-read-memory))
+
+      (use-package dape
+        :general
+        (:keymaps 'dape-info-mode-map
+         "<override-state>" 'motion
+         "SPC" nil                                                                    ; Give me back my leader
+         "h"   nil
+         "RET" "<return>"
+         [C-i] "<tab>"
+         "TAB" "<tab>"))
+    #+end_src
+
+*** Dape Projection
+    #+begin_src emacs-lisp
+      (require '+pkg-project)
+
+      (use-package dape
+        :autoload (dape--config-from-string
+                   dape--config-eval))
+
+      (use-package projection
+        :commands projection-dape+
+        :config
+        (defun projection-dape--adapt-config-options+ (artifact)
+          (let-alist artifact
+            ;; TODO: Support .environment property for debug invocation.
+            (pcase .type
+              ('executable `(,@(when .working-directory
+                                 (list :cwd .working-directory))
+                             :program ,.arg0
+                             ,@(when .argv
+                                 (list :command-args (apply #'vector .argv)))))
+              ('go-package `(:program ,.go-package))
+              (_ (error "Don't know how to derive debugger config from %S" config)))))
+
+        (defun projection-dape--select-adapter+ (artifact)
+          (let-alist artifact
+            (pcase .type
+              ('executable 'lldb-vscode)
+              ('go-package `dlv)
+              (_ (error "Don't know which adapter to use for %S" config)))))
+
+        (defun projection-dape--projection2dape-config+ (artifact)
+          (apply
+           'dape--config-eval
+           (thread-first
+             (cons (projection-dape--select-adapter+ artifact)
+                   (projection-dape--adapt-config-options+ artifact))
+             (prin1-to-string)
+             (substring 1 -1)
+             (dape--config-from-string))))
+
+        (defun projection-dape+ (config)
+          (interactive
+           (let ((artifact (projection-artifacts-read-debug-targets)))
+             (list (projection-dape--projection2dape-config+ artifact))))
+          (dape config))
+
+        :leader
+        ("lv" 'projection-dape+ "vv" 'projection-dape+
+         "lV" 'dape             "vV" 'dape))
+    #+end_src
+
+*** Appendix
+    #+begin_src emacs-lisp
+      (provide '+pkg-dape)
+    #+end_src
+
 * Languages
   :PROPERTIES:
   :header-args+: :shebang ";; -*- lexical-binding: t -*-\n(require '+core-base-packages)\n(require '+core-leader)\n(require '+config)\n(require '+core-completion)\n(require '+pkg-evil)\n(eval-when-compile (require '+use-package-setup-indent))\n(eval-when-compile (require '+use-package-show-whitespace))\n(eval-when-compile (require '+use-package-modify-syntax))\n(eval-when-compile (require '+use-package-prettify-symbols))\n(eval-when-compile (require '+pkg-flymake))\n(eval-when-compile (require '+lib-host-environment))\n(require '+pkg-electric)"
