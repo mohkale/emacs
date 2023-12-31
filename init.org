@@ -20734,7 +20734,9 @@ Welcome to my personal Emacs configuration 😎.
 *** JSON Mode
    #+begin_src emacs-lisp :tangle (package-lisp! +lang-json json tree-sitter)
      (use-package json-ts-mode
-       :hook (json-ts-mode . +flylint))
+       :hook (json-ts-mode . +flylint)
+       :modify-syntax+
+       (json-ts-mode--syntax-table '((?- . "w"))))
 
      (use-package org-src
        :config
@@ -20743,7 +20745,9 @@ Welcome to my personal Emacs configuration 😎.
 
    #+begin_src emacs-lisp :tangle (package-lisp! +lang-json json (not tree-sitter))
      (use-package js
-       :hook (js-json-mode . +flylint))
+       :hook (js-json-mode . +flylint)
+       :modify-syntax+
+       (js-json-mode-syntax-table '((?- . "w"))))
 
      (use-package org-src
        :config
