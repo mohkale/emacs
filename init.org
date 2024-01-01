@@ -446,7 +446,7 @@ Welcome to my personal Emacs configuration 😎.
           javascript
           ;; typescript                                                     ; NOTE requires javascript to also be enabled
           json
-          ;; jupyter
+          ;; jq
           ;; kotlin
           ;; glsl
           ;; log
@@ -20782,6 +20782,25 @@ Welcome to my personal Emacs configuration 😎.
     #+begin_src emacs-lisp
     (provide '+lang-json)
     #+end_src
+
+** JQ
+   :PROPERTIES:
+   :header-args+: :tangle (package-lisp! +lang-json json)
+   :END:
+
+   #+begin_src emacs-lisp :tangle (package-yes! jq)
+     (require '+lang-jq)
+   #+end_src
+
+   #+begin_src emacs-lisp
+     (use-package jq-mode
+       :straight t
+       :mode (rx ".jq" eol))
+   #+end_src
+
+   #+begin_src emacs-lisp
+    (provide '+lang-jq)
+   #+end_src
 
 ** Kotlin
   :PROPERTIES:
