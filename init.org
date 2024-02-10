@@ -10293,11 +10293,11 @@ Welcome to my personal Emacs configuration 😎.
         :preface
         (defmacro with-consult-ignore-project+ (func)
           (setq func (eval func))
-          `(defun ,(intern (concat (symbol-name func) "-no-project+")) ()
+          `(defun ,(intern (concat (symbol-name func) "-no-project+")) (&rest args)
              ,(format "Variant of `%s' which skips project checks." func)
              (interactive)
              (let ((consult-project-function nil))
-               (funcall-interactively (quote ,func)))))
+               (apply #'funcall-interactively (quote ,func) args))))
 
         :config
         (with-consult-ignore-project+ 'consult-ripgrep)
@@ -11010,13 +11010,6 @@ Welcome to my personal Emacs configuration 😎.
        When the number of characters in a buffer exceeds this threshold,
        `consult-ripgrep' will be used instead of `consult-line'.")
 
-       (defun consult-line-or-ripgrep--builder+ (file-name)
-         (lambda (input)
-           (when-let ((it (consult--ripgrep-builder input)))
-             (plist-put it :command
-                        (append (plist-get it :command)
-                                (list "--" (shell-quote-argument file-name)))))))
-
        (defun consult-line-or-ripgrep+ (&optional initial)
          "Call `consult-line' for small buffers or `consult-ripgrep' for large files."
          (interactive)
@@ -11027,14 +11020,15 @@ Welcome to my personal Emacs configuration 😎.
                  (jka-compr-get-compression-info buffer-file-name)
                  (<= (buffer-size)
                      (/ consult-line-or-ripgrep-line-limit+
-                        (if (eq major-mode 'org-mode) 2 1))))
+                        (if (eq major-mode 'org-mode) 2 1)))
+                 (not (executable-find "rg" 'remote)))
              (call-interactively 'consult-line)
            (when (file-writable-p buffer-file-name)
              (save-buffer))
-           (let ((consult-ripgrep-args (string-remove-suffix " ." consult-ripgrep-args)))
-             (consult--grep "Ripgrep"
-                            (consult-line-or-ripgrep--builder+ buffer-file-name)
-                            nil initial))))
+           (let ((consult-ripgrep-args
+                  (concat consult-ripgrep-args
+                          " --glob=" (shell-quote-argument (file-name-nondirectory buffer-file-name)))))
+             (consult-ripgrep-no-project+))))
      #+end_src
 
 **** dotfiles
