@@ -33,6 +33,8 @@ help:
 	@echo "    Cleanup tangled and bytecompiled files"
 	@echo "  tangle"
 	@echo "    Bootstrap elisp files from init.org for my config"
+	@echo "  run"
+	@echo "    Run emacs in the terminal"
 	@echo "  bytecompile"
 	@echo "    Bytecompile elisp files produced by tangle"
 	@echo "  nativecompile"
