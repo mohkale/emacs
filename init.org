@@ -2463,6 +2463,7 @@ Welcome to my personal Emacs configuration 😎.
                      "*Anaconda*"
                      "magit-diff: "
                      "*Bug Help*"
+                     (and bol "*vundo-diff" (+ any) eol)
                      "*Flycheck error messages*"
                      (and bol "org-roam: ")
                      "*org-roam*"
@@ -13615,15 +13616,19 @@ Welcome to my personal Emacs configuration 😎.
         :general
         (:keymaps 'vundo-mode-map
          ;; Evil, not emacs :-P.
-         "l" #'vundo-forward   "f" nil
-         "h" #'vundo-backward  "b" nil
-         "j" #'vundo-next      "n" nil
-         "k" #'vundo-previous  "p" nil
-         "u" #'vundo-stem-root "a" nil
-         "d" #'vundo-stem-end  "e" nil
-         "g" #'vundo-stem-root
-         "G" #'vundo-stem-end
-         "q" #'vundo-confirm
+         "l"   #'vundo-forward   "f" nil
+         "h"   #'vundo-backward  "b" nil
+         "j"   #'vundo-next      "n" nil
+         "k"   #'vundo-previous  "p" nil
+         "C-u" #'vundo-stem-root "a" nil
+         "C-d" #'vundo-stem-end  "e" nil
+         "g"   #'vundo-stem-root
+         "G"   #'vundo-stem-end
+         "'"   #'vundo-goto-next-saved
+         "m"   #'vundo-diff-mark
+         "u"   #'vundo-diff-unmark
+         "d"   #'vundo-diff
+         "q"   #'vundo-confirm
          "<escape>" #'vundo-quit))
     #+end_src
 
