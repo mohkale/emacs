@@ -19927,6 +19927,18 @@ Welcome to my personal Emacs configuration 😎.
             (kill-sexp -1)
             (insert (format (if prefix "%s" "%S") value))))
 
+        :preface
+        (defvar elisp-adjust-flymake-load-path+ t
+          "Duplicate `load-path' for flymake in elisp-mode.")
+
+        (defun elisp--adjust-flymake-load-path+ ()
+          (when (and (bound-and-true-p flymake-mode)
+                     elisp-adjust-flymake-load-path+)
+            (setq-local elisp-flymake-byte-compile-load-path
+                        (append (default-value 'elisp-flymake-byte-compile-load-path)
+                                load-path))))
+        :hook (flymake-mode . elisp--adjust-flymake-load-path+)
+
         :leader
         ("fk" 'emacs-lisp-byte-compile)
         (:prefix "k"
