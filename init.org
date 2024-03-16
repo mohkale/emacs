@@ -1724,10 +1724,12 @@ Welcome to my personal Emacs configuration 😎.
         "fvs" 'add-file-local-variable
         "fvl" 'add-file-local-variable-prop-line
 
-        "fvc" '(:ignore t :wk "copy")
-        "fvcf" 'copy-dir-locals-to-file-locals
-        "fvcd" 'copy-file-locals-to-dir-locals
-        "fvcl" 'copy-dir-locals-to-file-locals-prop-line
+        "fvc" 'customize-dirlocals
+
+        "fvm" '(:ignore t :wk "copy")
+        "fvmf" 'copy-dir-locals-to-file-locals
+        "fvmd" 'copy-file-locals-to-dir-locals
+        "fvml" 'copy-dir-locals-to-file-locals-prop-line
 
         "fvr" '(:ignore t :wk "remove")
         "fvrv" 'kill-local-variable
@@ -6959,6 +6961,8 @@ Welcome to my personal Emacs configuration 😎.
        :general
        (:states  'motion
         :keymaps 'custom-mode-map
+
+        "RET" 'widget-button-press
 
         ;; motion
         "TAB"       'widget-forward
@@ -14530,7 +14534,7 @@ Welcome to my personal Emacs configuration 😎.
         :general
         (:keymaps '(magit-todos-item-section-map
                     magit-todos-section-map)
-         "j" nil "B" nil "b" nil))
+         "j" nil "B" nil "b" nil "k" nil))
     #+END_SRC
 
 *** Git Rebase
