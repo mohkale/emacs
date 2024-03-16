@@ -21423,7 +21423,8 @@ Welcome to my personal Emacs configuration 😎.
         :hook ((markdown-mode . display-line-numbers-mode)
                (markdown-mode . auto-fill-mode)
                (markdown-mode . +flylint)
-               (markdown-mode . +flyspell))
+               (markdown-mode . +flyspell)
+               (markdown-mode . +lsp-hook))
         :custom
         (markdown-indent-on-enter 'indent-and-new-item)
         (markdown-fontify-code-blocks-natively t)
@@ -21434,6 +21435,9 @@ Welcome to my personal Emacs configuration 😎.
         (markdown-mode-syntax-table
          '((?_ . "$")
            (?- . "_")))
+
+        :init
+        (push '(markdown-mode . t) +lsp-maybe-connect)
 
         :config
       ;;; evil-markdown-mode (Somelauw/evil-markdown)
