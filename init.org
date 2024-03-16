@@ -25304,11 +25304,10 @@ Welcome to my personal Emacs configuration 😎.
          (defun +mode-line--update-eglot (&rest _)
            "Update `eglot' state."
            (setq +mode-line-eglot-text
-                 (when (bound-and-true-p eglot--managed-mode)
+                 (when (eglot-managed-p)
                    (pcase-let* ((server (eglot-current-server))
                                 (nick (and server (eglot--project-nickname server)))
-                                (pending (and server (hash-table-count
-                                                      (jsonrpc--request-continuations server))))
+                                (pending (and server (jsonrpc-continuation-count server)))
                                 (last-error (and server (jsonrpc-last-error server)))
                                 (face (cond (last-error 'compilation-mode-line-fail)
                                             ((and pending (cl-plusp pending))
@@ -25352,6 +25351,7 @@ Welcome to my personal Emacs configuration 😎.
 
          (add-hook 'eglot-managed-mode-hook #'+mode-line--update-eglot)
          (add-hook 'eglot-connect-hook #'+mode-line--update-eglot)
+         (advice-add 'eglot--managed-mode-off :after #'+mode-line--update-eglot)
        #+END_SRC
 
 ***** Appendix
