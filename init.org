@@ -17567,6 +17567,7 @@ Welcome to my personal Emacs configuration 😎.
         (dashboard-show-shortcuts t)
         (dashboard-page-separator "\n\f\n")
         (dashboard-icon-type 'all-the-icons)
+        (dashboard-banner-logo-title nil)
 
         :hide-whitespace+ dashboard-mode
 
@@ -17708,10 +17709,11 @@ Welcome to my personal Emacs configuration 😎.
                                     (string-to-number (match-string 2)))
                             (forward-line 1))
                         (cons 0 0)))
-                    (ansi-color-apply
-                     (buffer-substring (save-excursion
-                                         (line-beginning-position))
-                                       (point-max)))))))
+                    (s-trim-right
+                     (ansi-color-apply
+                      (buffer-substring (save-excursion
+                                          (line-beginning-position))
+                                        (point-max))))))))
 
         :autoload dashboard-insert-ascii-banner-centered+
         :config
@@ -17739,9 +17741,7 @@ Welcome to my personal Emacs configuration 😎.
             (prog1 t
               (goto-char (point-max))
               (let ((buffer-read-only nil))
-                (dashboard-insert-ascii-banner-centered+ dashboard-startup-banner)
-                (dashboard-insert-navigator)
-                (dashboard-insert-init-info)))))
+                (dashboard-insert-ascii-banner-centered+ dashboard-startup-banner)))))
 
         (advice-add 'dashboard-insert-banner :before-until #'dashboard-insert-banner+)
 
