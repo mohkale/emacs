@@ -10250,7 +10250,7 @@ Welcome to my personal Emacs configuration 😎.
         (xref-show-definitions-function #'consult-xref)
 
         :autoload consult-fix-dollar+
-        :init
+        :config
         ;; Fix consult cookie/tofu suffixes with some commands make $ (EOL) matching fail.
         (defun consult-fix-dollar+ (args)
           (if (string-suffix-p "$" (car args))
@@ -10259,6 +10259,7 @@ Welcome to my personal Emacs configuration 😎.
                             consult--tofu-char
                             (+ consult--tofu-char consult--tofu-range -1)))
             args))
+        :init
         (advice-add 'orderless-regexp :filter-args #'consult-fix-dollar+)
         (advice-add 'prescient-regexp-regexp :filter-args #'consult-fix-dollar+)
 
