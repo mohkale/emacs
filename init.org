@@ -19895,13 +19895,16 @@ Welcome to my personal Emacs configuration 😎.
         (emacs-lisp-mode nil)
         (lisp-interaction-mode nil)
 
+        :preface
+        (defvar elisp-syntax-table-modifications+
+          '((?_ . "w")
+            (?- . "w")
+            (?! . "w")
+            (?: . "w")
+            (?& . "w")))
         :modify-syntax+
-        (emacs-lisp-mode-syntax-table
-         '((?_ . "w")
-           (?- . "w")
-           (?! . "w")
-           (?: . "w")
-           (?& . "w")))
+        (emacs-lisp-mode-syntax-table elisp-syntax-table-modifications+)
+        (lisp-data-mode-syntax-table elisp-syntax-table-modifications+)
 
         ;; :pretty-symbols+
         ;; ((lisp-interaction-mode
