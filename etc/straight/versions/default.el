@@ -93,7 +93,7 @@
  ("evil-vimish-fold" . "b6e0e6b91b8cd047e80debef1a536d9d49eef31a")
  ("eyebrowse" . "f7e129b84183367f54f0d0d3c9db8540f754bd8d")
  ("f.el" . "1e7020dc0d4c52d3da9bd610d431cab13aa02d8c")
- ("flymake-collection" . "93f3dec01ac5652ffcd439007072d1ad9af6be45")
+ ("flymake-collection" . "f1d889f166934a4d8ec0f0e159e179314c2e8791")
  ("general.el" . "ced143c30de8e20f5a3761a465e684a1dc48471e")
  ("gh-md" . "e721fd5e41e682f47f2dd4ce26ef2ba28c7fa0b5")
  ("git-link" . "14156291e0eb7156bd779a80c17e1935a7f8f5e5")
