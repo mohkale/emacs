@@ -11600,6 +11600,10 @@ Welcome to my personal Emacs configuration 😎.
         (:keymaps 'eglot-mode-map
          [remap xref-find-apropos] 'consult-eglot-symbols
          [remap xref-find-references-and-replace] 'eglot-rename))
+
+      (use-package consult-eglot-embark
+        :straight (consult-eglot-embark :host github :repo "mohkale/consult-eglot"
+                                        :files (:defaults "extensions/consult-eglot-embark/*.el")))
     #+END_SRC
 
 *** Appendix
@@ -18859,90 +18863,11 @@ Welcome to my personal Emacs configuration 😎.
     #+begin_src emacs-lisp
       (require '+pkg-project)
 
-      (use-package dape
-        :commands dape
-        :autoload (dape--config-from-string
-                   dape--config-to-string
-                   dape--config-eval
-                   dape--config-mode-p
-                   dape--config-ensure))
-
-      (use-package projection
-        :commands projection-dape+
-        :autoload (projection-dape--select-adapter+
-                   projection-dape--adapt-config-options+
-                   projection-dape--projection2dape-config+)
-        :config
-        (defvar projection-dape-target-modes+
-          '((cmake-executable . c++-mode)
-            (cmake-test . c++-mode)
-            (go-package . go-mode))
-          "Projection artifacts to modes for supported debuggers.
-      This is used purely to filter available debuggers for a specific target.")
-
-        (defun projection-dape--select-adapter+ (artifact)
-          (require 'dape)
-          (if-let* ((type (alist-get 'type artifact))
-                    (major-mode (alist-get type projection-dape-target-modes+)))
-              (if-let ((available-configs
-                        (cl-loop for (key . config) in dape-configs
-                                 when (and (dape--config-mode-p config)
-                                           (dape--config-ensure config))
-                                 collect (dape--config-to-string key nil))))
-                  (intern
-                   (or (when (eq (length available-configs) 1)
-                         (car available-configs))
-                       (completing-read (projection--prompt
-                                         "Select debugger for %s: "
-                                         (projection--current-project 'no-error)
-                                         (alist-get 'name artifact))
-                                        available-configs
-                                        nil 'require-match)))
-                (error "No known adapters are available for %S" artifact))
-            (error "Don't know which adapter to use for %S" artifact)))
-
-        (defun projection-dape--adapt-config-options+ (artifact)
-          (let-alist artifact
-            (pcase .type
-              ((or 'cmake-executable 'cmake-test)
-               `(,@(when .working-directory
-                     (list :cwd .working-directory))
-                 :program ,.arg0
-                 ,@(when .environment
-                     (list :environment
-                           (cl-loop for (var . value) in .environment
-                                    collect (intern (concat ":" var))
-                                    collect value)))
-                 ,@(when .argv
-                     (list :command-args (apply #'vector .argv)))))
-              ('go-package `(:program ,.go-package))
-              (_ (error "Don't know how to derive debugger config from %S" artifact)))))
-
-        (defun projection-dape--projection2dape-config+ (artifact)
-          (pcase-let ((`(,key ,config)
-                       (thread-first
-                         (cons (projection-dape--select-adapter+ artifact)
-                               (projection-dape--adapt-config-options+ artifact))
-                         (prin1-to-string)
-                         (substring 1 -1)
-                         (dape--config-from-string))))
-            (cons key (dape--config-eval key config))))
-
-        (defvar dape-history)
-        (defun projection-dape+ (config)
-          (interactive
-           (pcase-let* ((artifact (projection-artifacts-read-debug-targets))
-                        (`(,key . ,evaled-config)
-                         (projection-dape--projection2dape-config+ artifact)))
-             (setq dape-history
-                   (cons (dape--config-to-string key evaled-config)
-                         dape-history))
-             (list evaled-config)))
-          (dape config))
-
+      (use-package projection-dape
+        :straight (projection-dape :host github :repo "mohkale/projection"
+                                   :files (:defaults "src/projection-dape/*.el"))
         :leader
-        ("v SPC" 'projection-dape+
-         "lv" 'dape
+        ("v SPC" 'projection-dape
          "vv" 'dape))
     #+end_src
 
