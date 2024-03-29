@@ -9015,48 +9015,51 @@ Welcome to my personal Emacs configuration 😎.
    Transparent ReMote Access Protocol
 
    #+begin_src emacs-lisp :tangle yes
-   (require '+pkg-tramp)
+     (require '+pkg-tramp)
    #+end_src
 
-   #+BEGIN_SRC emacs-lisp
-     (use-package tramp
-       :custom
-       (tramp-default-method "sshx")
+*** Tramp
+    #+BEGIN_SRC emacs-lisp
+      (use-package tramp
+        :custom
+        (tramp-default-method "sshx")
 
-       :config
-       (setq tramp-verbose 1) ;; Doesn't work with :custom.
+        :config
+        (setq tramp-verbose 1) ;; Doesn't work with :custom.
 
-       :leader
-       (:prefix "f2"
-        "" '(:ignore t :wk "remote")
-        "c" 'tramp-cleanup-this-connection
-        "x" 'tramp-cleanup-all-connections
-        "b" 'tramp-cleanup-all-buffers))
-   #+END_SRC
+        :leader
+        (:prefix "f2"
+         "" '(:ignore t :wk "remote")
+         "c" 'tramp-cleanup-this-connection
+         "x" 'tramp-cleanup-all-connections
+         "b" 'tramp-cleanup-all-buffers))
+    #+END_SRC
 
-   Google Cloud integration courtesy of [[https://qiita.com/tanatana/items/218b19808f2428b125fe][tanatana]]. See [[https://cloud.google.com/sdk/docs/quickstart-windows][here]] for how to install
-   the Google Cloud CLI.
+*** Google Cloud
+    Google Cloud integration courtesy of [[https://qiita.com/tanatana/items/218b19808f2428b125fe][tanatana]]. See [[https://cloud.google.com/sdk/docs/quickstart-windows][here]] for how to install
+    the Google Cloud CLI.
 
-   #+begin_src emacs-lisp
-     (use-package tramp
-       :config
-       (push
-        '("gcssh"
-          (tramp-login-program        "gcloud compute ssh")
-          (tramp-login-args           (("%h")))
-          (tramp-async-args           (("-q")))
-          (tramp-remote-shell         "/bin/sh")
-          (tramp-remote-shell-args    ("-c"))
-          (tramp-gw-args              (("-o" "GlobalKnownHostsFile=/dev/null")
-                                       ("-o" "UserKnownHostsFile=/dev/null")
-                                       ("-o" "StrictHostKeyChecking=no")))
-          (tramp-default-port         22))
-        tramp-methods))
-   #+end_src
+    #+begin_src emacs-lisp
+      (use-package tramp
+        :config
+        (push
+         '("gcssh"
+           (tramp-login-program        "gcloud compute ssh")
+           (tramp-login-args           (("%h")))
+           (tramp-async-args           (("-q")))
+           (tramp-remote-shell         "/bin/sh")
+           (tramp-remote-shell-args    ("-c"))
+           (tramp-gw-args              (("-o" "GlobalKnownHostsFile=/dev/null")
+                                        ("-o" "UserKnownHostsFile=/dev/null")
+                                        ("-o" "StrictHostKeyChecking=no")))
+           (tramp-default-port         22))
+         tramp-methods))
+    #+end_src
 
-   #+begin_src emacs-lisp
-   (provide '+pkg-tramp)
-   #+end_src
+*** Appendix
+    #+begin_src emacs-lisp
+    (provide '+pkg-tramp)
+    #+end_src
 
 ** Server                                                           :builtin:
    :PROPERTIES:
