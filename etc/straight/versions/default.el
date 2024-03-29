@@ -31,7 +31,7 @@
  ("compat" . "e398e1a8f098359c768b2a8e2e99d6e1d31e3c57")
  ("compile-multi" . "7124939e77da2bf3847aeeba2ba0387e47e11ce7")
  ("consult" . "b48ff6bf0527baeb6bfd07c6da9d303ff0b79c3d")
- ("consult-eglot" . "788804314139d6572c4e66d67e554a8e2e64589b")
+ ("consult-eglot" . "64262e72452f8fe6dd49d31bcdd4bd577b7d682d")
  ("consult-ls-git" . "3ccd9d80da73a05ef2a74616ffdc469860f74c21")
  ("consult-notmuch" . "d0d4129d45ccceddaeeaa3631eb42d5dd09a758b")
  ("consult-yasnippet" . "834d39acfe8a7d2c304afbe4d649b9372118c756")

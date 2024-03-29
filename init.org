@@ -11603,7 +11603,11 @@ Welcome to my personal Emacs configuration 😎.
 
       (use-package consult-eglot-embark
         :straight (consult-eglot-embark :host github :repo "mohkale/consult-eglot"
-                                        :files (:defaults "extensions/consult-eglot-embark/*.el")))
+                                        :files (:defaults "extensions/consult-eglot-embark/*.el"))
+        :after (embark consult-eglot)
+        :demand t
+        :config
+        (consult-eglot-embark-mode))
     #+END_SRC
 
 *** Appendix
