@@ -19809,6 +19809,153 @@ Welcome to my personal Emacs configuration 😎.
             (user-error "Could not resolve external mount for %s" default-directory))))
     #+end_src
 
+*** DevContainer Dir-Locals                                             :wip:
+    :PROPERTIES:
+    :header-args+: :tangle (package-lisp! +devcontainer-dirlocals docker)
+    :END:
+
+    A solution for setting remote Emacs configurations in the standard [[https://containers.dev/implementors/spec/][devcontainers]]
+    configuration file.
+
+    #+begin_src emacs-lisp :tangle (package-lisp! +lang-docker docker)
+      (use-package +devcontainer-dirlocals
+        :demand t
+        :after tramp-container)
+    #+end_src
+
+    #+begin_src emacs-lisp
+      (require 'cl-macs)
+      (eval-when-compile (require 'subr-x))
+
+      (declare-function map-merge-with "map" (type function &rest maps))
+      (declare-function map-merge "map" (type &rest maps))
+
+      (defconst devcontainer-dirlocal--config-files+
+        '(".devcontainer/devcontainer.json"
+          "devcontainer.json"))
+
+      (defun devcontainer-dirlocal-adapter--supported-p (directory)
+        "Whether dev-container local-vars is supported in DIRECTORY."
+        (and enable-remote-dir-locals
+             (string-match-p (rx bol "/docker:")
+                             (or (file-remote-p directory) ""))))
+
+      (defun devcontainer-dirlocal-adapter--config-file+ (directory)
+        "Check for dev-container config in DIRECTORY."
+        (when (and (devcontainer-dirlocal-adapter--supported-p directory)
+                   (file-readable-p directory))
+          (ensure-list
+           (cl-loop for file in devcontainer-dirlocal--config-files+
+                    do (setq file (expand-file-name file directory))
+                    when (and (file-readable-p file)
+                              (file-regular-p file))
+                      return file))))
+
+      (defun vscode-dirlocal-adapter--find-file-advice+ (func file &rest args)
+        "Advice to make FUNC check for devcontainer dir-locals file relative to FILE."
+        (or
+         (when (devcontainer-dirlocal-adapter--supported-p
+                (file-name-directory file))
+           (cl-letf (((symbol-function #'dir-locals--all-files)
+                      #'devcontainer-dirlocal-adapter--config-file+))
+             (apply func file args)))
+         (apply func file args)))
+
+      (advice-add 'dir-locals-find-file :around #'vscode-dirlocal-adapter--find-file-advice+)
+
+      (defun vscode-dirlocal-adapter--deserialise-file+ (file)
+        "Parse devcontainer config from FILE."
+        (with-temp-buffer
+          (insert-file-contents file)
+          (let ((json-array-type 'list)
+                (json-false nil))
+            (json-parse-buffer
+             :object-type 'alist :array-type 'list
+             :null-object nil :false-object nil))))
+
+      (defconst vscode-dirlocal-adapter--emacs-customization-name 'emacs)
+
+      (defun vscode-dirlocal-adapter--extract-customizations+ (config)
+        "Extract customizations section for Emacs from CONFIG."
+        (thread-last
+          config
+          (alist-get 'customizations)
+          (alist-get vscode-dirlocal-adapter--emacs-customization-name)))
+
+      (defun vscode-dirlocal-adapter--merge-inline+ (remaining inline)
+        "Merge INLINE and REMAINING dir-local configs together."
+        (cond
+         ((and remaining inline)
+          (require 'map)
+          (map-merge-with
+           'list
+           (lambda (a b)
+             (let ((ag
+                    (seq-group-by
+                     (lambda (e) (eq (car e) 'eval)) a))
+                   (bg
+                    (seq-group-by
+                     (lambda (e) (eq (car e) 'eval)) b)))
+               (append (map-merge 'list
+                                  (assoc-default nil ag)
+                                  (assoc-default nil bg))
+                       (assoc-default t ag)
+                       (assoc-default t bg))))
+           remaining inline))
+         (remaining remaining)
+         (t inline)))
+
+      (defun vscode-dirlocal-adapter--generate-variables+ (customizations)
+        "Generate updated variable list from devcontainer CUSTOMIZATIONS section.
+      This is a JSONised wrapper around dir-local configurations with the following
+      behaviour per key:
+      - *-mode: Is a mode specification like sh-script-mode.
+      - null: A global section equivalent to nil in standard dir-locals.
+      - inline-dir-locals: Is a string value containing a full dir-locals.el file
+        body. This will be merged with and take precedence over remaining
+        configured options.
+      - *: All remaining sections are interpreted as file-paths."
+        (dolist (it customizations)
+          (pcase (symbol-name (car it))
+            ("null" (setcar it nil))
+            ((or (rx "-mode" eol)
+                 "inline-dir-locals"))
+            (_ (setcar it (symbol-name (car it))))))
+        ;; Apply inline-dir-locals.
+        (when-let ((inline-config (alist-get 'inline-dir-locals customizations)))
+          (setq customizations (cl-remove 'inline-dir-locals customizations :key #'car)
+                inline-config (let ((read-circle nil))
+                                (read inline-config)))
+          (unless (listp inline-config)
+            (message "Invalid data in dev-container dir-locals inline-config: %s" inline-config)
+            (setq inline-config nil))
+          (setq customizations (vscode-dirlocal-adapter--merge-inline+ customizations inline-config)))
+        customizations)
+
+      (defun vscode-dirlocal-adapter--read-from-dir+ (directory)
+        "Try to read Emacs dir-locals from devcontainer configuration in DIRECTORY."
+        (when-let ((class-name (intern directory))
+                   (dev-container-config (car-safe (devcontainer-dirlocal-adapter--config-file+ directory))))
+          (let ((modtime 0) variables)
+            (with-demoted-errors "Error reading devcontainers config: %S"
+              (setq modtime (file-attribute-modification-time
+                             (file-attributes (file-chase-links dev-container-config)))
+                    variables (thread-first
+                                dev-container-config
+                                (vscode-dirlocal-adapter--deserialise-file+)
+                                (vscode-dirlocal-adapter--extract-customizations+)
+                                (vscode-dirlocal-adapter--generate-variables+)
+                                (dir-locals--sort-variables))))
+            (when variables
+              (dir-locals-set-class-variables class-name variables)
+              (dir-locals-set-directory-class directory class-name modtime)
+              class-name))))
+
+      (advice-add 'dir-locals-read-from-dir :before-until #'vscode-dirlocal-adapter--read-from-dir+)
+
+      (provide '+devcontainer-dirlocals)
+    #+end_src
+
 *** Appendix
     #+begin_src emacs-lisp
       (provide '+lang-docker)
