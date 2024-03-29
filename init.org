@@ -367,6 +367,7 @@ Welcome to my personal Emacs configuration 😎.
           skeletor                                                          ; Project skeleton generator package
           ;; tab-bar                                                        ; Enable browser like tabs showing buffer information
           toc-org                                                           ; Setup automatically updating table-of-contents for org and markdown modes.
+          ;; teleport                                                       ; TRAMP support for teleport tsh.
           ;; undo-tree                                                      ; Undo system based on vim with tree like visualiser
           vimish-fold                                                       ; Fold regions of code just like vim.
           yasnippet                                                         ; Yet-Another-Snippet framework for Emacs
@@ -9054,6 +9055,20 @@ Welcome to my personal Emacs configuration 😎.
                                         ("-o" "StrictHostKeyChecking=no")))
            (tramp-default-port         22))
          tramp-methods))
+    #+end_src
+
+*** Teleport                                                       :optional:
+    :PROPERTIES:
+    :header-args+: :tangle (package-lisp! +pkg-tramp.el teleport)
+    :END:
+
+    #+begin_src emacs-lisp
+      (use-package teleport
+        :straight t
+        :after tramp
+        :demand t
+        :config
+        (teleport-tramp-add-method))
     #+end_src
 
 *** Appendix
