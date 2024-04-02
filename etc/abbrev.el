@@ -3,6 +3,13 @@
   '(
     ("ns" "namespace" nil :count 1)
     ("us" "using" nil :count 1)
+    ("coa" "co_await" nil :count 1)
+    ("cor" "co_return" nil :count 1)
+    ("coy" "co_yield" nil :count 1)
+    ("td" "typedef" nil :count 1)
+    ("tn" "typename" nil :count 1)
+    ("vt" "virtual" nil :count 1)
+    ("ov" "override" nil :count 1)
    ))
 
 (define-abbrev-table 'c-base-mode-abbrev-table
