@@ -5520,8 +5520,13 @@ Welcome to my personal Emacs configuration 😎.
      (use-package cape
        :straight t
        :completion+
-       (prog-mode (cape-keyword :depth 10)
-                  (cape-file :depth 5))
+       (prog-mode (cape-file :depth 5)
+                  ;; Support keyword completions upto 3 chars. After that
+                  ;; fallback to mode specific completion and barring that
+                  ;; back to keywords. Prevents keyword matching obstructing
+                  ;; language server mappings.
+                  (cape-keyword-with-length-limit+ :depth 10)
+                  (cape-keyword :depth 50))
        (org-mode (cape-elisp-block :depth 10))
        (text-mode (cape-emoji :depth -15))
        (lisp-interaction-mode (cape-emoji :depth 15))
@@ -5531,7 +5536,26 @@ Welcome to my personal Emacs configuration 😎.
        ;; (jinx-mode cape-dict)
        ;; (flyspell-mode cape-dict)
        (latex-mode cape-tex)
-       (LaTeX-mode cape-tex))
+       (LaTeX-mode cape-tex)
+
+       :preface
+       (defun cape-wrap-max-prefix-length+ (capf length)
+         "Call CAPF and ensure that prefix length is greater or equal than LENGTH.
+     If the prefix is long enough, enforce auto completion."
+         (pcase (funcall capf)
+           (`(,beg ,end ,table . ,plist)
+            (when (<= (- end beg) length)
+              `(,beg ,end ,table
+                     :company-prefix-length t
+                     ,@plist)))))
+
+       (defun cape-capf-max-prefix-length+ (capf length)
+         (lambda () (funcall #'cape-wrap-max-prefix-length+ capf length)))
+
+       :autoload cape-keyword-with-length-limit+
+       :config
+       (defalias 'cape-keyword-with-length-limit+
+         (cape-capf-max-prefix-length+ #'cape-keyword 2)))
    #+end_src
 
    #+begin_src emacs-lisp
