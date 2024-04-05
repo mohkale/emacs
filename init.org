@@ -395,6 +395,7 @@ Welcome to my personal Emacs configuration 😎.
 
       ;;; LSP Clients
           eglot                                                             ; A light weight and clean LSP client
+          ;; eglot-x                                                        ; Non-standard LSP extensions for eglot.
           ;; lsp-mode                                                       ; A comprehensive and feature full client
 
       ;;; Interactive Diffs
@@ -11649,6 +11650,26 @@ Welcome to my personal Emacs configuration 😎.
         :config
         (consult-eglot-embark-mode))
     #+END_SRC
+
+*** Eglot-X                                                             :wip:
+    :PROPERTIES:
+    :header-args+: :tangle (package-lisp! +pkg-eglot :consult eglot eglot-x)
+    :END:
+
+    Non standard protocol extensions for eglot.
+
+    #+begin_src emacs-lisp
+      (use-package eglot-x
+        :straight (eglot-x :host github :repo "nemethf/eglot-x")
+        :after eglot
+        :demand t
+        :custom
+        (eglot-x-enable-menu (not (package! mk-mode-line)))
+        (eglot-x-enable-files t)
+
+        :config
+        (eglot-x-setup))
+    #+end_src
 
 *** Appendix
     #+begin_src emacs-lisp
