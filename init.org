@@ -369,6 +369,7 @@ Welcome to my personal Emacs configuration 😎.
           ;; undo-tree                                                      ; Undo system based on vim with tree like visualiser
           vimish-fold                                                       ; Fold regions of code just like vim.
           yasnippet                                                         ; Yet-Another-Snippet framework for Emacs
+          ;; tempel                                                         ; Simple templates for Emacs
 
       ;;; Debuggers
           gud                                                               ; Grand unified debugger
@@ -11619,15 +11620,6 @@ Welcome to my personal Emacs configuration 😎.
          "wc" 'eglot-signal-didChangeConfiguration))
     #+END_SRC
 
-*** Eglot Yasnippet
-    Eglot needs yasnippet otherwise snippet expansion won't work.
-
-    #+begin_src emacs-lisp
-      (use-package yasnippet
-        :after eglot
-        :demand t)
-    #+end_src
-
 *** Consult Eglot
     :PROPERTIES:
     :header-args+: :tangle (package-lisp! +pkg-eglot :consult eglot)
@@ -13104,6 +13096,15 @@ Welcome to my personal Emacs configuration 😎.
                         +lsp-maybe-connect)))
 
         :hook (after-init . treesit-amend-lsp-maybe-connect+))
+    #+end_src
+
+    #+begin_src emacs-lisp :tangle (package-yes! tempel tree-sitter)
+      (use-package tempel-collection
+        :init
+        (setq tempel-collection--aliases
+              (cl-loop for (src . dest) in +tree-sitter-mode-remap
+                       do (setq src (string-remove-suffix "-mode" (symbol-name src)))
+                       collect (cons dest src))))
     #+end_src
 
 *** Combobulate                                                :wip:disabled:
@@ -18621,7 +18622,7 @@ Welcome to my personal Emacs configuration 😎.
       (provide '+pkg-tab-bar)
     #+end_src
 
-** Yasnippet
+** Yasnippet                                                       :optional:
    :PROPERTIES:
    :header-args+: :tangle (package-lisp! +pkg-yasnippet yasnippet)
    :END:
@@ -18731,36 +18732,107 @@ Welcome to my personal Emacs configuration 😎.
         )
     #+END_SRC
 
+*** Eglot Yasnippet
+    #+begin_src emacs-lisp :tangle (package-lisp! +pkg-yasnippet yasnippet eglot)
+      (use-package yasnippet
+        :after eglot
+        :demand t)
+    #+end_src
+
 *** Appendix
     #+begin_src emacs-lisp
       (provide '+pkg-yasnippet)
     #+end_src
 
-** Tempel
-   #+begin_src emacs-lisp :tangle no
-     (use-package tempel
-       :straight t
-       :defer load-me-now-duration
-       :custom
-       (tempel-path (list (etc! "tempel" "templates")))
-       :leader
-       ("isn" 'tempel-insert)
+** Tempel                                                          :optional:
+   :PROPERTIES:
+   :header-args+: :tangle (package-lisp! +pkg-tempel tempel)
+   :END:
 
-       :general
-       (:states 'insert
-        [C-i] 'tempel-expand
-        "M-i" 'tempel-expand)
-       (:keymaps 'tempel-map
-        :states 'insert
-        ;; "<override-state>" 'all
-        "C-n" 'tempel-next
-        "TAB" 'tempel-next
-        "<tab>" 'tempel-next
-        "C-p" 'tempel-previous
-        "<backtab>" 'tempel-previous
-        "<C-return>" 'tempel-done
-        [remap backward-kill-sentence] 'tempel-kill))
+    #+begin_src emacs-lisp :tangle (package-yes! tempel)
+      (require '+pkg-tempel)
+    #+end_src
+
+*** Tempel
+    #+begin_src emacs-lisp
+      (use-package tempel
+        :straight t
+        :defer 30
+        :completion+
+        (emacs-lisp-mode (tempel-expand :depth -15))
+        (prog-mode (tempel-expand :depth -15))
+        (text-mode (tempel-expand :depth -15))
+
+        :preface
+        (defun tempel--normalize-evil-keymaps+ (&rest _)
+          (evil-normalize-keymaps))
+        :init
+        (advice-add 'tempel--insert :after #'tempel--normalize-evil-keymaps+)
+        (advice-add 'tempel-done :after #'tempel--normalize-evil-keymaps+)
+
+        :leader
+        ("isn" 'tempel-insert)
+
+        :general
+        (:states '(insert normal)
+         "C-M-i" 'tempel-complete)
+        (:states 'insert
+         [C-i] 'tempel-expand
+         "M-i" 'tempel-expand)
+        (:keymaps 'tempel-map
+         :states 'insert
+         ;; "<override-state>" 'all
+         "C-n" 'tempel-next
+         "TAB" 'tempel-next
+         "<tab>" 'tempel-next
+         "C-p" 'tempel-previous
+         "<backtab>" 'tempel-previous
+         "<C-return>" 'tempel-done
+         [remap backward-kill-sentence] 'tempel-kill))
+    #+end_src
+
+*** Snippets
+   #+BEGIN_SRC emacs-lisp :tangle (package-yes! yasnippet)
+     ;; <<tangle-tempel-snippets()>>
+   #+END_SRC
+
+   #+begin_src emacs-lisp
+     (use-package tempel
+       :custom
+       (tempel-path (list (etc! "tempel" "templates"))))
    #+end_src
+
+   #+NAME: tangle-tempel-snippets
+   #+BEGIN_SRC emacs-lisp :tangle no :exports none
+     (org-babel-tangle-file (etc! "tempel-snippets.org"))
+   #+END_SRC
+
+*** Tempel Collection
+    #+begin_src emacs-lisp
+      (use-package tempel-collection
+        :straight t
+        :after tempel
+        :demand t)
+    #+end_src
+
+*** Tempel Eglot
+    :PROPERTIES:
+    :header-args+: :tangle (package-lisp! +pkg-tempel eglot tempel)
+    :END:
+
+    #+begin_src emacs-lisp
+      (use-package eglot-tempel
+        :straight t
+        :after eglot
+        :demand t
+        :config
+        (eglot-tempel-mode))
+    #+end_src
+
+*** Appendix
+    #+begin_src emacs-lisp
+      (provide '+pkg-tempel)
+    #+end_src
 
 ** Abbrev                                                  :builtin:optional:
    :PROPERTIES:
@@ -26739,6 +26811,11 @@ Welcome to my personal Emacs configuration 😎.
        `(outline-6 ((,cls (:inherit font-lock-constant-face :weight normal))))
        ;; `(outline-7 ((,cls (:inherit font-lock-builtin-face))))
        ;; `(outline-8 ((,cls (:inherit font-lock-string-face))))
+
+      ;; tempel
+       `(tempel-form ((,cls (:inherit region))))
+       `(tempel-field ((,cls (:inherit region))))
+       `(tempel-default ((,cls (:inherit region))))
        )
 
       (custom-theme-set-variables 'an-old-hope
