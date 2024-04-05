@@ -6,11 +6,18 @@
     fundamental-mode
   #+END_SRC
 
+** abox
+   #+begin_src lisp-data
+     (abox "+-" (make-string (length str) ?-) "-+" n
+           "| " (s str)                       " |" n
+           "+-" (make-string (length str) ?-) "-+" q)
+   #+end_src
+
 ** box
    #+begin_src lisp-data
      (box "┌─" (make-string (length str) ?─) "─┐" n
           "│ " (s str)                       " │" n
-          "└─" (make-string (length str) ?─) "─┘" n)
+          "└─" (make-string (length str) ?─) "─┘" q)
    #+end_src
 
 ** bang
@@ -26,4 +33,10 @@
 ** autoload
    #+begin_src lisp-data
      (autoload ";;;###autoload")
+   #+end_src
+
+** use-package
+   #+begin_src lisp-data
+     (up "(use-package " (p "package-name") n>
+         ":straight t" q ")")
    #+end_src

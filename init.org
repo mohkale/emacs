@@ -18686,11 +18686,7 @@ Welcome to my personal Emacs configuration 😎.
       (use-package auto-yasnippet
         :straight t
         :leader
-        ("is"  '(:ignore t :wk "auto-yasnippet")
-         "isc" 'aya-create
-         "ise" 'aya-expand
-         "isw" 'aya-persist-snippet)
-
+        ("is" 'aya-create)
         :general
         (:states 'insert
          "M-i" 'aya-expand))
@@ -18770,12 +18766,9 @@ Welcome to my personal Emacs configuration 😎.
         (advice-add 'tempel--insert :after #'tempel--normalize-evil-keymaps+)
         (advice-add 'tempel-done :after #'tempel--normalize-evil-keymaps+)
 
-        :leader
-        ("isn" 'tempel-insert)
-
         :general
         (:states '(insert normal)
-         "C-M-i" 'tempel-complete)
+         "C-M-i" 'tempel-insert)
         (:states 'insert
          [C-i] 'tempel-expand
          "M-i" 'tempel-expand)
@@ -18806,6 +18799,44 @@ Welcome to my personal Emacs configuration 😎.
    #+BEGIN_SRC emacs-lisp :tangle no :exports none
      (org-babel-tangle-file (etc! "tempel-snippets.org"))
    #+END_SRC
+
+*** Auto Tempel
+    Save and run tempel snippets interactively in-buffer.
+
+    #+begin_src emacs-lisp
+      (use-package tempel
+        :preface
+        (defvar auto-tempel-snippet+ nil)
+
+        :leader ("is" 'evil-adjust-auto-tempel-save-snippet+)
+        :general
+        (:states 'insert "M-i" 'auto-tempel-expand-snippet+)
+
+        :commands auto-tempel-save-snippet+
+        :config
+        (defun auto-tempel-save-snippet+ ()
+          (interactive)
+          (let ((sexp (elisp--preceding-sexp)))
+            (unless (consp sexp)
+              (user-error "Auto-tempel only supports cons sexps. Not %S." sexp))
+            (setq auto-tempel-snippet+ sexp)
+            (message "Saved snippet: %S" sexp)))
+
+        :commands evil-adjust-auto-tempel-save-snippet+
+        :config
+        (defun evil-adjust-auto-tempel-save-snippet+ ()
+          (interactive)
+          (with-evil-adjust-to-eol+
+           (call-interactively #'auto-tempel-save-snippet+)))
+
+        :commands auto-tempel-save-snippet+
+        :config
+        (defun auto-tempel-expand-snippet+ ()
+          (interactive)
+          (unless auto-tempel-snippet+
+            (user-error "No auto-tempel snippet is saved."))
+          (tempel-insert auto-tempel-snippet+)))
+    #+end_src
 
 *** Tempel Collection
     #+begin_src emacs-lisp
