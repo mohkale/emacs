@@ -11469,7 +11469,9 @@ Welcome to my personal Emacs configuration 😎.
         :autoload (eglot-ensure eglot--major-modes eglot-server-exists-p+)
         :init
         (cl-defmethod +lsp--command ((_backend (eql eglot)))
-          (eglot-ensure))
+          (if current-prefix-arg
+              (call-interactively #'eglot)
+            (eglot-ensure)))
 
         (defun eglot-server-exists-p+ (mode &optional all-workspaces)
           "Assert whether a server exists in the current workspace for MODE.
