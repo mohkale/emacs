@@ -13044,6 +13044,23 @@ Welcome to my personal Emacs configuration 😎.
              (setf (cdr src-mapping) new-mode-without-suffix)))))
     #+end_src
 
+    Add tree-sitter variants for lsp-maybe-connect options.
+
+    #+begin_src emacs-lisp
+      (use-package treesit-auto
+        :preface
+        (defun treesit-amend-lsp-maybe-connect+ ()
+          (setq +lsp-maybe-connect
+                (append (cl-loop for (mode . ts-mode) in +tree-sitter-mode-remap
+                                 with entry = nil
+                                 do (setq entry (assoc mode +lsp-maybe-connect))
+                                 when entry
+                                   collect (cons ts-mode (cdr entry)))
+                        +lsp-maybe-connect)))
+
+        :hook (after-init . treesit-amend-lsp-maybe-connect+))
+    #+end_src
+
 *** Combobulate                                                :wip:disabled:
     #+begin_src emacs-lisp :tangle no
       (use-package combobulate
@@ -20908,11 +20925,9 @@ Welcome to my personal Emacs configuration 😎.
         :init
         (setq +lsp-maybe-connect
               (append
-               (list (cons 'js-mode #'javascript-enable-lsp-in-projects+)
-                     (cons 'js-ts-mode #'javascript-enable-lsp-in-projects+)
-                     (cons 'typescript-mode #'javascript-enable-lsp-in-projects+)
-                     (cons 'typescript-ts-mode #'javascript-enable-lsp-in-projects+)
-                     (cons 'typescript-react-mode #'javascript-enable-lsp-in-projects+))
+               `((js-mode . ,#'javascript-enable-lsp-in-projects+)
+                 (typescript-mode . ,#'javascript-enable-lsp-in-projects+)
+                 (typescript-react-mode . ,#'javascript-enable-lsp-in-projects+))
                +lsp-maybe-connect)))
     #+END_SRC
 
@@ -20964,9 +20979,11 @@ Welcome to my personal Emacs configuration 😎.
       (use-package json
         :hook ((json-mode jsonc-mode js-json-mode) . +lsp-hook)
         :init
-        (push `(json-mode . :global) +lsp-maybe-connect)
-        (push `(jsonc-mode . :global) +lsp-maybe-connect)
-        (push `(js-json-mode . :global) +lsp-maybe-connect))
+        (setq +lsp-maybe-connect
+              (append `((json-mode . :global)
+                        (jsonc-mode . :global)
+                        (js-json-mode . :global))
+                      +lsp-maybe-connect)))
     #+end_src
 
     #+begin_src emacs-lisp :tangle (package-lisp! +lang-json json eglot)
