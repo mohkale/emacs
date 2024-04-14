@@ -970,7 +970,6 @@ Welcome to my personal Emacs configuration 😎.
                                          (flymake :type built-in) ;; Ignore stale [[https://github.com/flymake/emacs-flymake][flymake/emacs-flymake]] repo.
                                          (hide-comnt :host github :repo "emacsmirror/hide-comnt")
                                          (miniedit :host github :repo "emacsorphanage/miniedit")
-                                         (notmuch :fork (:host github :repo "mohkale/notmuch") :branch "tag-exclude")
                                          (transpose-frame :host github :repo "emacsorphanage/transpose-frame")
                                          )))
     #+END_SRC
@@ -11531,7 +11530,8 @@ Welcome to my personal Emacs configuration 😎.
                                             (cdr item))))
             (mapcar #'map-kind-names (flatmap (lambda (c) (apply #'dfs c)) res))))
 
-        :autoload eglot-update-capf-metadata+
+        :autoload (eglot-update-capf-metadata+
+                   eglot-completion-at-point)
         :preface (advice-add #'eglot-completion-at-point :filter-return #'eglot-update-capf-metadata+)
         :config
         (defun eglot-update-capf-metadata+ (result)
@@ -11660,8 +11660,8 @@ Welcome to my personal Emacs configuration 😎.
          [remap xref-find-references-and-replace] 'eglot-rename))
 
       (use-package consult-eglot-embark
-        :straight (consult-eglot-embark :host github :repo "mohkale/consult-eglot"
-                                        :files (:defaults "extensions/consult-eglot-embark/*.el"))
+        :straight t
+        :commands consult-eglot-embark-mode
         :after (embark consult-eglot)
         :demand t
         :config
@@ -17609,29 +17609,28 @@ Welcome to my personal Emacs configuration 😎.
 
 *** Footer Icons
     #+NAME: dashboard-footer-icons
-    | source     | name           |
-    |------------+----------------|
-    | faicon     | google         |
-    | faicon     | android        |
-    | faicon     | steam          |
-    | faicon     | gitlab         |
-    | faicon     | slack          |
-    | faicon     | reddit-alien   |
-    | faicon     | cogs           |
-    | faicon     | apple          |
-    | wicon      | hurricane      |
-    | wicon      | day-sunny      |
-    | wicon      | snow           |
-    | wicon      | snowflake-cold |
-    | wicon      | stars          |
-    | wicon      | horizon        |
-    | wicon      | na             |
-    | faicon     | firefox        |
-    | faicon     | stack-overflow |
-    | alltheicon | ruby-alt       |
-    | alltheicon | ruby           |
-    | alltheicon | java           |
-    | alltheicon | python         |
+    | source       | name           |
+    |--------------+----------------|
+    | nerd-fa      | google         |
+    | nerd-fa      | android        |
+    | nerd-fa      | steam          |
+    | nerd-fa      | gitlab         |
+    | nerd-fa      | slack          |
+    | nerd-fa      | reddit-alien   |
+    | nerd-fa      | cogs           |
+    | nerd-fa      | apple          |
+    | nerd-weather | hurricane      |
+    | nerd-weather | day-sunny      |
+    | nerd-weather | snow           |
+    | nerd-weather | snowflake-cold |
+    | nerd-weather | stars          |
+    | nerd-weather | horizon        |
+    | nerd-weather | na             |
+    | nerd-fa      | firefox        |
+    | nerd-fa      | stack-overflow |
+    | nerd-fae     | ruby           |
+    | nerd-fae     | java           |
+    | nerd-fae     | python         |
 
     #+begin_src emacs-lisp
       (require '+pkg-all-the-icons)
@@ -17640,13 +17639,14 @@ Welcome to my personal Emacs configuration 😎.
     #+begin_src emacs-lisp :var dashboard-footer-icon-associations=dashboard-footer-icons
       (use-package all-the-icons
         :config
-        (when-let ((footer-item (seq-random-elt dashboard-footer-icon-associations)))
-          (setq dashboard-footer-icon
-                (all-the-icons-pad-on-tty-advice+
-                 (funcall
-                  (all-the-icons--function-name (intern (nth 0 footer-item)))
-                  (nth 1 footer-item) :height 0.75 :v-adjust -0.05
-                  :face 'dashboard-navigator)))))
+        (setq dashboard-footer-icon
+              (cl-loop for footer-item in dashboard-footer-icon-associations
+                       collect
+                       (all-the-icons-pad-on-tty-advice+
+                        (eval `(+icon ,(intern (nth 0 footer-item))
+                                      ,(nth 1 footer-item)
+                                      :height 0.75 :v-adjust -0.05
+                                      :face 'dashboard-navigator))))))
     #+end_src
 
 *** Dashboard
@@ -17759,7 +17759,6 @@ Welcome to my personal Emacs configuration 😎.
 
         :config
         (advice-add 'dashboard-insert-startupify-lists :around #'all-the-icons-pad-families-on-tty-advice+)
-        (setq dashboard-footer-icon (all-the-icons-pad-on-tty-advice+ dashboard-footer-icon))
 
         (when +icons-prefer-nerd-font
           (advice-add 'dashboard-insert-heading :around
@@ -17768,35 +17767,24 @@ Welcome to my personal Emacs configuration 😎.
                                    #'all-the-icons-nerd-oct))
                           (apply func args)))))
 
-      ;;; `dashboard-random-banner+'
       ;; I maintain a list of banners in my dotfiles that contain plain-text banners
       ;; with embedded ansi escape sequences for color. This was originally written
       ;; for my shell, but also works great as a cover for my emacs dashboard.
         :preface
-        (defvar dashboard-prefer-text-banners+ nil
+        (defvar dashboard-prefer-text-banners+ t
           "When true we use text banners even on GUI frames.")
 
         :autoload dashboard-random-banner+
         :config
-        (defun dashboard-random-banner+ (&optional arg)
-          "Toggle another banner to be used on the dashboard."
-          (if (and (not dashboard-prefer-text-banners+) (display-graphic-p))
-              'official
-            ;; You can create more banners using [[https://lachlanarthur.github.io/Braille-ASCII-Art/][this]] site.
-            (seq-random-elt
-             (or (let ((files (ignore-errors
-                                (file-expand-wildcards
-                                 (join-path+ (xdg-config-home) "banners" "*")))))
-                   (if (stringp dashboard-startup-banner)
-                       (cl-remove dashboard-startup-banner files :test #'string-equal)
-                     files))
-                 '(1 2 3)))))
-
-        ;; Ensure a random banner is chosen every time we reload the dashboard and initially.
-        (advice-add 'dashboard-refresh-buffer :before
-                    (defun dashboard-refresh-buffer--random-banner+ (&rest _)
-                      (setq dashboard-startup-banner (dashboard-random-banner+))))
-        (setq dashboard-startup-banner (dashboard-random-banner+))
+        (setq dashboard-startup-banner
+              (if (and (not dashboard-prefer-text-banners+)
+                       (display-graphic-p))
+                  'official
+                ;; You can create more banners using [[https://lachlanarthur.github.io/Braille-ASCII-Art/][this]] site.
+                (or (ignore-errors
+                      (file-expand-wildcards
+                       (join-path+ (xdg-config-home) "banners" "*")))
+                    '(1 2 3))))
 
         :autoload dashboard-read-banner+
         :config
@@ -17823,9 +17811,15 @@ Welcome to my personal Emacs configuration 😎.
                                           (line-beginning-position))
                                         (point-max))))))))
 
-        :autoload dashboard-insert-ascii-banner-centered+
+        :autoload (dashboard-insert-banner+
+                   dashboard-choose-banner--support-mk-banner+
+                   dashboard--insert-ascii-banner-centered+
+                   dashboard-choose-banner)
+        :init
+        (advice-add 'dashboard-choose-banner :before-until #'dashboard-choose-banner--support-mk-banner+)
+        (advice-add 'dashboard-insert-banner :before-until #'dashboard-insert-banner+)
         :config
-        (defun dashboard-insert-ascii-banner-centered+ (path)
+        (defun dashboard--insert-ascii-banner-centered+ (path)
           (unless (string-suffix-p ".txt" path)
             (when-let (banner (dashboard-read-banner+ path))
               (insert "\n")
@@ -17839,19 +17833,19 @@ Welcome to my personal Emacs configuration 😎.
                  start (point) `(line-prefix ,prefix wrap-prefix ,prefix)))))
             t)
 
-        :autoload (dashboard-insert-banner+
-                   dashboard-insert-navigator
-                   dashboard-insert-init-info)
-        :config
+        (defun dashboard-choose-banner--support-mk-banner+ (banner)
+          (when (and (stringp banner)
+                     (not (string-suffix-p ".txt" banner))
+                     (not (ignore-errors (image-type banner))))
+            (list :mohkale banner)))
+
         (defun dashboard-insert-banner+ ()
-          (when (and (stringp dashboard-startup-banner)
-                     (not (string-suffix-p ".txt" dashboard-startup-banner)))
+          (when-let* ((banner (dashboard-choose-banner dashboard-startup-banner))
+                      (is-custom (eq (car banner) :mohkale)))
             (prog1 t
               (goto-char (point-max))
               (let ((buffer-read-only nil))
-                (dashboard-insert-ascii-banner-centered+ dashboard-startup-banner)))))
-
-        (advice-add 'dashboard-insert-banner :before-until #'dashboard-insert-banner+)
+                (dashboard--insert-ascii-banner-centered+ (cadr banner))))))
 
         :general
         (:keymaps 'dashboard-mode-map
@@ -25484,6 +25478,7 @@ Welcome to my personal Emacs configuration 😎.
 
 ****** Eglot
        #+BEGIN_SRC emacs-lisp
+         (declare-function eglot-managed-p "eglot")
          (declare-function eglot-reconnect "eglot")
          (declare-function eglot-shutdown "eglot")
          (declare-function eglot-events-buffer "eglot")
@@ -25495,6 +25490,7 @@ Welcome to my personal Emacs configuration 😎.
          (declare-function jsonrpc--request-continuations "eglot")
          (declare-function eglot--project-nickname "eglot")
          (declare-function eglot-current-server "eglot")
+         (declare-function jsonrpc-continuation-count "jsonrpc")
 
          (defvar-local +mode-line-eglot-text nil)
          (defun +mode-line--update-eglot (&rest _)
