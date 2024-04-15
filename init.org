@@ -11530,22 +11530,6 @@ Welcome to my personal Emacs configuration 😎.
                                             (cdr item))))
             (mapcar #'map-kind-names (flatmap (lambda (c) (apply #'dfs c)) res))))
 
-        :autoload (eglot-update-capf-metadata+
-                   eglot-completion-at-point)
-        :preface (advice-add #'eglot-completion-at-point :filter-return #'eglot-update-capf-metadata+)
-        :config
-        (defun eglot-update-capf-metadata+ (result)
-          (let ((original-capf (caddr result))
-                (extra-metadata
-                 `((annotation-function . ,(plist-get (cdddr result) :annotation-function)))))
-            (setf (caddr result)
-                  (lambda (pattern pred action)
-                    (let ((res (funcall original-capf pattern pred action)))
-                      (if (and (eq action 'metadata) res)
-                          (append res extra-metadata)
-                        res)))))
-          result)
-
         :leader
         (:prefix leader-server-leader-prefix+
          "l" '+lsp-command
