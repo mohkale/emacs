@@ -8152,7 +8152,8 @@ Welcome to my personal Emacs configuration 😎.
         (defun compile--double-prefix-means-run-comint+ (args)
           "Override prefix behaviour for `compile'.
       Only run compile in comint when `current-prefix-arg' is C-u C-u."
-          (unless (eq (car-safe current-prefix-arg) 16)
+          (when (and (cadr args)
+                     (not (eq (car-safe current-prefix-arg) 16)))
             (setf (cadr args) nil))
           args)
 
