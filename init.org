@@ -8146,6 +8146,16 @@ Welcome to my personal Emacs configuration 😎.
         (when-let ((entry (member 'gnu compilation-error-regexp-alist)))
           (setcar entry 'gnu+ctest))
 
+        :autoload compile--double-prefix-means-run-comint+
+        :init (advice-add #'compile :filter-args #'compile--double-prefix-means-run-comint+)
+        :config
+        (defun compile--double-prefix-means-run-comint+ (args)
+          "Override prefix behaviour for `compile'.
+      Only run compile in comint when `current-prefix-arg' is C-u C-u."
+          (unless (eq (car-safe current-prefix-arg) 16)
+            (setf (cadr args) nil))
+          args)
+
         :general
         (:states 'motion
          :keymaps 'compilation-mode-map
@@ -16739,28 +16749,6 @@ Welcome to my personal Emacs configuration 😎.
         :preface (use-package +lib-misc :autoload inhibit-messages-wrapper!)
         :config
         (advice-add 'projectile-cleanup-known-projects :around #'inhibit-messages-wrapper!)
-
-        :autoload projectile-compile--double-prefix-means-run-comint+
-        :config
-        (defun projectile-compile--double-prefix-means-run-comint+ (func &optional _args)
-          "Allow running compilation interactively when multiple prefixes are given.
-      with two prefixes (C-u C-u) runs default compilation command in interactive
-      compilation buffer. with three prompts for command and then runs it in an
-      interactive compilation buffer."
-          (let ((prefix current-prefix-arg))
-            (if (and (consp prefix)
-                     (setq prefix (car prefix))
-                     (>= prefix 16))
-                (cl-letf* ((actual-compile (symbol-function #'compile))
-                           ((symbol-function #'compile)
-                            (lambda (command &optional _)
-                              (funcall actual-compile command 'comint))))
-                  (funcall func (if (eq prefix 16) nil '(4))))
-              (funcall func prefix))))
-
-        (advice-add 'projectile-run-project     :around #'projectile-compile--double-prefix-means-run-comint+)
-        (advice-add 'projectile-compile-project :around #'projectile-compile--double-prefix-means-run-comint+)
-        (advice-add 'projectile-test-project    :around #'projectile-compile--double-prefix-means-run-comint+)
 
         :autoload projectile-discover-projects-in-search-path
         :config
