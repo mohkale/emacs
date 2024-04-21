@@ -11542,12 +11542,18 @@ Welcome to my personal Emacs configuration 😎.
                                             (cdr item))))
             (mapcar #'map-kind-names (flatmap (lambda (c) (apply #'dfs c)) res))))
 
+        :commands eglot-completion-at-point-interactive+
+        :config
+        (defalias 'eglot-completion-at-point-interactive+
+          (cape-capf-interactive #'eglot-completion-at-point))
+
         :leader
         (:prefix leader-server-leader-prefix+
          "l" '+lsp-command
          "p" 'eglot-list-connections
          "e" 'eglot-events-buffer
-         "x" 'eglot-shutdown)
+         "x" 'eglot-shutdown
+         ":" 'eglot-completion-at-point-interactive+)
 
         :lazy-leader
         (:mode 'eglot--managed-mode
