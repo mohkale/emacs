@@ -592,7 +592,7 @@ Welcome to my personal Emacs configuration 😎.
           ; constructor
           (enummember :text "e" :icon "format-list-checks" :face aoh-blue-int)
           (enum-member :text "e" :icon "format-list-checks" :face aoh-blue-int)
-          (enum :text "e" :icon "format-list-bulleted-square" :face aoh-turquoise-int)
+          (enum :text "e" :icon "format-list-bulleted-square" :face aoh-turquoise)
           ; event
           (field :text "f" :icon "application-braces-outline" :face aoh-blue-int)
           (file :text "f" :icon "file-document-outline" :face aoh-very-light-grey)
@@ -8089,7 +8089,57 @@ Welcome to my personal Emacs configuration 😎.
 
         :config
         (cl-defmethod all-the-icons-completion-get-icon (cand (_cat (eql project)))
-          (all-the-icons-completion-get-icon cand 'file)))
+          (all-the-icons-completion-get-icon cand 'file))
+
+        :preface
+        (defvar completion-all-the-icons-lsp-kind-icon-alist+
+          ;; TODO: Source from icon names from +completion-popup-kind-icons.
+          (cl-loop
+           for it in
+           '((text all-the-icons-nerd-md "format-size")
+             (method all-the-icons-nerd-md "cube-outline")
+             (function all-the-icons-nerd-md "function-variant")
+             (constructor all-the-icons-nerd-oct "gear")
+             (field all-the-icons-nerd-md "tag-plus")
+             (variable all-the-icons-nerd-md "alpha")
+             (class all-the-icons-nerd-md "shape")
+             (interface all-the-icons-nerd-md "sitemap")
+             (module all-the-icons-nerd-oct "package")
+             (property all-the-icons-nerd-md "tag-plus")
+             (unit all-the-icons-nerd-md "ruler")
+             (value all-the-icons-nerd-md "numeric")
+             (enum all-the-icons-nerd-fa "sort-alpha-asc")
+             (keyword all-the-icons-nerd-md "key-variant")
+             (snippet all-the-icons-nerd-oct "code")
+             (color all-the-icons-nerd-md "palette")
+             (file all-the-icons-nerd-md "file-document")
+             (reference all-the-icons-nerd-md "export")
+             (folder all-the-icons-nerd-md "folder")
+             (enum-member all-the-icons-nerd-md "sort-alpha-asc")
+             (constant all-the-icons-nerd-md "pi")
+             (struct all-the-icons-nerd-md "file-tree")
+             (event all-the-icons-nerd-fa "flash")
+             (operator all-the-icons-nerd-fa "contrast")
+             (type-parameter all-the-icons-nerd-code "symbol-parameter")
+             (t all-the-icons-nerd-md "code-json"))
+           with face = nil
+           do (setq face (plist-get (alist-get (car it) +completion-popup-kind-icons) :face))
+           collect `(,@it ,@(when face (list :face face)))))
+
+        (cl-defmethod all-the-icons-completion-get-icon (cand (_cat (eql eglot-capf)))
+          (when-let ((config
+                      (or
+                       (when-let* ((lsp-item (get-text-property 0 'eglot--lsp-item cand))
+                                   (comp-kind (plist-get lsp-item :kind))
+                                   (kind-name (alist-get comp-kind eglot--kind-names))
+                                   (kind-name
+                                    (pcase kind-name
+                                      ("EnumMember" 'enum-member)
+                                      ("TypeParameter" 'type-parameter)
+                                      (_ (intern (downcase kind-name))))))
+                         (alist-get kind-name completion-all-the-icons-lsp-kind-icon-alist+))
+                       (alist-get t completion-all-the-icons-lsp-kind-icon-alist+))))
+            (concat (apply (car config) (cdr config)) " "))))
 
       (use-package +pkg-all-the-icons
         :autoload all-the-icons-pad-on-tty-advice+
