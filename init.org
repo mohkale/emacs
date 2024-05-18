@@ -20839,6 +20839,22 @@ Welcome to my personal Emacs configuration 😎.
       (use-package js
         :hook (((js-mode js-ts-mode) . electric-layout-local-mode)
                ((js-mode js-ts-mode) . +flylint))
+        ;; Adapted from [[https://github.com/microsoft/vscode/blob/11c70a6358044ca3615e3017c222083bda4874a7/extensions/json/package.json#L48-L70][vscode]].
+        :mode ((rx (or (and  (or ".jsonc"
+                                 ".eslintrc"
+                                 ".eslintrc.json"
+                                 ".jsfmtrc"
+                                 ".jshintrc"
+                                 ".swcrc"
+                                 ".hintrc"
+                                 ".babelrc")
+                             eol)
+                       (and bol (or "babel.config.json"
+                                    ".babelrc.json"
+                                    ".ember-cli"
+                                    "typedoc.json")
+                            eol)))
+               . js-mode)
 
         :indent+
         (js-mode 2)
@@ -20938,13 +20954,36 @@ Welcome to my personal Emacs configuration 😎.
   :END:
 
   #+begin_src emacs-lisp :tangle (package-yes! json)
-  (require '+lang-json)
+    (require '+lang-json)
+  #+end_src
+
+  #+begin_src emacs-lisp
+    ;; Adapted from [[https://github.com/microsoft/vscode/blob/11c70a6358044ca3615e3017c222083bda4874a7/extensions/json/package.json#L17-L47][vscode]].
+    (defvar +json-auto-mode-alist-rx
+      (rx (or (and  (or ".bowerrc"
+                        ".jscsrc"
+                        ".webmanifest"
+                        ".js.map"
+                        ".css.map"
+                        ".ts.map"
+                        ".har"
+                        ".jslintrc"
+                        ".jsonld"
+                        ".geojson"
+                        ".ipynb"
+                        ".vuerc")
+                    eol)
+              (and bol (or "composer.lock"
+                           ".watchmanconfig")
+                   eol))))
   #+end_src
 
 *** JSON Mode
    #+begin_src emacs-lisp :tangle (package-lisp! +lang-json json tree-sitter)
      (use-package json-ts-mode
        :hook (json-ts-mode . +flylint)
+       :init
+       (add-to-list 'auto-mode-alist (cons +json-auto-mode-alist-rx 'json-ts-mode))
        :modify-syntax+
        (json-ts-mode--syntax-table '((?- . "w"))))
 
@@ -20956,6 +20995,8 @@ Welcome to my personal Emacs configuration 😎.
    #+begin_src emacs-lisp :tangle (package-lisp! +lang-json json (not tree-sitter))
      (use-package js
        :hook (js-json-mode . +flylint)
+       :init
+       (add-to-list 'auto-mode-alist (cons +json-auto-mode-alist-rx 'js-json-mode))
        :modify-syntax+
        (js-json-mode-syntax-table '((?- . "w"))))
 
