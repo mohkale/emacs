@@ -27,6 +27,13 @@
     ("us" "using" nil :count 2)
     ))
 
+(define-abbrev-table 'go-mode-abbrev-table
+  '(
+    ("im" "import" nil :count 1)
+    ("pk" "package" nil :count 2)
+    ("st" "struct" nil :count 1)
+   ))
+
 (define-abbrev-table 'text-mode-abbrev-table
   '(
     ("bg" "background" nil :count 6)
@@ -45,13 +52,6 @@
     ("that've" "that have" nil :count 0)
     ("thatre" "that are" nil :count 0)
     ("thatve" "that have" nil :count 0)
-   ))
-
-(define-abbrev-table 'go-mode-abbrev-table
-  '(
-    ("imp" "import" nil :count 1)
-    ("pkg" "package" nil :count 2)
-    ("st" "struct" nil :count 1)
    ))
 
 (define-abbrev-table 'org-mode-abbrev-table
