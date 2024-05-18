@@ -20362,6 +20362,29 @@ Welcome to my personal Emacs configuration 😎.
          "ed" 'go-download-play))
     #+END_SRC
 
+*** Go Compilation
+    #+begin_src emacs-lisp
+      (use-package compile
+        :config
+        ;; Adapted from [[https://github.com/nlamirault/gotest.el/blob/490189e68d743a851bfb42d0017428a7550e8615/gotest.el#L179][gotest.el]].
+        (setq compilation-error-regexp-alist-alist
+              (append
+               '((go-test-testing . ("^[[:space:]]+\\([[:alnum:]-_/.]+\\.go\\):\\([0-9]+\\): .*$" 1 2)) ;; stdlib package testing
+                 (go-test-testify . ("^[[:space:]]+Location:\t\\([[:alnum:]-_/.]+\\.go\\):\\([0-9]+\\)$" 1 2)) ;; testify package assert
+                 (go-test-gopanic . ("^[[:space:]]+\\([[:alnum:]-_/.]+\\.go\\):\\([0-9]+\\) \\+0x\\(?:[0-9a-f]+\\)" 1 2)) ;; panic()
+                 (go-test-compile . ("^\\([[:alnum:]-_/.]+\\.go\\):\\([0-9]+\\):\\(?:\\([0-9]+\\):\\)? .*$" 1 2 3)) ;; go compiler
+                 (go-test-linkage . ("^\\([[:alnum:]-_/.]+\\.go\\):\\([0-9]+\\): undefined: .*$" 1 2))) ;; go linker)
+               compilation-error-regexp-alist-alist)
+              compilation-error-regexp-alist
+              (append
+               '(go-test-testing
+                 go-test-testify
+                 go-test-gopanic
+                 go-test-compile
+                 go-test-linkage)
+               compilation-error-regexp-alist)))
+    #+end_src
+
 *** Go Guru
     :PROPERTIES:
     :header-args+: :tangle (package-lisp! +lang-golang golang (not :lsp))
