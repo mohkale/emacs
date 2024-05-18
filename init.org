@@ -14829,6 +14829,13 @@ Welcome to my personal Emacs configuration 😎.
         (with-eval-after-load 'flymake-proc
           (remove-hook 'flymake-diagnostic-functions 'flymake-proc-legacy-flymake))
 
+        :custom
+        (flymake-margin-indicators-string
+         '((error   "X" compilation-error)
+           (warning "!" compilation-warning)
+           (note    "■" compilation-info)))
+        (flymake-margin-indicator-position 'right-margin)
+
         :preface
         (defmacro flymake-unsupported-command+ (name)
           `(lambda ()
