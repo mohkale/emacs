@@ -1086,6 +1086,7 @@ Welcome to my personal Emacs configuration 😎.
             confirm-nonexistent-file-or-buffer nil                                 ; Don't require confirmation when creating a new file
             history-length t                                                       ; Disable completing-read history truncation
             recenter-positions '(top middle bottom)
+            overlay-arrow-string ">"
             user-mail-address "mohkale@kisara.moe"
             user-full-name "Mohsin Kaleem")
     #+END_SRC
@@ -18883,6 +18884,9 @@ Welcome to my personal Emacs configuration 😎.
         dape-info-parent-mode
         :custom
         (dape-adapter-dir (cache! "dape" "adapters"))
+        (dape-inlay-hints nil)
+        (dape-info-hide-mode-line t)
+        (dape-default-breakpoints-file (cache! "dape" "dape-breakpoints"))
         (dape-display-source-buffer-action
          '((display-buffer-reuse-window
             display-buffer-same-window)
@@ -18932,10 +18936,12 @@ Welcome to my personal Emacs configuration 😎.
         :lazy-leader
         (:prefix "v"
          "DEL" 'dape-quit
+         "M-DEL" 'dape-disconnect-quit
          "b" 'dape-breakpoint-toggle
          "x" 'dape-breakpoint-remove-all
          "=" 'dape-breakpoint-expression
          "l" 'dape-breakpoint-log
+         "h" 'dape-breakpoint-hits
          "r" 'dape-restart
          "s" 'dape-step-in
          "k" 'dape-kill                                                               ; Restart debugger session
@@ -18946,7 +18952,9 @@ Welcome to my personal Emacs configuration 😎.
          "^" 'dape-select-stack
          "@" 'dape-select-thread
          "w" 'dape-watch-dwim
-         "m" 'dape-read-memory))
+         "m" 'dape-read-memory
+         "p" 'dape-pause
+         ))
 
       (use-package dape
         :general
@@ -25552,10 +25560,10 @@ Welcome to my personal Emacs configuration 😎.
          (declare-function eglot-forget-pending-continuations "eglot")
          (declare-function eglot-clear-status "eglot")
          (declare-function eglot--major-modes "eglot")
-         (declare-function jsonrpc-last-error "eglot")
-         (declare-function jsonrpc--request-continuations "eglot")
          (declare-function eglot--project-nickname "eglot")
          (declare-function eglot-current-server "eglot")
+         (declare-function jsonrpc-last-error "jsonrpc")
+         (declare-function jsonrpc--request-continuations "jsonrpc")
          (declare-function jsonrpc-continuation-count "jsonrpc")
 
          (defvar-local +mode-line-eglot-text nil)
