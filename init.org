@@ -18892,6 +18892,10 @@ Welcome to my personal Emacs configuration 😎.
             display-buffer-same-window)
            (body-function . nil)))
 
+        :config
+        ;; Remove dape from `mode-line-misc-info'.
+        (setf (alist-get 'dape-active-mode mode-line-misc-info nil t) nil)
+
         :init
         (advice-add 'dape--display-buffer :override #'display-buffer)
 
@@ -25620,6 +25624,44 @@ Welcome to my personal Emacs configuration 😎.
          (advice-add 'eglot--managed-mode-off :after #'+mode-line--update-eglot)
        #+END_SRC
 
+***** Dape
+      #+begin_src emacs-lisp
+        (require 'cl-lib)
+
+        (defvar +mode-line-dape-text nil)
+
+        (defvar dape--connection)
+        (declare-function dape--live-connection "dape")
+        (declare-function dape--state "dape")
+        (declare-function dape--live-connections "dape")
+        (declare-function dape--state-reason "dape")
+
+        (defun +mode-line--update-dape-text (&rest _)
+          (setq +mode-line-dape-text
+                (when-let ((conn (or (dape--live-connection 'last t)
+                                     dape--connection))
+                           ((not (memq (dape--state conn) '(exited terminated)))))
+                  (concat
+                   (all-the-icons-pad+
+                    (+icon nerd-fa "bug"
+                           :face
+                           (pcase (dape--state conn)
+                             ((or 'starting 'initialized)
+                              'font-lock-string-face)
+                             ('running 'font-lock-keyword-face)
+                             ('stopped nil))))
+                   (when-let ((conns (dape--live-connections))
+                              (nof-conns (length (cl-remove-if-not 'dape--threads conns)))
+                              ((> nof-conns 1)))
+                     (concat "+" (propertize (number-to-string nof-conns)
+                                             'face 'shadow
+                                             'help-echo "Active child connections")))
+                   (when-let ((reason (and conn (dape--state-reason conn))))
+                     (concat "/" (propertize reason 'face 'font-lock-doc-face)))))))
+
+        (advice-add 'dape--mode-line-format :override #'+mode-line--update-dape-text)
+      #+end_src
+
 ***** Appendix
       #+BEGIN_SRC emacs-lisp
         (defun +mode-line-status-icons ()
@@ -25627,7 +25669,8 @@ Welcome to my personal Emacs configuration 😎.
                                   (featurep 'all-the-icons)
                                   (all-the-icons-pad+ (+icon nerd-mdi "eye")))
                              +mode-line-eglot-text
-                             +mode-line-lsp-text)))
+                             +mode-line-lsp-text
+                             +mode-line-dape-text)))
             (unless (string-empty-p msg)
               (concat " " msg))))
       #+END_SRC
