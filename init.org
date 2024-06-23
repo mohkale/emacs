@@ -465,6 +465,7 @@ Welcome to my personal Emacs configuration 😎.
           ;; robotframework
           ;; ruby
           ;; rust
+          ;; scala
           sh-script
           sql
           ssh-config
@@ -24332,6 +24333,46 @@ Welcome to my personal Emacs configuration 😎.
 *** Appendix
     #+begin_src emacs-lisp
       (provide '+lang-rust)
+    #+end_src
+
+** Scala
+   :PROPERTIES:
+   :header-args+: :tangle (package-lisp! +lang-scala scala)
+   :END:
+   #+begin_src emacs-lisp :tangle (package-yes! scala)
+     (require '+lang-scala)
+   #+end_src
+
+*** Scala Mode
+    #+begin_src emacs-lisp :tangle (package-lisp! +lang-scala scala (not tree-sitter))
+      (use-package scala-mode
+        :straight t)
+    #+end_src
+
+*** Scala Tree Sitter Mode
+    #+begin_src emacs-lisp :tangle (package-lisp! +lang-scala scala tree-sitter)
+      (use-package scala-ts-mode
+        :straight t)
+    #+end_src
+
+*** Metals                                                              :lsp:
+    :PROPERTIES:
+    :header-args+: :tangle (package-lisp! +lang-scala scala eglot)
+    :END:
+
+    #+begin_src emacs-lisp
+      (use-package eglot
+        :after scala-ts-mode
+        :autoload eglot-alternatives
+        :config
+        (push `((scala-mode scala-ts-mode)
+                . ,(eglot-alternatives '("metals" "metals-emacs")))
+              eglot-server-programs))
+    #+end_src
+
+*** Appendix
+    #+begin_src emacs-lisp
+      (provide '+lang-scala)
     #+end_src
 
 ** Shell Script
