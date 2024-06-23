@@ -9,6 +9,7 @@ FILTERED_TANGLE_INDEX := $(CWD)/etc/tangle/index2.txt
 STRAIGHT_BUILD := $(XDG_CACHE_HOME)/emacs/straight/build
 EMACS_CC_ARGS := \
 	--load $(CWD)/quick-init.el \
+	--eval '(setq create-lockfiles nil)' \
 	--eval '(setq load-path (append (file-expand-wildcards "$(STRAIGHT_BUILD)/*") load-path))' \
 	--eval '(setq native-comp-eln-load-path (append (list "$(CWD)/site-lisp/eln-cache") (bound-and-true-p native-comp-eln-load-path)))' \
 	--directory $(CWD)/site-lisp \
