@@ -1959,7 +1959,14 @@ Welcome to my personal Emacs configuration 😎.
                          (append
                           result
                           `(,@ (when company
-                                 `((defalias ',capf-to-add (cape-company-to-capf #',capf))))
+                                 `((defalias ',capf-to-add
+                                     ;; Cape throws an error when adapting and using company-mode since
+                                     ;; there's a performance overhead. But there isn't a nice way to set
+                                     ;; priorities between capf and company backends so we ignore the check.
+                                     (let ((capf (cape-company-to-capf #',capf)))
+                                       (lambda (&rest args)
+                                         (let ((company-mode nil))
+                                           (apply capf args)))))))
                                (defun ,add-capf-func-name ()
                                  (add-hook 'completion-at-point-functions ',capf-to-add ,depth t))
                                (add-hook ',mode-hook ',add-capf-func-name)))))))
