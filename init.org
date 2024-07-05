@@ -19574,6 +19574,32 @@ Welcome to my personal Emacs configuration 😎.
         :hook (c++-mode . modern-c++-font-lock-mode))
     #+END_SRC
 
+*** Clangd                                                              :lsp:
+    #+begin_src emacs-lisp
+      (defvar c-mode-clangd-args+ '("--clang-tidy")
+        "Command line options to pass to clangd for lsp.")
+
+      (defvaralias 'c-mode-clangd-compile-commands-dir+ '+cmake-build-directory
+        "Customizable path to directory containing compile_commands.json")
+
+      (defun c-mode-clangd-args+ ()
+        `(,@c-mode-clangd-args+
+          ,@(when-let ((dir c-mode-clangd-compile-commands-dir+))
+              (list "--compile-commands-dir" dir))))
+    #+end_src
+
+    #+begin_src emacs-lisp :tangle (package-lisp! +lang-cpp c eglot)
+      (use-package eglot
+        :preface
+        (defun eglot-clangd-command+ (&optional _interactive _project)
+          `("clangd" ,@(c-mode-clangd-args+)))
+
+        :config
+        (push `((c-mode c-ts-mode c++-mode c++-ts-mode objc-mode)
+                . ,#'eglot-clangd-command+)
+              eglot-server-programs))
+    #+end_src
+
 *** Appendix
     #+begin_src emacs-lisp
       (provide '+lang-cpp)
