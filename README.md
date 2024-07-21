@@ -2,7 +2,7 @@
 
 <div align="right">
   <a href="https://www.gnu.org/software/emacs/">
-    <img alt="emacs-version" src="https://img.shields.io/badge/emacs-v27.1-blue"/>
+    <img alt="emacs-version" src="https://img.shields.io/badge/emacs-v30.0.50_840c33-blue"/>
   </a>
   <a href="https://github.com/mohkale/.emacs.d/actions?query=workflow%3Abuild">
     <img src="https://github.com/mohkale/.emacs.d/workflows/build/badge.svg" />
