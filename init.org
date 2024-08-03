@@ -10556,23 +10556,22 @@ Welcome to my personal Emacs configuration 😎.
             :enabled  ,#'project-current
             :items
             ,(lambda ()
-               (consult--project-files+ (project-current)))))
-        :autoload consult--project-files+
+               (when-let ((project (project-current)))
+                 (consult--hide-prefix+ (project-files project)
+                                        (project-root project))))))
+        :autoload consult--hide-prefix+
         :preface (use-package project :autoload (project-root project-files))
         :config
         (plist-put consult--source-project-file+ :new
                    (plist-get consult--source-project-recent-file :new))
 
-        (defun consult--project-files+ (project)
-          "Compute the files in PROJECT."
-          (let* ((root (project-root project))
-                 (files (project-files project))
-                 (inv-root (propertize (expand-file-name (project-root project))
-                                       'invisible t)))
+        (defun consult--hide-prefix+ (file-paths prefix)
+          "Strip PREFIX from FILE-PATHS."
+          (let* ((inv-root (propertize (expand-file-name prefix) 'invisible t)))
             (mapcar (lambda (f)
-                      (let ((relative-file-name (file-relative-name f root)))
+                      (let ((relative-file-name (file-relative-name f prefix)))
                         (concat inv-root relative-file-name)))
-                    files)))
+                    file-paths)))
 
         (add-to-list 'consult-project-buffer-sources 'consult--source-project-file+ 'append)
 
@@ -16598,6 +16597,39 @@ Welcome to my personal Emacs configuration 😎.
          "amb" 'projection-meson-set-build-type
          "amc" 'projection-meson-set-build-option
          ))
+    #+end_src
+
+*** Projection Consult
+   :PROPERTIES:
+   :header-args+: :tangle (package-lisp! +pkg-project :consult)
+   :END:
+    #+begin_src emacs-lisp
+      (require '+pkg-consult)
+
+      (use-package projection-find
+        :autoload projection-find-list-test-files)
+
+      (use-package consult
+        :preface
+        (defvar consult--source-projection-test-files+
+          `(:name     "Test files"
+            :narrow   (?t . "Tests")
+            :hidden   t
+            :category project-file
+            :face     consult-file
+            :history  file-name-history
+            :state    ,#'consult--file-state
+            :action   ,#'consult--file-action
+            :enabled  ,#'project-current
+            :items
+            ,(lambda ()
+               (when-let ((project (project-current)))
+                 (consult--hide-prefix+
+                  (projection-find-list-test-files project)
+                  (project-root project))))))
+
+        :config
+        (add-to-list 'consult-project-buffer-sources 'consult--source-projection-test-files+ 'append))
     #+end_src
 
 *** Projection Multi
