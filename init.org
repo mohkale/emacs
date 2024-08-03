@@ -10523,7 +10523,7 @@ Welcome to my personal Emacs configuration 😎.
         :preface
         (defvar consult--source-remote+
           `(:name     "Remote"
-            :narrow   ?r
+            :narrow   ?t
             :hidden   t
             :category buffer
             :face     consult-buffer
@@ -10574,20 +10574,20 @@ Welcome to my personal Emacs configuration 😎.
                         (concat inv-root relative-file-name)))
                     files)))
 
-        (push 'consult--source-project-file+ consult-project-buffer-sources)
+        (add-to-list 'consult-project-buffer-sources 'consult--source-project-file+ 'append)
 
         :preface
         (defvar consult--source-known-projects+
           `(:name     "Known Project"
             :narrow   (?p . "Project")
             :category project
-            :face     consult-project-extra-projects
+            :face     font-lock-constant-face
             :history  file-name-history
             :action   ,#'consult--file-action
             :items    ,#'project-known-project-roots))
 
         :config
-        (push 'consult--source-known-projects+ consult-project-buffer-sources))
+        (add-to-list 'consult-project-buffer-sources 'consult--source-known-projects+ 'append))
     #+end_src
 
 *** Consult Evil
