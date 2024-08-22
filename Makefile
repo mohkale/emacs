@@ -84,3 +84,16 @@ nativecompile: bytecompile $(FILTERED_TANGLE_INDEX)
 	    echo "[NCC] $$file"; \
 	    emacs -Q --batch $(EMACS_CC_ARGS) -f batch-native-compile "$$file"; \
 	done < "$(FILTERED_TANGLE_INDEX)"
+
+.PHONY: list-straight-changesets
+list-straight-changesets:
+	find "$$XDG_CACHE_HOME/emacs/straight/repos" -mindepth 1 -maxdepth 1 | \
+	    while read -r repo; do \
+	        if output=$$(git -C "$$repo" diff @ @{upstream} --name-only); then \
+	            if [ -n "$$output" ]; then \
+					echo "$$repo:0: info: Upstream has changes"; \
+                fi; \
+            else \
+                echo "$$repo:0: error: Failed to query upstream"; \
+	        fi \
+	    done
