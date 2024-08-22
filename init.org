@@ -10118,10 +10118,23 @@ Welcome to my personal Emacs configuration 😎.
             (mkdir dir t))
           (find-file dir))
 
+        :commands embark-save-basename+
+        :config
+        (defun embark-save-basename+ (file)
+          "Save the basename of FILE in the kill ring."
+          (interactive "FFile: ")
+          (thread-first
+            file
+            (substitute-in-file-name)
+            (directory-file-name)
+            (file-name-nondirectory)
+            (kill-new)))
+
         :general
         (:keymaps 'embark-file-map
          "m" 'embark-find-mkdir+
-         "+" 'embark-find-mkdir+)
+         "+" 'embark-find-mkdir+
+         "%" 'embark-save-basename+)
 
         ;; Embark core bindings.
 
