@@ -18841,10 +18841,11 @@ Welcome to my personal Emacs configuration 😎.
         (defvar +abbrev-mode-text-mode-parent-tables (list text-mode-abbrev-table))
 
         :config
-        (defvar git-commit-mode-abbrev-table)
-        (define-abbrev-table 'git-commit-mode-abbrev-table '()
+        (defvar git-commit-mode-abbrev-table+)
+        (define-abbrev-table 'git-commit-mode-abbrev-table+ '()
           :parents +abbrev-mode-text-mode-parent-tables)
-        (push `(git-commit-mode . ,git-commit-mode-abbrev-table)
+        (abbrev-table-put git-commit-mode-abbrev-table+ :parents +abbrev-mode-text-mode-parent-tables)
+        (push `(git-commit-mode . ,git-commit-mode-abbrev-table+)
               abbrev-minor-mode-table-alist)
 
         :config

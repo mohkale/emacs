@@ -72,3 +72,9 @@
     ("fr" "from" nil :count 1)
     ("im" "import" nil :count 1)
     ))
+
+(define-abbrev-table 'git-commit-mode-abbrev-table+
+  '(
+    ("cab" "Co-Authored-By:" nil :count 1)
+    ("cl" "Closes:" nil :count 1)
+    ))
