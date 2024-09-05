@@ -14408,6 +14408,90 @@ Welcome to my personal Emacs configuration 😎.
          [remap quit-window] 'magit-kill-this-buffer))
     #+END_SRC
 
+*** Magit Merge Remotes
+    Magit by default doesn't support merging from remotes as a quick action. We
+    define suffixes to make this easier.
+
+    #+begin_src emacs-lisp
+      (use-package transient
+        :autoload (transient-suffix
+                   transient-suffix-put
+                   transient-insert-suffix
+                   transient-append-suffix
+                   transient-remove-suffix
+                   transient-define-suffix))
+
+      (use-package magit
+        :autoload
+        (magit--select-push-remote
+         magit-get-current-branch
+         magit-get-upstream-branch
+         magit-merge-arguments
+         magit-merge-assert
+         magit-pull--pushbranch-description
+         magit-pull--upstream-description
+         magit-read-upstream-branch
+         magit-run-git-async
+         magit-set-upstream-branch)
+
+        :commands magit-merge-from-pushremote+
+        :config
+        (transient-define-suffix magit-merge-from-pushremote+ (args nocommit)
+          "Merge into the current branch from its push-remote branch.
+
+      When the push-remote is either not configured or unusable, then let
+      the user first configure the push-remote. With a prefix argument
+      skip generating a merge commit."
+          :if #'magit-get-current-branch
+          :description #'magit-pull--pushbranch-description
+          (interactive (list (magit-merge-arguments) current-prefix-arg))
+
+          (pcase-let ((`(,branch ,remote)
+                       (magit--select-push-remote "merge from this")))
+            (magit-merge-assert)
+            (magit-run-git-async "merge" (if nocommit "--no-commit" "--no-edit")
+                                 args (concat remote "/" branch))))
+
+        :commands magit-merge-from-upstream+
+        :config
+        (transient-define-suffix magit-merge-from-upstream+ (args nocommit)
+          "Merge the current branch from its upstream branch.
+
+      When the upstream is either not configured or unusable, then let
+      the user first configure the upstream. With a prefix argument
+      skip generating a merge commit."
+          :if #'magit-get-current-branch
+          :description #'magit-pull--upstream-description
+          (interactive (list (magit-merge-arguments) current-prefix-arg))
+
+          (let* ((branch (or (magit-get-current-branch)
+                             (user-error "No branch is checked out")))
+                 (upstream (magit-get-upstream-branch branch)))
+            (unless upstream
+              (setq upstream
+                    (magit-read-upstream-branch
+                     branch (format "Set upstream of %s and rebase onto that" branch)))
+              (magit-set-upstream-branch branch upstream))
+            (magit-merge-assert)
+            (magit-run-git-async "merge" (if nocommit "--no-commit" "--no-edit")
+                                 args upstream)))
+
+        :config
+        (transient-suffix-put 'magit-merge '(1 1 "p") :key "v")
+
+        (transient-insert-suffix 'magit-merge '(1 0 0) '("p" magit-merge-from-pushremote+))
+        (transient-append-suffix 'magit-merge '(1 0 0) '("u" magit-merge-from-upstream+))
+        (transient-remove-suffix 'magit-merge '(1 1 1)) ; Remove blank separator
+
+        ;; Move the absorb suffix to the next column
+        (transient-remove-suffix 'magit-merge '(1 0 "a"))
+        (transient-append-suffix 'magit-merge '(1 1 0) '("a" "Absorb" magit-merge-absorb))
+
+        ;; Add a configure setting like `magit-push'.
+        (transient-append-suffix 'magit-merge '(-1)
+          ["Configure" ("C" "Set variables..."  magit-branch-configure)]))
+    #+end_src
+
 *** Magit Evil
     Now we need to enable evil-bindings in magit buffers... which is honestly a lot
     more of a pain then you may expect. For now I've just copied and pasted a bunch
