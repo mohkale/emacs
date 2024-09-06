@@ -17070,11 +17070,19 @@ Welcome to my personal Emacs configuration 😎.
    #+end_src
 
    #+BEGIN_SRC emacs-lisp
+     (require '+pkg-browse-url)
+
      (use-package engine-mode
        :straight t
-       :autoload engine/function-name
        :custom
-       (engine/browser-function #'+xopen-url))
+       (engine/browser-function #'engine-mode-browse-url+)
+
+       :autoload engine-mode-browse-url+
+       :config
+       (defun engine-mode-browse-url+ (url &rest args)
+         "Browse URL and then print browsed URL."
+         (message "%s" url)
+         (apply #'+xopen-url url args)))
    #+END_SRC
 
    Here's a list of all the search-engines my emacs will setup alongside the
