@@ -8186,17 +8186,6 @@ Welcome to my personal Emacs configuration 😎.
           (when-let ((buf (next-error-find-buffer)))
             (delete-windows-on buf)))
 
-        :autoload compilation-colorize+
-        :hook (compilation-filter . compilation-colorize+)
-        :preface (autoload 'ansi-color-apply-on-region "ansi-color")
-        :config
-        (defun compilation-colorize+ ()
-          "Colorize from `compilation-filter-start' to `point'.
-      Taken from [[https://emacs.stackexchange.com/a/38531][here]]."
-          (let ((inhibit-read-only t))
-            (ansi-color-apply-on-region
-             compilation-filter-start (point))))
-
         :commands display-compilation-buffer+
         :leader ("cb" 'display-compilation-buffer+)
         :config
