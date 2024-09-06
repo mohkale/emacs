@@ -17146,28 +17146,32 @@ Welcome to my personal Emacs configuration 😎.
    #+end_src
 
    #+BEGIN_SRC emacs-lisp :var engines=engine-mode-search-engines
-     (setq engines (cdr engines)) ;; strip header row
+     (setq engines (cdr engines))                                ; strip header row
 
-     ;; Assign leader keys and setup autoloads for each searcher.
-     (cl-loop for (engine key id-str) in engines
-              with id-sym = nil
-              do (setq id-sym (intern
-                               (concat "engine/search-" id-str)))
-              when (string-empty-p engine)
-                do (setq engine id-str)
-              do (progn
-                   (when key
-                     (leader-set-keys key (list id-sym :wk engine)))
-                   (autoload id-sym "engine-mode.el" nil t)))
+     (use-package engine-mode
+       :straight t
+       :init
+       ;; Assign leader keys and setup autoloads for each searcher.
+       (cl-loop for (engine key id-str) in engines
+                with id-sym = nil
+                do (setq id-sym (intern
+                                 (concat "engine/search-" id-str)))
+                when (string-empty-p engine)
+                  do (setq engine id-str)
+                do (progn
+                     (when key
+                       (leader-set-keys key (list id-sym :wk engine)))
+                     (autoload id-sym "engine-mode" nil 'interactive)))
 
-     (with-eval-after-load 'engine-mode
+       :config
        (cl-loop for (name _ id-str query) in engines
                 with id-sym = nil
                 when (and id-str query)
                   do (setq id-sym (intern id-str))
                   and do (eval
                           `(defengine ,id-sym ,query))
-                  and do (cl-pushnew (cons (or name id-str) (engine/function-name id-sym))
+                  and do (cl-pushnew (cons (or name id-str)
+                                           (intern (concat "engine/search-" id-str)))
                                      engine-engines+)))
    #+END_SRC
 
@@ -17181,13 +17185,15 @@ Welcome to my personal Emacs configuration 😎.
    Lets create a command to interactively select and execute a search engine.
 
    #+BEGIN_SRC emacs-lisp
-     (defun engine-search+ ()
-       (interactive)
-       (call-interactively
-        (alist-get (completing-read "Engine: " engine-engines+)
-                   engine-engines+ nil nil #'string-equal)))
-
-     (leader-set-keys "ses" 'engine-search+)
+     (use-package engine-mode
+       :commands engine-search+
+       :config
+       (defun engine-search+ ()
+         (interactive)
+         (call-interactively
+          (alist-get (completing-read "Engine: " engine-engines+)
+                     engine-engines+ nil nil #'string-equal)))
+       :leader ("ses" 'engine-search+))
    #+END_SRC
 
    #+begin_src emacs-lisp
