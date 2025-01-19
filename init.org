@@ -12312,8 +12312,10 @@ Welcome to my personal Emacs configuration 😎.
         (notmuch-search-line-faces
          '(("unread" . notmuch-search-unread-face)
            ("H" . notmuch-search-H-face+)
+           ("scheduled" . notmuch-search-scheduled-face+)
            ("flagged" . notmuch-search-flagged-face)
-           ("reminder" . notmuch-search-flagged-face)))
+           ("reminder" . notmuch-search-flagged-face)
+           ("waiting" . notmuch-search-waiting-face+)))
         (notmuch-show-all-tags-list t)
         (notmuch-draft-folder (join-path+ "local" (system-name) "drafts"))
         (notmuch-saved-searches
@@ -12324,8 +12326,8 @@ Welcome to my personal Emacs configuration 😎.
            (:name "Sent" :query "tag:sent" :key "s")
            (:name "Drafts" :query "tag:draft" :key "d")
            ;; Custom additions
-           (:name "Alerts" :query "tag:/^a\\//" :key "l")
-           (:name "Mailing Lists" :query "tag:/^l\\// and not:tag:promotion" :key "m")
+           (:name "Alerts" :query "tag:/^a\\//" :key "n")
+           (:name "Mailing Lists" :query "( tag:/^l\\// or tag:/^s\\// ) and not:tag:promotion" :key "l")
            (:name "Host Reports" :query "tag:/^h\\//" :key "h")))
 
         :autoload notmuch-company
@@ -12333,6 +12335,10 @@ Welcome to my personal Emacs configuration 😎.
 
         :preface
         (defface notmuch-search-H-face+ '((t (:foreground "#FF6EB4")))
+          "Face for lines tagged H in the `notmuch-search-mode' buffer.")
+        (defface notmuch-search-waiting-face+ '((t (:foreground "#FF8700")))
+          "Face for lines tagged H in the `notmuch-search-mode' buffer.")
+        (defface notmuch-search-scheduled-face+ '((t (:foreground "#67e4c4")))
           "Face for lines tagged H in the `notmuch-search-mode' buffer.")
 
         :init
@@ -12732,7 +12738,7 @@ Welcome to my personal Emacs configuration 😎.
             (define-key map "i"
               (defun notmuch-tag-remove-from-inbox+ (only)
                 (interactive "P")
-                (notmuch-tag+ `("-inbox" ,@(unless only (list "-unread"))))))
+                (notmuch-tag+ `("-inbox" ,@(unless only (list "-unread" "-waiting" "-scheduled"))))))
 
             (define-key map "r"
               (defun notmuch-tag-read+ ()
