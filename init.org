@@ -687,8 +687,8 @@ Welcome to my personal Emacs configuration 😎.
       MODE defaults to `major-mode'."
         (or mode (setq mode major-mode))
 
-        (when-let ((enable (alist-get mode +lsp-maybe-connect
-                                      (alist-get t +lsp-maybe-connect))))
+        (when-let* ((enable (alist-get mode +lsp-maybe-connect
+                                       (alist-get t +lsp-maybe-connect))))
           (when (functionp enable)
             (setq enable (funcall enable)))
 
@@ -1211,7 +1211,7 @@ Welcome to my personal Emacs configuration 😎.
     #+BEGIN_SRC emacs-lisp
      (add-hook 'window-configuration-change-hook
                (defun +change-window-divider ()
-                 (when-let ((display-table (or buffer-display-table standard-display-table)))
+                 (when-let* ((display-table (or buffer-display-table standard-display-table)))
                    (set-display-table-slot display-table 5 ?│)
                    (set-window-display-table (selected-window) display-table))))
     #+END_SRC
@@ -2416,7 +2416,7 @@ Welcome to my personal Emacs configuration 😎.
    #+BEGIN_SRC emacs-lisp
        (defmacro display-buffer-create-focus-method+ (func)
          `(defun ,(intern (concat (symbol-name func) "-and-focus+")) (buffer alist)
-            (when-let ((window (,func buffer alist)))
+            (when-let* ((window (,func buffer alist)))
               (select-window window))))
 
        (display-buffer-create-focus-method+ display-buffer--maybe-same-window)
@@ -2518,8 +2518,8 @@ Welcome to my personal Emacs configuration 😎.
 
            (window--display-buffer
             buffer
-            (if-let ((horizontal-layout (with-selected-window (car windows)
-                                          (window-in-direction 'right))))
+            (if-let* ((horizontal-layout (with-selected-window (car windows)
+                                           (window-in-direction 'right))))
                 (split-window (if (eq side-horizontal 'left)
                                   (car windows)
                                 (cadr windows))
@@ -2629,7 +2629,7 @@ Welcome to my personal Emacs configuration 😎.
                      (type message &optional level buffer-name)
                    (unless level
                      (setq level :warning))
-                   (when-let ((new (cdr (assq level warning-levels))))
+                   (when-let* ((new (cdr (assq level warning-levels))))
                      (setq level new))
 
                    (unless (or (not (or after-init-time noninteractive (daemonp)))
@@ -3424,9 +3424,9 @@ Welcome to my personal Emacs configuration 😎.
 
       (defun smart-buffer-file-name+ (&optional buffer strip-remote)
         (with-current-buffer (or buffer (current-buffer))
-          (or (when-let ((bfn (buffer-file-name)))
-                (if-let ((strip-remote strip-remote)
-                         (remote (file-remote-p bfn)))
+          (or (when-let* ((bfn (buffer-file-name)))
+                (if-let* ((strip-remote strip-remote)
+                          (remote (file-remote-p bfn)))
                     (string-remove-prefix remote bfn)
                   bfn))
               (and (derived-mode-p 'dired-mode)
@@ -3453,7 +3453,7 @@ Welcome to my personal Emacs configuration 😎.
 
       (defun show-and-copy-buffer-file-basename+ (&optional include-linum)
         (interactive "P")
-        (when-let ((file-name (smart-buffer-file-name+ nil t)))
+        (when-let* ((file-name (smart-buffer-file-name+ nil t)))
           (show-and-copy+
            (concat
             (file-name-nondirectory file-name)
@@ -3464,7 +3464,7 @@ Welcome to my personal Emacs configuration 😎.
 
       (defun show-and-copy-buffer-file-name+ (&optional include-linum)
         (interactive "P")
-        (when-let ((file-name (smart-buffer-file-name+ nil t)))
+        (when-let* ((file-name (smart-buffer-file-name+ nil t)))
           (show-and-copy+
            (concat
             file-name
@@ -3480,7 +3480,7 @@ Welcome to my personal Emacs configuration 😎.
       (defun show-and-copy-directory+ ()
         (interactive)
         (show-and-copy+
-         (if-let ((file-name (smart-buffer-file-name+ nil t)))
+         (if-let* ((file-name (smart-buffer-file-name+ nil t)))
              (file-name-directory file-name)
            default-directory)))
 
@@ -3530,14 +3530,14 @@ Welcome to my personal Emacs configuration 😎.
         (interactive)
         (unless initial-buffer-choice
           (user-error "No initial buffer choice setup"))
-        (if-let ((buffer
-                  (pcase initial-buffer-choice
-                    ((pred stringp)
-                     (find-buffer-visiting initial-buffer-choice))
-                    ((pred functionp)
-                     (funcall initial-buffer-choice))
-                    ((pred symbol-value)
-                     (get-buffer "*scratch*")))))
+        (if-let* ((buffer
+                   (pcase initial-buffer-choice
+                     ((pred stringp)
+                      (find-buffer-visiting initial-buffer-choice))
+                     ((pred functionp)
+                      (funcall initial-buffer-choice))
+                     ((pred symbol-value)
+                      (get-buffer "*scratch*")))))
             (switch-to-buffer buffer)))
     #+END_SRC
 
@@ -3591,7 +3591,7 @@ Welcome to my personal Emacs configuration 😎.
                    nil
                    nil
                    default-basename)))))
-        (when-let ((dir (file-name-directory path)))
+        (when-let* ((dir (file-name-directory path)))
           (unless (string-empty-p dir)
             (mkdir dir t)))
         (find-file path))
@@ -5364,8 +5364,8 @@ Welcome to my personal Emacs configuration 😎.
       This can happen because `all-the-icons' associations are out of date."
           (when (and (not +icons-prefer-nerd-font)
                      (string-prefix-p "nerd-" (symbol-name family)))
-            (if-let ((new-family (alist-get (intern (substring (symbol-name family) 5))
-                                            +icon-nerd-to-all-the-icons)))
+            (if-let* ((new-family (alist-get (intern (substring (symbol-name family) 5))
+                                             +icon-nerd-to-all-the-icons)))
                 (setq family new-family)
               (error "Nerd fonts not enabled but need to return a %s icon" family)))
           ;; Function name calculation copied from `all-the-icons--function-name'.
@@ -5376,11 +5376,11 @@ Welcome to my personal Emacs configuration 😎.
       TARGET can be a buffer, directory path, file-name, mode-symbol, etc. depending
       on the value of FOR. ARGS when supported will be passed to the associated icon
       fetcher and can be used to set :height or :face properties."
-          (if-let ((func (cl-case for
-                           (file #'all-the-icons-icon-for-file)
-                           (mode #'all-the-icons-icon-for-mode)
-                           (url  #'all-the-icons-icon-for-url)
-                           ((dir directory) #'all-the-icons-icon-for-dir))))
+          (if-let* ((func (cl-case for
+                            (file #'all-the-icons-icon-for-file)
+                            (mode #'all-the-icons-icon-for-mode)
+                            (url  #'all-the-icons-icon-for-url)
+                            ((dir directory) #'all-the-icons-icon-for-dir))))
               `(,func ,target ,@args)
             (cl-case for
               ;; `all-the-icons-icon-for-buffer'.
@@ -7231,13 +7231,13 @@ Welcome to my personal Emacs configuration 😎.
         (defun electric-layout-update-rules+ ()
           (cond
            ((bound-and-true-p electric-layout-mode)
-            (when-let ((local-rules
-                        (cl-loop
-                         for (mode . variables) in electric-layout-mode-rules+
-                         when (seq-find #'derived-mode-p (if (consp mode)
-                                                             mode
-                                                           (list mode)))
-                           append variables)))
+            (when-let* ((local-rules
+                         (cl-loop
+                          for (mode . variables) in electric-layout-mode-rules+
+                          when (seq-find #'derived-mode-p (if (consp mode)
+                                                              mode
+                                                            (list mode)))
+                            append variables)))
               (setq-local electric-layout-rules local-rules)))
            (t
             (kill-local-variable 'electric-layout-rules)))))
@@ -8028,7 +8028,7 @@ Welcome to my personal Emacs configuration 😎.
                  with last-face = nil
                  with current-face = nil
                  do (setq current-face
-                          (when-let ((face (get-text-property i 'face str)))
+                          (when-let* ((face (get-text-property i 'face str)))
                             (if (listp face) (car face) face)))
                  with seq-range = nil
                  when (and current-face (member current-face minibuffer-override-faces+))
@@ -8153,7 +8153,7 @@ Welcome to my personal Emacs configuration 😎.
                                      (string-remove-prefix (rx bol) (car new-regex))))
            new-regex))
 
-        (when-let ((entry (member 'gnu compilation-error-regexp-alist)))
+        (when-let* ((entry (member 'gnu compilation-error-regexp-alist)))
           (setcar entry 'gnu+ctest))
 
         :autoload compile--double-prefix-means-run-comint+
@@ -8184,7 +8184,7 @@ Welcome to my personal Emacs configuration 😎.
         :config
         (defun kill-compilation-windows+ ()
           (interactive)
-          (when-let ((buf (next-error-find-buffer)))
+          (when-let* ((buf (next-error-find-buffer)))
             (delete-windows-on buf)))
 
         :commands display-compilation-buffer+
@@ -8192,7 +8192,7 @@ Welcome to my personal Emacs configuration 😎.
         :config
         (defun display-compilation-buffer+ ()
           (interactive)
-          (if-let ((buffer (next-error-find-buffer)))
+          (if-let* ((buffer (next-error-find-buffer)))
               (select-window
                (display-buffer buffer
                                '(nil
@@ -8319,7 +8319,7 @@ Welcome to my personal Emacs configuration 😎.
                                         str))
                    (not (apply 'derived-mode-p compilation-auto-kill-ignore-modes+)))
           (let ((terminate-window t))
-            (when-let ((notifications (compilation-cancel-auto-kill-p+)))
+            (when-let* ((notifications (compilation-cancel-auto-kill-p+)))
               (when debug-on-error
                 (message "Window kill suspended due to encountering: %s"
                          (combine-and-quote-strings notifications)))
@@ -9160,7 +9160,7 @@ Welcome to my personal Emacs configuration 😎.
      With ALL-FRAMES use all frames known to the current emacs session."
          (cl-remove-duplicates
           (cl-loop for frame in (if all-frames (frame-list) (list (selected-frame)))
-                   append (when-let ((proc (frame-parameter frame 'client)))
+                   append (when-let* ((proc (frame-parameter frame 'client)))
                             (process-get proc 'buffers)))))
 
        (defvar move-client-buffers-wrap-around+ t
@@ -10239,10 +10239,10 @@ Welcome to my personal Emacs configuration 😎.
         (defun embark-magit-status+ (file)
           (interactive "fFile: ")
           (setq file (file-chase-links file))
-          (if-let ((root (project-current-root+
-                          (or (when (file-directory-p file)
-                                file)
-                              (file-name-directory file)))))
+          (if-let* ((root (project-current-root+
+                           (or (when (file-directory-p file)
+                                 file)
+                               (file-name-directory file)))))
               (magit-status-setup-buffer root)
             (user-error "Could not find project root for %s" root)))
 
@@ -10559,7 +10559,7 @@ Welcome to my personal Emacs configuration 😎.
             :enabled  ,#'project-current
             :items
             ,(lambda ()
-               (when-let ((project (project-current)))
+               (when-let* ((project (project-current)))
                  (consult--hide-prefix+ (project-files project)
                                         (project-root project))))))
         :autoload consult--hide-prefix+
@@ -10959,7 +10959,7 @@ Welcome to my personal Emacs configuration 😎.
        (defun consult-evil-marks+ ()
          "Jump to a local or glboal evil-mark."
          (interactive)
-         (if-let ((marks (consult--with-increased-gc (consult--evil-marks-candidates+))))
+         (if-let* ((marks (consult--with-increased-gc (consult--evil-marks-candidates+))))
              (consult--read
               marks
               :prompt "Evil mark: "
@@ -11060,7 +11060,7 @@ Welcome to my personal Emacs configuration 😎.
           (ebdb-records)))
 
        (defun consult-ebdb-read+ ()
-         (if-let ((cands (consult-ebdb-cands+)))
+         (if-let* ((cands (consult-ebdb-cands+)))
              (cdr
               (assoc
                (completing-read "Records: "
@@ -11231,7 +11231,7 @@ Welcome to my personal Emacs configuration 😎.
                                                    (propertize (concat "(" tags ") ") 'face 'bold))
                                                  title
                                                  (when url
-                                                   (when-let ((domain (url-domain (url-generic-parse-url url))))
+                                                   (when-let* ((domain (url-domain (url-generic-parse-url url))))
                                                      (concat " [" (propertize domain 'face 'font-lock-preprocessor-face) "]"))))
                                          url))))
                    (t (funcall async action))))))
@@ -11544,7 +11544,7 @@ Welcome to my personal Emacs configuration 😎.
           (cl-labels ((flatmap (function sequence)
                                (let ((result nil))
                                  (dolist (it (apply #'append (mapcar function sequence)))
-                                   (if-let ((existing-group (alist-get (car it) result)))
+                                   (if-let* ((existing-group (alist-get (car it) result)))
                                        (setcdr existing-group (append (cdr existing-group) (cdr it)))
                                      (push (cons (car it) (cdr it)) result)))
                                  (nreverse result)))
@@ -11558,7 +11558,7 @@ Welcome to my personal Emacs configuration 😎.
                                       (mapcar (apply-partially #'map-parent-group-prefix name)
                                               (flatmap (lambda (c) (apply #'dfs c)) children)))
                                      (parent-entry `((,name . ,(car reg)))))
-                                 (if-let ((existing-group (alist-get kind result)))
+                                 (if-let* ((existing-group (alist-get kind result)))
                                      (setcdr existing-group (append parent-entry (cdr existing-group)))
                                    (push (cons kind parent-entry) result))
                                  result))))
@@ -11768,10 +11768,10 @@ Welcome to my personal Emacs configuration 😎.
             (let ((major-mode mode))
               (seq-intersection
                (lsp--filter-clients #'lsp--matching-clients?)
-               (when-let ((workspaces
-                           (if all-workspaces
-                               (-flatten (hash-table-values (lsp-session-folder->servers (lsp-session))))
-                             (gethash (lsp-workspace-root) (lsp-session-folder->servers (lsp-session))))))
+               (when-let* ((workspaces
+                            (if all-workspaces
+                                (-flatten (hash-table-values (lsp-session-folder->servers (lsp-session))))
+                              (gethash (lsp-workspace-root) (lsp-session-folder->servers (lsp-session))))))
                  (mapcar #'lsp--workspace-client workspaces))
                #'equal))))
 
@@ -12120,7 +12120,7 @@ Welcome to my personal Emacs configuration 😎.
        :config
        (defmacro skeletor-conf+ (key &optional default)
          "Retrieve a value from the skeletor substitions."
-         `(if-let ((val (assoc ,key subs)))
+         `(if-let* ((val (assoc ,key subs)))
               (cdr val)
             ,default))
 
@@ -12380,7 +12380,7 @@ Welcome to my personal Emacs configuration 😎.
             ('notmuch-tree-mode (notmuch-tree-tag tag-changes))
             (_ (user-error "No tag command known for %s" major-mode)))
 
-          (when-let ((next (alist-get major-mode next)))
+          (when-let* ((next (alist-get major-mode next)))
             (funcall next)))
 
         :autoload notmuch-show-get-tag
@@ -12447,10 +12447,10 @@ Welcome to my personal Emacs configuration 😎.
             (user-error "%s can only be called in `notmuch-show' buffers" this-command))
 
           (let ((to (car (mail-header-parse-address (notmuch-show-get-to)))))
-            (if-let ((url-gen (cdr
-                               (cl-find-if (lambda (it)
-                                             (string-match-p (car it) to))
-                                           notmuch-open-remote-urls+))))
+            (if-let* ((url-gen (cdr
+                                (cl-find-if (lambda (it)
+                                              (string-match-p (car it) to))
+                                            notmuch-open-remote-urls+))))
                 (funcall url-gen to)
               (user-error "No opener configured for mail from %s" to))))
 
@@ -12458,7 +12458,7 @@ Welcome to my personal Emacs configuration 😎.
         :config
         (defun notmuch-show-and-copy-remote+ ()
           (interactive)
-          (if-let ((url (notmuch-remote+)))
+          (if-let* ((url (notmuch-remote+)))
               (progn
                 (kill-new url)
                 (message "%s" url))
@@ -12468,7 +12468,7 @@ Welcome to my personal Emacs configuration 😎.
         :config
         (defun notmuch-open-remote+ ()
           (interactive)
-          (if-let ((url (notmuch-remote+)))
+          (if-let* ((url (notmuch-remote+)))
               (browse-url url)
             (user-error "Failed to resolve remote for current buffer")))
 
@@ -12525,7 +12525,7 @@ Welcome to my personal Emacs configuration 😎.
                       (cl-destructuring-bind (msg part depth &optional hide) args
                         (list msg part depth
                               (or hide
-                                  (when-let ((mime-type (notmuch-show-mime-type part)))
+                                  (when-let* ((mime-type (notmuch-show-mime-type part)))
                                     (cl-some (apply-partially #'notmuch-match-content-type
                                                               mime-type)
                                              notmuch-collapse-inline-mime-types+)))))))
@@ -13022,16 +13022,16 @@ Welcome to my personal Emacs configuration 😎.
                       (new-modes
                        (cond
                         ((symbolp mode)
-                         (when-let ((ts-variant (alist-get mode +tree-sitter-mode-remap)))
+                         (when-let* ((ts-variant (alist-get mode +tree-sitter-mode-remap)))
                            (list mode ts-variant)))
                         ((consp mode)
-                         (when-let ((ts-variants
-                                     (cl-loop
-                                      for sub-mode in mode
-                                      with ts-variant = nil
-                                      do (setq ts-variant
-                                               (alist-get sub-mode +tree-sitter-mode-remap))
-                                      when ts-variant collect ts-variant)))
+                         (when-let* ((ts-variants
+                                      (cl-loop
+                                       for sub-mode in mode
+                                       with ts-variant = nil
+                                       do (setq ts-variant
+                                                (alist-get sub-mode +tree-sitter-mode-remap))
+                                       when ts-variant collect ts-variant)))
                            (append mode ts-variants))))))
             (setcar it new-modes))))
     #+end_src
@@ -15193,7 +15193,7 @@ Welcome to my personal Emacs configuration 😎.
                    flycheck-help-echo-all-error-messages)
         :config
         (defun flycheck-eldoc-function+ (_callback)
-          (when-let ((errors (flycheck-overlay-errors-at (point))))
+          (when-let* ((errors (flycheck-overlay-errors-at (point))))
             (flycheck-help-echo-all-error-messages errors)))
 
         (defun flycheck-setup-eldoc+ ()
@@ -16044,7 +16044,7 @@ Welcome to my personal Emacs configuration 😎.
          (apply-partially #'identity t))
         :config
         ;; Add padding to make sure icons aren't truncated on the terminal.
-        (when-let ((cell (assoc 'ibuffer-make-column-icon ibuffer-inline-columns)))
+        (when-let* ((cell (assoc 'ibuffer-make-column-icon ibuffer-inline-columns)))
           (setcdr cell
                   (list `(all-the-icons-pad-on-tty-advice+ ,@(cdr cell))))))
     #+END_SRC
@@ -16062,8 +16062,8 @@ Welcome to my personal Emacs configuration 😎.
           (:description "filename"
            :reader (file-truename
                     (read-directory-name "List files from file/directory name: ")))
-          (when-let ((it (or (buffer-local-value 'buffer-file-name buf)
-                             (buffer-local-value 'dired-directory buf))))
+          (when-let* ((it (or (buffer-local-value 'buffer-file-name buf)
+                              (buffer-local-value 'dired-directory buf))))
             ;; (message "qual: %s, it: %s" qualifier (file-truename it))
             (string-prefix-p qualifier (file-truename it))))
 
@@ -16577,14 +16577,14 @@ Welcome to my personal Emacs configuration 😎.
         :autoload project-current-root+
         :init
         (defun project-current-root+ (&optional dir)
-          (when-let ((project
-                      (project-current nil (or dir default-directory))))
+          (when-let* ((project
+                       (project-current nil (or dir default-directory))))
             (project-root project)))
 
         :autoload project-has-file-p+
         :init
         (defun project-has-file-p+ (&rest files)
-          (when-let ((default-directory (project-current-root+)))
+          (when-let* ((default-directory (project-current-root+)))
             (cl-find-if #'file-exists-p files)))
 
         :commands project-show-and-copy-project-dir+
@@ -16592,7 +16592,7 @@ Welcome to my personal Emacs configuration 😎.
         :config
         (defun project-show-and-copy-project-dir+ (&optional arg)
           (interactive "P")
-          (if-let ((path (project-current-root+)))
+          (if-let* ((path (project-current-root+)))
               (progn
                 (when arg
                   (if (and (consp arg)
@@ -16719,7 +16719,7 @@ Welcome to my personal Emacs configuration 😎.
             :enabled  ,#'project-current
             :items
             ,(lambda ()
-               (when-let ((project (project-current)))
+               (when-let* ((project (project-current)))
                  (consult--hide-prefix+
                   (projection-find-list-test-files project)
                   (project-root project))))))
@@ -16818,11 +16818,11 @@ Welcome to my personal Emacs configuration 😎.
         (defun project-org-project-file+ (&optional arg)
           (interactive "P")
           (find-file
-           (if-let ((cands (let ((default-directory project-org-projects-directory+))
-                             (cl-loop for file in (cl-remove-if
-                                                   (apply-partially #'string-match-p +find-file-ignore-regexp)
-                                                   (append (file-expand-wildcards "*.org")))
-                                      collect (cons file (concat default-directory "/" file))))))
+           (if-let* ((cands (let ((default-directory project-org-projects-directory+))
+                              (cl-loop for file in (cl-remove-if
+                                                    (apply-partially #'string-match-p +find-file-ignore-regexp)
+                                                    (append (file-expand-wildcards "*.org")))
+                                       collect (cons file (concat default-directory "/" file))))))
                (or (and (not arg)
                         (when-let* ((current-project (project-current))
                                     (current-project (project-name current-project))
@@ -17901,7 +17901,7 @@ Welcome to my personal Emacs configuration 😎.
           "Force refresh of Emacs dashboard after startup.
       This works around an issue where the font-lock rules for the dashboard are
       incorrect at startup."
-          (when-let ((dash (get-buffer dashboard-buffer-name)))
+          (when-let* ((dash (get-buffer dashboard-buffer-name)))
             (with-current-buffer dash
               (dashboard-refresh-buffer))))
 
@@ -17979,7 +17979,7 @@ Welcome to my personal Emacs configuration 😎.
         :config
         (defun dashboard--insert-ascii-banner-centered+ (path)
           (unless (string-suffix-p ".txt" path)
-            (when-let (banner (dashboard-read-banner+ path))
+            (when-let* ((banner (dashboard-read-banner+ path)))
               (insert "\n")
               (let* ((start (point))
                      (width  (car (car banner)))
@@ -18302,7 +18302,7 @@ Welcome to my personal Emacs configuration 😎.
                    yas-expand-snippet)
         :config
         (defun autoinsert-expand-yas+ (mode uuid)
-          (if-let ((snippet (yas--get-template-by-uuid mode uuid)))
+          (if-let* ((snippet (yas--get-template-by-uuid mode uuid)))
               (yas-expand-snippet (yas--template-content snippet))
             (user-error "Failed to find snippet %s/%s" mode uuid))))
     #+end_src
@@ -18537,7 +18537,7 @@ Welcome to my personal Emacs configuration 😎.
        (defun ggtags-enable-in-projects+ ()
          "Enable `ggtags-mode' when opening a file in a project with a GTAGS file."
          (unless (bound-and-true-p ggtags-mode)
-           (when-let ((root (project-current-root+)))
+           (when-let* ((root (project-current-root+)))
              (when (file-exists-p (concat root "GTAGS"))
                (ggtags-mode +1)))))
        :hook (find-file . ggtags-enable-in-projects+)
@@ -18695,10 +18695,10 @@ Welcome to my personal Emacs configuration 😎.
           (let ((current-tab-p (eq (car tab) 'current-tab))
                 (face (funcall tab-bar-tab-face-function tab)))
             (append
-             (when-let ((sep (cond
-                              (current-tab-p (propertize tab-bar-separator+ 'face 'tab-bar-separator))
-                              ((eq i 1) (propertize " " 'face face))
-                              (t (propertize tab-bar-inactive-separator+ 'face 'tab-bar-inactive-separator)))))
+             (when-let* ((sep (cond
+                               (current-tab-p (propertize tab-bar-separator+ 'face 'tab-bar-separator))
+                               ((eq i 1) (propertize " " 'face face))
+                               (t (propertize tab-bar-inactive-separator+ 'face 'tab-bar-inactive-separator)))))
                `((,(intern (format "sep-%i" i)) menu-item ,sep ignore)))
              (let ((name (funcall tab-bar-tab-name-format-function tab i)))
                (cond
@@ -19735,7 +19735,7 @@ Welcome to my personal Emacs configuration 😎.
 
       (defun c-mode-clangd-args+ ()
         `(,@c-mode-clangd-args+
-          ,@(when-let ((dir c-mode-clangd-compile-commands-dir+))
+          ,@(when-let* ((dir c-mode-clangd-compile-commands-dir+))
               (list "--compile-commands-dir" dir))))
     #+end_src
 
@@ -20099,7 +20099,7 @@ Welcome to my personal Emacs configuration 😎.
       Requires the current directory to be accessed through docker-tramp and
       be mounted from an external file-system into it."
           (interactive)
-          (if-let ((directory (docker-original-default-directory+)))
+          (if-let* ((directory (docker-original-default-directory+)))
               (find-file directory)
             (user-error "Could not resolve external mount for %s" default-directory))))
     #+end_src
@@ -20217,7 +20217,7 @@ Welcome to my personal Emacs configuration 😎.
                  "inline-dir-locals"))
             (_ (setcar it (symbol-name (car it))))))
         ;; Apply inline-dir-locals.
-        (when-let ((inline-config (alist-get 'inline-dir-locals customizations)))
+        (when-let* ((inline-config (alist-get 'inline-dir-locals customizations)))
           (setq customizations (cl-remove 'inline-dir-locals customizations :key #'car)
                 inline-config (let ((read-circle nil))
                                 (read inline-config)))
@@ -20229,8 +20229,8 @@ Welcome to my personal Emacs configuration 😎.
 
       (defun vscode-dirlocal-adapter--read-from-dir+ (directory)
         "Try to read Emacs dir-locals from devcontainer configuration in DIRECTORY."
-        (when-let ((class-name (intern directory))
-                   (dev-container-config (car-safe (devcontainer-dirlocal-adapter--config-file+ directory))))
+        (when-let* ((class-name (intern directory))
+                    (dev-container-config (car-safe (devcontainer-dirlocal-adapter--config-file+ directory))))
           (let ((modtime 0) variables)
             (with-demoted-errors "Error reading devcontainers config: %S"
               (setq modtime (file-attribute-modification-time
@@ -21481,12 +21481,12 @@ Welcome to my personal Emacs configuration 😎.
                          (concat "emacsclient "
                                  (cond
                                   ((unix-p+)
-                                   (when-let ((server-socket-dir (bound-and-true-p server-socket-dir)))
+                                   (when-let* ((server-socket-dir (bound-and-true-p server-socket-dir)))
                                      (concat
                                       " --socket-name "
                                       (shell-quote-argument (join-path+ server-socket-dir "server")))))
                                   ((windows-p+)
-                                   (when-let ((server-auth-dir (bound-and-true-p server-auth-dir)))
+                                   (when-let* ((server-auth-dir (bound-and-true-p server-auth-dir)))
                                      (concat
                                       (concat
                                        "--server-file "
@@ -22393,8 +22393,8 @@ Welcome to my personal Emacs configuration 😎.
         (defun org-find-file+ (&optional select initial-input)
           (interactive "P")
           (if select
-              (if-let ((default-directory (or +notes-home default-directory))
-                       (org-files (org-find-file-candidates+)))
+              (if-let* ((default-directory (or +notes-home default-directory))
+                        (org-files (org-find-file-candidates+)))
                   (cond
                    ((package! :consult)
                     (declare-function consult--read "consult")
@@ -22910,11 +22910,11 @@ Welcome to my personal Emacs configuration 😎.
       To make links more informative, you can attach the special :eldoc property,
       this function will be passed the link and the result will be shown in the
       echo area."
-          (when-let ((ctx (org-element-lineage (org-element-context) '(link) t)))
+          (when-let* ((ctx (org-element-lineage (org-element-context) '(link) t)))
             (let ((value (org-element-property :path ctx))
                   (type (org-element-property :type ctx)))
               (or
-               (when-let ((eldoc (org-link-get-parameter type :eldoc)))
+               (when-let* ((eldoc (org-link-get-parameter type :eldoc)))
                  (ignore-errors (funcall eldoc value)))
                value))))
 
@@ -23880,9 +23880,9 @@ Welcome to my personal Emacs configuration 😎.
                    "\\([ \t([/]\\|$\\)"))
 
          (defun cperl-eldoc+ (cb)
-           (when-let ((val (save-excursion
-                             ;; moves point for some reason..
-                             (cperl-word-at-point-hard))))
+           (when-let* ((val (save-excursion
+                              ;; moves point for some reason..
+                              (cperl-word-at-point-hard))))
              (let ((cperl-message-on-help-error nil)
                    (cperl-help-from-timer t)
                    (case-fold-search nil)
@@ -25058,10 +25058,10 @@ Welcome to my personal Emacs configuration 😎.
                "\n")))
 
      (defun create-skeletor-project (&optional project)
-       (if-let ((skeleton (if project
-                              (--first (equal project (SkeletorProjectType-title it))
-                                       skeletor--project-types)
-                            (skeletor--read-project-type))))
+       (if-let* ((skeleton (if project
+                               (--first (equal project (SkeletorProjectType-title it))
+                                        skeletor--project-types)
+                             (skeletor--read-project-type))))
            (skeletor-expand-project+ skeleton dest-dir)
          (error "Failed to find project type %s" project)))
 
@@ -25483,7 +25483,7 @@ Welcome to my personal Emacs configuration 😎.
 
        (defun +mode-line-update-remote-component (&rest _)
          "Update file remote component in the `mode-line'."
-         (when-let ((host (file-remote-p default-directory 'host)))
+         (when-let* ((host (file-remote-p default-directory 'host)))
            (save-match-data
              (seq-find
               (lambda (remap)
@@ -25867,9 +25867,9 @@ Welcome to my personal Emacs configuration 😎.
 
         (defun +mode-line--update-dape-text (&rest _)
           (setq +mode-line-dape-text
-                (when-let ((conn (or (dape--live-connection 'last t)
-                                     dape--connection))
-                           ((not (memq (dape--state conn) '(exited terminated)))))
+                (when-let* ((conn (or (dape--live-connection 'last t)
+                                      dape--connection))
+                            ((not (memq (dape--state conn) '(exited terminated)))))
                   (concat
                    (all-the-icons-pad+
                     (+icon nerd-fa "bug"
@@ -25879,13 +25879,13 @@ Welcome to my personal Emacs configuration 😎.
                               'font-lock-string-face)
                              ('running 'font-lock-keyword-face)
                              ('stopped nil))))
-                   (when-let ((conns (dape--live-connections))
-                              (nof-conns (length (cl-remove-if-not 'dape--threads conns)))
-                              ((> nof-conns 1)))
+                   (when-let* ((conns (dape--live-connections))
+                               (nof-conns (length (cl-remove-if-not 'dape--threads conns)))
+                               ((> nof-conns 1)))
                      (concat "+" (propertize (number-to-string nof-conns)
                                              'face 'shadow
                                              'help-echo "Active child connections")))
-                   (when-let ((reason (and conn (dape--state-reason conn))))
+                   (when-let* ((reason (and conn (dape--state-reason conn))))
                      (concat "/" (propertize reason 'face 'font-lock-doc-face)))))))
 
         (advice-add 'dape--mode-line-format :override #'+mode-line--update-dape-text)
