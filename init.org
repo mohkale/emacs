@@ -11296,23 +11296,19 @@ Welcome to my personal Emacs configuration 😎.
        :config
        (setf (alist-get 'json-mode apheleia-mode-alist) 'jq)
        (setf (alist-get 'js-json-mode apheleia-mode-alist) 'jq)
-       (setf (alist-get 'json-ts-mode apheleia-mode-alist) 'jq)
 
        (setf (alist-get 'cabal-fmt apheleia-formatters) '("cabal-fmt"))
        (setf (alist-get 'haskell-mode apheleia-mode-alist) 'cabal-fmt)
 
        (setf (alist-get 'dotnet apheleia-formatters) '("dotnet" "format"))
        (setf (alist-get 'csharp-mode apheleia-mode-alist) 'dotnet)
-       (setf (alist-get 'csharp-ts-mode apheleia-mode-alist) 'dotnet)
 
        (setf (alist-get 'python-mode apheleia-mode-alist) '(isort black))
-       (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(isort black))
 
        (setf (alist-get 'ruby-mode apheleia-mode-alist) 'rubocop)
        (setf (alist-get 'enh-ruby-mode apheleia-mode-alist) 'rubocop)
 
-       (setf (alist-get 'sh-mode apheleia-mode-alist)
-             (alist-get 'bash-ts-mode apheleia-mode-alist)))
+       (setf (alist-get 'sh-mode apheleia-mode-alist) 'shfmt))
    #+end_src
 
    #+begin_src emacs-lisp
@@ -13112,6 +13108,19 @@ Welcome to my personal Emacs configuration 😎.
                         +lsp-maybe-connect)))
 
         :hook (after-init . treesit-amend-lsp-maybe-connect+))
+    #+end_src
+
+    Re-use normal mode formatters with tree-sitter formatters.
+
+    #+begin_src emacs-lisp :tangle (package-yes! apheleia tree-sitter)
+      (use-package apheleia
+        :config
+        (cl-loop
+         for (mode . ts-mode) in +tree-sitter-mode-remap
+         with formatters = nil
+         when (and (setq formatters (alist-get mode apheleia-mode-alist))
+                   (not (assoc ts-mode apheleia-mode-alist)))
+           do (push (cons ts-mode formatters) apheleia-mode-alist)))
     #+end_src
 
 *** Combobulate                                                :wip:disabled:
