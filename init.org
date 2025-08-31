@@ -24,6 +24,7 @@ Welcome to my personal Emacs configuration 😎.
   + [ ] Look into [[https://github.com/svaante/lsp-snippet][lsp-snippet]].
   + [ ] Look into [[https://code.bsdgeek.org/adam/cape-jinx-completion][cape-jinx-completion]].
   + [ ] Look into [[https://codeberg.org/joostkremers/visual-fill-column][visual-fill-column]].
+  + [ ] Remove use-package installation with straight.
 
 * Pre-Initialisation
   This is a hacky indirection. It makes org mode evaluate these code blocks from
@@ -6000,6 +6001,15 @@ Welcome to my personal Emacs configuration 😎.
         "gyh" 'git-link-homepage))
    #+END_SRC
 
+   #+begin_src emacs-lisp :tangle (package-lisp! +pkg-gitlink magit)
+     (use-package git-link
+       :preface (use-package transient :autoload transient-suffix-put)
+       :after magit
+       :config
+       (transient-insert-suffix 'magit-dispatch '(0 2 6)
+         '(git-link-dispatch :key "o" :description "Git link")))
+   #+end_src
+
    #+begin_src emacs-lisp
       (provide '+pkg-gitlink)
    #+end_src
@@ -9931,7 +9941,7 @@ Welcome to my personal Emacs configuration 😎.
         :hook (vertico-mode . vertico-multiform-mode)
         :custom
         (vertico-multiform-categories
-         '((jinx grid (vertico-grid-annotate . 25)))
+         '((jinx grid (vertico-grid-annotate . 25) (vertico-count . 4)))
          "Adjust vertico display based on completion session."))
     #+end_src
 
@@ -10013,7 +10023,7 @@ Welcome to my personal Emacs configuration 😎.
                         (projectile-switch-project . project))
                       marginalia-command-categories))
         (push '(project marginalia-annotate-file builtin none)
-              marginalia-annotator-registry))
+              marginalia-annotators))
    #+END_SRC
 
    #+begin_src emacs-lisp
@@ -10395,27 +10405,6 @@ Welcome to my personal Emacs configuration 😎.
         (with-consult-ignore-project+ 'consult-grep)
         (with-consult-ignore-project+ 'consult-find)
 
-        :autoload consult--customize-put
-        :config
-        (consult-customize
-         consult-ripgrep
-         consult-ripgrep-no-project+
-         consult-grep-no-project+
-         xref-find-references
-         consult-recent-file
-         consult--source-recent-file
-         consult--source-project-file+
-         :preview-key consult-manual-preview-key+
-         consult-recent-file
-         :sort nil
-         ;; Async commands that produce a lot of output so it's useful for them to be async
-         ;; but once produced you won't be re-running the command again.
-         consult-find
-         consult-find-no-project+
-         :initial "/*/"
-         scratch-buffer+
-         :state #'consult--buffer-state)
-
         :config
         ;; Always follow symlinks with `consult-ripgrep'.
         (unless (string-match-p (rx bow "--follow" eow) consult-ripgrep-args)
@@ -10666,7 +10655,7 @@ Welcome to my personal Emacs configuration 😎.
       This forces consistency in narrowing keys across all languages.")
 
         :autoload consult-imenu-gen-types+
-        :init
+        :preface
         (defun consult-imenu-gen-types+ (&rest types)
           "Build a `consult-imenu' configuration for TYPES."
           (cl-loop for type in types
@@ -10875,7 +10864,7 @@ Welcome to my personal Emacs configuration 😎.
          +dot-goto-executable
          +dot-goto-fs-aliases
          +dot-open-bookmark
-         :initial "/*/")
+         :initial "*/")
 
         :preface
         (defvar embark-org-capture-completion-actions+ (make-sparse-keymap))
@@ -11273,6 +11262,38 @@ Welcome to my personal Emacs configuration 😎.
      #+BEGIN_SRC emacs-lisp
        (provide '+consult-custom)
      #+END_SRC
+
+*** Consult Extensions
+    Customizations are put at the end because otherwise =consult-customize= will
+    trigger compiler warnings.
+
+    #+begin_src emacs-lisp
+      (require '+setup-scratch)
+
+      (use-package consult
+        :straight t
+
+        :autoload consult--customize-put
+        :config
+        (consult-customize
+         consult-ripgrep
+         consult-ripgrep-no-project+
+         consult-grep-no-project+
+         xref-find-references
+         consult-recent-file
+         consult--source-recent-file
+         consult--source-project-file+
+         :preview-key consult-manual-preview-key+
+         consult-recent-file
+         :sort nil
+         ;; Async commands that produce a lot of output so it's useful for them to be async
+         ;; but once produced you won't be re-running the command again.
+         consult-find
+         consult-find-no-project+
+         :initial "*/"
+         scratch-buffer+
+         :state #'consult--buffer-state))
+    #+end_src
 
 *** Appendix
     #+begin_src emacs-lisp
@@ -13614,13 +13635,6 @@ Welcome to my personal Emacs configuration 😎.
    (provide '+pkg-miniedit)
    #+end_src
 
-** SQLite Builtin
-   #+begin_src emacs-lisp
-     (when (sqlite-available-p)
-       (use-package emacsql-sqlite-builtin
-         :straight t))
-   #+end_src
-
 ** Undo Tree                                                       :optional:
    :PROPERTIES:
    :header-args+: :tangle (package-lisp! +pkg-undo-tree undo-tree)
@@ -14325,6 +14339,7 @@ Welcome to my personal Emacs configuration 😎.
          "$" 'magit-process-buffer
          "!" 'magit-run
          "g" 'magit-dispatch
+         "t" 'magit-file-dispatch
          "s" 'magit-status
          "u" 'magit-unstage-file
          "b" 'magit-blame
@@ -14744,6 +14759,9 @@ Welcome to my personal Emacs configuration 😎.
                     forge-pullreq-list-mode-map)
          leader-key nil                                                               ; GIVE ME BACK MY LEADER!!!
          "<override-state>" 'all)
+        (:keymaps 'magit-refs-mode-map
+         "s" 'magit-branch-shelve
+         "u" 'magit-branch-unshelve)
         (:keymaps 'magit-gh-pulls-mode-map
          leader-key nil                                                               ; GIVE ME BACK MY LEADER!!!
          "<override-state>" 'motion)
@@ -17936,11 +17954,11 @@ Welcome to my personal Emacs configuration 😎.
         (dashboard-display-icons-p +icons-available)
         (dashboard-set-file-icons +icons-available)
         (dashboard-set-heading-icons +icons-available)
-        (dashboard-heading-icons '((recents   . "file")
-                                   (bookmarks . "bookmark")
-                                   (agenda    . "calendar")
-                                   (projects  . "briefcase")
-                                   (registers . "database")))
+        (dashboard-heading-icons `((recents   . ,(macroexpand '(+icon nerd-fa "file-text")))
+                                   (bookmarks . ,(macroexpand '(+icon nerd-oct "bookmark")))
+                                   (agenda    . ,(macroexpand '(+icon nerd-oct "calendar")))
+                                   (projects  . ,(macroexpand '(+icon nerd-oct "briefcase") ))
+                                   (registers . ,(macroexpand '(+icon nerd-oct "database")))))
 
         :config
         (advice-add 'dashboard-insert-startupify-lists :around #'all-the-icons-pad-families-on-tty-advice+)
@@ -19067,7 +19085,7 @@ Welcome to my personal Emacs configuration 😎.
 *** Dape
     #+begin_src emacs-lisp
       (use-package dape
-        :straight (dape :type git :host github :repo "svaante/dape")
+        :straight t
         :hide-whitespace+
         dape-repl-mode
         dape-info-parent-mode
@@ -21784,12 +21802,34 @@ Welcome to my personal Emacs configuration 😎.
      (require '+lang-lua)
    #+end_src
 
+   #+begin_src emacs-lisp
+     (defvar lua-syntax-table-modifications+
+       '((?_ . "w")))
+   #+end_src
+
 *** Lua Mode
-    #+begin_src emacs-lisp
+    #+begin_src emacs-lisp :tangle (package-lisp! +lang-lua lua tree-sitter)
+      (use-package lua-ts-mode
+        :indent+ (lua-ts-mode 2)
+        :hook (lua-ts-mode . +flylint)
+        :modify-syntax+ (lua-ts--syntax-table lua-syntax-table-modifications+)
+        :flymake-hook
+        (flymake-collection-lua
+         (lua-ts-flymake-luacheck :disabled t)))
+    #+end_src
+
+    #+begin_src emacs-lisp :tangle (package-lisp! +lang-lua lua (not tree-sitter))
       (use-package lua-mode
         :straight t
         :indent+ (lua-mode 2)
         :hook (lua-mode . +flylint)
+        :modify-syntax+ lua-syntax-table-modifications+
+
+        :autoload lua-flymake
+        :flymake-hook
+        (flymake-collection-lua
+         (lua-flymake :disabled t))
+
         :leader
         (:mode 'lua-mode
          "h" '(:ignore t :wk "help")
@@ -21808,20 +21848,14 @@ Welcome to my personal Emacs configuration 😎.
       (use-package company-lua
         :straight t
         :autoload company-lua
-        :completion+ (lua-mode (company-lua :company t)))
+        :completion+ (lua-mode (company-lua :company t))
+        :completion+ (lua-ts-mode (company-lua :company t)))
     #+end_src
 
 *** Lua Language Server                                                 :lsp:
     #+begin_src emacs-lisp
       (use-package lua-mode
         :hook (lua-mode . +lsp-hook))
-    #+end_src
-
-    #+begin_src emacs-lisp :tangle (package-lisp! +lang-lua lua eglot)
-      (use-package eglot
-        :config
-        (push '(lua-mode "lua-language-server")
-              eglot-server-programs))
     #+end_src
 
 *** Appendix
