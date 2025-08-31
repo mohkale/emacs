@@ -16647,6 +16647,16 @@ Welcome to my personal Emacs configuration 😎.
                 (kill-new path))
             (message "You're not currently in a project.")))
 
+        :commands project-run-compile-command+
+        :leader ("p@" 'project-run-compile-command+)
+        :config
+        (defun project-run-compile-command+ ()
+          (interactive)
+          (let* ((default-directory (project-current-root+))
+                 (compilation-read-command t)
+                 (compile-command nil))
+            (call-interactively #'compile)))
+
         :leader
         ("fp" 'project-switch-project)
 
