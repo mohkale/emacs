@@ -1151,6 +1151,9 @@ Welcome to my personal Emacs configuration 😎.
        (push "#" completion-ignored-extensions)
        (push ".override.yml" completion-ignored-extensions)
        (push ".override.yaml" completion-ignored-extensions)
+       ;; Bloomberg BDE UOR conventions use .mem file extensions
+       (setq completion-ignored-extensions
+             (delete ".mem" completion-ignored-extensions))
     #+end_src
 
     Set the string shown on the title bar of emacs frames.
