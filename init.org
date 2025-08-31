@@ -1142,18 +1142,28 @@ Welcome to my personal Emacs configuration 😎.
     c object files.
 
     #+begin_src emacs-lisp
-       (push "node_modules/" completion-ignored-extensions)
-       (push "__pycache__/" completion-ignored-extensions)
-       (push "CMakeCache.txt" completion-ignored-extensions)
-       (push "cmake_install.cmake" completion-ignored-extensions)
-       (push "CMakeFiles/" completion-ignored-extensions)
-       (push "eln-cache/" completion-ignored-extensions)
-       (push "#" completion-ignored-extensions)
-       (push ".override.yml" completion-ignored-extensions)
-       (push ".override.yaml" completion-ignored-extensions)
-       ;; Bloomberg BDE UOR conventions use .mem file extensions
-       (setq completion-ignored-extensions
-             (delete ".mem" completion-ignored-extensions))
+      (push "node_modules/" completion-ignored-extensions)
+      (push "__pycache__/" completion-ignored-extensions)
+      (push "CMakeFiles/" completion-ignored-extensions)
+      (push "eln-cache/" completion-ignored-extensions)
+      (push "__pycache__/" completion-ignored-extensions)
+      (push "node_modules/" completion-ignored-extensions)
+      (push ".pytest_cache/" completion-ignored-extensions)
+      (push ".mypy_cache/" completion-ignored-extensions)
+      (push ".tox/" completion-ignored-extensions)
+      (push ".gradle/" completion-ignored-extensions)
+      (push ".sass-cache/" completion-ignored-extensions)
+      (push ".jekyll-cache/" completion-ignored-extensions)
+      (push ".bundle/" completion-ignored-extensions)
+      (push ".clangd/" completion-ignored-extensions)
+
+      (push "#" completion-ignored-extensions)
+      (push ".override.yml" completion-ignored-extensions)
+      (push ".override.yaml" completion-ignored-extensions)
+
+      ;; Bloomberg BDE UOR conventions use .mem file extensions
+      (setq completion-ignored-extensions
+            (delete ".mem" completion-ignored-extensions))
     #+end_src
 
     Set the string shown on the title bar of emacs frames.
@@ -9600,29 +9610,25 @@ Welcome to my personal Emacs configuration 😎.
       (use-package dired-x
         :hook (dired-mode . dired-omit-mode)
         :custom
-        (dired-omit-files (rx (or ".#"
-                                  (and bol
-                                       (or "."
-                                           ".."
-                                           ".git"
-                                           ".github"
-                                           ".bundle"
-                                           ".clangd"
-                                           ".dired"
-                                           "__pycache__"
-                                           "node_modules"
-                                           ".pytest_cache"
-                                           ".mypy_cache"
-                                           ".tox"
-                                           ".gradle"
-                                           ".sass-cache"
-                                           ".jekyll-cache"
-                                           "Pipfile"
-                                           "CMakeFiles"
-                                           "CMakeCache"
-                                           "cmake_install.cmake"
-                                           (and "service.log." (one-or-more (any digit "_"))))
-                                       eol))))
+        (dired-omit-files
+         (rx (or ".#"
+                 (and bol
+                      (or "."
+                          ".."
+                          ".git"
+                          ".github"
+                          ".dired"
+                          "Pipfile"
+                          (and "service.log." (one-or-more (any digit "_")))
+                          ;; Dired will respect `completion-ignored-extensions' for files, but not directories.
+                          ;; We setup a directory match as part of `dired-omit-files'.
+                          (eval
+                           `(or
+                             ,@(cl-loop
+                                for sequence in completion-ignored-extensions
+                                when (string-suffix-p "/" sequence)
+                                  collect (string-remove-suffix "/" sequence)))))
+                      eol))))
         :leader
         (:mode '(dired-mode wdired-mode)
          "." 'dired-omit-mode))
