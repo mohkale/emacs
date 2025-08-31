@@ -29,7 +29,7 @@
  ("company-shell" . "5f959a63a6e66eb0cbdac3168cad523a62cc2ccd")
  ("company-web" . "863fb84b81ed283474e50330cd8d27b1ca0d74f1")
  ("compat" . "cccd41f549fa88031a32deb26253b462021d7e12")
- ("compile-multi" . "19d16d8871b5f19f5625e1a66c1dc46a7c3f6a3a")
+ ("compile-multi" . "d111f99303ceb0354e37e2a5cd7f504d19f105f7")
  ("cond-let" . "06e31b2124b46fb0a6ae86d40c9397a558523ef2")
  ("consult" . "51c5d3dcaac644db9b196d29fc624023288b24c5")
  ("consult-eglot" . "d8b444aac39edfc6473ffbd228df3e9119451b51")
