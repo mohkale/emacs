@@ -8173,19 +8173,6 @@ Welcome to my personal Emacs configuration 😎.
         :preface (use-package ansi-color :autoload ansi-color-compilation-filter)
         :hook (compilation-filter . ansi-color-compilation-filter)
 
-        :config
-        ;; Setup a GNU matcher variant for ctest -V invocations.
-        (setf
-         (alist-get 'gnu+ctest compilation-error-regexp-alist-alist)
-         (let* ((gnu (alist-get 'gnu compilation-error-regexp-alist-alist))
-                (new-regex (seq-copy gnu)))
-           (setcar new-regex (concat (rx bol (? (+ digit) ": "))
-                                     (string-remove-prefix (rx bol) (car new-regex))))
-           new-regex))
-
-        (when-let* ((entry (member 'gnu compilation-error-regexp-alist)))
-          (setcar entry 'gnu+ctest))
-
         :autoload compile--double-prefix-means-run-comint+
         :init (advice-add #'compile :filter-args #'compile--double-prefix-means-run-comint+)
         :config
@@ -16684,7 +16671,8 @@ Welcome to my personal Emacs configuration 😎.
     #+begin_src emacs-lisp
       (use-package projection
         :straight t
-        :hook (after-init . global-projection-hook-mode)
+        :hook ((after-init . global-projection-hook-mode)
+               (compilation-mode . projection-customize-compilation-mode))
         :custom
         (projection-cmake-target-backend 'code-model)
         (projection-cmake-configure-options
@@ -16693,6 +16681,8 @@ Welcome to my personal Emacs configuration 😎.
            "-DCMAKE_CXX_FLAGS=-g2"
            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
            "-DCMAKE_COLOR_DIAGNOSTICS=ON"))
+        (compilation-buffer-name-function
+         #'projection-customize-compilation-buffer-name-function)
 
         :init
         (defvaralias 'projection-cmake-build-directory '+cmake-build-directory)
@@ -20649,29 +20639,6 @@ Welcome to my personal Emacs configuration 😎.
          "er" 'go-play-region
          "ed" 'go-download-play))
     #+END_SRC
-
-*** Go Compilation
-    #+begin_src emacs-lisp
-      (use-package compile
-        :config
-        ;; Adapted from [[https://github.com/nlamirault/gotest.el/blob/490189e68d743a851bfb42d0017428a7550e8615/gotest.el#L179][gotest.el]].
-        (setq compilation-error-regexp-alist-alist
-              (append
-               '((go-test-testing . ("^[[:space:]]+\\([[:alnum:]-_/.]+\\.go\\):\\([0-9]+\\): .*$" 1 2)) ;; stdlib package testing
-                 (go-test-testify . ("^[[:space:]]+Location:\t\\([[:alnum:]-_/.]+\\.go\\):\\([0-9]+\\)$" 1 2)) ;; testify package assert
-                 (go-test-gopanic . ("^[[:space:]]+\\([[:alnum:]-_/.]+\\.go\\):\\([0-9]+\\) \\+0x\\(?:[0-9a-f]+\\)" 1 2)) ;; panic()
-                 (go-test-compile . ("^\\([[:alnum:]-_/.]+\\.go\\):\\([0-9]+\\):\\(?:\\([0-9]+\\):\\)? .*$" 1 2 3)) ;; go compiler
-                 (go-test-linkage . ("^\\([[:alnum:]-_/.]+\\.go\\):\\([0-9]+\\): undefined: .*$" 1 2))) ;; go linker)
-               compilation-error-regexp-alist-alist)
-              compilation-error-regexp-alist
-              (append
-               '(go-test-testing
-                 go-test-testify
-                 go-test-gopanic
-                 go-test-compile
-                 go-test-linkage)
-               compilation-error-regexp-alist)))
-    #+end_src
 
 *** Go Guru
     :PROPERTIES:

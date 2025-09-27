@@ -155,7 +155,7 @@
  ("pkg-info" . "76ba7415480687d05a4353b27fea2ae02b8d9d61")
  ("popup-el" . "b189a4e8ccf18356395878c3d38a23df834d3898")
  ("prescient.el" . "87e2d2f2ddf24f591a5f70cc90d2afb4537caa18")
- ("projection" . "c26f4af61bc395db60ee9aeb69c3f03030b3bbbc")
+ ("projection" . "482789397c5e11dbb95438c87ccd0cad3d37a33a")
  ("pyimport" . "4398ce8dd64fa0f685f4bf8683a35087649346d3")
  ("queue" . "f986fb68e75bdae951efb9e11a3012ab6bd408ee")
  ("real-auto-save" . "481a2d1460ab5a9b6df3721dda76ad515923bfd1")
