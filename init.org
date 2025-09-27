@@ -14601,18 +14601,21 @@ Welcome to my personal Emacs configuration 😎.
         ;; Adjust popups
         :preface (use-package transient :autoload transient-suffix-put)
         :config
-        (transient-suffix-put 'magit-branch   "x" :key "X") ;; magit-branch-reset
-        (transient-suffix-put 'magit-branch   "k" :key "x") ;; magit-branch-delete
+        (transient-remove-suffix 'magit-dispatch "H")       ;; magit-describe-section
+        (transient-suffix-put 'magit-dispatch "V" :key "H") ;; magit-revert
+        (transient-suffix-put 'magit-revert   "V" :key "H") ;; magit-revert-and-commit
+        (transient-suffix-put 'magit-revert   "V" :key "H") ;; magit-sequencer-continue
+        (transient-suffix-put 'magit-revert   "v" :key "h") ;; magit-revert-no-commit
+
         (transient-suffix-put 'magit-dispatch "o" :key "'") ;; magit-submodule
         (transient-suffix-put 'magit-dispatch "O" :key "\"") ;; magit-subtree
-        (transient-suffix-put 'magit-dispatch "V" :key "_") ;; magit-revert
         (transient-suffix-put 'magit-dispatch "X" :key "O") ;; magit-reset
-        (transient-suffix-put 'magit-dispatch "v" :key "-") ;; magit-reverse
+
+        (transient-suffix-put 'magit-branch   "x" :key "X") ;; magit-branch-reset
+        (transient-suffix-put 'magit-branch   "k" :key "x") ;; magit-branch-delete
+        (transient-suffix-put 'magit-dispatch "v" :key "X") ;; magit-reverse
         (transient-suffix-put 'magit-dispatch "k" :key "x") ;; magit-discard
         (transient-suffix-put 'magit-remote   "k" :key "x") ;; magit-remote-remove
-        (transient-suffix-put 'magit-revert   "v" :key "+") ;; magit-revert-no-commit
-        (transient-suffix-put 'magit-revert   "V" :key "_") ;; magit-revert-and-commit
-        (transient-suffix-put 'magit-revert   "V" :key "_") ;; magit-sequencer-continue
         (transient-suffix-put 'magit-tag      "k" :key "x") ;; magit-tag-delete
 
         :general
@@ -14651,7 +14654,7 @@ Welcome to my personal Emacs configuration 😎.
          "x"     'magit-delete-thing
          "X"     'magit-file-untrack
          "-"     'magit-revert-no-commit
-         "_"     'magit-revert
+         "H"     'magit-revert
          "p"     'magit-push
          "o"     'magit-reset-quickly
          "O"     'magit-reset
