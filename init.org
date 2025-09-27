@@ -14268,6 +14268,12 @@ Welcome to my personal Emacs configuration 😎.
        (transient-values-file  (etc! "transient/values.el"))
        (transient-levels-file  (etc! "transient/levels.el"))
 
+       :config
+       (push `(,(regexp-quote transient--buffer-name)
+               ,@transient-display-buffer-action
+               (body-function . nil))
+             display-buffer-alist)
+
        :general
        ;; Escape means quit too
        (:keymaps 'transient-base-map
