@@ -20457,12 +20457,21 @@ Welcome to my personal Emacs configuration 😎.
       (setq lisp-indent-function #'+emacs-lisp-indent-function)
     #+END_SRC
 
-*** Buttercup                                                      :disabled:
+*** Buttercup
     A unit testing framework for Emacs lisp packages.
 
-    #+begin_src emacs-lisp :tangle no
+    #+begin_src emacs-lisp
       (use-package buttercup
-        :straight t)
+        :straight t
+        :hook (emacs-lisp-mode . elisp-enable-buttercup+)
+        :preface
+        (defun elisp-enable-buttercup+ ()
+          (when-let*
+              ((file-name (buffer-file-name))
+               (is-test-file (string-match-p
+                              (rx bol "test-")
+                              (file-name-base (buffer-file-name)))))
+            (buttercup-minor-mode +1))))
     #+end_src
 
 *** Paredit
