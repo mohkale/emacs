@@ -20357,6 +20357,11 @@ Welcome to my personal Emacs configuration 😎.
             (kill-sexp -1)
             (insert (format (if prefix "%s" "%S") value))))
 
+        :hook (emacs-lisp-mode . elisp-set-fill-column+)
+        :preface
+        (defun elisp-set-fill-column+ ()
+          (setq fill-column 80))
+
         :preface
         (defvar elisp-adjust-flymake-load-path+ t
           "Duplicate `load-path' for flymake in elisp-mode.")
