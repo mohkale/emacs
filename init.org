@@ -16666,6 +16666,7 @@ Welcome to my personal Emacs configuration 😎.
          "b" 'project-switch-to-buffer
          "h" 'project-dired                                                           ; Dired in project home directory
          "f" 'project-find-file
+         "F" 'project-or-external-find-file
          "c" 'project-compile
          "x" 'project-kill-buffers
          "SPC" 'project-execute-extended-command                                      ; Run M-x in the root of the current project
@@ -16674,6 +16675,52 @@ Welcome to my personal Emacs configuration 😎.
          ;; "sg" 'project-find-regexp
          "sq" 'project-query-replace-regexp))
     #+END_SRC
+
+*** Project External Roots
+    Setup a hook list for functions used to discover external project roots.
+
+    #+begin_src emacs-lisp
+      (use-package project
+        :preface
+        (defvar +project-external-roots-hook nil
+          "Hook function used to enumerate paths for `project-vc-external-roots-function'.
+      The function should return either a list or ")
+
+        :config (setq project-vc-external-roots-function #'project-external-roots+)
+        :autoload project-external-roots+
+        :config
+        (defun project-external-roots+ ()
+          "Determine external roots through `+project-external-roots-hook'."
+          (thread-last
+            +project-external-roots-hook
+            (mapcar #'funcall)
+            (mapcar #'ensure-list)
+            (apply #'append))))
+    #+end_src
+
+**** Project External Git Worktrees
+
+     #+begin_src emacs-lisp
+       (use-package project
+         :preface
+         (use-package vc-git
+           :autoload vc-git-command)
+
+         :hook (+project-external-roots . project-external-roots-from-git-submodules+)
+         :autoload project-external-roots-from-git-submodules+
+         :config
+         (defun project-external-roots-from-git-submodules+ ()
+           (when-let* ((project (project-current))
+                       (backend-is-git (eq 'Git (cadr project))))
+             (cl-loop
+              for line in
+              (split-string
+               (with-output-to-string
+                 (vc-git-command standard-output 0 nil "worktree" "list"))
+               "\n" t)
+              collect
+              (replace-regexp-in-string (rx bol (group (+ (not space))) (+ any) eol) "\\1" line)))))
+     #+end_src
 
 *** Projection
     #+begin_src emacs-lisp
