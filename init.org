@@ -972,6 +972,7 @@ Welcome to my personal Emacs configuration 😎.
                                          (eglot :type built-in)
                                          (flymake :type built-in) ;; Ignore stale [[https://github.com/flymake/emacs-flymake][flymake/emacs-flymake]] repo.
                                          (hide-comnt :host github :repo "emacsmirror/hide-comnt")
+                                         (magit-todos :fork (:host github :repo "mohkale/magit-todos") :branch "use-font-lock-face-alongside-face")
                                          (miniedit :host github :repo "emacsorphanage/miniedit")
                                          (transpose-frame :host github :repo "emacsorphanage/transpose-frame")
                                          )))
@@ -3996,7 +3997,9 @@ Welcome to my personal Emacs configuration 😎.
         :custom
         (completion-styles '(orderless basic))
         (completion-category-overrides
-         '((file (styles basic-remote+ orderless partial-completion))))
+         '((file (styles orderless partial-completion))))
+        (completion-pcm-leading-wildcard t
+         "In Emacs 31 partial-completion will behave like substring")
         (orderless-affix-dispatch-alist nil)
 
         :preface
@@ -9902,27 +9905,6 @@ Welcome to my personal Emacs configuration 😎.
          "C-c C-p" 'vertico-previous-group
          "<S-return>" 'vertico-exit-input
          [remap minibuffer-forward-char-or-exit+] #'vertico-forward-char-or-exit+))
-    #+end_src
-
-    Configure a completion style which explicitly falls back to basic for remote files
-    and retains any other completion styles for other types of find-file prompts. This
-    was lifted from the [[https://github.com/minad/vertico/tree/a2e9b1b9b04c78e15cc2272a122e7005947d7308#tramp-hostname-completion][vertico]] completion guide.
-
-    #+begin_src emacs-lisp
-      (use-package vertico
-        :autoload vertico--remote-p
-        :preface
-        (defun basic-remote-try-completion+ (string table pred point)
-          (and (vertico--remote-p string)
-               (completion-basic-try-completion string table pred point)))
-
-        (defun basic-remote-all-completions+ (string table pred point)
-          (and (vertico--remote-p string)
-               (completion-basic-all-completions string table pred point)))
-
-        (add-to-list
-         'completion-styles-alist
-         '(basic-remote+ basic-remote-try-completion+ basic-remote-all-completions+ nil)))
     #+end_src
 
 *** Vertico Grid
@@ -17522,14 +17504,14 @@ Welcome to my personal Emacs configuration 😎.
        :config
        (global-orglink-mode +1)
 
-       :autoload turn-on-orglink-mode-if-desired
+       :autoload orglink-mode--turn-on
        :config
        ;; Enable in all the existing buffers it should be enabled in.
        (dolist (buf (buffer-list))
          (with-current-buffer buf
            (when (and (not (bound-and-true-p orglink--mode))
                       (not (derived-mode-p 'org-mode)))
-             (turn-on-orglink-mode-if-desired)))))
+             (orglink-mode--turn-on)))))
    #+END_SRC
 
    #+begin_src emacs-lisp
