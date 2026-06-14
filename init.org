@@ -25,6 +25,9 @@ Welcome to my personal Emacs configuration 😎.
   + [ ] Look into [[https://code.bsdgeek.org/adam/cape-jinx-completion][cape-jinx-completion]].
   + [ ] Look into [[https://codeberg.org/joostkremers/visual-fill-column][visual-fill-column]].
   + [ ] Remove use-package installation with straight.
+  + [ ] Investigate [[https://github.com/benotn/kkp][KKP]] integration for Emacs
+  + [ ] Check all-the-icons-nerd-fonts advice integration
+  + [ ] Add gradle and maven tests to projection.
 
 * Pre-Initialisation
   This is a hacky indirection. It makes org mode evaluate these code blocks from
@@ -972,7 +975,6 @@ Welcome to my personal Emacs configuration 😎.
                                          (eglot :type built-in)
                                          (flymake :type built-in) ;; Ignore stale [[https://github.com/flymake/emacs-flymake][flymake/emacs-flymake]] repo.
                                          (hide-comnt :host github :repo "emacsmirror/hide-comnt")
-                                         (magit-todos :fork (:host github :repo "mohkale/magit-todos") :branch "use-font-lock-face-alongside-face")
                                          (miniedit :host github :repo "emacsorphanage/miniedit")
                                          (transpose-frame :host github :repo "emacsorphanage/transpose-frame")
                                          )))
@@ -4746,27 +4748,24 @@ Welcome to my personal Emacs configuration 😎.
         (evil-emacs-state-cursor    'box)  ; █
         (evil-operator-state-cursor 'hbar) ; _
 
-        :hook (tty-setup . evil-terminal-cursor-changer-activate+)
-        :autoload (evil-terminal-cursor-changer-activate+
-                   etcc--evil-set-cursor
-                   etcc--evil-set-cursor-color)
-        :config
-        (advice-add 'etcc--evil-set-cursor :filter-args #'ignore)
-        (advice-add 'etcc--evil-set-cursor-color :filter-args
-                    (lambda (color &rest _)
-                      (list color)))
+        :hook (tty-setup . evil-terminal-cursor-changer-activate)
+        :autoload (evil-terminal-cursor-changer-activate)
 
-        ;; Latest version of cursor changer no longer depends on evil, but
-        ;; this change means it cannot process evil-operator-state-cursor
-        ;; so I've reverted to the prior implementation.
-        (defun evil-terminal-cursor-changer-activate+ ()
-          (when etcc-use-blink
-            (add-hook 'blink-cursor-mode-hook #'etcc--evil-set-cursor))
-          (advice-add 'evil-set-cursor :after #'etcc--evil-set-cursor)
-          (advice-add 'evil-set-cursor-color :after #'etcc--evil-set-cursor-color))
-
+        ;; Evil terminal cursor doesn't integrate into operator mode so we force integration here.
+        :autoload etcc--set-cursor
         :config
-        (advice-add 'etcc--make-tmux-seq :override #'identity))
+        (advice-add 'etcc--set-cursor :filter-args #'ignore)
+
+        (defun evil-terminal-cursor-operator-mode-advice+ (&rest _)
+          (etcc--set-cursor))
+
+        (advice-add #'evil-terminal-cursor-changer-activate :after
+                    (defun evil-terminal-cursor-enable-operator-mode-cursor+ ()
+                      (advice-add 'evil-set-cursor :after #'evil-terminal-cursor-operator-mode-advice+)))
+
+        (advice-add #'evil-terminal-cursor-changer-deactivate :after
+                    (defun evil-terminal-cursor-disable-operator-mode-cursor+ ()
+                      (advice-remove 'evil-set-cursor #'evil-terminal-cursor-operator-mode-advice+))))
     #+end_src
 
 *** Evil Numbers
@@ -5519,6 +5518,7 @@ Welcome to my personal Emacs configuration 😎.
          (if (stringp +icons-prefer-nerd-font)
              +icons-prefer-nerd-font
            "Symbols Nerd Font"))
+        (all-the-icons-nerd-fonts-advise-all-the-icons-functions nil)
 
         :config
         (setf (alist-get 'notmuch-show-mode all-the-icons-mode-icon-alist)
@@ -9872,6 +9872,11 @@ Welcome to my personal Emacs configuration 😎.
                                           (apply actual-vertico-format-candidate
                                                  (funcall hl-func cand) args)))))
                           (apply func args)))))
+        :preface
+        (add-hook 'after-init-hook
+                  (defun after-init-cycle-vertico-integration+ ()
+                    (advice-remove #'vertico--arrange-candidates #'vertico-format-candidates+)
+                    (advice-add #'vertico--arrange-candidates :around #'vertico-format-candidates+)))
 
         :preface (use-package +pkg-minibuffer :autoload +completion-category-sort-func)
         :config
@@ -10309,7 +10314,6 @@ Welcome to my personal Emacs configuration 😎.
         :straight t
         :autoload (consult--read
                    consult--lookup-cdr)
-        :hook (completion-list-mode . consult-preview-at-point-mode)
         :custom
         (consult-async-min-input 2)
         (consult-async-split-style 'slash)
@@ -10473,23 +10477,23 @@ Welcome to my personal Emacs configuration 😎.
 *** Consult Buffer
     #+begin_src emacs-lisp
       (use-package consult
-        :autoload (consult--source-project-buffer
-                   consult--source-project-recent-file)
+        :autoload (consult-source-project-buffer
+                   consult-source-project-recent-file)
         :config
         (setq consult-project-buffer-sources
               `((:hidden nil
                  :narrow (?b . "Buffer")
-                 ,@consult--source-project-buffer)
+                 ,@consult-source-project-buffer)
                 (:hidden t                                        ; Should be shown by project-file.
                  :narrow ?r
                  :narrow (?r . "Recent File")
                  :name "Project Recent File"
-                 ,@consult--source-project-recent-file)))
+                 ,@consult-source-project-recent-file)))
 
         :autoload (consult--buffer-state
                    consult--buffer-query)
         :preface
-        (defvar consult--source-dired+
+        (defvar consult-source-dired+
           `(:name     "Dired"
             :narrow   ?d
             :hidden   t
@@ -10503,10 +10507,10 @@ Welcome to my personal Emacs configuration 😎.
                                       :as #'buffer-name)))
           "Dired buffer candidate source for `consult-buffer'.")
         :config
-        (push 'consult--source-dired+ consult-buffer-sources)
+        (push 'consult-source-dired+ consult-buffer-sources)
 
         :preface
-        (defvar consult--source-remote+
+        (defvar consult-source-remote+
           `(:name     "Remote"
             :narrow   ?t
             :hidden   t
@@ -10524,13 +10528,13 @@ Welcome to my personal Emacs configuration 😎.
                                                           default-directory)))))))
           "Remote buffer candidate source for `consult-buffer'.")
         :config
-        (push 'consult--source-remote+ consult-buffer-sources)
+        (push 'consult-source-remote+ consult-buffer-sources)
 
         :autoload (consult--file-state
                    consult--file-action)
         :preface
         ;; Make `consult-project-buffer' more like [[https://github.com/Qkessler/consult-project-extra][consult-project-extra]].
-        (defvar consult--source-project-file+
+        (defvar consult-source-project-file+
           `(:name     "Project File"
             :narrow   (?f . "File")
             :category project-file
@@ -10547,8 +10551,8 @@ Welcome to my personal Emacs configuration 😎.
         :autoload consult--hide-prefix+
         :preface (use-package project :autoload (project-root project-files))
         :config
-        (plist-put consult--source-project-file+ :new
-                   (plist-get consult--source-project-recent-file :new))
+        (plist-put consult-source-project-file+ :new
+                   (plist-get consult-source-project-recent-file :new))
 
         (defun consult--hide-prefix+ (file-paths prefix)
           "Strip PREFIX from FILE-PATHS."
@@ -10558,10 +10562,10 @@ Welcome to my personal Emacs configuration 😎.
                         (concat inv-root relative-file-name)))
                     file-paths)))
 
-        (add-to-list 'consult-project-buffer-sources 'consult--source-project-file+ 'append)
+        (add-to-list 'consult-project-buffer-sources 'consult-source-project-file+ 'append)
 
         :preface
-        (defvar consult--source-known-projects+
+        (defvar consult-source-known-projects+
           `(:name     "Known Project"
             :narrow   (?p . "Project")
             :category project
@@ -10571,7 +10575,7 @@ Welcome to my personal Emacs configuration 😎.
             :items    ,#'project-known-project-roots))
 
         :config
-        (add-to-list 'consult-project-buffer-sources 'consult--source-known-projects+ 'append))
+        (add-to-list 'consult-project-buffer-sources 'consult-source-known-projects+ 'append))
     #+end_src
 
 *** Consult Evil
@@ -11264,8 +11268,8 @@ Welcome to my personal Emacs configuration 😎.
          consult-grep-no-project+
          xref-find-references
          consult-recent-file
-         consult--source-recent-file
-         consult--source-project-file+
+         consult-source-recent-file
+         consult-source-project-file+
          :preview-key consult-manual-preview-key+
          consult-recent-file
          :sort nil
@@ -14368,15 +14372,16 @@ Welcome to my personal Emacs configuration 😎.
          "r"  'magit-pop-revision-stack
          "a"  'git-commit-insert-pseudo-header
 
-         "i"  '(:ignore t :wk "insert")
-         "ia" 'git-commit-ack ;; acknowledgement
-         "iS" 'git-commit-suggested
-         "im" 'git-commit-modified
-         "ic" 'git-commit-cc
-         "ir" 'git-commit-reported
-         "iR" 'git-commit-review
-         "is" 'git-commit-signoff
-         "it" 'git-commit-test)
+         "i" 'git-commit-insert-trailer
+         "I"  '(:ignore t :wk "insert")
+         "Ia" 'git-commit-ack ;; acknowledgement
+         "IS" 'git-commit-suggested
+         "Im" 'git-commit-modified
+         "Ic" 'git-commit-cc
+         "Ir" 'git-commit-reported
+         "IR" 'git-commit-review
+         "Is" 'git-commit-signoff
+         "It" 'git-commit-test)
 
         :preface
         (defvar magit-blob-mode-map (make-sparse-keymap))                            ; Suppress creation.
@@ -16815,7 +16820,7 @@ Welcome to my personal Emacs configuration 😎.
 
       (use-package consult
         :preface
-        (defvar consult--source-projection-test-files+
+        (defvar consult-source-projection-test-files+
           `(:name     "Test files"
             :narrow   (?t . "Tests")
             :hidden   t
@@ -16833,7 +16838,7 @@ Welcome to my personal Emacs configuration 😎.
                   (project-root project))))))
 
         :config
-        (add-to-list 'consult-project-buffer-sources 'consult--source-projection-test-files+ 'append))
+        (add-to-list 'consult-project-buffer-sources 'consult-source-projection-test-files+ 'append))
     #+end_src
 
 *** Projection Multi
@@ -18040,7 +18045,6 @@ Welcome to my personal Emacs configuration 😎.
         (defvar dashboard-prefer-text-banners+ t
           "When true we use text banners even on GUI frames.")
 
-        :autoload dashboard-random-banner+
         :config
         (setq dashboard-startup-banner
               (if (and (not dashboard-prefer-text-banners+)
@@ -24463,20 +24467,6 @@ Welcome to my personal Emacs configuration 😎.
          "i'" 'ruby-tools-to-single-quote-string))
     #+END_SRC
 
-*** Bundler
-    #+BEGIN_SRC emacs-lisp
-      (use-package bundler
-        :straight t
-        :leader
-        (:mode 'ruby-mode
-         "b"  '(:ignore t :wk "bundler")
-         "rb" 'bundle-console
-         "bf" 'bundle-open
-         "bi" 'bundle-install
-         "bu" 'bundle-update
-         "bc" 'bundle-check))
-    #+END_SRC
-
 *** Ruby Electric
     #+begin_src emacs-lisp
       (use-package ruby-electric
@@ -26491,6 +26481,7 @@ Welcome to my personal Emacs configuration 😎.
        `(magit-reflog-commit ((,cls (:foreground ,green-int))))
        `(magit-reflog-checkout ((,cls (:foreground ,blue-int))))
        `(magit-reflog-cherry-pick ((,cls (:foreground ,green-int))))
+       `(git-commit-comment-button ((,cls (:inherit link))))
 
        `(magit-mode-line-process-error ((,cls (:inherit compilation-mode-line-fail))))
 
