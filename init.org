@@ -12342,13 +12342,15 @@ Welcome to my personal Emacs configuration 😎.
            (:name "Inbox" :query "tag:inbox" :key "i")
            (:name "Unread" :query "tag:unread" :key "u")
            (:name "Flagged" :query "tag:flagged" :key "f")
-           (:name "Sent" :query "tag:sent" :key "s")
+           (:name "Sent" :query "tag:sent" :key "S")
            (:name "Drafts" :query "tag:draft" :key "d")
            ;; Custom additions
            (:name "Promotions" :query "tag:promotion -tag:event" :key "p")
            (:name "Alerts" :query "tag:/^a\\//" :key "n")
            (:name "Mailing Lists" :query "( tag:/^l\\// or tag:/^s\\// ) and not:tag:promotion" :key "l")
-           (:name "Host Reports" :query "tag:/^h\\//" :key "h")))
+           (:name "Host Reports" :query "tag:/^h\\//" :key "h")
+           (:name "Scheduled" :query "tag:scheduled or tag:waiting" :key "s")
+           ))
 
         :autoload notmuch-company
         :completion+ (notmuch-message-mode (notmuch-company :company t))
@@ -12749,12 +12751,12 @@ Welcome to my personal Emacs configuration 😎.
                 (interactive)
                 ;; Removes spam tag because now status has moved from spam
                 ;; to pending deletion.
-                (notmuch-tag+ '("+deleted" "-spam" "-flagged" "-inbox" "-unread"))))
+                (notmuch-tag+ '("+deleted" "-spam" "-flagged" "-inbox" "-unread" "-waiting" "-scheduled"))))
 
             (define-key map "s"
               (defun notmuch-tag-set-spam+ ()
                 (interactive)
-                (notmuch-tag+ '("+spam" "-inbox" "-flagged" "-unread"))))
+                (notmuch-tag+ '("+spam" "-inbox" "-flagged" "-unread" "-waiting" "-scheduled"))))
 
             (define-key map "f"
               (defun notmuch-tag-set-flagged+ ()
@@ -12764,7 +12766,7 @@ Welcome to my personal Emacs configuration 😎.
             (define-key map "i"
               (defun notmuch-tag-remove-from-inbox+ (only)
                 (interactive "P")
-                (notmuch-tag+ `("-inbox" ,@(unless only (list "-unread" "-waiting" "-scheduled"))))))
+                (notmuch-tag+ `("-inbox" ,@(unless only (list "-unread"))))))
 
             (define-key map "r"
               (defun notmuch-tag-read+ ()
